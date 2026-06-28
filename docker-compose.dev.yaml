@@ -38,6 +38,7 @@ services:
       - "5173:5173"
     environment:
       API_PROXY_TARGET: http://api:8000
+      VITE_AUTH_DISABLED: "true"
     depends_on:
       - api
 

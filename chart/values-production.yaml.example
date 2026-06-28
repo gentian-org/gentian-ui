@@ -1,0 +1,39 @@
+# Production overrides — copy to gentian-deployments; never commit secrets.
+# See docs/SECURITY.md (M9, M27).
+
+kernelDomain: example.gentian.cloud
+
+auth:
+  disabled: false
+
+api:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  env:
+    ENVIRONMENT: production
+    BACKEND_CORS_ORIGINS: https://portal.example.gentian.cloud
+    # OIDC_*, DATABASE_URL, OPENFGA_* from existingSecret
+
+web:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  env:
+    # Build-time Vite args — set in CI image build, not at pod runtime
+    VITE_OIDC_ISSUER: https://auth.example.gentian.cloud/realms/kernel
+    VITE_OIDC_CLIENT_ID: gentian-portal
+    VITE_OIDC_REDIRECT_URI: https://portal.example.gentian.cloud/
+    VITE_AUTH_DISABLED: "false"
+
+openfga:
+  apiUrl: ""
+  storeId: ""

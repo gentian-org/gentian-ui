@@ -3,11 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import apps, health, prefs, session
 from app.core.config import get_settings
+from app.core.logging_middleware import RedactingAccessLogMiddleware
 
 settings = get_settings()
 
 app = FastAPI(title=settings.project_name, openapi_url=f"{settings.api_v1_str}/openapi.json")
 
+app.add_middleware(RedactingAccessLogMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,

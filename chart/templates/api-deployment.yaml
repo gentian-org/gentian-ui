@@ -29,11 +29,26 @@ spec:
               name: http
           securityContext:
             {{- include "gentian-portal.containerSecurityContext" . | nindent 12 }}
+            {{- with .Values.api.securityContext }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           env:
             - name: KERNEL_DOMAIN
               value: {{ .Values.kernelDomain | quote }}
             - name: AUTH_DISABLED
               value: {{ ternary "true" "false" .Values.auth.disabled | quote }}
+            {{- range $key, $value := .Values.api.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if .Values.openfga.apiUrl }}
+            - name: OPENFGA_API_URL
+              value: {{ .Values.openfga.apiUrl | quote }}
+            {{- end }}
+            {{- if .Values.openfga.storeId }}
+            - name: OPENFGA_STORE_ID
+              value: {{ .Values.openfga.storeId | quote }}
+            {{- end }}
           envFrom:
             - secretRef:
                 name: {{ .Values.existingSecret.name }}

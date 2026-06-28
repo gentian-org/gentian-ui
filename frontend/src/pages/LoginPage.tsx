@@ -1,12 +1,24 @@
+import { useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useAuth } from "@/auth/AuthProvider";
 import { defaultBasePath } from "@/lib/device";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const { login, authDisabled, isAuthenticated, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      void navigate({ to: defaultBasePath() });
+    }
+  }, [isAuthenticated, isLoading, navigate]);
 
   function signIn() {
-    // M2: Keycloak OIDC redirect. Dev bypass goes straight to shell.
-    void navigate({ to: defaultBasePath() });
+    if (authDisabled) {
+      void navigate({ to: defaultBasePath() });
+      return;
+    }
+    login(defaultBasePath());
   }
 
   return (

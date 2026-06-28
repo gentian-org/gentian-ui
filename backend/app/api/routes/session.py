@@ -12,4 +12,5 @@ def get_me(user: dict = Depends(get_current_user)) -> dict:
         "username": user.get("preferred_username") or user.get("sub"),
         "name": user.get("name"),
         "email": user.get("email"),
+        "tenant": user.get("tenant"),
     }

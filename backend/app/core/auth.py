@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import get_settings
+from app.core.tenant import resolve_user_context
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -39,11 +40,12 @@ async def get_current_user(
             "preferred_username": "dev-user",
             "name": "Dev User",
             "email": "dev@gentian.local",
+            "tenant": settings.kernel_domain,
         }
     if credentials is None or not credentials.credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     try:
-        return _decode_token(
+        claims = _decode_token(
             credentials.credentials,
             settings.oidc_issuer,
             settings.oidc_audience or settings.oidc_client_id,
@@ -52,3 +54,6 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
         ) from exc
+
+    claims["tenant"] = resolve_user_context(claims, settings)
+    return claims

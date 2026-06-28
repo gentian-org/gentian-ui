@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,10 +20,10 @@ class Settings(BaseSettings):
     oidc_client_secret: str | None = Field(default=None, alias="OIDC_CLIENT_SECRET")
     oidc_audience: str | None = Field(default=None, alias="OIDC_AUDIENCE")
 
-    auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
-
     openfga_api_url: str | None = Field(default=None, alias="OPENFGA_API_URL")
     openfga_store_id: str | None = Field(default=None, alias="OPENFGA_STORE_ID")
+
+    auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
 
     cors_origins: str = Field(default="http://localhost:5173", alias="BACKEND_CORS_ORIGINS")
 
@@ -32,6 +32,18 @@ class Settings(BaseSettings):
         if self.cors_origins.strip() == "*":
             return ["*"]
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.lower() in {"production", "prod", "staging"}
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        if self.is_production and self.cors_origins.strip() == "*":
+            raise ValueError("BACKEND_CORS_ORIGINS must not be '*' in production (M9)")
+        if self.is_production and self.auth_disabled:
+            raise ValueError("AUTH_DISABLED must be false in production (M2)")
+        return self
 
 
 @lru_cache

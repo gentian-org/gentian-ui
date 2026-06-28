@@ -28,6 +28,9 @@ spec:
               name: http
           securityContext:
             {{- include "gentian-portal.containerSecurityContext" . | nindent 12 }}
+            {{- with .Values.web.securityContext }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /

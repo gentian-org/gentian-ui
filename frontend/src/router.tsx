@@ -5,6 +5,7 @@ import {
   Outlet,
   redirect,
 } from "@tanstack/react-router";
+import { RequireAuth } from "@/auth/RequireAuth";
 import { DesktopPage } from "@/pages/DesktopPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { MobilePage } from "@/pages/MobilePage";
@@ -27,19 +28,33 @@ const loginRoute = createRoute({
   component: LoginPage,
 });
 
-const desktopRoute = createRoute({
+const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
+  id: "shell",
+  component: () => (
+    <RequireAuth>
+      <Outlet />
+    </RequireAuth>
+  ),
+});
+
+const desktopRoute = createRoute({
+  getParentRoute: () => shellRoute,
   path: "/desktop",
   component: DesktopPage,
 });
 
 const mobileRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => shellRoute,
   path: "/mobile",
   component: MobilePage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, loginRoute, desktopRoute, mobileRoute]);
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  loginRoute,
+  shellRoute.addChildren([desktopRoute, mobileRoute]),
+]);
 
 export const router = createRouter({ routeTree });
 
