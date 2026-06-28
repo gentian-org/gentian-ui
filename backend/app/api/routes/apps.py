@@ -7,10 +7,28 @@ router = APIRouter(prefix="/apps", tags=["apps"])
 
 @router.get("/")
 def list_apps(user: dict = Depends(get_current_user)) -> dict:
-    """Installed tenant apps for the shell launcher. K8s/AppProfile wiring comes in M2."""
+    """Installed tenant apps for the shell launcher. K8s/AppProfile wiring comes later."""
     _ = user
     return {
         "apps": [
+            {
+                "id": "mail",
+                "title": "Mail",
+                "icon": "mail",
+                "launchUrl": "https://example.com/mail",
+            },
+            {
+                "id": "chat",
+                "title": "Chat",
+                "icon": "chat",
+                "launchUrl": "https://example.com/chat",
+            },
+            {
+                "id": "files",
+                "title": "Files",
+                "icon": "files",
+                "launchUrl": "https://example.com/files",
+            },
             {
                 "id": "settings",
                 "title": "Settings",

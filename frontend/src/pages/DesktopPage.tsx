@@ -3,14 +3,16 @@ import { useMemo } from "react";
 import { apiFetch, type AppsResponse, type MeResponse, type PrefsResponse } from "@/api/client";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
-import { UserMenu } from "@/shell/UserMenu";
 import { SettingsPanel } from "@/settings/SettingsPanel";
 import { useAppsStore } from "@/stores/apps";
 import { useWindowsStore } from "@/stores/windows";
 import { WindowManager } from "@/windows/WindowManager";
 
 export function DesktopPage() {
-  const { data: me } = useQuery({ queryKey: ["me"], queryFn: () => apiFetch<MeResponse>("/session/me") });
+  const { data: me } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => apiFetch<MeResponse>("/session/me"),
+  });
   const { data: prefs } = useQuery({
     queryKey: ["prefs"],
     queryFn: () => apiFetch<PrefsResponse>("/prefs/"),
@@ -26,7 +28,6 @@ export function DesktopPage() {
   const openWindow = useWindowsStore((s) => s.openWindow);
 
   const settingsOpen = activeAppId === "settings";
-
   const launcherApps = useMemo(() => apps, [apps]);
 
   function handleSelect(app: (typeof apps)[number]) {
@@ -42,28 +43,24 @@ export function DesktopPage() {
       appId: app.id,
       title: app.title,
       url: app.launchUrl,
-      geometry: { x: 80, y: 80, w: 960, h: 640 },
     });
   }
 
   return (
-    <div className="gentian-shell relative min-h-full pt-16">
+    <div className="gentian-shell shell-surface relative min-h-full">
       <Background imageUrl={prefs?.backgroundUrl} />
-      {me && (
-        <UserMenu username={me.username} onLogout={() => (window.location.href = "/login")} />
-      )}
-      <AppMenu
-        mode="desktop"
-        apps={launcherApps}
-        activeAppId={activeAppId}
-        onSelect={handleSelect}
-      />
       {settingsOpen && (
-        <div className="relative z-20 flex min-h-[calc(100vh-4rem)] items-center justify-center p-6">
+        <div className="relative z-20 flex min-h-[calc(100vh-var(--app-menu-height))] items-center justify-center p-6">
           <SettingsPanel />
         </div>
       )}
       <WindowManager />
+      <AppMenu
+        apps={launcherApps}
+        activeAppId={activeAppId}
+        username={me?.username}
+        onSelect={handleSelect}
+      />
     </div>
   );
 }

@@ -21,12 +21,15 @@ Local dev uses `AUTH_DISABLED=true` and `VITE_AUTH_DISABLED=true` (see
 
 ```
 backend/          shell-api (FastAPI) — same modules as gentian-app-template
-frontend/         React SPA (Vite + TanStack Router + Query + Zustand)
-  src/auth/       OIDC stubs (AuthProvider, RequireAuth, bearer client)
+frontend/
+  design-system/  Brand tokens (gentian-theme.css)
+  public/fonts/   Self-hosted webfonts
+  public/tiles/   App launcher icons
+  public/branding/ Logo
+  src/auth/       OIDC stubs
+  src/shell/      App menu, background, launcher
 chart/            Kernel Helm chart (portal.<domain>)
-design-system/    → legacy/design-system (tokens, tiles, UI kits)
-docs/             AGENTS.md, SECURITY.md, FRONTEND-STACK.md, ARCHITECTURE.md
-legacy/           Archived Vue/Nubus codebase (reference only)
+legacy/           Archived reference only — never imported at runtime
 ```
 
 ## Related

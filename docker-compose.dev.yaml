@@ -8,7 +8,7 @@ services:
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U shell"]
+      test: ["CMD-SHELL", "pg_isready -U shell -d gentian_shell"]
       interval: 5s
       timeout: 5s
       retries: 5

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/auth/AuthProvider";
 import { defaultBasePath } from "@/lib/device";
@@ -6,6 +6,8 @@ import { defaultBasePath } from "@/lib/device";
 export function LoginPage() {
   const navigate = useNavigate();
   const { login, authDisabled, isAuthenticated, isLoading } = useAuth();
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -14,30 +16,50 @@ export function LoginPage() {
   }, [isAuthenticated, isLoading, navigate]);
 
   function signIn() {
+    setErrorMessage("");
     if (authDisabled) {
+      setIsRedirecting(true);
       void navigate({ to: defaultBasePath() });
       return;
     }
-    login(defaultBasePath());
+    try {
+      setIsRedirecting(true);
+      login(defaultBasePath());
+    } catch {
+      setIsRedirecting(false);
+      setErrorMessage("Could not initiate sign-in. Please try again.");
+    }
   }
 
   return (
-    <div className="gentian-shell flex min-h-full items-center justify-center p-6">
-      <div className="w-full max-w-md rounded-[var(--gtn-r2)] border border-[var(--gtn-border)] bg-[var(--gtn-paper-3)] p-8 text-center shadow-[var(--gtn-shadow-3)]">
-        <p className="text-sm font-medium uppercase tracking-wide text-[var(--gtn-500)]">
-          Gentian
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold">Sign in</h1>
-        <p className="mt-2 text-sm text-[var(--gtn-ink-1)]/70">
-          Sign in to your workspace
-        </p>
+    <div className="gentian-login">
+      <div className="gentian-login__card" role="main">
+        <img
+          className="gentian-login__logo"
+          src="/branding/logo.png"
+          alt=""
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = "none";
+          }}
+        />
+        <h1 className="gentian-login__title">gentian</h1>
+        <p className="gentian-login__subtitle">Sign in to your workspace</p>
+
         <button
           type="button"
+          className="gentian-login__btn"
+          disabled={isRedirecting}
           onClick={signIn}
-          className="mt-8 w-full rounded-[var(--gtn-r2)] bg-[var(--gtn-500)] px-4 py-3 text-white hover:bg-[var(--gtn-600)]"
         >
-          Continue
+          {isRedirecting && <span className="gentian-login__spinner" aria-hidden="true" />}
+          {isRedirecting ? "Signing in…" : "Sign in"}
         </button>
+
+        {errorMessage && (
+          <p className="gentian-login__error" role="alert">
+            {errorMessage}
+          </p>
+        )}
       </div>
     </div>
   );

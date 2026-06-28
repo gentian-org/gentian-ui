@@ -1,5 +1,6 @@
 @import "tailwindcss";
-@import "./styles/gentian.css";
+@import "../design-system/gentian-theme.css";
+@import "./styles/shell.css";
 
 html,
 body,
@@ -9,7 +10,8 @@ body,
 
 body {
   margin: 0;
-  font-family: "Hanken Grotesk", system-ui, sans-serif;
+  font-family: var(--gtn-font-sans, "Hanken Grotesk", system-ui, sans-serif);
   background: var(--gtn-paper-0, #f4f1ea);
   color: var(--gtn-ink-1, #14152e);
+  -webkit-font-smoothing: antialiased;
 }

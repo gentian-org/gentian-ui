@@ -19,8 +19,10 @@ shell** instance; see template `docs/AGENTS.md` for catalogue-app specifics
 | `backend/app/api/routes/` | HTTP routers (`session`, `apps`, `prefs`) |
 | `frontend/src/auth/` | OIDC provider, RequireAuth, token helpers |
 | `frontend/src/pages/` | Login, Desktop, Mobile |
-| `frontend/src/shell/` | App menu, background, user menu |
-| `frontend/src/windows/` | Window manager |
+| `frontend/design-system/` | Brand tokens (`gentian-theme.css`) — vendored, not legacy |
+| `frontend/public/fonts/` | Self-hosted Hanken Grotesk + Commit Mono |
+| `frontend/public/tiles/` | App launcher tile SVGs |
+| `frontend/src/shell/` | App menu, background, launcher |
 | `frontend/src/stores/` | Zustand client state |
 | `frontend/src/api/client.ts` | Typed fetch + Bearer token |
 | `frontend/src/router.tsx` | TanStack Router |

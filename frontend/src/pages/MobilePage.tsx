@@ -4,11 +4,13 @@ import { apiFetch, type AppsResponse, type MeResponse, type PrefsResponse } from
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { MobileAppLayer } from "@/shell/MobileAppLayer";
-import { UserMenu } from "@/shell/UserMenu";
 import { SettingsPanel } from "@/settings/SettingsPanel";
 
 export function MobilePage() {
-  const { data: me } = useQuery({ queryKey: ["me"], queryFn: () => apiFetch<MeResponse>("/session/me") });
+  const { data: me } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => apiFetch<MeResponse>("/session/me"),
+  });
   const { data: prefs } = useQuery({
     queryKey: ["prefs"],
     queryFn: () => apiFetch<PrefsResponse>("/prefs/"),
@@ -33,25 +35,27 @@ export function MobilePage() {
   const showSettings = activeAppId === "settings";
 
   return (
-    <div className="gentian-shell relative min-h-full pb-24">
+    <div className="gentian-shell shell-surface relative min-h-full">
       <Background imageUrl={prefs?.backgroundUrl} />
-      {me && (
-        <UserMenu username={me.username} onLogout={() => (window.location.href = "/login")} />
-      )}
       {!activeAppId && (
-        <div className="flex min-h-full items-center justify-center p-8 text-center text-white/90">
-          <p>Tap an app below to get started</p>
+        <div className="gentian-mobile__welcome" aria-live="polite">
+          <p className="gentian-mobile__welcome-text">Tap an app below to get started</p>
         </div>
       )}
       {showSettings && (
-        <div className="relative z-20 p-4 pt-16">
+        <div className="relative z-20 p-4 pt-8">
           <SettingsPanel />
         </div>
       )}
       {!showSettings && activeApp?.launchUrl && (
         <MobileAppLayer url={activeApp.launchUrl} title={activeApp.title} />
       )}
-      <AppMenu mode="mobile" apps={apps} activeAppId={activeAppId} onSelect={handleSelect} />
+      <AppMenu
+        apps={apps}
+        activeAppId={activeAppId}
+        username={me?.username}
+        onSelect={handleSelect}
+      />
     </div>
   );
 }
