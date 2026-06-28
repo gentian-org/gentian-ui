@@ -31,7 +31,7 @@ web:
     # Build-time Vite args — set in CI image build, not at pod runtime
     VITE_OIDC_ISSUER: https://auth.example.gentian.cloud/realms/kernel
     VITE_OIDC_CLIENT_ID: gentian-portal
-    VITE_OIDC_REDIRECT_URI: https://portal.example.gentian.cloud/
+    VITE_OIDC_REDIRECT_URI: https://portal.example.gentian.cloud/login
     VITE_AUTH_DISABLED: "false"
 
 openfga:

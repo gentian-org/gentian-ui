@@ -23,7 +23,7 @@ spec:
       containers:
         - name: api
           image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ .Values.api.image.pullPolicy | default "IfNotPresent" }}
           ports:
             - containerPort: 8000
               name: http

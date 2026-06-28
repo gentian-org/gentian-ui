@@ -1,0 +1,68 @@
+name: gentian-portal
+
+on:
+  push:
+    branches:
+      - develop
+      - feat/new-ui
+      - feat/new-security
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - "chart/**"
+      - ".github/workflows/gentian-portal.yaml"
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  WEB_IMAGE: ghcr.io/gentian-org/gentian-portal-web
+  API_IMAGE: ghcr.io/gentian-org/gentian-portal-api
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image tag
+        id: meta
+        run: |
+          short="${GITHUB_SHA::7}"
+          branch="${GITHUB_REF_NAME//\//-}"
+          echo "tag=${branch}" >> "$GITHUB_OUTPUT"
+          echo "short=${short}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push web
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          file: frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.short }}
+          build-args: |
+            VITE_OIDC_ISSUER=https://id.desk.gentian.org/realms/kernel
+            VITE_OIDC_CLIENT_ID=gentian-portal
+            VITE_OIDC_REDIRECT_URI=https://portal.desk.gentian.org/login
+            VITE_AUTH_DISABLED=false
+
+      - name: Build and push api
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.API_IMAGE }}:${{ steps.meta.outputs.short }}

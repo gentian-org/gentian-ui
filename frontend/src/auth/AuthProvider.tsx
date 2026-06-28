@@ -31,12 +31,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    handleOAuthCallback();
-    setAuthenticated(isAuthenticated());
-    setIsLoading(false);
+    void (async () => {
+      const fromCallback = await handleOAuthCallback();
+      setAuthenticated(fromCallback || isAuthenticated());
+      setIsLoading(false);
+    })();
   }, []);
 
-  const login = useCallback((returnTo?: string) => loginRedirect(returnTo), []);
+  const login = useCallback((returnTo?: string) => {
+    void loginRedirect(returnTo);
+  }, []);
   const logout = useCallback(() => {
     logoutRedirect();
     setAuthenticated(false);
