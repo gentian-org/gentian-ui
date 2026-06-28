@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends
 
 from app.core.auth import get_current_user
+from app.core.authz import require_shell_launch
 
 router = APIRouter(prefix="/apps", tags=["apps"])
 
 
 @router.get("/")
-def list_apps(user: dict = Depends(get_current_user)) -> dict:
+def list_apps(user: dict = Depends(get_current_user), _authz: dict = Depends(require_shell_launch())) -> dict:
     """Installed tenant apps for the shell launcher. K8s/AppProfile wiring comes later."""
     _ = user
     return {

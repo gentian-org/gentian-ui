@@ -9,11 +9,7 @@ from fastapi import Depends, HTTPException, status
 
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
-from app.core.openfga_client import OpenFGAClient
-
-
-def _user_subject(user: dict[str, Any]) -> str:
-    return str(user.get("sub") or user.get("preferred_username") or "")
+from app.core.openfga_client import OpenFGAClient, user_subject
 
 
 async def check_permission(
@@ -26,7 +22,7 @@ async def check_permission(
 ) -> None:
     client = OpenFGAClient(settings)
     allowed = await client.check(
-        user=_user_subject(user),
+        user=user_subject(user),
         relation=relation,
         object_type=object_type,
         object_id=object_id,
@@ -51,6 +47,25 @@ def require_permission(
             relation=relation,
             object_type=object_type,
             object_id=object_id,
+            settings=settings,
+        )
+        return user
+
+    return _dependency
+
+
+def require_shell_launch() -> Callable[..., Any]:
+    """PEP: tenant members may launch the Gentian shell app (Stage 1 exit criteria)."""
+
+    async def _dependency(
+        user: dict[str, Any] = Depends(get_current_user),
+        settings: Settings = Depends(get_settings),
+    ) -> dict[str, Any]:
+        await check_permission(
+            user=user,
+            relation="can_launch",
+            object_type="shell_app",
+            object_id="gentian-ui",
             settings=settings,
         )
         return user

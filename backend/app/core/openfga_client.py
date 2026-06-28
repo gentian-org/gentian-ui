@@ -1,10 +1,22 @@
-"""OpenFGA / AuthZEN PDP client stub (M22, S1)."""
+"""OpenFGA / AuthZEN PDP client (M22, Stage 1)."""
 
 from typing import Any
 
 import httpx
 
 from app.core.config import Settings
+
+
+def user_subject(user: dict[str, Any] | str) -> str:
+    if isinstance(user, str):
+        raw = user.strip()
+    else:
+        raw = str(user.get("sub") or user.get("preferred_username") or "").strip()
+    if not raw:
+        return "user:"
+    if ":" in raw:
+        return raw
+    return f"user:{raw}"
 
 
 class OpenFGAClient:
@@ -33,7 +45,7 @@ class OpenFGAClient:
         )
         payload: dict[str, Any] = {
             "tuple_key": {
-                "user": user,
+                "user": user_subject(user),
                 "relation": relation,
                 "object": f"{object_type}:{object_id}",
             },
