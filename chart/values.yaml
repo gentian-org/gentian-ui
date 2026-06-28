@@ -1,0 +1,41 @@
+kernelDomain: gentian.local
+
+api:
+  image:
+    repository: ghcr.io/gentian-org/gentian-portal-api
+    tag: "0.1.0"
+  replicaCount: 1
+  resources: {}
+  securityContext: {}
+
+web:
+  image:
+    repository: ghcr.io/gentian-org/gentian-portal-web
+    tag: "0.1.0"
+  replicaCount: 1
+  port: 8080
+  resources: {}
+  securityContext: {}
+
+gateway:
+  enabled: true
+  parentGatewayName: kernel-public-gateway
+  parentGatewayNamespace: gentian-kernel
+  host: portal
+
+existingSecret:
+  name: gentian-portal-secrets
+
+auth:
+  disabled: false
+
+rbac:
+  create: true
+
+networkPolicy:
+  create: false
+
+podSecurity:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532

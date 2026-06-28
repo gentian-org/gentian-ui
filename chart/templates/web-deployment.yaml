@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gentian-portal.fullname" . }}-web
+  labels:
+    {{- include "gentian-portal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  replicas: {{ .Values.web.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "gentian-portal.name" . }}-web
+  template:
+    metadata:
+      labels:
+        {{- include "gentian-portal.labels" . | nindent 8 }}
+        app.kubernetes.io/name: {{ include "gentian-portal.name" . }}-web
+        app.kubernetes.io/component: web
+    spec:
+      securityContext:
+        {{- include "gentian-portal.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: web
+          image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: {{ .Values.web.port }}
+              name: http
+          securityContext:
+            {{- include "gentian-portal.containerSecurityContext" . | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}

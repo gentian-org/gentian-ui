@@ -1,0 +1,6 @@
+apiVersion: v2
+name: gentian-portal
+description: Gentian OS kernel shell (FastAPI + React)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

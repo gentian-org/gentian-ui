@@ -1,0 +1,17 @@
+/* Gentian design tokens — sync from design-system/colors_and_type.css */
+:root {
+  --gtn-500: #262696;
+  --gtn-600: #1b1a82;
+  --gtn-700: #131370;
+  --gtn-400: #4a4ab3;
+  --gtn-ink-1: #14152e;
+  --gtn-paper-0: #f4f1ea;
+  --gtn-paper-3: #ffffff;
+  --gtn-border: rgba(20, 21, 46, 0.1);
+  --gtn-shadow-3: 0 12px 28px -8px rgba(20, 21, 46, 0.14);
+  --gtn-r2: 10px;
+}
+
+.gentian-shell {
+  min-height: 100%;
+}

@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gentian-portal.fullname" . }}-api
+  labels:
+    {{- include "gentian-portal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.api.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "gentian-portal.name" . }}-api
+  template:
+    metadata:
+      labels:
+        {{- include "gentian-portal.labels" . | nindent 8 }}
+        app.kubernetes.io/name: {{ include "gentian-portal.name" . }}-api
+        app.kubernetes.io/component: api
+    spec:
+      serviceAccountName: {{ include "gentian-portal.fullname" . }}
+      securityContext:
+        {{- include "gentian-portal.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: api
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          securityContext:
+            {{- include "gentian-portal.containerSecurityContext" . | nindent 12 }}
+          env:
+            - name: KERNEL_DOMAIN
+              value: {{ .Values.kernelDomain | quote }}
+            - name: AUTH_DISABLED
+              value: {{ ternary "true" "false" .Values.auth.disabled | quote }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.existingSecret.name }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

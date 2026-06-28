@@ -1,0 +1,22 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.routes import apps, health, prefs, session
+from app.core.config import get_settings
+
+settings = get_settings()
+
+app = FastAPI(title=settings.project_name, openapi_url=f"{settings.api_v1_str}/openapi.json")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(health.router)
+app.include_router(session.router, prefix=settings.api_v1_str)
+app.include_router(apps.router, prefix=settings.api_v1_str)
+app.include_router(prefs.router, prefix=settings.api_v1_str)
