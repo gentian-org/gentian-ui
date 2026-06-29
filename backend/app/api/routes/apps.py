@@ -4,9 +4,9 @@ from app.core.auth import get_current_user
 from app.core.authz import require_shell_launch
 from app.core.gentian_groups import (
     is_bootstrap_tenant_admin,
-    is_platform_superadmin,
     is_tenant_admin,
     normalize_groups,
+    user_is_platform_admin,
 )
 from app.core.config import Settings, get_settings
 
@@ -19,7 +19,7 @@ def _shell_apps(user: dict, settings: Settings) -> list[dict]:
         groups = groups or ["gentian:tenant:demo:admins"]
     is_admin = (
         settings.auth_disabled
-        or is_platform_superadmin(groups)
+        or user_is_platform_admin(user)
         or is_tenant_admin(groups)
         or is_bootstrap_tenant_admin(user)
     )

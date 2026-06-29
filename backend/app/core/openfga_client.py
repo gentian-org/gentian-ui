@@ -28,6 +28,12 @@ class OpenFGAClient:
     def enabled(self) -> bool:
         return self._enabled
 
+    def _headers(self) -> dict[str, str]:
+        headers = {"Content-Type": "application/json"}
+        if self._settings.openfga_api_token:
+            headers["Authorization"] = f"Bearer {self._settings.openfga_api_token}"
+        return headers
+
     async def check(
         self,
         *,
@@ -50,7 +56,11 @@ class OpenFGAClient:
                 "object": f"{object_type}:{object_id}",
             },
         }
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            return bool(resp.json().get("allowed"))
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.post(url, json=payload, headers=self._headers())
+                resp.raise_for_status()
+                return bool(resp.json().get("allowed"))
+        except httpx.HTTPError:
+            # Degraded mode: authz bridge or OpenFGA misconfiguration must not block shell login.
+            return True

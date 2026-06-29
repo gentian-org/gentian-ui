@@ -6,9 +6,9 @@ from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
 from app.core.gentian_groups import (
     is_bootstrap_tenant_admin,
-    is_platform_superadmin,
     is_tenant_admin,
     normalize_groups,
+    user_is_platform_admin,
 )
 
 router = APIRouter(prefix="/session", tags=["session"])
@@ -29,7 +29,7 @@ def get_me(
         "email": user.get("email"),
         "tenant": user.get("tenant"),
         "groups": groups,
-        "isPlatformAdmin": settings.auth_disabled or is_platform_superadmin(groups),
+        "isPlatformAdmin": settings.auth_disabled or user_is_platform_admin(user),
         "isTenantAdmin": settings.auth_disabled
         or is_tenant_admin(groups)
         or is_bootstrap_tenant_admin(user),

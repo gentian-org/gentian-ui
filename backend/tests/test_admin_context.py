@@ -35,6 +35,12 @@ def test_platform_admin_defaults_kernel_realm():
     assert tenant == "kernel"
 
 
+def test_platform_bootstrap_administrator_defaults_kernel_realm():
+    user = {"preferred_username": "administrator"}
+    tenant = resolve_admin_tenant(user, _settings(), None)
+    assert tenant == "kernel"
+
+
 def test_platform_admin_can_target_tenant():
     user = {"groups": ["gentian:platform:superadmin"]}
     tenant = resolve_admin_tenant(user, _settings(), "demo")

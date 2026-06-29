@@ -8,6 +8,7 @@ PLATFORM_SUPERADMIN = "gentian:platform:superadmin"
 PLATFORM_OPERATOR = "gentian:platform:operator"
 PLATFORM_BREAK_GLASS = "gentian:platform:break-glass"
 ROLE_MEMBER = "gentian:role:member"
+PLATFORM_BOOTSTRAP_USERNAME = "administrator"
 
 
 def tenant_prefix(tenant: str) -> str:
@@ -62,13 +63,22 @@ def is_tenant_admin(groups: list[str]) -> bool:
     return bool(tenant_admin_tenants(groups))
 
 
+def _local_username(user: dict[str, Any]) -> str:
+    username = str(user.get("preferred_username") or user.get("email") or "")
+    return username.split("@", 1)[0]
+
+
+def is_platform_bootstrap_admin(user: dict[str, Any]) -> bool:
+    """Stage 1 install creates `administrator` in gentian:platform:superadmin via bootstrap Job."""
+    return _local_username(user) == PLATFORM_BOOTSTRAP_USERNAME
+
+
 def is_bootstrap_tenant_admin(user: dict[str, Any], tenant: str | None = None) -> bool:
     """Fallback until Keycloak group mappers emit gentian:tenant:<t>:admins in portal JWTs."""
-    username = str(user.get("preferred_username") or user.get("email") or "")
+    username = _local_username(user)
     if not username.startswith("admin-"):
         return False
-    local = username.split("@", 1)[0]
-    inferred = local.removeprefix("admin-")
+    inferred = username.removeprefix("admin-")
     if tenant is not None:
         return inferred == tenant
     return bool(inferred)
@@ -79,3 +89,8 @@ def user_is_tenant_admin(user: dict[str, Any], tenant: str | None = None) -> boo
     if is_tenant_admin(groups):
         return True
     return is_bootstrap_tenant_admin(user, tenant)
+
+
+def user_is_platform_admin(user: dict[str, Any]) -> bool:
+    groups = normalize_groups(user)
+    return is_platform_superadmin(groups) or is_platform_bootstrap_admin(user)

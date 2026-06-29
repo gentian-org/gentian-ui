@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { apiFetch, type AppsResponse, type MeResponse, type PrefsResponse } from "@/api/client";
+import { apiFetch, type AppsResponse, type MeResponse, type PrefsResponse, type ShellApp } from "@/api/client";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { AdminConsole } from "@/admin/AdminConsole";
@@ -22,7 +22,25 @@ export function DesktopPage() {
     queryFn: () => apiFetch<AppsResponse>("/apps/"),
   });
 
-  const apps = appsData?.apps ?? [];
+  const apps = useMemo(() => {
+    const fromApi = appsData?.apps ?? [];
+    if (fromApi.length > 0) {
+      return fromApi;
+    }
+    if (me?.isPlatformAdmin || me?.isTenantAdmin) {
+      return [
+        {
+          id: "admin",
+          title: "Admin Console",
+          icon: "admin",
+          launchUrl: null,
+          builtin: true,
+        },
+      ] satisfies ShellApp[];
+    }
+    return fromApi;
+  }, [appsData?.apps, me?.isPlatformAdmin, me?.isTenantAdmin]);
+
   const activeAppId = useAppsStore((s) => s.activeAppId);
   const setActiveAppId = useAppsStore((s) => s.setActiveAppId);
   const openWindow = useWindowsStore((s) => s.openWindow);

@@ -42,8 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void loginRedirect(returnTo);
   }, []);
   const logout = useCallback(() => {
+    // Full-page navigation only — do not clear React auth state here or RequireAuth
+    // on /desktop will immediately start a new OIDC login before Keycloak logout runs.
     logoutRedirect();
-    setAuthenticated(false);
   }, []);
 
   const value = useMemo(

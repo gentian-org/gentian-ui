@@ -12,6 +12,7 @@ from app.core.gentian_groups import (
     is_platform_superadmin,
     normalize_groups,
     tenant_admin_tenants,
+    user_is_platform_admin,
 )
 from app.core.tenant import extract_tenant_from_claims
 
@@ -25,7 +26,7 @@ def resolve_admin_tenant(
         return requested_tenant or str(user.get("tenant") or "demo")
 
     groups = normalize_groups(user)
-    if is_platform_superadmin(groups):
+    if user_is_platform_admin(user):
         if requested_tenant:
             return requested_tenant
         claim_tenant = extract_tenant_from_claims(user)

@@ -20,6 +20,7 @@ from app.core.gentian_groups import (
     tenant_members_group,
     tenant_prefix,
     tenant_admin_tenants,
+    user_is_platform_admin,
 )
 from app.services.admin_store import AdminStore, Member, get_admin_store
 from app.services.security_policy_store import SecurityPolicyStore, get_security_policy_store
@@ -121,7 +122,7 @@ def _require_admin(user: dict[str, Any], settings: Settings) -> None:
     if settings.auth_disabled:
         return
     groups = normalize_groups(user)
-    if is_platform_superadmin(groups) or is_tenant_admin(groups):
+    if user_is_platform_admin(user) or is_tenant_admin(groups):
         return
     if is_bootstrap_tenant_admin(user):
         return

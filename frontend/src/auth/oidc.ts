@@ -92,7 +92,7 @@ export function logoutRedirect(): void {
   const idToken = sessionStorage.getItem(ID_TOKEN_STORAGE_KEY);
   clearAccessToken();
   if (!config.issuer || !config.clientId) {
-    window.location.href = "/login";
+    window.location.replace("/login");
     return;
   }
   const params = new URLSearchParams({
@@ -102,7 +102,9 @@ export function logoutRedirect(): void {
   if (idToken) {
     params.set("id_token_hint", idToken);
   }
-  window.location.href = `${config.issuer.replace(/\/$/, "")}/protocol/openid-connect/logout?${params}`;
+  window.location.replace(
+    `${config.issuer.replace(/\/$/, "")}/protocol/openid-connect/logout?${params}`,
+  );
 }
 
 export function isAuthenticated(): boolean {
