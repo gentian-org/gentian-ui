@@ -155,3 +155,38 @@ async def test_admin_sessions_in_auth_disabled_mode():
         )
         assert disabled.status_code == 200
         assert (await client.get("/api/v1/admin/sessions")).json() == []
+
+
+@pytest.mark.asyncio
+async def test_admin_audit_events_in_auth_disabled_mode():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        created = await client.post(
+            "/api/v1/admin/members",
+            json={"email": "frank@demo.desk.gentian.org", "enabled": True},
+        )
+        assert created.status_code == 201
+        member_id = created.json()["id"]
+
+        listed = await client.get("/api/v1/admin/audit-events")
+        assert listed.status_code == 200
+        events = listed.json()
+        assert any(event["action"] == "member.created" for event in events)
+
+        filtered = await client.get(
+            "/api/v1/admin/audit-events",
+            params={"action": "member.created", "category": "admin_action"},
+        )
+        assert filtered.status_code == 200
+        assert all(item["category"] == "admin_action" for item in filtered.json())
+
+        export_csv = await client.get(
+            "/api/v1/admin/audit-events/export",
+            params={"format": "csv"},
+        )
+        assert export_csv.status_code == 200
+        assert "member.created" in export_csv.text
+
+        await client.delete(f"/api/v1/admin/members/{member_id}")
+        after_delete = await client.get("/api/v1/admin/audit-events")
+        assert any(event["action"] == "member.deleted" for event in after_delete.json())

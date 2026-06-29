@@ -1,4 +1,5 @@
 import { apiFetch } from "@/api/client";
+import { getAccessToken } from "@/auth/oidc";
 
 export type AdminContext = {
   tenant: string;
@@ -208,4 +209,82 @@ export function revokeAllMemberSessions(memberId: string, tenant?: string) {
     `/admin/members/${memberId}/sessions/revoke-all${tenantQuery(tenant)}`,
     { method: "POST" },
   );
+}
+
+export type AuditEventCategory = "sign_in" | "admin_action" | "entitlement";
+
+export type AuditEvent = {
+  id: string;
+  occurredAt: number;
+  category: AuditEventCategory;
+  action: string;
+  actor?: string | null;
+  target?: string | null;
+  tenant: string;
+  ipAddress?: string | null;
+  success: boolean;
+  details: Record<string, string>;
+};
+
+export type AuditEventFilters = {
+  user?: string;
+  action?: string;
+  category?: AuditEventCategory;
+  from?: string;
+  to?: string;
+  limit?: number;
+};
+
+function auditQuery(filters: AuditEventFilters, tenant?: string) {
+  const params = new URLSearchParams();
+  if (tenant) {
+    params.set("tenant", tenant);
+  }
+  if (filters.user) {
+    params.set("user", filters.user);
+  }
+  if (filters.action) {
+    params.set("action", filters.action);
+  }
+  if (filters.category) {
+    params.set("category", filters.category);
+  }
+  if (filters.from) {
+    params.set("from", filters.from);
+  }
+  if (filters.to) {
+    params.set("to", filters.to);
+  }
+  if (filters.limit) {
+    params.set("limit", String(filters.limit));
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export function fetchAuditEvents(filters: AuditEventFilters = {}, tenant?: string) {
+  return apiFetch<AuditEvent[]>(`/admin/audit-events${auditQuery(filters, tenant)}`);
+}
+
+export async function downloadAuditExport(
+  format: "json" | "csv",
+  filters: AuditEventFilters = {},
+  tenant?: string,
+) {
+  const params = new URLSearchParams(auditQuery(filters, tenant).replace(/^\?/, ""));
+  params.set("format", format);
+  const token = getAccessToken();
+  const response = await fetch(`/api/v1/admin/audit-events/export?${params.toString()}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    throw new Error(`Audit export failed: ${response.status}`);
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `audit-export.${format}`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }

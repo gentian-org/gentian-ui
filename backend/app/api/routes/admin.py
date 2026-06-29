@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import csv
+import io
+import json
+from datetime import datetime, timezone
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 
 from app.core.admin_context import admin_tenant_query, resolve_admin_tenant
+from app.core.audit_log import record_admin_audit
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
 from app.core.gentian_groups import (
@@ -23,6 +29,8 @@ from app.core.gentian_groups import (
     user_is_platform_admin,
 )
 from app.services.admin_store import AdminStore, AdminStoreDep, Member
+from app.services.audit_events import AuditCategory, AuditEvent, AuditEventFilters
+from app.services.audit_store import AuditStoreDep
 from app.services.security_policy_store import SecurityPolicyStoreDep
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -130,6 +138,19 @@ class MemberSessionResponse(BaseModel):
     lastAccessAt: int
 
 
+class AuditEventResponse(BaseModel):
+    id: str
+    occurredAt: int
+    category: AuditCategory
+    action: str
+    actor: str | None = None
+    target: str | None = None
+    tenant: str
+    ipAddress: str | None = None
+    success: bool
+    details: dict[str, str] = Field(default_factory=dict)
+
+
 def _require_admin(user: dict[str, Any], settings: Settings) -> None:
     if settings.auth_disabled:
         return
@@ -194,6 +215,80 @@ async def _list_tenant_sessions(store: AdminStore, realm: str) -> list[MemberSes
             sessions.append(_session_response(session, member))
     sessions.sort(key=lambda item: item.lastAccessAt, reverse=True)
     return sessions
+
+
+def _audit_event_response(event: AuditEvent) -> AuditEventResponse:
+    return AuditEventResponse(
+        id=event.id,
+        occurredAt=event.occurred_at,
+        category=event.category,
+        action=event.action,
+        actor=event.actor,
+        target=event.target,
+        tenant=event.tenant,
+        ipAddress=event.ip_address,
+        success=event.success,
+        details=event.details,
+    )
+
+
+def _parse_epoch_ms(value: str | None) -> int | None:
+    if not value:
+        return None
+    stripped = value.strip()
+    if stripped.isdigit():
+        parsed = int(stripped)
+        return parsed if parsed > 10_000_000_000 else parsed * 1000
+    try:
+        if stripped.endswith("Z"):
+            stripped = stripped[:-1] + "+00:00"
+        dt = datetime.fromisoformat(stripped)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp() * 1000)
+    except ValueError:
+        return None
+
+
+def _audit_filters(
+    *,
+    user: str | None,
+    action: str | None,
+    category: AuditCategory | None,
+    from_time: str | None,
+    to_time: str | None,
+    limit: int,
+) -> AuditEventFilters:
+    return AuditEventFilters(
+        user=user,
+        action=action,
+        category=category,
+        from_epoch_ms=_parse_epoch_ms(from_time),
+        to_epoch_ms=_parse_epoch_ms(to_time),
+        limit=limit,
+    )
+
+
+def _audit_export_csv(events: list[AuditEventResponse]) -> str:
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        ["occurredAt", "category", "action", "actor", "target", "success", "ipAddress", "details"],
+    )
+    for event in events:
+        writer.writerow(
+            [
+                event.occurredAt,
+                event.category,
+                event.action,
+                event.actor or "",
+                event.target or "",
+                event.success,
+                event.ipAddress or "",
+                json.dumps(event.details, sort_keys=True),
+            ],
+        )
+    return buffer.getvalue()
 
 
 def _validate_group_name(name: str, tenant: str, settings: Settings) -> str:
@@ -349,6 +444,13 @@ async def create_member(
         last_name=body.lastName,
         enabled=body.enabled,
     )
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="member.created",
+        target=member.email or member.username,
+        details={"memberId": member.id},
+    )
     return _member_response(member)
 
 
@@ -375,6 +477,13 @@ async def invite_member(
         group_ids=group_ids,
         require_totp=body.requireTotp,
     )
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="member.invited",
+        target=member.email or member.username,
+        details={"memberId": member.id},
+    )
     return _member_response(member)
 
 
@@ -395,6 +504,13 @@ async def enable_member_totp(
         member_id,
         send_email=body.sendEmail,
     )
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="member.totp_enabled",
+        target=member.email or member.username,
+        details={"memberId": member_id, "sendEmail": str(body.sendEmail)},
+    )
     return _member_response(member)
 
 
@@ -410,6 +526,13 @@ async def remove_member_totp(
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
     member = await store.remove_totp(_realm_for_tenant(resolved), member_id)
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="member.totp_removed",
+        target=member.email or member.username,
+        details={"memberId": member_id},
+    )
     return _member_response(member)
 
 
@@ -424,7 +547,16 @@ async def reset_member_password(
 ) -> None:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
-    await store.send_password_reset(_realm_for_tenant(resolved), member_id)
+    realm = _realm_for_tenant(resolved)
+    member = await store.get_member(realm, member_id)
+    await store.send_password_reset(realm, member_id)
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="member.password_reset",
+        target=member.email or member.username,
+        details={"memberId": member_id},
+    )
 
 
 @router.get("/members/{member_id}", response_model=MemberResponse)
@@ -454,14 +586,40 @@ async def update_member(
 ) -> MemberResponse:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
+    realm = _realm_for_tenant(resolved)
+    before = await store.get_member(realm, member_id)
     member = await store.update_member(
-        _realm_for_tenant(resolved),
+        realm,
         member_id,
         email=str(body.email) if body.email is not None else None,
         first_name=body.firstName,
         last_name=body.lastName,
         enabled=body.enabled,
     )
+    if body.enabled is False and before.enabled:
+        await record_admin_audit(
+            user,
+            tenant=resolved,
+            action="member.disabled",
+            target=member.email or member.username,
+            details={"memberId": member_id},
+        )
+    elif body.enabled is True and not before.enabled:
+        await record_admin_audit(
+            user,
+            tenant=resolved,
+            action="member.enabled",
+            target=member.email or member.username,
+            details={"memberId": member_id},
+        )
+    else:
+        await record_admin_audit(
+            user,
+            tenant=resolved,
+            action="member.updated",
+            target=member.email or member.username,
+            details={"memberId": member_id},
+        )
     return _member_response(member)
 
 
@@ -476,7 +634,16 @@ async def delete_member(
 ) -> None:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
-    await store.delete_member(_realm_for_tenant(resolved), member_id)
+    realm = _realm_for_tenant(resolved)
+    member = await store.get_member(realm, member_id)
+    await store.delete_member(realm, member_id)
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="member.deleted",
+        target=member.email or member.username,
+        details={"memberId": member_id},
+    )
 
 
 @router.put("/members/{member_id}/groups", response_model=MemberResponse)
@@ -500,6 +667,14 @@ async def update_member_groups(
             detail="One or more groups are outside this tenant scope",
         )
     member = await store.set_member_groups(realm, member_id, body.groupIds)
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="member.groups_updated",
+        target=member.email or member.username,
+        category="entitlement",
+        details={"memberId": member_id, "groupCount": str(len(body.groupIds))},
+    )
     return _member_response(member)
 
 
@@ -530,6 +705,13 @@ async def create_group(
     resolved = resolve_admin_tenant(user, settings, tenant)
     name = _validate_group_name(body.name, resolved, settings)
     group = await store.create_group(_realm_for_tenant(resolved), name=name)
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="group.created",
+        target=group.name,
+        details={"groupId": group.id},
+    )
     return _group_response(group)
 
 
@@ -551,6 +733,13 @@ async def update_group(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Group is not manageable")
     name = _validate_group_name(body.name, resolved, settings)
     group = await store.update_group(realm, group_id, name=name)
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="group.updated",
+        target=group.name,
+        details={"groupId": group_id},
+    )
     return _group_response(group)
 
 
@@ -570,6 +759,13 @@ async def delete_group(
     if not is_admin_managed_group(existing.name, resolved, kernel_realm=settings.kernel_realm):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Group is not manageable")
     await store.delete_group(realm, group_id)
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="group.deleted",
+        target=existing.name,
+        details={"groupId": group_id},
+    )
 
 
 @router.get("/security-policies", response_model=SecurityPoliciesResponse)
@@ -603,6 +799,12 @@ async def update_security_policies(
         resolved,
         _security_policies_from_request(body),
         store,
+    )
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="security_policies.updated",
+        target=resolved,
     )
     return _security_policies_response(policies)
 
@@ -652,7 +854,16 @@ async def revoke_member_session(
 ) -> None:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
-    await store.revoke_member_session(_realm_for_tenant(resolved), member_id, session_id)
+    realm = _realm_for_tenant(resolved)
+    member = await store.get_member(realm, member_id)
+    await store.revoke_member_session(realm, member_id, session_id)
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="session.revoked",
+        target=member.email or member.username,
+        details={"memberId": member_id, "sessionId": session_id},
+    )
 
 
 @router.post(
@@ -669,4 +880,82 @@ async def revoke_all_member_sessions(
 ) -> None:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
-    await store.revoke_all_member_sessions(_realm_for_tenant(resolved), member_id)
+    realm = _realm_for_tenant(resolved)
+    member = await store.get_member(realm, member_id)
+    await store.revoke_all_member_sessions(realm, member_id)
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="session.revoked_all",
+        target=member.email or member.username,
+        details={"memberId": member_id},
+    )
+
+
+@router.get("/audit-events", response_model=list[AuditEventResponse])
+async def list_audit_events(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    audit_store: AuditStoreDep,
+    tenant: str | None = Depends(admin_tenant_query),
+    user_filter: str | None = Query(default=None, alias="user"),
+    action: str | None = Query(default=None),
+    category: AuditCategory | None = Query(default=None),
+    from_time: str | None = Query(default=None, alias="from"),
+    to_time: str | None = Query(default=None, alias="to"),
+    limit: int = Query(default=200, ge=1, le=500),
+) -> list[AuditEventResponse]:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    filters = _audit_filters(
+        user=user_filter,
+        action=action,
+        category=category,
+        from_time=from_time,
+        to_time=to_time,
+        limit=limit,
+    )
+    events = await audit_store.list_events(_realm_for_tenant(resolved), resolved, filters)
+    return [_audit_event_response(event) for event in events]
+
+
+@router.get("/audit-events/export")
+async def export_audit_events(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    audit_store: AuditStoreDep,
+    tenant: str | None = Depends(admin_tenant_query),
+    format: Literal["json", "csv"] = Query(default="json"),
+    user_filter: str | None = Query(default=None, alias="user"),
+    action: str | None = Query(default=None),
+    category: AuditCategory | None = Query(default=None),
+    from_time: str | None = Query(default=None, alias="from"),
+    to_time: str | None = Query(default=None, alias="to"),
+    limit: int = Query(default=500, ge=1, le=500),
+):
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    filters = _audit_filters(
+        user=user_filter,
+        action=action,
+        category=category,
+        from_time=from_time,
+        to_time=to_time,
+        limit=limit,
+    )
+    events = await audit_store.list_events(_realm_for_tenant(resolved), resolved, filters)
+    payload = [_audit_event_response(event) for event in events]
+    if format == "csv":
+        content = _audit_export_csv(payload)
+        return StreamingResponse(
+            iter([content]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="audit-{resolved}.csv"'},
+        )
+    return StreamingResponse(
+        iter([json.dumps([item.model_dump() for item in payload], indent=2)]),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="audit-{resolved}.json"'},
+    )

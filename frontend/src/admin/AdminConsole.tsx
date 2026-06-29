@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { fetchAdminContext, fetchGroups } from "@/api/admin";
+import { AuditSection } from "@/admin/AuditSection";
 import { GroupsSection } from "@/admin/GroupsSection";
 import { MembersSection } from "@/admin/MembersSection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
 import { SessionsSection } from "@/admin/SessionsSection";
 import "./admin.css";
 
-type AdminTab = "members" | "groups" | "security" | "sessions";
+type AdminTab = "members" | "groups" | "security" | "sessions" | "audit";
 
 export function AdminConsole() {
   const [tab, setTab] = useState<AdminTab>("members");
@@ -92,6 +93,13 @@ export function AdminConsole() {
           >
             Sessions
           </button>
+          <button
+            type="button"
+            className={`admin-console__tab${tab === "audit" ? " admin-console__tab--active" : ""}`}
+            onClick={() => setTab("audit")}
+          >
+            Audit
+          </button>
         </nav>
 
         <div className="admin-console__body">
@@ -101,8 +109,10 @@ export function AdminConsole() {
             <GroupsSection tenant={tenant} />
           ) : tab === "security" ? (
             <SecurityPoliciesSection tenant={tenant} />
-          ) : (
+          ) : tab === "sessions" ? (
             <SessionsSection tenant={tenant} />
+          ) : (
+            <AuditSection tenant={tenant} />
           )}
         </div>
       </div>
