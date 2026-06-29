@@ -7,13 +7,32 @@ from typing import Annotated, Protocol
 from fastapi import Depends
 
 from app.core.config import Settings, get_settings
+from app.db.engine import init_audit_database
 from app.services.admin_store import admin_store_configured
 from app.services.audit_events import AuditCategory, AuditEvent, AuditEventFilters
 from app.services.keycloak_audit_fetcher import KeycloakAuditFetcher
 from app.services.memory_audit_store import MemoryAuditStore
+from app.services.sql_audit_store import SqlAuditStore
 
 _memory_audit_store: MemoryAuditStore | None = None
 _keycloak_audit_fetcher: KeycloakAuditFetcher | None = None
+
+
+class BffAuditStore(Protocol):
+    async def record(
+        self,
+        *,
+        tenant: str,
+        category: AuditCategory,
+        action: str,
+        actor: str | None,
+        target: str | None = None,
+        ip_address: str | None = None,
+        success: bool = True,
+        details: dict[str, str] | None = None,
+    ) -> AuditEvent: ...
+
+    async def list_events(self, tenant: str, filters: AuditEventFilters) -> list[AuditEvent]: ...
 
 
 class AuditStore(Protocol):
@@ -34,8 +53,8 @@ class AuditStore(Protocol):
 
 
 class CompositeAuditStore:
-    def __init__(self, memory: MemoryAuditStore, keycloak: KeycloakAuditFetcher | None) -> None:
-        self._memory = memory
+    def __init__(self, bff_store: BffAuditStore, keycloak: KeycloakAuditFetcher | None) -> None:
+        self._bff = bff_store
         self._keycloak = keycloak
 
     async def record(
@@ -50,7 +69,7 @@ class CompositeAuditStore:
         success: bool = True,
         details: dict[str, str] | None = None,
     ) -> AuditEvent:
-        return await self._memory.record(
+        return await self._bff.record(
             tenant=tenant,
             category=category,
             action=action,
@@ -62,7 +81,7 @@ class CompositeAuditStore:
         )
 
     async def list_events(self, realm: str, tenant: str, filters: AuditEventFilters) -> list[AuditEvent]:
-        events = await self._memory.list_events(tenant, filters)
+        events = await self._bff.list_events(tenant, filters)
         if self._keycloak is not None:
             try:
                 events.extend(await self._keycloak.fetch_events(realm, filters))
@@ -79,18 +98,25 @@ def _memory_store() -> MemoryAuditStore:
     return _memory_audit_store
 
 
+def _bff_audit_store(settings: Settings) -> BffAuditStore:
+    if settings.database_url:
+        init_audit_database(settings.database_url)
+        return SqlAuditStore()
+    return _memory_store()
+
+
 def get_audit_store(settings: Settings = Depends(get_settings)) -> AuditStore:
     global _keycloak_audit_fetcher
-    memory = _memory_store()
+    bff = _bff_audit_store(settings)
     if admin_store_configured(settings):
         if _keycloak_audit_fetcher is None:
             _keycloak_audit_fetcher = KeycloakAuditFetcher(
                 base_url=settings.keycloak_admin_url or "",
                 username=settings.keycloak_admin_username,
-                password=settings.keycloak_admin_password or "",
+                password=settings.keycloak_admin_password,
             )
-        return CompositeAuditStore(memory, _keycloak_audit_fetcher)
-    return CompositeAuditStore(memory, None)
+        return CompositeAuditStore(bff, _keycloak_audit_fetcher)
+    return CompositeAuditStore(bff, None)
 
 
 AuditStoreDep = Annotated[AuditStore, Depends(get_audit_store)]

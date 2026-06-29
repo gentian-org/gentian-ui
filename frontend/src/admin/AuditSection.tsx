@@ -103,8 +103,8 @@ export function AuditSection({ tenant }: AuditSectionProps) {
       </div>
 
       <p style={{ fontSize: "0.875rem", color: "var(--gtn-ink-4)", marginBottom: "1rem" }}>
-        Sign-in events from Keycloak (when realm events are enabled) plus admin mutations recorded
-        by the portal API.
+        Admin mutations are stored in the portal database when configured. Sign-in events are
+        fetched live from Keycloak when realm events are enabled.
       </p>
 
       <form

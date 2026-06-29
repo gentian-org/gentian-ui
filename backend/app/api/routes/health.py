@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Response, status
+from sqlalchemy import text
 
 from app.core.config import get_settings
+from app.db.engine import audit_database_ready, get_db_session
 
 router = APIRouter(tags=["health"])
 
@@ -24,11 +26,20 @@ def readyz(response: Response) -> dict[str, object]:
         errors.append("OPENFGA_STORE_ID required when OPENFGA_API_URL is set")
 
     checks["oidc"] = "ok" if settings.oidc_issuer or not settings.is_production else "missing"
-    checks["database"] = (
-        "configured (stub ping — wire SELECT 1 when using Postgres)"
-        if settings.database_url
-        else "skipped"
-    )
+    if settings.database_url:
+        if audit_database_ready():
+            try:
+                with get_db_session() as session:
+                    session.execute(text("SELECT 1"))
+                checks["database"] = "ok"
+            except Exception:
+                checks["database"] = "error"
+                errors.append("database unreachable")
+        else:
+            checks["database"] = "not_initialized"
+            errors.append("database not initialized")
+    else:
+        checks["database"] = "skipped"
     checks["openfga"] = (
         "configured" if settings.openfga_api_url and settings.openfga_store_id else "skipped"
     )
