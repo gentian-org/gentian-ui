@@ -3,6 +3,7 @@ import type { ShellApp } from "@/api/client";
 import { useAuth } from "@/auth/AuthProvider";
 import { AppLauncher } from "@/shell/AppLauncher";
 import { AppMenuSlot } from "@/shell/AppMenuSlot";
+import { NotificationInbox } from "@/shell/NotificationInbox";
 import { AppsGridIcon, MenuIcon, TrayButton } from "@/shell/TrayButton";
 
 type AppMenuProps = {
@@ -42,6 +43,7 @@ export function AppMenu({ apps, activeAppId, username, onSelect }: AppMenuProps)
         </div>
 
         <div className="app-menu__tray">
+          <NotificationInbox />
           <TrayButton
             label={username ? `Menu (${username})` : "Menu"}
             onClick={() => setUserMenuOpen((v) => !v)}

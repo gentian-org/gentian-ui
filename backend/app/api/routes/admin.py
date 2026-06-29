@@ -29,8 +29,12 @@ from app.core.gentian_groups import (
     user_is_platform_admin,
 )
 from app.services.admin_store import AdminStore, AdminStoreDep, Member
+from app.services.admin_notifications import NotificationAudience, NotificationSeverity
 from app.services.audit_events import AuditCategory, AuditEvent, AuditEventFilters
-from app.services.audit_store import AuditStoreDep
+from app.services.audit_store import AuditStoreDep, audit_actor
+from app.services.notification_audience import validate_publish_audience
+from app.services.notification_cloudevents import notification_to_cloudevent
+from app.services.notification_store import NotificationStoreDep
 from app.services.security_policy_store import SecurityPolicyStoreDep
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -151,6 +155,37 @@ class AuditEventResponse(BaseModel):
     details: dict[str, str] = Field(default_factory=dict)
 
 
+class NotificationAudienceRequest(BaseModel):
+    scope: Literal["platform", "tenant"] = "tenant"
+    tenant: str | None = None
+    groups: list[str] = Field(default_factory=list)
+
+
+class NotificationPublishRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=512)
+    body: str = Field(min_length=1, max_length=4000)
+    severity: NotificationSeverity = "info"
+    audience: NotificationAudienceRequest = Field(default_factory=NotificationAudienceRequest)
+    linkUrl: str | None = Field(default=None, max_length=2048)
+    linkLabel: str | None = Field(default=None, max_length=255)
+    expiresAt: int | None = Field(default=None, ge=0)
+
+
+class NotificationResponse(BaseModel):
+    id: str
+    publishedAt: int
+    title: str
+    body: str
+    severity: NotificationSeverity
+    audience: NotificationAudienceRequest
+    publisher: str
+    tenant: str
+    linkUrl: str | None = None
+    linkLabel: str | None = None
+    expiresAt: int | None = None
+    cloudEvent: dict[str, Any] = Field(default_factory=dict)
+
+
 def _require_admin(user: dict[str, Any], settings: Settings) -> None:
     if settings.auth_disabled:
         return
@@ -215,6 +250,31 @@ async def _list_tenant_sessions(store: AdminStore, realm: str) -> list[MemberSes
             sessions.append(_session_response(session, member))
     sessions.sort(key=lambda item: item.lastAccessAt, reverse=True)
     return sessions
+
+
+def _notification_audience_request(audience: NotificationAudience) -> NotificationAudienceRequest:
+    return NotificationAudienceRequest(
+        scope=audience.scope,
+        tenant=audience.tenant,
+        groups=audience.groups,
+    )
+
+
+def _notification_response(notification: Any) -> NotificationResponse:
+    return NotificationResponse(
+        id=notification.id,
+        publishedAt=notification.published_at,
+        title=notification.title,
+        body=notification.body,
+        severity=notification.severity,
+        audience=_notification_audience_request(notification.audience),
+        publisher=notification.publisher,
+        tenant=notification.tenant,
+        linkUrl=notification.link_url,
+        linkLabel=notification.link_label,
+        expiresAt=notification.expires_at,
+        cloudEvent=notification_to_cloudevent(notification),
+    )
 
 
 def _audit_event_response(event: AuditEvent) -> AuditEventResponse:
@@ -959,3 +1019,64 @@ async def export_audit_events(
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="audit-{resolved}.json"'},
     )
+
+
+@router.get("/notifications", response_model=list[NotificationResponse])
+async def list_notifications(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    store: NotificationStoreDep,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> list[NotificationResponse]:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    items = await store.list_for_tenant(resolved)
+    return [_notification_response(item) for item in items]
+
+
+@router.post("/notifications", response_model=NotificationResponse, status_code=status.HTTP_201_CREATED)
+async def publish_notification(
+    body: NotificationPublishRequest,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    store: NotificationStoreDep,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> NotificationResponse:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    audience = validate_publish_audience(
+        user,
+        resolved_tenant=resolved,
+        kernel_realm=settings.kernel_realm,
+        audience=NotificationAudience(
+            scope=body.audience.scope,
+            tenant=body.audience.tenant,
+            groups=body.audience.groups,
+        ),
+        auth_disabled=settings.auth_disabled,
+    )
+    notification = await store.publish(
+        tenant=resolved,
+        title=body.title.strip(),
+        body=body.body.strip(),
+        severity=body.severity,
+        audience=audience,
+        publisher=audit_actor(user),
+        link_url=body.linkUrl,
+        link_label=body.linkLabel,
+        expires_at=body.expiresAt,
+    )
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="notification.published",
+        target=notification.title,
+        details={
+            "notificationId": notification.id,
+            "severity": notification.severity,
+            "audienceScope": audience.scope,
+        },
+    )
+    return _notification_response(notification)

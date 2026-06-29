@@ -190,3 +190,40 @@ async def test_admin_audit_events_in_auth_disabled_mode():
         await client.delete(f"/api/v1/admin/members/{member_id}")
         after_delete = await client.get("/api/v1/admin/audit-events")
         assert any(event["action"] == "member.deleted" for event in after_delete.json())
+
+
+@pytest.mark.asyncio
+async def test_admin_notifications_in_auth_disabled_mode():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        published = await client.post(
+            "/api/v1/admin/notifications",
+            params={"tenant": "demo"},
+            json={
+                "title": "Scheduled maintenance",
+                "body": "Portal will restart at 02:00 UTC.",
+                "severity": "warning",
+                "audience": {"scope": "platform"},
+            },
+        )
+        assert published.status_code == 201
+        payload = published.json()
+        assert payload["title"] == "Scheduled maintenance"
+        assert payload["cloudEvent"]["type"] == "gentian.admin.notification.published.v1"
+        notification_id = payload["id"]
+
+        listed = await client.get("/api/v1/admin/notifications", params={"tenant": "demo"})
+        assert listed.status_code == 200
+        assert any(item["id"] == notification_id for item in listed.json())
+
+        inbox = await client.get("/api/v1/notifications/inbox")
+        assert inbox.status_code == 200
+        assert any(item["id"] == notification_id for item in inbox.json())
+
+        dismissed = await client.post(f"/api/v1/notifications/{notification_id}/dismiss")
+        assert dismissed.status_code == 204
+        assert not any(item["id"] == notification_id for item in (await client.get("/api/v1/notifications/inbox")).json())
+
+        audit = await client.get("/api/v1/admin/audit-events", params={"action": "notification.published"})
+        assert audit.status_code == 200
+        assert any(event["action"] == "notification.published" for event in audit.json())

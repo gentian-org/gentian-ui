@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin, apps, health, prefs, session
+from app.api.routes import admin, apps, health, notifications, prefs, session
 from app.core.config import get_settings
 from app.core.logging_middleware import RedactingAccessLogMiddleware
 from app.db.engine import init_audit_database
@@ -38,3 +38,4 @@ app.include_router(session.router, prefix=settings.api_v1_str)
 app.include_router(apps.router, prefix=settings.api_v1_str)
 app.include_router(prefs.router, prefix=settings.api_v1_str)
 app.include_router(admin.router, prefix=settings.api_v1_str)
+app.include_router(notifications.router, prefix=settings.api_v1_str)

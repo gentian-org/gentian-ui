@@ -74,8 +74,9 @@ class SqlAuditStore:
 
         with get_db_session() as session:
             rows = session.scalars(stmt).all()
+            events = [_row_to_event(row) for row in rows]
 
-        events = _apply_text_filters([_row_to_event(row) for row in rows], filters)
+        events = _apply_text_filters(events, filters)
         return events[: filters.normalized_limit()]
 
 

@@ -4,11 +4,12 @@ import { fetchAdminContext, fetchGroups } from "@/api/admin";
 import { AuditSection } from "@/admin/AuditSection";
 import { GroupsSection } from "@/admin/GroupsSection";
 import { MembersSection } from "@/admin/MembersSection";
+import { NotificationsSection } from "@/admin/NotificationsSection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
 import { SessionsSection } from "@/admin/SessionsSection";
 import "./admin.css";
 
-type AdminTab = "members" | "groups" | "security" | "sessions" | "audit";
+type AdminTab = "members" | "groups" | "security" | "sessions" | "audit" | "notifications";
 
 export function AdminConsole() {
   const [tab, setTab] = useState<AdminTab>("members");
@@ -100,6 +101,13 @@ export function AdminConsole() {
           >
             Audit
           </button>
+          <button
+            type="button"
+            className={`admin-console__tab${tab === "notifications" ? " admin-console__tab--active" : ""}`}
+            onClick={() => setTab("notifications")}
+          >
+            Notifications
+          </button>
         </nav>
 
         <div className="admin-console__body">
@@ -111,6 +119,8 @@ export function AdminConsole() {
             <SecurityPoliciesSection tenant={tenant} />
           ) : tab === "sessions" ? (
             <SessionsSection tenant={tenant} />
+          ) : tab === "notifications" ? (
+            <NotificationsSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
           ) : (
             <AuditSection tenant={tenant} />
           )}

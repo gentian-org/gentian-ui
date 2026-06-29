@@ -53,7 +53,8 @@ async def get_current_user(
             "preferred_username": "dev-user",
             "name": "Dev User",
             "email": "dev@gentian.local",
-            "tenant": settings.kernel_domain,
+            "tenant": "demo",
+            "groups": ["gentian:tenant:demo:admins", "gentian:tenant:demo:members"],
         }
     if credentials is None or not credentials.credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")

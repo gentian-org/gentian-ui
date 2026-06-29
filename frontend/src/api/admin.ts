@@ -288,3 +288,48 @@ export async function downloadAuditExport(
   anchor.click();
   URL.revokeObjectURL(url);
 }
+
+export type NotificationSeverity = "info" | "warning" | "critical";
+
+export type NotificationAudience = {
+  scope: "platform" | "tenant";
+  tenant?: string | null;
+  groups: string[];
+};
+
+export type AdminNotification = {
+  id: string;
+  publishedAt: number;
+  title: string;
+  body: string;
+  severity: NotificationSeverity;
+  audience: NotificationAudience;
+  publisher: string;
+  tenant: string;
+  linkUrl?: string | null;
+  linkLabel?: string | null;
+  expiresAt?: number | null;
+  cloudEvent: Record<string, unknown>;
+};
+
+export function fetchNotifications(tenant?: string) {
+  return apiFetch<AdminNotification[]>(`/admin/notifications${tenantQuery(tenant)}`);
+}
+
+export function publishNotification(
+  body: {
+    title: string;
+    body: string;
+    severity?: NotificationSeverity;
+    audience?: NotificationAudience;
+    linkUrl?: string;
+    linkLabel?: string;
+    expiresAt?: number;
+  },
+  tenant?: string,
+) {
+  return apiFetch<AdminNotification>(`/admin/notifications${tenantQuery(tenant)}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
