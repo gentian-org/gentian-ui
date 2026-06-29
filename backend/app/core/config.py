@@ -42,6 +42,31 @@ class Settings(BaseSettings):
         return f"https://portal.{self.kernel_domain}/login"
 
     @property
+    def oidc_realm_base_url(self) -> str | None:
+        """Realm OIDC base URL for JWKS/userinfo (prefer in-cluster Keycloak)."""
+        issuer = (self.oidc_issuer or "").rstrip("/")
+        if not issuer:
+            return None
+        if self.keycloak_admin_url and "/realms/" in issuer:
+            realm_path = issuer[issuer.index("/realms/") :]
+            return self.keycloak_admin_url.rstrip("/") + realm_path
+        return issuer
+
+    @property
+    def oidc_jwks_url(self) -> str | None:
+        base = self.oidc_realm_base_url
+        return f"{base}/protocol/openid-connect/certs" if base else None
+
+    @property
+    def oidc_userinfo_url(self) -> str | None:
+        base = self.oidc_realm_base_url
+        return f"{base}/protocol/openid-connect/userinfo" if base else None
+
+    @property
+    def oidc_expected_client_id(self) -> str | None:
+        return self.oidc_audience or self.oidc_client_id
+
+    @property
     def cors_origin_list(self) -> list[str]:
         if self.cors_origins.strip() == "*":
             return ["*"]

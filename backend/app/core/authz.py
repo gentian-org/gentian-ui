@@ -9,6 +9,12 @@ from fastapi import Depends, HTTPException, status
 
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
+from app.core.gentian_groups import (
+    is_bootstrap_tenant_admin,
+    is_tenant_admin,
+    normalize_groups,
+    user_is_platform_admin,
+)
 from app.core.openfga_client import OpenFGAClient, user_subject
 
 
@@ -61,6 +67,14 @@ def require_shell_launch() -> Callable[..., Any]:
         user: dict[str, Any] = Depends(get_current_user),
         settings: Settings = Depends(get_settings),
     ) -> dict[str, Any]:
+        groups = normalize_groups(user)
+        if (
+            settings.auth_disabled
+            or user_is_platform_admin(user)
+            or is_tenant_admin(groups)
+            or is_bootstrap_tenant_admin(user)
+        ):
+            return user
         await check_permission(
             user=user,
             relation="can_launch",
