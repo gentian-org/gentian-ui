@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Annotated, Protocol
 
-from fastapi import HTTPException, status
+from fastapi import Depends, HTTPException, status
 
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from app.services.admin_store import AdminStore
 from app.services.security_policies import SecurityPolicies
 
@@ -23,7 +23,7 @@ class SecurityPolicyStore(Protocol):
     ) -> SecurityPolicies: ...
 
 
-def get_security_policy_store(settings: Settings) -> SecurityPolicyStore:
+def get_security_policy_store(settings: Settings = Depends(get_settings)) -> SecurityPolicyStore:
     from app.services.keycloak_security_policy_store import KeycloakSecurityPolicyStore
     from app.services.memory_security_policy_store import MemorySecurityPolicyStore
 
@@ -39,3 +39,6 @@ def get_security_policy_store(settings: Settings) -> SecurityPolicyStore:
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail="Security policy store is not configured",
     )
+
+
+SecurityPolicyStoreDep = Annotated[SecurityPolicyStore, Depends(get_security_policy_store)]

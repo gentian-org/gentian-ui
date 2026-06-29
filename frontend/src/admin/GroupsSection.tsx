@@ -9,7 +9,9 @@ type GroupsSectionProps = {
 
 export function GroupsSection({ tenant }: GroupsSectionProps) {
   const queryClient = useQueryClient();
-  const [name, setName] = useState(`gentian:tenant:${tenant}:app:`);
+  const defaultGroupPrefix =
+    tenant === "kernel" ? "gentian:platform:" : `gentian:tenant:${tenant}:app:`;
+  const [name, setName] = useState(`${defaultGroupPrefix}`);
   const [error, setError] = useState<string | null>(null);
 
   const groupsQuery = useQuery({
@@ -20,7 +22,7 @@ export function GroupsSection({ tenant }: GroupsSectionProps) {
   const createMutation = useMutation({
     mutationFn: () => createGroup(name, tenant),
     onSuccess: async () => {
-      setName(`gentian:tenant:${tenant}:app:`);
+      setName(`${defaultGroupPrefix}`);
       setError(null);
       await queryClient.invalidateQueries({ queryKey: ["admin", "groups", tenant] });
     },

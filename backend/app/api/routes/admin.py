@@ -11,10 +11,10 @@ from app.core.admin_context import admin_tenant_query, resolve_admin_tenant
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
 from app.core.gentian_groups import (
+    is_admin_managed_group,
     is_bootstrap_tenant_admin,
     is_platform_superadmin,
     is_tenant_admin,
-    is_tenant_managed_group,
     normalize_groups,
     tenant_admins_group,
     tenant_members_group,
@@ -22,8 +22,8 @@ from app.core.gentian_groups import (
     tenant_admin_tenants,
     user_is_platform_admin,
 )
-from app.services.admin_store import AdminStore, Member, get_admin_store
-from app.services.security_policy_store import SecurityPolicyStore, get_security_policy_store
+from app.services.admin_store import AdminStore, AdminStoreDep, Member
+from app.services.security_policy_store import SecurityPolicyStoreDep
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -160,8 +160,15 @@ def _group_response(group: Any) -> GroupResponse:
     )
 
 
-def _validate_group_name(name: str, tenant: str) -> str:
+def _validate_group_name(name: str, tenant: str, settings: Settings) -> str:
     normalized = name.strip()
+    if tenant == settings.kernel_realm:
+        if not normalized.startswith("gentian:platform:"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Platform groups must start with gentian:platform:",
+            )
+        return normalized
     if not normalized.startswith(tenant_prefix(tenant)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -175,19 +182,24 @@ def _validate_group_name(name: str, tenant: str) -> str:
     return normalized
 
 
-async def _managed_groups(store: AdminStore, tenant: str) -> list[Any]:
+async def _managed_groups(store: AdminStore, tenant: str, settings: Settings) -> list[Any]:
     realm = _realm_for_tenant(tenant)
     groups = await store.list_groups(realm)
-    return [g for g in groups if is_tenant_managed_group(g.name, tenant)]
+    return [
+        g
+        for g in groups
+        if is_admin_managed_group(g.name, tenant, kernel_realm=settings.kernel_realm)
+    ]
 
 
 async def _invite_group_ids(
     store: AdminStore,
     tenant: str,
+    settings: Settings,
     requested: list[str],
 ) -> list[str]:
     realm = _realm_for_tenant(tenant)
-    allowed = {g.id for g in await _managed_groups(store, tenant)}
+    allowed = {g.id for g in await _managed_groups(store, tenant, settings)}
     invalid = [gid for gid in requested if gid not in allowed]
     if invalid:
         raise HTTPException(
@@ -260,7 +272,7 @@ async def admin_context(
     return AdminContextResponse(
         tenant=resolved,
         realm=_realm_for_tenant(resolved),
-        isPlatformAdmin=settings.auth_disabled or is_platform_superadmin(groups),
+        isPlatformAdmin=settings.auth_disabled or user_is_platform_admin(user),
         isTenantAdmin=settings.auth_disabled or is_tenant_admin(groups),
         availableTenants=available,
         storeConfigured=settings.auth_disabled
@@ -272,7 +284,8 @@ async def admin_context(
 async def list_members(
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> list[MemberResponse]:
     _require_admin(user, settings)
@@ -286,7 +299,8 @@ async def create_member(
     body: MemberCreateRequest,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> MemberResponse:
     _require_admin(user, settings)
@@ -307,13 +321,14 @@ async def invite_member(
     body: MemberInviteRequest,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> MemberResponse:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
     realm = _realm_for_tenant(resolved)
-    group_ids = await _invite_group_ids(store, resolved, body.groupIds)
+    group_ids = await _invite_group_ids(store, resolved, settings, body.groupIds)
     member = await store.invite_member(
         realm,
         username=str(body.email),
@@ -333,7 +348,8 @@ async def enable_member_totp(
     body: TotpEnableRequest,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> MemberResponse:
     _require_admin(user, settings)
@@ -351,7 +367,8 @@ async def remove_member_totp(
     member_id: str,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> MemberResponse:
     _require_admin(user, settings)
@@ -365,7 +382,8 @@ async def reset_member_password(
     member_id: str,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> None:
     _require_admin(user, settings)
@@ -378,7 +396,8 @@ async def get_member(
     member_id: str,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> MemberResponse:
     _require_admin(user, settings)
@@ -393,7 +412,8 @@ async def update_member(
     body: MemberUpdateRequest,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> MemberResponse:
     _require_admin(user, settings)
@@ -414,7 +434,8 @@ async def delete_member(
     member_id: str,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> None:
     _require_admin(user, settings)
@@ -428,13 +449,14 @@ async def update_member_groups(
     body: MemberGroupsUpdateRequest,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> MemberResponse:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
     realm = _realm_for_tenant(resolved)
-    allowed = {g.id for g in await _managed_groups(store, resolved)}
+    allowed = {g.id for g in await _managed_groups(store, resolved, settings)}
     invalid = [gid for gid in body.groupIds if gid not in allowed]
     if invalid:
         raise HTTPException(
@@ -449,12 +471,13 @@ async def update_member_groups(
 async def list_groups(
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> list[GroupResponse]:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
-    groups = await _managed_groups(store, resolved)
+    groups = await _managed_groups(store, resolved, settings)
     return [_group_response(group) for group in groups]
 
 
@@ -463,12 +486,13 @@ async def create_group(
     body: GroupCreateRequest,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> GroupResponse:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
-    name = _validate_group_name(body.name, resolved)
+    name = _validate_group_name(body.name, resolved, settings)
     group = await store.create_group(_realm_for_tenant(resolved), name=name)
     return _group_response(group)
 
@@ -479,16 +503,17 @@ async def update_group(
     body: GroupUpdateRequest,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> GroupResponse:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
     realm = _realm_for_tenant(resolved)
     existing = await store.get_group(realm, group_id)
-    if not is_tenant_managed_group(existing.name, resolved):
+    if not is_admin_managed_group(existing.name, resolved, kernel_realm=settings.kernel_realm):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Group is not manageable")
-    name = _validate_group_name(body.name, resolved)
+    name = _validate_group_name(body.name, resolved, settings)
     group = await store.update_group(realm, group_id, name=name)
     return _group_response(group)
 
@@ -498,14 +523,15 @@ async def delete_group(
     group_id: str,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    store: AdminStore = Depends(get_admin_store),
+    *,
+    store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
 ) -> None:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
     realm = _realm_for_tenant(resolved)
     existing = await store.get_group(realm, group_id)
-    if not is_tenant_managed_group(existing.name, resolved):
+    if not is_admin_managed_group(existing.name, resolved, kernel_realm=settings.kernel_realm):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Group is not manageable")
     await store.delete_group(realm, group_id)
 
@@ -514,8 +540,9 @@ async def delete_group(
 async def get_security_policies(
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    policy_store: SecurityPolicyStore = Depends(get_security_policy_store),
     tenant: str | None = Depends(admin_tenant_query),
+    *,
+    policy_store: SecurityPolicyStoreDep,
 ) -> SecurityPoliciesResponse:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
@@ -528,9 +555,10 @@ async def update_security_policies(
     body: SecurityPoliciesUpdateRequest,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
-    policy_store: SecurityPolicyStore = Depends(get_security_policy_store),
-    store: AdminStore = Depends(get_admin_store),
     tenant: str | None = Depends(admin_tenant_query),
+    *,
+    policy_store: SecurityPolicyStoreDep,
+    store: AdminStoreDep,
 ) -> SecurityPoliciesResponse:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)

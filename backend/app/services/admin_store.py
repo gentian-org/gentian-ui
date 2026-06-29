@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Annotated, Protocol
 
-from fastapi import HTTPException, status
+from fastapi import Depends, HTTPException, status
 
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 
 
 INVITE_EMAIL_ATTR = "gentian.inviteEmail"
@@ -107,7 +107,7 @@ def admin_store_configured(settings: Settings) -> bool:
     return bool(settings.keycloak_admin_url and settings.keycloak_admin_password)
 
 
-def get_admin_store(settings: Settings) -> AdminStore:
+def get_admin_store(settings: Settings = Depends(get_settings)) -> AdminStore:
     from app.services.keycloak_admin_store import KeycloakAdminStore
     from app.services.memory_admin_store import MemoryAdminStore
 
@@ -125,3 +125,6 @@ def get_admin_store(settings: Settings) -> AdminStore:
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail="Admin identity store is not configured",
     )
+
+
+AdminStoreDep = Annotated[AdminStore, Depends(get_admin_store)]

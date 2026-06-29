@@ -36,6 +36,16 @@ def is_tenant_managed_group(name: str, tenant: str) -> bool:
     return True
 
 
+def is_platform_managed_group(name: str) -> bool:
+    return name.startswith("gentian:platform:")
+
+
+def is_admin_managed_group(name: str, tenant: str, *, kernel_realm: str) -> bool:
+    if tenant == kernel_realm:
+        return is_platform_managed_group(name)
+    return is_tenant_managed_group(name, tenant)
+
+
 def normalize_groups(claims: dict) -> list[str]:
     raw = claims.get("groups")
     if raw is None:
