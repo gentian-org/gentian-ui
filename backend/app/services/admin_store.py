@@ -37,6 +37,17 @@ class Group:
     member_count: int = 0
 
 
+@dataclass
+class UserSession:
+    id: str
+    member_id: str
+    client_id: str
+    client_name: str
+    ip_address: str | None
+    started_at: int
+    last_access_at: int
+
+
 class AdminStore(Protocol):
     async def list_members(self, realm: str) -> list[Member]: ...
 
@@ -103,12 +114,22 @@ class AdminStore(Protocol):
 
     async def set_member_groups(self, realm: str, member_id: str, group_ids: list[str]) -> Member: ...
 
+    async def list_member_sessions(self, realm: str, member_id: str) -> list[UserSession]: ...
+
+    async def revoke_member_session(self, realm: str, member_id: str, session_id: str) -> None: ...
+
+    async def revoke_all_member_sessions(self, realm: str, member_id: str) -> None: ...
+
 
 def admin_store_configured(settings: Settings) -> bool:
     return bool(settings.keycloak_admin_url and settings.keycloak_admin_password)
 
 
+_memory_admin_store: AdminStore | None = None
+
+
 def get_admin_store(settings: Settings = Depends(get_settings)) -> AdminStore:
+    global _memory_admin_store
     from app.services.keycloak_admin_store import KeycloakAdminStore
     from app.services.memory_admin_store import MemoryAdminStore
 
@@ -121,7 +142,9 @@ def get_admin_store(settings: Settings = Depends(get_settings)) -> AdminStore:
             portal_login_url=settings.portal_login_url,
         )
     if settings.auth_disabled:
-        return MemoryAdminStore()
+        if _memory_admin_store is None:
+            _memory_admin_store = MemoryAdminStore()
+        return _memory_admin_store
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail="Admin identity store is not configured",

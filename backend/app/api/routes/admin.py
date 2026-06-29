@@ -118,6 +118,18 @@ class SecurityPoliciesUpdateRequest(SecurityPoliciesResponse):
     pass
 
 
+class MemberSessionResponse(BaseModel):
+    id: str
+    memberId: str
+    memberEmail: str | None = None
+    memberUsername: str
+    clientId: str
+    clientName: str
+    ipAddress: str | None = None
+    startedAt: int
+    lastAccessAt: int
+
+
 def _require_admin(user: dict[str, Any], settings: Settings) -> None:
     if settings.auth_disabled:
         return
@@ -158,6 +170,30 @@ def _group_response(group: Any) -> GroupResponse:
         path=group.path,
         memberCount=group.member_count,
     )
+
+
+def _session_response(session: Any, member: Member) -> MemberSessionResponse:
+    return MemberSessionResponse(
+        id=session.id,
+        memberId=session.member_id,
+        memberEmail=member.email,
+        memberUsername=member.username,
+        clientId=session.client_id,
+        clientName=session.client_name,
+        ipAddress=session.ip_address,
+        startedAt=session.started_at,
+        lastAccessAt=session.last_access_at,
+    )
+
+
+async def _list_tenant_sessions(store: AdminStore, realm: str) -> list[MemberSessionResponse]:
+    members = await store.list_members(realm)
+    sessions: list[MemberSessionResponse] = []
+    for member in members:
+        for session in await store.list_member_sessions(realm, member.id):
+            sessions.append(_session_response(session, member))
+    sessions.sort(key=lambda item: item.lastAccessAt, reverse=True)
+    return sessions
 
 
 def _validate_group_name(name: str, tenant: str, settings: Settings) -> str:
@@ -569,3 +605,68 @@ async def update_security_policies(
         store,
     )
     return _security_policies_response(policies)
+
+
+@router.get("/sessions", response_model=list[MemberSessionResponse])
+async def list_sessions(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    store: AdminStoreDep,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> list[MemberSessionResponse]:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    return await _list_tenant_sessions(store, _realm_for_tenant(resolved))
+
+
+@router.get("/members/{member_id}/sessions", response_model=list[MemberSessionResponse])
+async def list_member_sessions(
+    member_id: str,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    store: AdminStoreDep,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> list[MemberSessionResponse]:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    realm = _realm_for_tenant(resolved)
+    member = await store.get_member(realm, member_id)
+    sessions = await store.list_member_sessions(realm, member_id)
+    return [_session_response(session, member) for session in sessions]
+
+
+@router.delete(
+    "/members/{member_id}/sessions/{session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def revoke_member_session(
+    member_id: str,
+    session_id: str,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    store: AdminStoreDep,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> None:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    await store.revoke_member_session(_realm_for_tenant(resolved), member_id, session_id)
+
+
+@router.post(
+    "/members/{member_id}/sessions/revoke-all",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def revoke_all_member_sessions(
+    member_id: str,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    store: AdminStoreDep,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> None:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    await store.revoke_all_member_sessions(_realm_for_tenant(resolved), member_id)

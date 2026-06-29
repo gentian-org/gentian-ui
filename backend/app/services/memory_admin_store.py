@@ -8,7 +8,7 @@ from copy import deepcopy
 from fastapi import HTTPException, status
 
 from app.core.gentian_groups import tenant_members_group, tenant_prefix
-from app.services.admin_store import Group, Member
+from app.services.admin_store import Group, Member, UserSession
 
 
 class MemoryAdminStore:
@@ -16,12 +16,14 @@ class MemoryAdminStore:
         self._members: dict[str, dict[str, Member]] = {}
         self._groups: dict[str, dict[str, Group]] = {}
         self._member_groups: dict[str, dict[str, set[str]]] = {}
+        self._sessions: dict[str, dict[str, list[UserSession]]] = {}
 
     def _ensure_realm(self, realm: str) -> None:
         if realm not in self._members:
             self._members[realm] = {}
             self._groups[realm] = {}
             self._member_groups[realm] = {}
+            self._sessions[realm] = {}
             members_name = tenant_members_group(realm)
             group_id = str(uuid.uuid4())
             self._groups[realm][group_id] = Group(
@@ -141,6 +143,8 @@ class MemoryAdminStore:
         if enabled is not None:
             member.enabled = enabled
         self._members[realm][member_id] = member
+        if enabled is False:
+            self._sessions[realm][member_id] = []
         return await self.get_member(realm, member_id)
 
     async def delete_member(self, realm: str, member_id: str) -> None:
@@ -198,6 +202,41 @@ class MemoryAdminStore:
             await self.get_group(realm, group_id)
         self._member_groups[realm][member_id] = set(group_ids)
         return await self.get_member(realm, member_id)
+
+    async def list_member_sessions(self, realm: str, member_id: str) -> list[UserSession]:
+        await self.get_member(realm, member_id)
+        return [deepcopy(session) for session in self._sessions[realm].get(member_id, [])]
+
+    async def revoke_member_session(self, realm: str, member_id: str, session_id: str) -> None:
+        await self.get_member(realm, member_id)
+        sessions = self._sessions[realm].get(member_id, [])
+        self._sessions[realm][member_id] = [s for s in sessions if s.id != session_id]
+
+    async def revoke_all_member_sessions(self, realm: str, member_id: str) -> None:
+        await self.get_member(realm, member_id)
+        self._sessions[realm][member_id] = []
+
+    def seed_member_session(
+        self,
+        realm: str,
+        member_id: str,
+        *,
+        client_name: str = "gentian-portal",
+        ip_address: str = "10.0.0.1",
+    ) -> UserSession:
+        """Test helper — add a synthetic active session for a member."""
+        self._ensure_realm(realm)
+        session = UserSession(
+            id=str(uuid.uuid4()),
+            member_id=member_id,
+            client_id=str(uuid.uuid4()),
+            client_name=client_name,
+            ip_address=ip_address,
+            started_at=1_700_000_000,
+            last_access_at=1_700_000_100,
+        )
+        self._sessions[realm].setdefault(member_id, []).append(session)
+        return session
 
     def _hydrate_member(self, realm: str, member: Member) -> Member:
         group_ids = self._member_groups[realm].get(member.id, set())

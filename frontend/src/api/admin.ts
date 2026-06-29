@@ -173,3 +173,39 @@ export function updateSecurityPolicies(body: SecurityPolicies, tenant?: string) 
     body: JSON.stringify(body),
   });
 }
+
+export type AdminMemberSession = {
+  id: string;
+  memberId: string;
+  memberEmail?: string | null;
+  memberUsername: string;
+  clientId: string;
+  clientName: string;
+  ipAddress?: string | null;
+  startedAt: number;
+  lastAccessAt: number;
+};
+
+export function fetchSessions(tenant?: string) {
+  return apiFetch<AdminMemberSession[]>(`/admin/sessions${tenantQuery(tenant)}`);
+}
+
+export function fetchMemberSessions(memberId: string, tenant?: string) {
+  return apiFetch<AdminMemberSession[]>(
+    `/admin/members/${memberId}/sessions${tenantQuery(tenant)}`,
+  );
+}
+
+export function revokeMemberSession(memberId: string, sessionId: string, tenant?: string) {
+  return apiFetch<void>(
+    `/admin/members/${memberId}/sessions/${sessionId}${tenantQuery(tenant)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function revokeAllMemberSessions(memberId: string, tenant?: string) {
+  return apiFetch<void>(
+    `/admin/members/${memberId}/sessions/revoke-all${tenantQuery(tenant)}`,
+    { method: "POST" },
+  );
+}

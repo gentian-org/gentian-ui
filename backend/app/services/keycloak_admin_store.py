@@ -10,7 +10,7 @@ from urllib.parse import quote
 import httpx
 from fastapi import HTTPException, status
 
-from app.services.admin_store import CONFIGURE_TOTP_ACTION, INVITE_EMAIL_ATTR, UPDATE_PASSWORD_ACTION, Group, Member
+from app.services.admin_store import CONFIGURE_TOTP_ACTION, INVITE_EMAIL_ATTR, UPDATE_PASSWORD_ACTION, Group, Member, UserSession
 
 
 class KeycloakAdminStore:
@@ -219,6 +219,8 @@ class KeycloakAdminStore:
             f"/admin/realms/{quote(realm, safe='')}/users/{member_id}",
             json=body,
         )
+        if enabled is False:
+            await self.revoke_all_member_sessions(realm, member_id)
         return await self.get_member(realm, member_id)
 
     async def delete_member(self, realm: str, member_id: str) -> None:
@@ -278,6 +280,31 @@ class KeycloakAdminStore:
         for group_id in desired - current_ids:
             await self.add_member_to_group(realm, member_id, group_id)
         return await self.get_member(realm, member_id)
+
+    async def list_member_sessions(self, realm: str, member_id: str) -> list[UserSession]:
+        await self.get_member(realm, member_id)
+        raw = await self._request(
+            "GET",
+            f"/admin/realms/{quote(realm, safe='')}/users/{member_id}/sessions",
+        )
+        if not isinstance(raw, list):
+            return []
+        return [self._session_from_raw(member_id, item) for item in raw]
+
+    async def revoke_member_session(self, realm: str, member_id: str, session_id: str) -> None:
+        await self.get_member(realm, member_id)
+        await self._request(
+            "DELETE",
+            f"/admin/realms/{quote(realm, safe='')}/sessions/{quote(session_id, safe='')}",
+            params={"isOffline": "false"},
+        )
+
+    async def revoke_all_member_sessions(self, realm: str, member_id: str) -> None:
+        await self.get_member(realm, member_id)
+        await self._request(
+            "POST",
+            f"/admin/realms/{quote(realm, safe='')}/users/{member_id}/logout",
+        )
 
     async def _execute_actions_email(
         self,
@@ -529,4 +556,21 @@ class KeycloakAdminStore:
             name=raw.get("name") or "",
             path=raw.get("path") or raw.get("name") or "",
             member_count=int(raw.get("subGroupCount") or 0),
+        )
+
+    @staticmethod
+    def _session_from_raw(member_id: str, raw: dict[str, Any]) -> UserSession:
+        clients = raw.get("clients") or {}
+        if isinstance(clients, dict) and clients:
+            client_id, client_name = next(iter(clients.items()))
+        else:
+            client_id, client_name = "", "unknown"
+        return UserSession(
+            id=raw["id"],
+            member_id=member_id,
+            client_id=str(client_id),
+            client_name=str(client_name),
+            ip_address=raw.get("ipAddress"),
+            started_at=int(raw.get("start") or 0),
+            last_access_at=int(raw.get("lastAccess") or 0),
         )

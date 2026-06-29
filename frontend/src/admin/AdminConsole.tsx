@@ -4,9 +4,10 @@ import { fetchAdminContext, fetchGroups } from "@/api/admin";
 import { GroupsSection } from "@/admin/GroupsSection";
 import { MembersSection } from "@/admin/MembersSection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
+import { SessionsSection } from "@/admin/SessionsSection";
 import "./admin.css";
 
-type AdminTab = "members" | "groups" | "security";
+type AdminTab = "members" | "groups" | "security" | "sessions";
 
 export function AdminConsole() {
   const [tab, setTab] = useState<AdminTab>("members");
@@ -84,6 +85,13 @@ export function AdminConsole() {
           >
             Security
           </button>
+          <button
+            type="button"
+            className={`admin-console__tab${tab === "sessions" ? " admin-console__tab--active" : ""}`}
+            onClick={() => setTab("sessions")}
+          >
+            Sessions
+          </button>
         </nav>
 
         <div className="admin-console__body">
@@ -91,8 +99,10 @@ export function AdminConsole() {
             <MembersSection tenant={tenant} groups={groupsQuery.data ?? []} />
           ) : tab === "groups" ? (
             <GroupsSection tenant={tenant} />
-          ) : (
+          ) : tab === "security" ? (
             <SecurityPoliciesSection tenant={tenant} />
+          ) : (
+            <SessionsSection tenant={tenant} />
           )}
         </div>
       </div>

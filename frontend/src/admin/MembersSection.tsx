@@ -97,8 +97,15 @@ export function MembersSection({ tenant, groups }: MembersSectionProps) {
   const toggleMutation = useMutation({
     mutationFn: (member: AdminMember) =>
       updateMember(member.id, { enabled: !member.enabled }, tenant),
-    onSuccess: async () => {
+    onSuccess: async (_data, member) => {
+      setError(null);
+      if (member.enabled) {
+        setSuccess("Member disabled. All active sessions were signed out.");
+      } else {
+        setSuccess(null);
+      }
       await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
+      await queryClient.invalidateQueries({ queryKey: ["admin", "sessions", tenant] });
     },
   });
 

@@ -105,3 +105,53 @@ async def test_admin_security_policies_in_auth_disabled_mode():
         assert payload["passwordMinLength"] == 12
         assert payload["passwordRequireDigits"] is True
         assert payload["requireTotpAdmins"] is True
+
+
+@pytest.mark.asyncio
+async def test_admin_sessions_in_auth_disabled_mode():
+    from app.core.config import get_settings
+    from app.services.admin_store import get_admin_store
+    from app.services.memory_admin_store import MemoryAdminStore
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        created = await client.post(
+            "/api/v1/admin/members",
+            json={"email": "eve@demo.desk.gentian.org", "enabled": True},
+        )
+        assert created.status_code == 201
+        member_id = created.json()["id"]
+
+        empty = await client.get("/api/v1/admin/sessions")
+        assert empty.status_code == 200
+        assert empty.json() == []
+
+        store = get_admin_store(get_settings())
+        assert isinstance(store, MemoryAdminStore)
+        store.seed_member_session("demo", member_id, client_name="gentian-portal")
+
+        listed = await client.get("/api/v1/admin/sessions")
+        assert listed.status_code == 200
+        sessions = listed.json()
+        assert len(sessions) == 1
+        session_id = sessions[0]["id"]
+
+        revoked = await client.delete(f"/api/v1/admin/members/{member_id}/sessions/{session_id}")
+        assert revoked.status_code == 204
+        assert (await client.get("/api/v1/admin/sessions")).json() == []
+
+        store.seed_member_session("demo", member_id)
+        store.seed_member_session("demo", member_id, client_name="other-client")
+        assert len((await client.get("/api/v1/admin/sessions")).json()) == 2
+
+        sign_out = await client.post(f"/api/v1/admin/members/{member_id}/sessions/revoke-all")
+        assert sign_out.status_code == 204
+        assert (await client.get("/api/v1/admin/sessions")).json() == []
+
+        store.seed_member_session("demo", member_id)
+        disabled = await client.patch(
+            f"/api/v1/admin/members/{member_id}",
+            json={"enabled": False},
+        )
+        assert disabled.status_code == 200
+        assert (await client.get("/api/v1/admin/sessions")).json() == []
