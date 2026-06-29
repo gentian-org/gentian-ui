@@ -10,7 +10,7 @@ from urllib.parse import quote
 import httpx
 from fastapi import HTTPException, status
 
-from app.services.admin_store import CONFIGURE_TOTP_ACTION, INVITE_EMAIL_ATTR, Group, Member
+from app.services.admin_store import CONFIGURE_TOTP_ACTION, INVITE_EMAIL_ATTR, UPDATE_PASSWORD_ACTION, Group, Member
 
 
 class KeycloakAdminStore:
@@ -152,7 +152,7 @@ class KeycloakAdminStore:
         await self._execute_actions_email(
             realm,
             member_id,
-            ["UPDATE_PASSWORD"],
+            [UPDATE_PASSWORD_ACTION],
             delivery_email=delivery,
         )
 
@@ -331,6 +331,9 @@ class KeycloakAdminStore:
                         "enabled": current.get("enabled", True),
                     },
                 )
+            if self._smtp_unavailable(response):
+                await self._set_required_actions(realm, member_id, current, actions)
+                return
             await self._raise_for_status(response)
         if restored and primary:
             await self._request(
@@ -397,6 +400,42 @@ class KeycloakAdminStore:
                 "enabled": raw.get("enabled", True),
                 "requiredActions": required_actions,
             },
+        )
+
+    async def _set_required_actions(
+        self,
+        realm: str,
+        member_id: str,
+        raw: dict[str, Any],
+        actions: list[str],
+    ) -> None:
+        required_actions = list(raw.get("requiredActions") or [])
+        for action in actions:
+            if action not in required_actions:
+                required_actions.append(action)
+        await self._request(
+            "PUT",
+            f"/admin/realms/{quote(realm, safe='')}/users/{member_id}",
+            json={
+                "username": raw.get("username"),
+                "email": raw.get("email"),
+                "firstName": raw.get("firstName", ""),
+                "lastName": raw.get("lastName", ""),
+                "enabled": raw.get("enabled", True),
+                "requiredActions": required_actions,
+            },
+        )
+
+    @staticmethod
+    def _smtp_unavailable(response: httpx.Response) -> bool:
+        text = response.text.lower()
+        return (
+            response.status_code >= 400
+            and (
+                "no sender address" in text
+                or "failed to send execute actions email" in text
+                or "failed to send email" in text
+            )
         )
 
     async def _admin_token(self) -> str:

@@ -12,6 +12,7 @@ from app.core.config import Settings, get_settings
 
 INVITE_EMAIL_ATTR = "gentian.inviteEmail"
 CONFIGURE_TOTP_ACTION = "CONFIGURE_TOTP"
+UPDATE_PASSWORD_ACTION = "UPDATE_PASSWORD"
 
 
 @dataclass

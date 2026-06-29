@@ -55,7 +55,9 @@ export function MembersSection({ tenant, groups }: MembersSectionProps) {
     onSuccess: async () => {
       setForm({ email: "", inviteEmail: "", firstName: "", lastName: "", groupIds: [], requireTotp: false });
       setError(null);
-      setSuccess("Invite email sent.");
+      setSuccess(
+        "Invite sent. The member will complete setup on first sign-in (email delivery requires SMTP).",
+      );
       await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
     },
     onError: (err: Error) => {
@@ -82,7 +84,9 @@ export function MembersSection({ tenant, groups }: MembersSectionProps) {
     mutationFn: (id: string) => resetMemberPassword(id, tenant),
     onSuccess: () => {
       setError(null);
-      setSuccess("Password reset email sent.");
+      setSuccess(
+        "Password reset initiated. The member will set a new password on next sign-in.",
+      );
     },
     onError: (err: Error) => {
       setSuccess(null);
