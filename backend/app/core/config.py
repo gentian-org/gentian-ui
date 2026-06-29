@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     kernel_domain: str = Field(default="gentian.local", alias="KERNEL_DOMAIN")
     kernel_realm: str = Field(default="kernel", alias="KERNEL_REALM")
+    tenancy_mode: str = Field(default="multi", alias="TENANCY_MODE")
 
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
 

@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/auth/AuthProvider";
+import { loginRedirect } from "@/auth/oidc";
 import { defaultBasePath } from "@/lib/device";
+
+type LoginRouteResponse = {
+  loginHint: string;
+  idpHint: string | null;
+  kind: "platform" | "tenant";
+};
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { login, authDisabled, isAuthenticated, isLoading } = useAuth();
+  const { authDisabled, isAuthenticated, isLoading } = useAuth();
+  const [email, setEmail] = useState("");
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -15,19 +23,39 @@ export function LoginPage() {
     }
   }, [isAuthenticated, isLoading, navigate]);
 
-  function signIn() {
+  async function signIn(event: React.FormEvent) {
+    event.preventDefault();
     setErrorMessage("");
+
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setErrorMessage("Enter your email address to continue.");
+      return;
+    }
+
     if (authDisabled) {
       setIsRedirecting(true);
       void navigate({ to: defaultBasePath() });
       return;
     }
+
+    setIsRedirecting(true);
     try {
-      setIsRedirecting(true);
-      login(defaultBasePath());
-    } catch {
+      const params = new URLSearchParams({ email: trimmed });
+      const response = await fetch(`/api/v1/auth/login-route?${params.toString()}`);
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { detail?: string } | null;
+        throw new Error(payload?.detail ?? "Could not resolve your workspace.");
+      }
+      const route = (await response.json()) as LoginRouteResponse;
+      await loginRedirect({
+        returnTo: defaultBasePath(),
+        loginHint: route.loginHint,
+        idpHint: route.idpHint ?? undefined,
+      });
+    } catch (error) {
       setIsRedirecting(false);
-      setErrorMessage("Could not initiate sign-in. Please try again.");
+      setErrorMessage(error instanceof Error ? error.message : "Could not initiate sign-in.");
     }
   }
 
@@ -45,15 +73,29 @@ export function LoginPage() {
         <h1 className="gentian-login__title">gentian</h1>
         <p className="gentian-login__subtitle">Sign in to your workspace</p>
 
-        <button
-          type="button"
-          className="gentian-login__btn"
-          disabled={isRedirecting}
-          onClick={signIn}
-        >
-          {isRedirecting && <span className="gentian-login__spinner" aria-hidden="true" />}
-          {isRedirecting ? "Signing in…" : "Sign in"}
-        </button>
+        <form className="gentian-login__form" onSubmit={(e) => void signIn(e)}>
+          <label className="gentian-login__label" htmlFor="login-email">
+            Email
+          </label>
+          <input
+            id="login-email"
+            className="gentian-login__input"
+            type="email"
+            name="email"
+            autoComplete="username"
+            inputMode="email"
+            placeholder="you@demo.desk.gentian.org"
+            value={email}
+            disabled={isRedirecting}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+          />
+
+          <button type="submit" className="gentian-login__btn" disabled={isRedirecting}>
+            {isRedirecting && <span className="gentian-login__spinner" aria-hidden="true" />}
+            {isRedirecting ? "Signing in…" : "Continue"}
+          </button>
+        </form>
 
         {errorMessage && (
           <p className="gentian-login__error" role="alert">

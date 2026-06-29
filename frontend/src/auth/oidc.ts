@@ -64,7 +64,16 @@ export function clearAccessToken(): void {
   sessionStorage.removeItem(PKCE_VERIFIER_KEY);
 }
 
-export async function loginRedirect(returnTo = "/desktop"): Promise<void> {
+export type LoginRedirectOptions = {
+  returnTo?: string;
+  loginHint?: string;
+  idpHint?: string;
+};
+
+export async function loginRedirect(options: LoginRedirectOptions | string = "/desktop"): Promise<void> {
+  const normalized =
+    typeof options === "string" ? { returnTo: options } : options;
+  const returnTo = normalized.returnTo ?? "/desktop";
   const config = getOidcConfig();
   if (config.authDisabled || !config.issuer || !config.clientId) {
     return;
@@ -83,6 +92,12 @@ export async function loginRedirect(returnTo = "/desktop"): Promise<void> {
     code_challenge: challenge,
     code_challenge_method: "S256",
   });
+  if (normalized.loginHint) {
+    params.set("login_hint", normalized.loginHint);
+  }
+  if (normalized.idpHint) {
+    params.set("kc_idp_hint", normalized.idpHint);
+  }
 
   window.location.href = `${config.issuer.replace(/\/$/, "")}/protocol/openid-connect/auth?${params}`;
 }

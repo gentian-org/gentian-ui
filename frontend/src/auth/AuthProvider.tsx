@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback((returnTo?: string) => {
-    void loginRedirect(returnTo);
+    void loginRedirect({ returnTo });
   }, []);
   const logout = useCallback(() => {
     // Full-page navigation only — do not clear React auth state here or RequireAuth
