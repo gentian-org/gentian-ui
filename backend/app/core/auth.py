@@ -56,4 +56,28 @@ async def get_current_user(
         ) from exc
 
     claims["tenant"] = resolve_user_context(claims, settings)
+    if not claims.get("groups"):
+        claims = _enrich_groups_from_userinfo(claims, credentials.credentials, settings)
+    return claims
+
+
+def _enrich_groups_from_userinfo(
+    claims: dict[str, Any], token: str, settings: Any
+) -> dict[str, Any]:
+    """Keycloak emits group membership when the groups scope is authorized."""
+    issuer = (settings.oidc_issuer or "").rstrip("/")
+    if not issuer:
+        return claims
+    try:
+        resp = httpx.get(
+            f"{issuer}/protocol/openid-connect/userinfo",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        info = resp.json()
+        if info.get("groups"):
+            claims = {**claims, "groups": info["groups"]}
+    except httpx.HTTPError:
+        pass
     return claims

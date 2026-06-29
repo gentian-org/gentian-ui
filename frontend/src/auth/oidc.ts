@@ -19,7 +19,7 @@ export function getOidcConfig(): OidcConfig {
     issuer: import.meta.env.VITE_OIDC_ISSUER ?? "",
     clientId: import.meta.env.VITE_OIDC_CLIENT_ID ?? "",
     redirectUri: import.meta.env.VITE_OIDC_REDIRECT_URI ?? `${window.location.origin}/login`,
-    scopes: import.meta.env.VITE_OIDC_SCOPES ?? "openid profile email",
+    scopes: import.meta.env.VITE_OIDC_SCOPES ?? "openid profile email groups",
     authDisabled: import.meta.env.VITE_AUTH_DISABLED === "true",
   };
 }

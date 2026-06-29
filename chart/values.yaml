@@ -1,4 +1,5 @@
 kernelDomain: gentian.local
+kernelRealm: kernel
 
 api:
   image:

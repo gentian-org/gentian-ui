@@ -35,6 +35,8 @@ spec:
           env:
             - name: KERNEL_DOMAIN
               value: {{ .Values.kernelDomain | quote }}
+            - name: KERNEL_REALM
+              value: {{ .Values.kernelRealm | default "kernel" | quote }}
             - name: AUTH_DISABLED
               value: {{ ternary "true" "false" .Values.auth.disabled | quote }}
             {{- range $key, $value := .Values.api.env }}

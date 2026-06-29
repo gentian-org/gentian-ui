@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { apiFetch, type AppsResponse, type MeResponse, type PrefsResponse } from "@/api/client";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
-import { SettingsPanel } from "@/settings/SettingsPanel";
+import { AdminConsole } from "@/admin/AdminConsole";
 import { useAppsStore } from "@/stores/apps";
 import { useWindowsStore } from "@/stores/windows";
 import { WindowManager } from "@/windows/WindowManager";
@@ -27,12 +27,12 @@ export function DesktopPage() {
   const setActiveAppId = useAppsStore((s) => s.setActiveAppId);
   const openWindow = useWindowsStore((s) => s.openWindow);
 
-  const settingsOpen = activeAppId === "settings";
+  const adminOpen = activeAppId === "admin";
   const launcherApps = useMemo(() => apps, [apps]);
 
   function handleSelect(app: (typeof apps)[number]) {
     setActiveAppId(app.id);
-    if (app.builtin && app.id === "settings") {
+    if (app.builtin && app.id === "admin") {
       return;
     }
     if (!app.launchUrl) {
@@ -49,9 +49,9 @@ export function DesktopPage() {
   return (
     <div className="gentian-shell shell-surface relative min-h-full">
       <Background imageUrl={prefs?.backgroundUrl} />
-      {settingsOpen && (
-        <div className="relative z-20 flex min-h-[calc(100vh-var(--app-menu-height))] items-center justify-center p-6">
-          <SettingsPanel />
+      {adminOpen && (
+        <div className="relative z-20">
+          <AdminConsole />
         </div>
       )}
       <WindowManager />

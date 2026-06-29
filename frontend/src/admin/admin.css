@@ -1,0 +1,208 @@
+.admin-console {
+  position: relative;
+  z-index: 20;
+  min-height: calc(100vh - var(--app-menu-height));
+  padding: 1.5rem;
+  overflow: auto;
+}
+
+.admin-console__frame {
+  max-width: 1120px;
+  margin: 0 auto;
+  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-radius: var(--gtn-r2, 4px);
+  background: var(--gtn-paper-3, #fff);
+}
+
+.admin-console__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+}
+
+.admin-console__eyebrow {
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gtn-ink-4, #74779a);
+  margin-bottom: 0.5rem;
+}
+
+.admin-console__title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 500;
+  color: var(--gtn-ink-1, #14152e);
+}
+
+.admin-console__tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+}
+
+.admin-console__tab {
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--gtn-ink-3, #45486b);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-console__tab--active {
+  color: var(--gtn-gentian-600, #1b1a82);
+  border-bottom-color: var(--gtn-gentian-500, #262696);
+}
+
+.admin-console__body {
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.admin-console__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-console__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.admin-console__table th,
+.admin-console__table td {
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+}
+
+.admin-console__table th {
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gtn-ink-4, #74779a);
+  font-weight: 600;
+}
+
+.admin-console__mono {
+  font-family: "Commit Mono", ui-monospace, monospace;
+  font-size: 0.8125rem;
+}
+
+.admin-console__btn {
+  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-radius: 2px;
+  background: var(--gtn-paper-0, #f4f1ea);
+  color: var(--gtn-ink-1, #14152e);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+}
+
+.admin-console__btn--primary {
+  background: var(--gtn-gentian-600, #1b1a82);
+  border-color: transparent;
+  color: #fff;
+}
+
+.admin-console__btn--danger {
+  color: #9b2d2d;
+  border-color: rgba(155, 45, 45, 0.35);
+}
+
+.admin-console__form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 28rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-radius: 4px;
+  background: var(--gtn-paper-0, #f4f1ea);
+}
+
+.admin-console__form--wide {
+  max-width: 36rem;
+}
+
+.admin-console__fieldset {
+  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  margin: 0;
+}
+
+.admin-console__fieldset legend {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gtn-ink-3, #45486b);
+  padding: 0 0.25rem;
+}
+
+.admin-console__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  margin-bottom: 0.35rem;
+}
+
+.admin-console__field select {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-radius: 2px;
+  font: inherit;
+  background: #fff;
+}
+
+.admin-console__field label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--gtn-ink-3, #45486b);
+}
+
+.admin-console__field input {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-radius: 2px;
+  font: inherit;
+}
+
+.admin-console__error {
+  color: #9b2d2d;
+  font-size: 0.8125rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-console__success {
+  color: #1f6b3a;
+  font-size: 0.8125rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-console__chip {
+  display: inline-block;
+  margin: 0.125rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 2px;
+  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  background: var(--gtn-paper-1, #ece8df);
+  font-family: "Commit Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+}

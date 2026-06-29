@@ -20,8 +20,14 @@ def extract_tenant_from_claims(claims: dict[str, Any]) -> str | None:
             return str(value)
 
     groups = claims.get("groups") or claims.get("realm_access", {}).get("roles") or []
+    if isinstance(groups, str):
+        groups = [groups]
     for group in groups:
         group_str = str(group)
+        if group_str.startswith("gentian:tenant:") and ":admins" in group_str:
+            parts = group_str.split(":")
+            if len(parts) >= 3:
+                return parts[2]
         if group_str.startswith("tenant:"):
             return group_str.removeprefix("tenant:")
 

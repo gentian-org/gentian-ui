@@ -3,12 +3,7 @@ import type { ShellApp } from "@/api/client";
 import { useAuth } from "@/auth/AuthProvider";
 import { AppLauncher } from "@/shell/AppLauncher";
 import { AppMenuSlot } from "@/shell/AppMenuSlot";
-import {
-  AppsGridIcon,
-  BellIcon,
-  MenuIcon,
-  TrayButton,
-} from "@/shell/TrayButton";
+import { AppsGridIcon, MenuIcon, TrayButton } from "@/shell/TrayButton";
 
 type AppMenuProps = {
   apps: ShellApp[];
@@ -47,9 +42,6 @@ export function AppMenu({ apps, activeAppId, username, onSelect }: AppMenuProps)
         </div>
 
         <div className="app-menu__tray">
-          <TrayButton label="Notifications">
-            <BellIcon />
-          </TrayButton>
           <TrayButton
             label={username ? `Menu (${username})` : "Menu"}
             onClick={() => setUserMenuOpen((v) => !v)}

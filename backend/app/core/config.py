@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     environment: str = Field(default="local", alias="ENVIRONMENT")
 
     kernel_domain: str = Field(default="gentian.local", alias="KERNEL_DOMAIN")
+    kernel_realm: str = Field(default="kernel", alias="KERNEL_REALM")
 
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
 
@@ -23,9 +24,21 @@ class Settings(BaseSettings):
     openfga_api_url: str | None = Field(default=None, alias="OPENFGA_API_URL")
     openfga_store_id: str | None = Field(default=None, alias="OPENFGA_STORE_ID")
 
+    keycloak_admin_url: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_URL")
+    keycloak_admin_username: str = Field(default="admin", alias="KEYCLOAK_ADMIN_USERNAME")
+    keycloak_admin_password: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_PASSWORD")
+
     auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
 
     cors_origins: str = Field(default="http://localhost:5173", alias="BACKEND_CORS_ORIGINS")
+
+    @property
+    def portal_client_id(self) -> str:
+        return self.oidc_client_id or "gentian-portal"
+
+    @property
+    def portal_login_url(self) -> str:
+        return f"https://portal.{self.kernel_domain}/login"
 
     @property
     def cors_origin_list(self) -> list[str]:

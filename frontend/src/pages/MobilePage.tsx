@@ -4,8 +4,6 @@ import { apiFetch, type AppsResponse, type MeResponse, type PrefsResponse } from
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { MobileAppLayer } from "@/shell/MobileAppLayer";
-import { SettingsPanel } from "@/settings/SettingsPanel";
-
 export function MobilePage() {
   const { data: me } = useQuery({
     queryKey: ["me"],
@@ -32,8 +30,6 @@ export function MobilePage() {
     setActiveAppId(app.id);
   }
 
-  const showSettings = activeAppId === "settings";
-
   return (
     <div className="gentian-shell shell-surface relative min-h-full">
       <Background imageUrl={prefs?.backgroundUrl} />
@@ -42,12 +38,7 @@ export function MobilePage() {
           <p className="gentian-mobile__welcome-text">Tap an app below to get started</p>
         </div>
       )}
-      {showSettings && (
-        <div className="relative z-20 p-4 pt-8">
-          <SettingsPanel />
-        </div>
-      )}
-      {!showSettings && activeApp?.launchUrl && (
+      {activeApp?.launchUrl && (
         <MobileAppLayer url={activeApp.launchUrl} title={activeApp.title} />
       )}
       <AppMenu
