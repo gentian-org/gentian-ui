@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import {
   downloadAuditExport,
   fetchAuditEvents,
-  type AuditEvent,
   type AuditEventCategory,
 } from "@/api/admin";
 import "./admin.css";
