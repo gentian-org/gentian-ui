@@ -11,6 +11,7 @@ export type OidcConfig = {
 };
 
 const TOKEN_STORAGE_KEY = "gentian.access_token";
+const ID_TOKEN_STORAGE_KEY = "gentian.id_token";
 const PKCE_VERIFIER_KEY = "gentian.pkce_verifier";
 
 export function getOidcConfig(): OidcConfig {
@@ -53,8 +54,13 @@ export function setAccessToken(token: string): void {
   sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
 }
 
+export function setIdToken(token: string): void {
+  sessionStorage.setItem(ID_TOKEN_STORAGE_KEY, token);
+}
+
 export function clearAccessToken(): void {
   sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  sessionStorage.removeItem(ID_TOKEN_STORAGE_KEY);
   sessionStorage.removeItem(PKCE_VERIFIER_KEY);
 }
 
@@ -82,15 +88,20 @@ export async function loginRedirect(returnTo = "/desktop"): Promise<void> {
 }
 
 export function logoutRedirect(): void {
-  clearAccessToken();
   const config = getOidcConfig();
+  const idToken = sessionStorage.getItem(ID_TOKEN_STORAGE_KEY);
+  clearAccessToken();
   if (!config.issuer || !config.clientId) {
+    window.location.href = "/login";
     return;
   }
   const params = new URLSearchParams({
     client_id: config.clientId,
     post_logout_redirect_uri: config.redirectUri,
   });
+  if (idToken) {
+    params.set("id_token_hint", idToken);
+  }
   window.location.href = `${config.issuer.replace(/\/$/, "")}/protocol/openid-connect/logout?${params}`;
 }
 
@@ -135,13 +146,16 @@ export async function handleOAuthCallback(): Promise<boolean> {
     return false;
   }
 
-  const payload = (await response.json()) as { access_token?: string };
+  const payload = (await response.json()) as { access_token?: string; id_token?: string };
   if (!payload.access_token) {
     sessionStorage.removeItem(PKCE_VERIFIER_KEY);
     return false;
   }
 
   setAccessToken(payload.access_token);
+  if (payload.id_token) {
+    setIdToken(payload.id_token);
+  }
   sessionStorage.removeItem(PKCE_VERIFIER_KEY);
 
   const state = params.get("state") ?? "/desktop";

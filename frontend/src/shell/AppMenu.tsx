@@ -84,7 +84,6 @@ export function AppMenu({ apps, activeAppId, username, onSelect }: AppMenuProps)
             onClick={() => {
               setUserMenuOpen(false);
               logout();
-              window.location.href = "/login";
             }}
           >
             Sign out

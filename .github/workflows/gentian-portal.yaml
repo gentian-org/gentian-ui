@@ -52,7 +52,7 @@ jobs:
             ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}
             ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.short }}
           build-args: |
-            VITE_OIDC_ISSUER=https://id.desk.gentian.org/realms/kernel
+            VITE_OIDC_ISSUER=https://id.desk.gentian.org/auth/realms/kernel
             VITE_OIDC_CLIENT_ID=gentian-portal
             VITE_OIDC_REDIRECT_URI=https://portal.desk.gentian.org/login
             VITE_AUTH_DISABLED=false
