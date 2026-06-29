@@ -11,20 +11,44 @@ from app.core.tenant import resolve_user_context
 _bearer = HTTPBearer(auto_error=False)
 
 
-def _validate_client_id(claims: dict[str, Any], expected: str | None) -> None:
-    """Keycloak public clients often emit azp instead of aud."""
+def _validate_client_id(claims: dict[str, Any], settings: Settings) -> None:
+    """Accept tokens from the public portal client or the BFF ROPC client."""
+    expected = [settings.oidc_expected_client_id, settings.portal_bff_client_id]
+    expected = [client_id for client_id in expected if client_id]
     if not expected:
         return
     aud = claims.get("aud")
     audiences = aud if isinstance(aud, list) else [aud] if aud else []
-    if expected in audiences or claims.get("azp") == expected:
+    azp = claims.get("azp")
+    if any(client_id in audiences or azp == client_id for client_id in expected):
         return
     raise jwt.InvalidAudienceError("Token audience does not match portal client")
 
 
+def _issuer_allowed(issuer: str, settings: Settings) -> bool:
+    normalized = issuer.rstrip("/")
+    kernel = (settings.oidc_issuer or "").rstrip("/")
+    if kernel and normalized == kernel:
+        return True
+    prefix = f"https://id.{settings.kernel_domain}/auth/realms/"
+    return normalized.startswith(prefix)
+
+
+def _jwks_url_for_issuer(issuer: str, settings: Settings) -> str:
+    issuer = issuer.rstrip("/")
+    if settings.keycloak_admin_url and "/realms/" in issuer:
+        realm_path = issuer[issuer.index("/realms/") :]
+        return settings.keycloak_admin_url.rstrip("/") + realm_path + "/protocol/openid-connect/certs"
+    return f"{issuer}/protocol/openid-connect/certs"
+
+
 def _decode_token(token: str, settings: Settings) -> dict[str, Any]:
-    issuer = (settings.oidc_issuer or "").rstrip("/")
-    jwks_url = settings.oidc_jwks_url or f"{issuer}/protocol/openid-connect/certs"
+    unverified = jwt.decode(token, options={"verify_signature": False})
+    issuer = (unverified.get("iss") or "").rstrip("/")
+    if not _issuer_allowed(issuer, settings):
+        raise jwt.InvalidIssuerError("Token issuer is not trusted")
+
+    jwks_url = _jwks_url_for_issuer(issuer, settings)
     jwks = httpx.get(jwks_url, timeout=10.0).json()
     header = jwt.get_unverified_header(token)
     kid = header.get("kid")
@@ -39,7 +63,7 @@ def _decode_token(token: str, settings: Settings) -> dict[str, Any]:
         issuer=issuer,
         options={"verify_aud": False},
     )
-    _validate_client_id(claims, settings.oidc_expected_client_id)
+    _validate_client_id(claims, settings)
     return claims
 
 
@@ -70,6 +94,14 @@ async def get_current_user(
     return claims
 
 
+def _userinfo_url_for_issuer(issuer: str, settings: Settings) -> str | None:
+    issuer = issuer.rstrip("/")
+    if settings.keycloak_admin_url and "/realms/" in issuer:
+        realm_path = issuer[issuer.index("/realms/") :]
+        return settings.keycloak_admin_url.rstrip("/") + realm_path + "/protocol/openid-connect/userinfo"
+    return f"{issuer}/protocol/openid-connect/userinfo"
+
+
 def _enrich_claims_from_userinfo(
     claims: dict[str, Any], token: str, settings: Settings
 ) -> dict[str, Any]:
@@ -79,7 +111,8 @@ def _enrich_claims_from_userinfo(
     if not needs_groups and not needs_username:
         return claims
 
-    userinfo_url = settings.oidc_userinfo_url
+    issuer = (claims.get("iss") or "").rstrip("/")
+    userinfo_url = _userinfo_url_for_issuer(issuer, settings) if issuer else settings.oidc_userinfo_url
     if not userinfo_url:
         return claims
     try:

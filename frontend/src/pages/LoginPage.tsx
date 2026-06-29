@@ -1,20 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/auth/AuthProvider";
-import { loginRedirect } from "@/auth/oidc";
+import { setAccessToken, setIdToken } from "@/auth/oidc";
 import { defaultBasePath } from "@/lib/device";
-
-type LoginRouteResponse = {
-  loginHint: string;
-  idpHint: string | null;
-  kind: "platform" | "tenant";
-};
 
 export function LoginPage() {
   const navigate = useNavigate();
   const { authDisabled, isAuthenticated, isLoading } = useAuth();
   const [email, setEmail] = useState("");
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -27,35 +22,39 @@ export function LoginPage() {
     event.preventDefault();
     setErrorMessage("");
 
-    const trimmed = email.trim();
-    if (!trimmed) {
-      setErrorMessage("Enter your email address to continue.");
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setErrorMessage("Enter your email and password.");
       return;
     }
 
     if (authDisabled) {
-      setIsRedirecting(true);
+      setIsSubmitting(true);
       void navigate({ to: defaultBasePath() });
       return;
     }
 
-    setIsRedirecting(true);
+    setIsSubmitting(true);
     try {
-      const params = new URLSearchParams({ email: trimmed });
-      const response = await fetch(`/api/v1/auth/login-route?${params.toString()}`);
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { detail?: string } | null;
-        throw new Error(payload?.detail ?? "Could not resolve your workspace.");
-      }
-      const route = (await response.json()) as LoginRouteResponse;
-      await loginRedirect({
-        returnTo: defaultBasePath(),
-        loginHint: route.loginHint,
-        idpHint: route.idpHint ?? undefined,
+      const response = await fetch("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmedEmail, password }),
       });
+      const payload = (await response.json().catch(() => null)) as
+        | { accessToken?: string; idToken?: string; detail?: string }
+        | null;
+      if (!response.ok || !payload?.accessToken) {
+        throw new Error(payload?.detail ?? "Invalid username or password.");
+      }
+      setAccessToken(payload.accessToken);
+      if (payload.idToken) {
+        setIdToken(payload.idToken);
+      }
+      window.location.assign(defaultBasePath());
     } catch (error) {
-      setIsRedirecting(false);
-      setErrorMessage(error instanceof Error ? error.message : "Could not initiate sign-in.");
+      setIsSubmitting(false);
+      setErrorMessage(error instanceof Error ? error.message : "Could not sign in.");
     }
   }
 
@@ -86,14 +85,29 @@ export function LoginPage() {
             inputMode="email"
             placeholder="you@demo.desk.gentian.org"
             value={email}
-            disabled={isRedirecting}
+            disabled={isSubmitting}
             onChange={(event) => setEmail(event.target.value)}
             required
           />
 
-          <button type="submit" className="gentian-login__btn" disabled={isRedirecting}>
-            {isRedirecting && <span className="gentian-login__spinner" aria-hidden="true" />}
-            {isRedirecting ? "Signing in…" : "Continue"}
+          <label className="gentian-login__label" htmlFor="login-password">
+            Password
+          </label>
+          <input
+            id="login-password"
+            className="gentian-login__input"
+            type="password"
+            name="password"
+            autoComplete="current-password"
+            value={password}
+            disabled={isSubmitting}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
+
+          <button type="submit" className="gentian-login__btn" disabled={isSubmitting}>
+            {isSubmitting && <span className="gentian-login__spinner" aria-hidden="true" />}
+            {isSubmitting ? "Signing in…" : "Sign in"}
           </button>
         </form>
 
