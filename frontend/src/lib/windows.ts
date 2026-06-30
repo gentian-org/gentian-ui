@@ -37,3 +37,21 @@ export function maximizedGeometry(
     h: viewport.height - APP_MENU_HEIGHT,
   };
 }
+
+/** Keep at least part of the title bar on-screen while dragging. */
+export function clampWindowPosition(
+  x: number,
+  y: number,
+  w: number,
+  viewport = { width: window.innerWidth, height: window.innerHeight },
+): Pick<WindowGeometry, "x" | "y"> {
+  const minVisible = 48;
+  const minX = Math.min(0, minVisible - w);
+  const maxX = Math.max(0, viewport.width - minVisible);
+  const minY = 0;
+  const maxY = Math.max(0, viewport.height - APP_MENU_HEIGHT - WINDOW_HEADER_HEIGHT);
+  return {
+    x: Math.min(Math.max(minX, x), maxX),
+    y: Math.min(Math.max(minY, y), maxY),
+  };
+}

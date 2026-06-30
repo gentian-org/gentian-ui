@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, type PrefsResponse } from "@/api/client";
+import { bootstrapIdpSession } from "@/auth/idpSession";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { AdminConsole } from "@/admin/AdminConsole";
 import { useShellApps } from "@/shell/useShellApps";
 import { useAppsStore } from "@/stores/apps";
 import { useWindowsStore } from "@/stores/windows";
+import { buildAppLaunchUrl } from "@/lib/appLaunchUrl";
 import { WindowManager } from "@/windows/WindowManager";
 
 export function DesktopPage() {
@@ -22,7 +24,7 @@ export function DesktopPage() {
 
   const adminOpen = activeAppId === "admin";
 
-  function handleSelect(app: (typeof apps)[number]) {
+  function handleSelect(app: (typeof apps)[number], options?: { forceLogin?: boolean }) {
     setActiveAppId(app.id);
     if (app.builtin && app.id === "admin") {
       return;
@@ -30,11 +32,20 @@ export function DesktopPage() {
     if (!app.launchUrl) {
       return;
     }
-    openWindow({
-      id: crypto.randomUUID(),
-      appId: app.id,
-      title: app.title,
-      url: app.launchUrl,
+    const launchUrl = app.launchUrl;
+    void bootstrapIdpSession().finally(() => {
+      const linkTarget = options?.forceLogin ? "newwindow" : app.linkTarget;
+      const url = buildAppLaunchUrl(launchUrl, {
+        username: me?.username,
+        linkTarget,
+        authMode: app.authMode,
+      });
+      openWindow({
+        id: crypto.randomUUID(),
+        appId: app.id,
+        title: app.title,
+        url,
+      });
     });
   }
 

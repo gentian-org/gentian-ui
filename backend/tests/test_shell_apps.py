@@ -42,6 +42,7 @@ def test_shell_apps_for_tenant_admin_includes_admin_tile():
             "displayName": "Element (Matrix)",
             "ingress": {"subDomain": "chat"},
             "tile": {"icon": "chat"},
+            "kernelRequirements": {"identity": {"oidc": {"clientId": "opendesk-synapse"}}},
             "portalTiles": [
                 {
                     "name": "element",
@@ -78,6 +79,7 @@ def test_shell_apps_for_member_includes_entitled_app():
             "displayName": "Element (Matrix)",
             "ingress": {"subDomain": "chat"},
             "tile": {"icon": "chat"},
+            "kernelRequirements": {"identity": {"oidc": {"clientId": "opendesk-synapse"}}},
             "portalTiles": [
                 {
                     "name": "element",
@@ -100,6 +102,8 @@ def test_shell_apps_for_member_includes_entitled_app():
             "title": "Chat",
             "icon": "chat",
             "launchUrl": "https://chat.demo.desk.gentian.org",
+            "linkTarget": "embedded",
+            "authMode": "oidc",
             "builtin": False,
         }
     ]

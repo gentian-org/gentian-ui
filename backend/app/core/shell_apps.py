@@ -58,6 +58,13 @@ def tile_title(profile_spec: dict[str, Any], portal_tile: dict[str, Any]) -> str
     return str(portal_tile.get("name") or profile_spec.get("compositionRef") or "App")
 
 
+def profile_auth_mode(profile_spec: dict[str, Any]) -> str | None:
+    identity = (profile_spec.get("kernelRequirements") or {}).get("identity") or {}
+    if identity.get("oidc"):
+        return "oidc"
+    return None
+
+
 def tile_icon(profile_spec: dict[str, Any], portal_tile: dict[str, Any]) -> str:
     tile_spec = portal_tile.get("tile") or {}
     if tile_spec.get("icon"):
@@ -141,6 +148,8 @@ def tenant_shell_apps(
                     "title": tile_title(spec, portal_tile),
                     "icon": tile_icon(spec, portal_tile),
                     "launchUrl": launch_url,
+                    "linkTarget": str(portal_tile.get("linkTarget") or "newwindow"),
+                    "authMode": profile_auth_mode(spec),
                     "builtin": False,
                 }
             )

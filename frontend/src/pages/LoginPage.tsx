@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useAuth } from "@/auth/AuthProvider";
 import { setAccessToken, setIdToken } from "@/auth/oidc";
+import { bootstrapIdpSession } from "@/auth/idpSession";
 import { resolvePostLoginPath } from "@/lib/postLogin";
 import { safeReturnTo } from "@/lib/returnTo";
 
@@ -54,6 +55,7 @@ export function LoginPage() {
       if (payload.idToken) {
         setIdToken(payload.idToken);
       }
+      await bootstrapIdpSession();
       const target = returnTo
         ? postLoginPath
         : await resolvePostLoginPath(payload.accessToken);

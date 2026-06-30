@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { getAccessToken, getOidcConfig } from "@/auth/oidc";
 import { RequireAuth } from "@/auth/RequireAuth";
+import { IdpSessionBootstrap } from "@/auth/IdpSessionBootstrap";
 import { basePathFromLegacyRouter } from "@/lib/device";
 import { DesktopPage } from "@/pages/DesktopPage";
 import { LoginPage } from "@/pages/LoginPage";
@@ -93,6 +94,7 @@ const shellRoute = createRoute({
   },
   component: () => (
     <RequireAuth>
+      <IdpSessionBootstrap />
       <Outlet />
     </RequireAuth>
   ),

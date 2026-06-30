@@ -33,6 +33,7 @@ type WindowsState = {
   minimizeWindow: (id: string) => void;
   maximizeWindow: (id: string) => void;
   restoreWindow: (id: string) => void;
+  moveWindow: (id: string, x: number, y: number) => void;
 };
 
 const BASE_Z = 100;
@@ -130,4 +131,12 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
         ),
       };
     }),
+  moveWindow: (id, x, y) =>
+    set((state) => ({
+      windows: state.windows.map((w) => {
+        if (w.id !== id || w.state === "maximized") return w;
+        const geometry = { ...w.geometry, x, y };
+        return { ...w, geometry, restoreGeometry: geometry };
+      }),
+    })),
 }));

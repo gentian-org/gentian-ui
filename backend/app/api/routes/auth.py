@@ -3,8 +3,10 @@
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
 from app.core.login_routing import resolve_login_route
+from app.services.keycloak_idp_session import create_idp_session_redirect
 from app.services.keycloak_password_login import LoginFailedError, password_login
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -20,6 +22,11 @@ class LoginResponse(BaseModel):
     idToken: str | None = None
     realm: str
     kind: str
+
+
+class IdpSessionResponse(BaseModel):
+    redirectUrl: str | None = None
+    skipped: bool = False
 
 
 @router.get("/login-route")
@@ -64,3 +71,18 @@ def login(body: LoginRequest, settings: Settings = Depends(get_settings)) -> Log
         realm=tokens["realm"],
         kind=route.kind,
     )
+
+
+@router.post("/idp-session", response_model=IdpSessionResponse)
+def idp_session(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> IdpSessionResponse:
+    """Bootstrap a Keycloak browser SSO session after portal password login."""
+    if settings.auth_disabled:
+        return IdpSessionResponse(skipped=True)
+
+    redirect_url = create_idp_session_redirect(user, settings)
+    if redirect_url is None:
+        return IdpSessionResponse(skipped=True)
+    return IdpSessionResponse(redirectUrl=redirect_url)

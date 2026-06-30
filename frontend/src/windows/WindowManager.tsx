@@ -1,5 +1,6 @@
 import { useWindowsStore } from "@/stores/windows";
 import { APP_MENU_HEIGHT, WINDOW_HEADER_HEIGHT } from "@/lib/windows";
+import { useWindowDrag } from "@/windows/useWindowDrag";
 
 function WindowChromeButton({
   label,
@@ -23,6 +24,12 @@ export function WindowManager() {
   const closeWindow = useWindowsStore((s) => s.closeWindow);
   const minimizeWindow = useWindowsStore((s) => s.minimizeWindow);
   const maximizeWindow = useWindowsStore((s) => s.maximizeWindow);
+  const {
+    onHeaderPointerDown,
+    onHeaderPointerMove,
+    onHeaderPointerUp,
+    onHeaderPointerCancel,
+  } = useWindowDrag();
 
   const minimized = windows.filter((w) => w.state === "minimized");
   const visible = windows.filter((w) => w.state !== "minimized");
@@ -46,7 +53,13 @@ export function WindowManager() {
           }}
           onMouseDown={() => focusWindow(win.id)}
         >
-          <header className="shell-window__header">
+          <header
+            className="shell-window__header"
+            onPointerDown={(event) => onHeaderPointerDown(event, win)}
+            onPointerMove={onHeaderPointerMove}
+            onPointerUp={onHeaderPointerUp}
+            onPointerCancel={onHeaderPointerCancel}
+          >
             <span className="shell-window__title">{win.title}</span>
             <div className="shell-window__controls">
               <WindowChromeButton label="Minimize" onClick={() => minimizeWindow(win.id)}>

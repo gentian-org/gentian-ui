@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, type PrefsResponse } from "@/api/client";
+import { bootstrapIdpSession } from "@/auth/idpSession";
 import { AdminConsole } from "@/admin/AdminConsole";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { MobileAppLayer } from "@/shell/MobileAppLayer";
 import { useShellApps } from "@/shell/useShellApps";
 import { useAppsStore } from "@/stores/apps";
+import { buildAppLaunchUrl } from "@/lib/appLaunchUrl";
 
 export function MobilePage() {
   const { me, apps } = useShellApps();
@@ -20,9 +22,18 @@ export function MobilePage() {
 
   const activeApp = apps.find((app) => app.id === activeAppId) ?? null;
   const adminOpen = activeAppId === "admin";
+  const activeLaunchUrl =
+    activeApp?.launchUrl && me?.username
+      ? buildAppLaunchUrl(activeApp.launchUrl, {
+          username: me.username,
+          linkTarget: activeApp.linkTarget,
+          authMode: activeApp.authMode,
+        })
+      : activeApp?.launchUrl ?? null;
 
   function handleSelect(app: (typeof apps)[number]) {
     setActiveAppId(app.id);
+    void bootstrapIdpSession();
   }
 
   return (
@@ -38,8 +49,8 @@ export function MobilePage() {
           <p className="gentian-mobile__welcome-text">Tap an app below to get started</p>
         </div>
       )}
-      {activeApp?.launchUrl && (
-        <MobileAppLayer url={activeApp.launchUrl} title={activeApp.title} />
+      {activeLaunchUrl && (
+        <MobileAppLayer url={activeLaunchUrl} title={activeApp?.title ?? "App"} />
       )}
       <AppMenu
         apps={apps}

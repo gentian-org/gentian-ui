@@ -63,6 +63,8 @@ export type ShellApp = {
   title: string;
   icon: string;
   launchUrl: string | null;
+  linkTarget?: string | null;
+  authMode?: string | null;
   builtin?: boolean;
 };
 
