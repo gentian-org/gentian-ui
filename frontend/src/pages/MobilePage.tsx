@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, type PrefsResponse } from "@/api/client";
-import { openIdpBootstrapPopup, prepareEmbeddedOidcSession } from "@/auth/idpSession";
+import { prepareEmbeddedOidcSession } from "@/auth/idpSession";
 import { AdminConsole } from "@/admin/AdminConsole";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
@@ -34,8 +34,7 @@ export function MobilePage() {
   function handleSelect(app: (typeof apps)[number]) {
     setActiveAppId(app.id);
     if (app.authMode === "oidc" && app.linkTarget === "embedded") {
-      const popup = openIdpBootstrapPopup();
-      void prepareEmbeddedOidcSession(popup);
+      void prepareEmbeddedOidcSession();
     }
   }
 
