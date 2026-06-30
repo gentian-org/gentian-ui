@@ -1,5 +1,9 @@
 name: gentian-portal
 
+# Builds gentian-portal-api and gentian-portal-web images. Cluster rollout is
+# automatic via Argo CD Image Updater on the gentian-portal Application
+# (see gentian-deployments/clusters/<cluster>/kernel/gentian-portal-*.yaml).
+
 on:
   push:
     branches:
