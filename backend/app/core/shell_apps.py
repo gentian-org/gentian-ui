@@ -58,9 +58,11 @@ def tile_title(profile_spec: dict[str, Any], portal_tile: dict[str, Any]) -> str
     return str(portal_tile.get("name") or profile_spec.get("compositionRef") or "App")
 
 
-def profile_auth_mode(profile_spec: dict[str, Any]) -> str | None:
+def profile_auth_mode(profile_spec: dict[str, Any], profile_name: str) -> str | None:
     identity = (profile_spec.get("kernelRequirements") or {}).get("identity") or {}
     if identity.get("oidc"):
+        if profile_name == "element":
+            return "matrix-bridge"
         return "oidc"
     return None
 
@@ -149,7 +151,7 @@ def tenant_shell_apps(
                     "icon": tile_icon(spec, portal_tile),
                     "launchUrl": launch_url,
                     "linkTarget": str(portal_tile.get("linkTarget") or "newwindow"),
-                    "authMode": profile_auth_mode(spec),
+                    "authMode": profile_auth_mode(spec, profile_name),
                     "builtin": False,
                 }
             )

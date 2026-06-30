@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, type PrefsResponse } from "@/api/client";
 import { fetchIdpSessionRedirect } from "@/auth/idpSession";
+import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { AdminConsole } from "@/admin/AdminConsole";
@@ -32,23 +33,40 @@ export function DesktopPage() {
     if (!app.launchUrl) {
       return;
     }
-    const launchUrl = app.launchUrl;
+    const appLaunchBase = app.launchUrl;
     void (async () => {
       const linkTarget = options?.forceLogin ? "newwindow" : app.linkTarget;
-      const appUrl = buildAppLaunchUrl(launchUrl, {
+      const appUrl = buildAppLaunchUrl(appLaunchBase, {
         username: me?.username,
         linkTarget,
         authMode: app.authMode,
       });
+      const useMatrixBridge =
+        app.authMode === "matrix-bridge" && app.linkTarget === "embedded" && !options?.forceLogin;
       const useIdpBootstrap =
         app.authMode === "oidc" && app.linkTarget === "embedded" && !options?.forceLogin;
-      const idpUrl = useIdpBootstrap ? await fetchIdpSessionRedirect() : null;
+
+      let launchUrl = appUrl;
+      let pendingUrl: string | undefined;
+      if (useMatrixBridge) {
+        const ticket = await fetchMatrixBridgeTicket();
+        if (ticket) {
+          launchUrl = matrixBridgeLaunchUrl(new URL(appUrl).origin, ticket);
+        }
+      } else if (useIdpBootstrap) {
+        const idpUrl = await fetchIdpSessionRedirect();
+        if (idpUrl) {
+          launchUrl = idpUrl;
+          pendingUrl = appUrl;
+        }
+      }
+
       openWindow({
         id: crypto.randomUUID(),
         appId: app.id,
         title: app.title,
-        url: idpUrl ?? appUrl,
-        pendingUrl: idpUrl ? appUrl : undefined,
+        url: launchUrl,
+        pendingUrl,
       });
     })();
   }

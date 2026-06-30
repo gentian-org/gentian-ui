@@ -103,7 +103,7 @@ def test_shell_apps_for_member_includes_entitled_app():
             "icon": "chat",
             "launchUrl": "https://chat.demo.desk.gentian.org",
             "linkTarget": "embedded",
-            "authMode": "oidc",
+            "authMode": "matrix-bridge",
             "builtin": False,
         }
     ]

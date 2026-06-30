@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
@@ -11,8 +11,23 @@ from app.core.gentian_groups import (
     user_is_platform_admin,
 )
 from app.core.shell_apps import shell_apps_for_user
+from app.core.tenant import resolve_user_context
+from app.services.matrix_session_bridge import (
+    create_matrix_bridge_ticket,
+    is_allowed_app_origin,
+    redeem_matrix_bridge_ticket,
+)
 
 router = APIRouter(prefix="/session", tags=["session"])
+
+
+def _apply_matrix_bridge_cors(request: Request, response: Response, settings: Settings) -> None:
+    origin = request.headers.get("origin")
+    if origin and is_allowed_app_origin(origin, settings):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Vary"] = "Origin"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
 
 
 @router.get("/me")
@@ -36,3 +51,49 @@ def get_me(
         or is_bootstrap_tenant_admin(user),
         "shellApps": shell_apps_for_user(user, settings),
     }
+
+
+@router.post("/matrix-bridge/ticket")
+def create_matrix_bridge_ticket_route(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    """Mint a one-time ticket for chat.* to redeem into a Matrix session."""
+    if settings.auth_disabled:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Matrix bridge is unavailable while auth is disabled",
+        )
+
+    tenant = resolve_user_context(user, settings)
+    if tenant == settings.kernel_domain:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Matrix bridge is only available for tenant users",
+        )
+
+    ticket = create_matrix_bridge_ticket(user, tenant=tenant, settings=settings)
+    return {"ticket": ticket}
+
+
+@router.options("/matrix-bridge/redeem/{ticket}")
+def redeem_matrix_bridge_preflight(
+    ticket: str,
+    request: Request,
+    response: Response,
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    _apply_matrix_bridge_cors(request, response, settings)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/matrix-bridge/redeem/{ticket}")
+def redeem_matrix_bridge_route(
+    ticket: str,
+    request: Request,
+    response: Response,
+    settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    """Redeem a portal-issued ticket on the chat.* origin (no portal cookie)."""
+    _apply_matrix_bridge_cors(request, response, settings)
+    return redeem_matrix_bridge_ticket(ticket, settings)
