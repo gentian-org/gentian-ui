@@ -4,11 +4,8 @@ from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.core.config import Settings, get_settings
-from app.services.keycloak_password_login import (
-    LoginFailedError,
-    password_login,
-    resolve_password_login_route,
-)
+from app.core.login_routing import resolve_login_route
+from app.services.keycloak_password_login import LoginFailedError, password_login
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -32,9 +29,10 @@ def login_route(
 ) -> dict[str, str | None]:
     """Resolve email → tenant realm for Gentian login."""
     try:
-        route = resolve_password_login_route(
+        route = resolve_login_route(
             email,
-            settings,
+            kernel_domain=settings.kernel_domain,
+            tenancy_mode=settings.tenancy_mode,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -49,7 +47,11 @@ def login_route(
 def login(body: LoginRequest, settings: Settings = Depends(get_settings)) -> LoginResponse:
     """Authenticate with email/password on the Gentian login page (no Keycloak redirect)."""
     try:
-        route = resolve_password_login_route(body.email, settings)
+        route = resolve_login_route(
+            body.email,
+            kernel_domain=settings.kernel_domain,
+            tenancy_mode=settings.tenancy_mode,
+        )
         tokens = password_login(body.email, body.password, route, settings)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

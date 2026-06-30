@@ -527,6 +527,11 @@ async def invite_member(
 ) -> MemberResponse:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
+    if body.inviteEmail and str(body.inviteEmail).strip().lower() != str(body.email).strip().lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Secondary invite emails are not supported; use the member workspace email",
+        )
     realm = _realm_for_tenant(resolved)
     group_ids = await _invite_group_ids(store, resolved, settings, body.groupIds)
     member = await store.invite_member(

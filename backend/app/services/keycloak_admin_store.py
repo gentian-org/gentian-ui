@@ -105,17 +105,19 @@ class KeycloakAdminStore:
         require_totp: bool = False,
     ) -> Member:
         await self._assert_realm_smtp_configured(realm)
-        attributes: dict[str, list[str]] = {}
-        if invite_email:
-            attributes[INVITE_EMAIL_ATTR] = [invite_email]
+        if invite_email and invite_email.strip().lower() != email.strip().lower():
+            raise HTTPException(
+                status_code=400,
+                detail="Secondary invite emails are not supported; use the member workspace email",
+            )
         body = {
             "username": username,
             "email": email,
             "firstName": first_name or "",
             "lastName": last_name or "",
             "enabled": True,
-            "emailVerified": False,
-            "attributes": attributes,
+            "emailVerified": True,
+            "attributes": {},
         }
         response = await self._raw_request(
             "POST",
@@ -138,15 +140,13 @@ class KeycloakAdminStore:
         try:
             if group_ids:
                 await self.set_member_groups(realm, member_id, group_ids)
-            delivery = invite_email or email
-            actions = ["VERIFY_EMAIL", "UPDATE_PASSWORD"]
+            actions = [UPDATE_PASSWORD_ACTION]
             if require_totp:
                 actions.append(CONFIGURE_TOTP_ACTION)
             await self._execute_actions_email(
                 realm,
                 member_id,
                 actions,
-                delivery_email=delivery,
                 require_delivery=True,
             )
         except Exception:
