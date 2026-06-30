@@ -8,8 +8,6 @@ on:
   push:
     branches:
       - develop
-      - feat/new-ui
-      - feat/new-security
     paths:
       - "frontend/**"
       - "backend/**"
