@@ -15,6 +15,7 @@ from app.models.admin_notification import (  # noqa: F401 — register models
     AdminNotificationDismissalRow,
     AdminNotificationRow,
 )
+from app.models.user_shell_prefs import UserShellPrefsRow  # noqa: F401 — register model
 
 _engine: Engine | None = None
 _session_factory: sessionmaker[Session] | None = None

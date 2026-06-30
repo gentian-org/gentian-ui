@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ShellApp } from "@/api/client";
 import { useAuth } from "@/auth/AuthProvider";
 import { AppLauncher } from "@/shell/AppLauncher";
@@ -11,12 +11,39 @@ type AppMenuProps = {
   activeAppId: string | null;
   username?: string;
   onSelect: (app: ShellApp) => void;
+  onOpenAccount?: () => void;
+  onOpenSettings?: () => void;
 };
 
-export function AppMenu({ apps, activeAppId, username, onSelect }: AppMenuProps) {
+export function AppMenu({
+  apps,
+  activeAppId,
+  username,
+  onSelect,
+  onOpenAccount,
+  onOpenSettings,
+}: AppMenuProps) {
   const [launcherOpen, setLauncherOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { logout } = useAuth();
+
+  useEffect(() => {
+    if (!userMenuOpen) {
+      return;
+    }
+    function onPointerDown(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [userMenuOpen]);
+
+  function closeUserMenu() {
+    setUserMenuOpen(false);
+  }
 
   return (
     <>
@@ -42,7 +69,7 @@ export function AppMenu({ apps, activeAppId, username, onSelect }: AppMenuProps)
           ))}
         </div>
 
-        <div className="app-menu__tray">
+        <div className="app-menu__tray" ref={menuRef}>
           <NotificationInbox />
           <TrayButton
             label={username ? `Menu (${username})` : "Menu"}
@@ -50,39 +77,51 @@ export function AppMenu({ apps, activeAppId, username, onSelect }: AppMenuProps)
           >
             <MenuIcon />
           </TrayButton>
+
+          {userMenuOpen && (
+            <div className="user-menu" role="menu">
+              {username && <p className="user-menu__label">{username}</p>}
+              <button
+                type="button"
+                role="menuitem"
+                className="user-menu__item"
+                onClick={() => {
+                  closeUserMenu();
+                  onOpenAccount?.();
+                }}
+              >
+                Account
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="user-menu__item"
+                onClick={() => {
+                  closeUserMenu();
+                  onOpenSettings?.();
+                }}
+              >
+                Settings
+              </button>
+              <div className="user-menu__separator" />
+              <button
+                type="button"
+                role="menuitem"
+                className="user-menu__item"
+                onClick={() => {
+                  closeUserMenu();
+                  logout();
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       </nav>
 
       {launcherOpen && (
-        <AppLauncher
-          apps={apps}
-          onSelect={onSelect}
-          onClose={() => setLauncherOpen(false)}
-        />
-      )}
-
-      {userMenuOpen && (
-        <div
-          className="fixed bottom-[calc(var(--app-menu-height)+8px)] right-4 z-[210] min-w-40 rounded-[var(--gtn-r2)] border border-[var(--gtn-border)] bg-[var(--gtn-paper-3)] py-1 shadow-[var(--gtn-shadow-2)]"
-          role="menu"
-        >
-          {username && (
-            <p className="border-b border-[var(--gtn-border)] px-3 py-2 text-xs text-[var(--gtn-ink-3)]">
-              {username}
-            </p>
-          )}
-          <button
-            type="button"
-            role="menuitem"
-            className="block w-full px-3 py-2 text-left text-sm hover:bg-[var(--gtn-50)]"
-            onClick={() => {
-              setUserMenuOpen(false);
-              logout();
-            }}
-          >
-            Sign out
-          </button>
-        </div>
+        <AppLauncher apps={apps} onSelect={onSelect} onClose={() => setLauncherOpen(false)} />
       )}
     </>
   );

@@ -143,6 +143,36 @@
   line-height: 1.45;
 }
 
+.gentian-login__info {
+  margin: 12px 0 0;
+  width: 100%;
+  padding: 8px 12px;
+  color: var(--gtn-ink-2);
+  background: var(--gtn-50);
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r1);
+  font-size: 13px;
+  text-align: center;
+  line-height: 1.45;
+}
+
+.gentian-login__link {
+  margin-top: 0.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--gtn-gentian-600, #1b1a82);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  align-self: flex-start;
+}
+
+.gentian-login__link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @keyframes gtn-login-spin {
   to {
     transform: rotate(360deg);
@@ -231,6 +261,7 @@
 }
 
 .app-menu__tray {
+  position: relative;
   flex-shrink: 0;
   display: flex;
   flex-direction: row;

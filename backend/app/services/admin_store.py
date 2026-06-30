@@ -120,6 +120,8 @@ class AdminStore(Protocol):
 
     async def revoke_all_member_sessions(self, realm: str, member_id: str) -> None: ...
 
+    async def send_password_reset_by_email(self, realm: str, email: str) -> bool: ...
+
 
 def admin_store_configured(settings: Settings) -> bool:
     return bool(settings.keycloak_admin_url and settings.keycloak_admin_password)

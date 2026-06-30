@@ -14,7 +14,7 @@ def healthz() -> dict[str, str]:
 
 @router.get("/readyz")
 def readyz(response: Response) -> dict[str, object]:
-    """Readiness probe — verify config and optional dependencies (M8)."""
+    """Readiness probe — verify config and dependencies (M8)."""
     settings = get_settings()
     checks: dict[str, str] = {}
     errors: list[str] = []
@@ -26,20 +26,17 @@ def readyz(response: Response) -> dict[str, object]:
         errors.append("OPENFGA_STORE_ID required when OPENFGA_API_URL is set")
 
     checks["oidc"] = "ok" if settings.oidc_issuer or not settings.is_production else "missing"
-    if settings.database_url:
-        if audit_database_ready():
-            try:
-                with get_db_session() as session:
-                    session.execute(text("SELECT 1"))
-                checks["database"] = "ok"
-            except Exception:
-                checks["database"] = "error"
-                errors.append("database unreachable")
-        else:
-            checks["database"] = "not_initialized"
-            errors.append("database not initialized")
+    if audit_database_ready():
+        try:
+            with get_db_session() as session:
+                session.execute(text("SELECT 1"))
+            checks["database"] = "ok"
+        except Exception:
+            checks["database"] = "error"
+            errors.append("database unreachable")
     else:
-        checks["database"] = "skipped"
+        checks["database"] = "not_initialized"
+        errors.append("database not initialized")
     checks["openfga"] = (
         "configured" if settings.openfga_api_url and settings.openfga_store_id else "skipped"
     )

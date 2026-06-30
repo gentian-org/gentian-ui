@@ -9,10 +9,7 @@ from fastapi import Depends
 from app.core.config import Settings, get_settings
 from app.db.engine import init_portal_database
 from app.services.admin_notifications import AdminNotification, NotificationAudience, NotificationSeverity
-from app.services.memory_notification_store import MemoryNotificationStore
 from app.services.sql_notification_store import SqlNotificationStore
-
-_memory_notification_store: MemoryNotificationStore | None = None
 
 
 class NotificationStore(Protocol):
@@ -39,18 +36,9 @@ class NotificationStore(Protocol):
     async def get(self, notification_id: str) -> AdminNotification | None: ...
 
 
-def _memory_store() -> MemoryNotificationStore:
-    global _memory_notification_store
-    if _memory_notification_store is None:
-        _memory_notification_store = MemoryNotificationStore()
-    return _memory_notification_store
-
-
 def get_notification_store(settings: Settings = Depends(get_settings)) -> NotificationStore:
-    if settings.database_url:
-        init_portal_database(settings.database_url)
-        return SqlNotificationStore()
-    return _memory_store()
+    init_portal_database(settings.database_url)
+    return SqlNotificationStore()
 
 
 NotificationStoreDep = Annotated[NotificationStore, Depends(get_notification_store)]

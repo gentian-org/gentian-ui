@@ -1,6 +1,4 @@
 import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiFetch, type PrefsResponse } from "@/api/client";
 import { openIdpBootstrapPopup, prepareEmbeddedOidcSession } from "@/auth/idpSession";
 import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
 import {
@@ -10,6 +8,7 @@ import {
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { useShellApps } from "@/shell/useShellApps";
+import { useShellBackgroundUrl } from "@/shell/useShellBackground";
 import { useAppsStore } from "@/stores/apps";
 import { useWindowsStore } from "@/stores/windows";
 import { buildAppLaunchUrl } from "@/lib/appLaunchUrl";
@@ -17,11 +16,7 @@ import { WindowManager } from "@/windows/WindowManager";
 
 export function DesktopPage() {
   const { me, apps } = useShellApps();
-
-  const { data: prefs } = useQuery({
-    queryKey: ["prefs"],
-    queryFn: () => apiFetch<PrefsResponse>("/prefs/"),
-  });
+  const backgroundUrl = useShellBackgroundUrl();
 
   const activeAppId = useAppsStore((s) => s.activeAppId);
   const setActiveAppId = useAppsStore((s) => s.setActiveAppId);
@@ -30,10 +25,29 @@ export function DesktopPage() {
   const openWindow = useWindowsStore((s) => s.openWindow);
 
   useEffect(() => {
-    if (activeAppId === "admin" && !windows.some((win) => win.appId === "admin")) {
+    const builtinIds = ["admin", "account", "settings"] as const;
+    if (
+      activeAppId &&
+      (builtinIds as readonly string[]).includes(activeAppId) &&
+      !windows.some((win) => win.appId === activeAppId)
+    ) {
       setActiveAppId(null);
     }
   }, [activeAppId, setActiveAppId, windows]);
+
+  function openBuiltinPanel(
+    id: "account" | "settings",
+    title: string,
+    builtinComponent: "account" | "settings",
+  ) {
+    setActiveAppId(id);
+    openOrFocusWindow({
+      id,
+      appId: id,
+      title,
+      builtinComponent,
+    });
+  }
 
   function handleSelect(app: (typeof apps)[number], options?: { forceLogin?: boolean }) {
     setActiveAppId(app.id);
@@ -95,13 +109,15 @@ export function DesktopPage() {
 
   return (
     <div className="gentian-shell shell-surface relative min-h-full">
-      <Background imageUrl={prefs?.backgroundUrl} />
+      <Background imageUrl={backgroundUrl} />
       <WindowManager />
       <AppMenu
         apps={apps}
         activeAppId={activeAppId}
         username={me?.username}
         onSelect={handleSelect}
+        onOpenAccount={() => openBuiltinPanel("account", "Account", "account")}
+        onOpenSettings={() => openBuiltinPanel("settings", "Settings", "settings")}
       />
     </div>
   );

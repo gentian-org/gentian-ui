@@ -1,4 +1,6 @@
+import { AccountPanel } from "@/account/AccountPanel";
 import { AdminConsole } from "@/admin/AdminConsole";
+import { SettingsPanel } from "@/settings/SettingsPanel";
 import type { ShellWindow } from "@/stores/windows";
 
 type WindowBodyProps = {
@@ -11,6 +13,22 @@ export function WindowBody({ win, onIframeLoad }: WindowBodyProps) {
     return (
       <div className="shell-window__body shell-window__body--component">
         <AdminConsole embedded />
+      </div>
+    );
+  }
+
+  if (win.builtinComponent === "account") {
+    return (
+      <div className="shell-window__body shell-window__body--component">
+        <AccountPanel embedded />
+      </div>
+    );
+  }
+
+  if (win.builtinComponent === "settings") {
+    return (
+      <div className="shell-window__body shell-window__body--component">
+        <SettingsPanel embedded />
       </div>
     );
   }

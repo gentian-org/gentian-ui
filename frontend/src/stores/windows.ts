@@ -3,7 +3,7 @@ import { createWindowGeometry, maximizedGeometry, type WindowGeometry } from "@/
 
 export type WindowVisualState = "normal" | "minimized" | "maximized";
 
-export type ShellWindowBuiltin = "admin";
+export type ShellWindowBuiltin = "admin" | "account" | "settings";
 
 export type ShellWindow = {
   id: string;

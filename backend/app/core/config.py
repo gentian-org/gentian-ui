@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     kernel_realm: str = Field(default="kernel", alias="KERNEL_REALM")
     tenancy_mode: str = Field(default="multi", alias="TENANCY_MODE")
 
-    database_url: str | None = Field(default=None, alias="DATABASE_URL")
+    database_url: str = Field(alias="DATABASE_URL")
 
     oidc_issuer: str | None = Field(default=None, alias="OIDC_ISSUER")
     oidc_client_id: str | None = Field(default=None, alias="OIDC_CLIENT_ID")

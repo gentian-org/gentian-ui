@@ -7,6 +7,7 @@ from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
 from app.core.login_routing import resolve_login_route
 from app.services.keycloak_idp_session import create_idp_session_redirect
+from app.services.admin_store import AdminStoreDep, admin_store_configured
 from app.services.keycloak_password_login import LoginFailedError, password_login
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -27,6 +28,10 @@ class LoginResponse(BaseModel):
 class IdpSessionResponse(BaseModel):
     redirectUrl: str | None = None
     skipped: bool = False
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
 
 
 @router.get("/login-route")
@@ -71,6 +76,35 @@ def login(body: LoginRequest, settings: Settings = Depends(get_settings)) -> Log
         realm=tokens["realm"],
         kind=route.kind,
     )
+
+
+@router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    settings: Settings = Depends(get_settings),
+    store: AdminStoreDep,
+) -> None:
+    """Send a password-reset email when the account exists (always 204)."""
+    if settings.auth_disabled:
+        return
+    if not admin_store_configured(settings):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Password reset is not configured on this cluster",
+        )
+    try:
+        route = resolve_login_route(
+            body.email,
+            kernel_domain=settings.kernel_domain,
+            tenancy_mode=settings.tenancy_mode,
+        )
+    except ValueError:
+        return
+    realm = settings.kernel_realm if route.idp_hint is None else route.idp_hint
+    try:
+        await store.send_password_reset_by_email(realm, body.email)
+    except Exception:
+        return
 
 
 @router.post("/idp-session", response_model=IdpSessionResponse)

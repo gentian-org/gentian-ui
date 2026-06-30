@@ -157,6 +157,25 @@ class KeycloakAdminStore:
             raise
         return await self.get_member(realm, member_id)
 
+    async def send_password_reset_by_email(self, realm: str, email: str) -> bool:
+        """Send password-reset email if a user exists. Returns whether a user was found."""
+        normalized = email.strip().lower()
+        users = await self._request(
+            "GET",
+            f"/admin/realms/{quote(realm, safe='')}/users",
+            params={"email": normalized, "exact": "true", "max": "1"},
+        )
+        if not users:
+            users = await self._request(
+                "GET",
+                f"/admin/realms/{quote(realm, safe='')}/users",
+                params={"username": normalized, "exact": "true", "max": "1"},
+            )
+        if not users:
+            return False
+        await self.send_password_reset(realm, str(users[0]["id"]))
+        return True
+
     async def send_password_reset(self, realm: str, member_id: str) -> None:
         raw = await self._request("GET", f"/admin/realms/{quote(realm, safe='')}/users/{member_id}")
         delivery = self._delivery_email(raw)

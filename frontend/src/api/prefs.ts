@@ -1,0 +1,52 @@
+import { getAccessToken } from "@/auth/oidc";
+import { apiFetch, type PrefsResponse } from "@/api/client";
+
+const API_BASE = "/api/v1";
+
+export function fetchPrefs() {
+  return apiFetch<PrefsResponse>("/prefs/");
+}
+
+export async function uploadBackground(file: File): Promise<void> {
+  const token = getAccessToken();
+  const form = new FormData();
+  form.append("file", file);
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const response = await fetch(`${API_BASE}/prefs/background`, {
+    method: "PUT",
+    headers,
+    body: form,
+  });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const body = (await response.json()) as { detail?: string };
+      if (body.detail) {
+        detail = `: ${body.detail}`;
+      }
+    } catch {
+      // ignore
+    }
+    throw new Error(`Upload failed${detail}`);
+  }
+}
+
+export async function deleteBackground(): Promise<void> {
+  await apiFetch<void>("/prefs/background", { method: "DELETE" });
+}
+
+export async function fetchBackgroundBlob(): Promise<Blob> {
+  const token = getAccessToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const response = await fetch(`${API_BASE}/prefs/background`, { headers });
+  if (!response.ok) {
+    throw new Error("Could not load background image");
+  }
+  return response.blob();
+}

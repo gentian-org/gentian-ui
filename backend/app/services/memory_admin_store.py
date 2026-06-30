@@ -100,6 +100,14 @@ class MemoryAdminStore:
     async def send_password_reset(self, realm: str, member_id: str) -> None:
         await self.get_member(realm, member_id)
 
+    async def send_password_reset_by_email(self, realm: str, email: str) -> bool:
+        self._ensure_realm(realm)
+        normalized = email.strip().lower()
+        for member in self._members[realm].values():
+            if (member.email or "").lower() == normalized or (member.username or "").lower() == normalized:
+                return True
+        return False
+
     async def enable_totp(self, realm: str, member_id: str, *, send_email: bool) -> Member:
         member = await self.get_member(realm, member_id)
         if member.totp_configured:

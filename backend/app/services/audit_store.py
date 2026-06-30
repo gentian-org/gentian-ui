@@ -7,7 +7,7 @@ from typing import Annotated, Protocol
 from fastapi import Depends
 
 from app.core.config import Settings, get_settings
-from app.db.engine import init_audit_database
+from app.db.engine import init_portal_database
 from app.services.admin_store import admin_store_configured
 from app.services.audit_events import AuditCategory, AuditEvent, AuditEventFilters
 from app.services.keycloak_audit_fetcher import KeycloakAuditFetcher
@@ -99,10 +99,8 @@ def _memory_store() -> MemoryAuditStore:
 
 
 def _bff_audit_store(settings: Settings) -> BffAuditStore:
-    if settings.database_url:
-        init_audit_database(settings.database_url)
-        return SqlAuditStore()
-    return _memory_store()
+    init_portal_database(settings.database_url)
+    return SqlAuditStore()
 
 
 def get_audit_store(settings: Settings = Depends(get_settings)) -> AuditStore:
