@@ -67,6 +67,7 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
             appId: win.appId,
             title: win.title,
             url: win.url,
+            builtinComponent: win.builtinComponent,
             pendingUrl: win.pendingUrl,
             geometry,
             restoreGeometry: geometry,

@@ -16,9 +16,15 @@ export function WindowMinimizeIcon({ className }: IconProps) {
 export function WindowMaximizeIcon({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M4.5 3.5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Zm0 1.5v7h7v-7h-7Z"
+      <rect
+        x="3.5"
+        y="3.5"
+        width="9"
+        height="9"
+        rx="0.75"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
       />
     </svg>
   );
@@ -27,9 +33,25 @@ export function WindowMaximizeIcon({ className }: IconProps) {
 export function WindowRestoreIcon({ className }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 16 16" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M6 2.5h6.5a1 1 0 0 1 1 1V6h-1.5V4.5H6V2.5ZM3.5 6H10a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H3.5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Zm0 1.5v6.5H10V7.5H3.5Z"
+      <rect
+        x="5.5"
+        y="2.5"
+        width="7"
+        height="7"
+        rx="0.75"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+      />
+      <rect
+        x="2.5"
+        y="5.5"
+        width="7"
+        height="7"
+        rx="0.75"
+        fill="var(--gtn-paper-1, #ece8df)"
+        stroke="currentColor"
+        strokeWidth="1.75"
       />
     </svg>
   );

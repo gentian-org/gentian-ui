@@ -397,6 +397,8 @@
 
 .shell-window {
   position: fixed;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--gtn-border);
   border-radius: var(--gtn-r2);
@@ -483,6 +485,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex: 0 0 40px;
   height: 40px;
   padding: 0 4px 0 12px;
   background: var(--gtn-paper-1);
@@ -558,13 +561,16 @@
 }
 
 .shell-window__body {
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
   border: 0;
   background: var(--gtn-paper-0);
 }
 
 .shell-window__body--component {
-  display: block;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: var(--gtn-paper-3);
 }
