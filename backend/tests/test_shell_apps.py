@@ -16,6 +16,8 @@ APP_STORE_PROFILE = {
         "displayName": "App Store",
         "ingress": {"subDomain": "store"},
         "tile": {"icon": "store"},
+        "extraValues": {"auth": {"disabled": True}},
+        "kernelRequirements": {"identity": {"oidc": {"clientId": "app-store"}}},
         "portalTiles": [
             {
                 "name": "app-store",
@@ -122,6 +124,8 @@ def test_shell_apps_for_tenant_admin_includes_admin_and_app_store_only():
 
     assert [app["id"] for app in apps] == ["app-store-app-store", "admin"]
     assert all(app["id"] != "element-element" for app in apps)
+    store_app = next(app for app in apps if app["id"] == "app-store-app-store")
+    assert store_app["authMode"] is None
 
 
 def test_shell_apps_for_member_includes_entitled_app():

@@ -58,6 +58,12 @@ def tile_title(profile_spec: dict[str, Any], portal_tile: dict[str, Any]) -> str
 
 
 def profile_auth_mode(profile_spec: dict[str, Any], profile_name: str) -> str | None:
+    # App Store runs with auth.disabled when embedded in the portal shell; the portal
+    # already authenticated the tenant admin — no Keycloak browser bootstrap needed.
+    extra_values = profile_spec.get("extraValues") or {}
+    if extra_values.get("auth", {}).get("disabled") is True:
+        return None
+
     identity = (profile_spec.get("kernelRequirements") or {}).get("identity") or {}
     if identity.get("oidc"):
         if profile_name == "element":
