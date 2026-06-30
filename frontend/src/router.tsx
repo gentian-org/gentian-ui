@@ -5,7 +5,9 @@ import {
   Outlet,
   redirect,
 } from "@tanstack/react-router";
+import { getAccessToken, getOidcConfig } from "@/auth/oidc";
 import { RequireAuth } from "@/auth/RequireAuth";
+import { loginPathWithReturnTo } from "@/lib/returnTo";
 import { basePathFromLegacyRouter } from "@/lib/device";
 import { DesktopPage } from "@/pages/DesktopPage";
 import { LoginPage } from "@/pages/LoginPage";
@@ -26,6 +28,9 @@ const indexRoute = createRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
+  validateSearch: (search: Record<string, unknown>) => ({
+    returnTo: typeof search.returnTo === "string" ? search.returnTo : undefined,
+  }),
   component: LoginPage,
 });
 
@@ -72,6 +77,21 @@ const legacyUniventionOidcRoute = createRoute({
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "shell",
+  beforeLoad: ({ location }) => {
+    const config = getOidcConfig();
+    if (config.authDisabled) {
+      return;
+    }
+    if (!config.issuer || !config.clientId) {
+      return;
+    }
+    if (!getAccessToken()) {
+      throw redirect({
+        to: "/login",
+        search: { returnTo: location.pathname },
+      });
+    }
+  },
   component: () => (
     <RequireAuth>
       <Outlet />

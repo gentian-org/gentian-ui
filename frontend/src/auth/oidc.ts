@@ -175,6 +175,10 @@ export type LoginRedirectOptions = {
   idpHint?: string;
 };
 
+/**
+ * Browser OIDC authorization redirect (legacy / broker flows only).
+ * End users must sign in on the Gentian portal `/login` page instead.
+ */
 export async function loginRedirect(options: LoginRedirectOptions | string = "/desktop"): Promise<void> {
   const normalized =
     typeof options === "string" ? { returnTo: options } : options;

@@ -1,10 +1,20 @@
+import { useEffect } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { getOidcConfig } from "@/auth/oidc";
+import { loginPathWithReturnTo } from "@/lib/returnTo";
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, authDisabled, login } = useAuth();
+  const { isAuthenticated, isLoading, authDisabled } = useAuth();
   const config = getOidcConfig();
   const oidcConfigured = Boolean(config.issuer && config.clientId);
+
+  useEffect(() => {
+    if (isLoading || authDisabled || isAuthenticated || !oidcConfigured) {
+      return;
+    }
+    const returnTo = `${window.location.pathname}${window.location.search}`;
+    window.location.replace(loginPathWithReturnTo(returnTo));
+  }, [authDisabled, isAuthenticated, isLoading, oidcConfigured]);
 
   if (isLoading) {
     return (
@@ -28,7 +38,6 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated && !authDisabled) {
-    login("/desktop");
     return (
       <div className="flex min-h-screen items-center justify-center text-[var(--gtn-ink-1)]/70">
         Redirecting to sign in…

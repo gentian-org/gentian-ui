@@ -12,9 +12,9 @@ import {
   getOidcConfig,
   handleOAuthCallback,
   isAuthenticated,
-  loginRedirect,
   logoutRedirect,
 } from "@/auth/oidc";
+import { loginPathWithReturnTo } from "@/lib/returnTo";
 
 type AuthContextValue = {
   isAuthenticated: boolean;
@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const login = useCallback((returnTo?: string) => {
-    void loginRedirect({ returnTo });
+    window.location.assign(loginPathWithReturnTo(returnTo));
   }, []);
   const logout = useCallback(() => {
     // Full-page navigation only — do not clear React auth state here or RequireAuth

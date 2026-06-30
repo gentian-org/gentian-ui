@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useAuth } from "@/auth/AuthProvider";
 import { setAccessToken, setIdToken } from "@/auth/oidc";
-import { defaultBasePath } from "@/lib/device";
 import { resolvePostLoginPath } from "@/lib/postLogin";
+import { safeReturnTo } from "@/lib/returnTo";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const { returnTo } = useSearch({ from: "/login" });
+  const postLoginPath = safeReturnTo(returnTo);
   const { authDisabled, isAuthenticated, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,9 +17,9 @@ export function LoginPage() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      void navigate({ to: defaultBasePath() });
+      void navigate({ to: postLoginPath });
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, isLoading, navigate, postLoginPath]);
 
   async function signIn(event: React.FormEvent) {
     event.preventDefault();
@@ -31,7 +33,7 @@ export function LoginPage() {
 
     if (authDisabled) {
       setIsSubmitting(true);
-      void navigate({ to: defaultBasePath() });
+      void navigate({ to: postLoginPath });
       return;
     }
 
@@ -52,7 +54,9 @@ export function LoginPage() {
       if (payload.idToken) {
         setIdToken(payload.idToken);
       }
-      const target = await resolvePostLoginPath(payload.accessToken);
+      const target = returnTo
+        ? postLoginPath
+        : await resolvePostLoginPath(payload.accessToken);
       window.location.assign(target);
     } catch (error) {
       setIsSubmitting(false);

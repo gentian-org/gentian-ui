@@ -1,4 +1,5 @@
 import { clearAccessToken, getAccessToken } from "@/auth/oidc";
+import { loginPathWithReturnTo } from "@/lib/returnTo";
 
 const API_BASE = "/api/v1";
 
@@ -30,7 +31,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     if (response.status === 401 && token) {
       clearAccessToken();
       if (!window.location.pathname.startsWith("/login")) {
-        window.location.replace("/login");
+        window.location.replace(loginPathWithReturnTo(window.location.pathname));
       }
     }
     throw new Error(`API ${path} failed: ${response.status}${detail}`);
