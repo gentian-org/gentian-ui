@@ -1,6 +1,14 @@
 import { useWindowsStore, type ShellWindow } from "@/stores/windows";
 import { APP_MENU_HEIGHT, WINDOW_HEADER_HEIGHT } from "@/lib/windows";
 import { useWindowDrag } from "@/windows/useWindowDrag";
+import { useWindowResize } from "@/windows/useWindowResize";
+import {
+  WindowCloseIcon,
+  WindowMaximizeIcon,
+  WindowMinimizeIcon,
+  WindowRestoreIcon,
+} from "@/windows/WindowChromeIcons";
+import { WindowResizeHandles } from "@/windows/WindowResizeHandles";
 
 function handleIframeLoad(win: ShellWindow, advanceWindowNavigation: (id: string) => void) {
   if (!win.pendingUrl) {
@@ -38,6 +46,12 @@ export function WindowManager() {
     onHeaderPointerUp,
     onHeaderPointerCancel,
   } = useWindowDrag();
+  const {
+    onHandlePointerDown,
+    onHandlePointerMove,
+    onHandlePointerUp,
+    onHandlePointerCancel,
+  } = useWindowResize();
 
   const minimized = windows.filter((w) => w.state === "minimized");
   const visible = windows.filter((w) => w.state !== "minimized");
@@ -71,16 +85,20 @@ export function WindowManager() {
             <span className="shell-window__title">{win.title}</span>
             <div className="shell-window__controls">
               <WindowChromeButton label="Minimize" onClick={() => minimizeWindow(win.id)}>
-                −
+                <WindowMinimizeIcon className="shell-window__control-icon" />
               </WindowChromeButton>
               <WindowChromeButton
                 label={win.state === "maximized" ? "Restore" : "Maximize"}
                 onClick={() => maximizeWindow(win.id)}
               >
-                {win.state === "maximized" ? "⧉" : "□"}
+                {win.state === "maximized" ? (
+                  <WindowRestoreIcon className="shell-window__control-icon" />
+                ) : (
+                  <WindowMaximizeIcon className="shell-window__control-icon" />
+                )}
               </WindowChromeButton>
               <WindowChromeButton label="Close" onClick={() => closeWindow(win.id)}>
-                ×
+                <WindowCloseIcon className="shell-window__control-icon shell-window__control-icon--close" />
               </WindowChromeButton>
             </div>
           </header>
@@ -92,6 +110,13 @@ export function WindowManager() {
             style={{ height: `calc(100% - ${WINDOW_HEADER_HEIGHT}px)` }}
             allow="geolocation; microphone; camera; encrypted-media; storage-access *"
             onLoad={() => handleIframeLoad(win, advanceWindowNavigation)}
+          />
+          <WindowResizeHandles
+            win={win}
+            onPointerDown={onHandlePointerDown}
+            onPointerMove={onHandlePointerMove}
+            onPointerUp={onHandlePointerUp}
+            onPointerCancel={onHandlePointerCancel}
           />
         </div>
       ))}

@@ -408,6 +408,77 @@
   border-radius: 0;
 }
 
+.shell-window__resize-handle {
+  position: absolute;
+  touch-action: none;
+  user-select: none;
+  z-index: 2;
+}
+
+.shell-window__resize-handle--n {
+  top: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+  cursor: n-resize;
+}
+
+.shell-window__resize-handle--s {
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+  cursor: s-resize;
+}
+
+.shell-window__resize-handle--e {
+  top: 10px;
+  right: 0;
+  bottom: 10px;
+  width: 6px;
+  cursor: e-resize;
+}
+
+.shell-window__resize-handle--w {
+  top: 10px;
+  left: 0;
+  bottom: 10px;
+  width: 6px;
+  cursor: w-resize;
+}
+
+.shell-window__resize-handle--ne {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  cursor: ne-resize;
+}
+
+.shell-window__resize-handle--nw {
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  cursor: nw-resize;
+}
+
+.shell-window__resize-handle--se {
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  cursor: se-resize;
+}
+
+.shell-window__resize-handle--sw {
+  left: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  cursor: sw-resize;
+}
+
 .shell-window__header {
   display: flex;
   align-items: center;
@@ -451,15 +522,31 @@
 }
 
 .shell-window__control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 36px;
   height: 40px;
   border: none;
   background: transparent;
-  color: inherit;
-  font-size: 16px;
-  line-height: 1;
+  color: var(--gtn-ink-2);
   cursor: pointer;
   transition: background var(--gtn-dur-1);
+}
+
+.shell-window--focused .shell-window__control {
+  color: #fff;
+}
+
+.shell-window__control-icon {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.shell-window__control-icon--close {
+  width: 18px;
+  height: 18px;
 }
 
 .shell-window__control:hover {
