@@ -8,6 +8,8 @@ export type ShellWindow = {
   appId: string;
   title: string;
   url: string;
+  /** When set, navigate the iframe to this URL after the current IdP bootstrap page loads. */
+  pendingUrl?: string;
   geometry: WindowGeometry;
   /** Saved when maximizing so restore returns to the prior size. */
   restoreGeometry: WindowGeometry;
@@ -21,6 +23,7 @@ type OpenWindowInput = {
   appId: string;
   title: string;
   url: string;
+  pendingUrl?: string;
   geometry?: WindowGeometry;
 };
 
@@ -34,6 +37,7 @@ type WindowsState = {
   maximizeWindow: (id: string) => void;
   restoreWindow: (id: string) => void;
   moveWindow: (id: string, x: number, y: number) => void;
+  advanceWindowNavigation: (id: string) => void;
 };
 
 const BASE_Z = 100;
@@ -55,6 +59,7 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
             appId: win.appId,
             title: win.title,
             url: win.url,
+            pendingUrl: win.pendingUrl,
             geometry,
             restoreGeometry: geometry,
             zIndex: nextZ,
@@ -137,6 +142,15 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
         if (w.id !== id || w.state === "maximized") return w;
         const geometry = { ...w.geometry, x, y };
         return { ...w, geometry, restoreGeometry: geometry };
+      }),
+    })),
+  advanceWindowNavigation: (id) =>
+    set((state) => ({
+      windows: state.windows.map((w) => {
+        if (w.id !== id || !w.pendingUrl) {
+          return w;
+        }
+        return { ...w, url: w.pendingUrl, pendingUrl: undefined };
       }),
     })),
 }));

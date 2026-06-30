@@ -8,9 +8,24 @@ type IdpSessionResponse = {
 
 let bootstrapPromise: Promise<void> | null = null;
 
+/** Fetch the Keycloak impersonation URL that establishes a browser SSO session. */
+export async function fetchIdpSessionRedirect(): Promise<string | null> {
+  if (!getAccessToken()) {
+    return null;
+  }
+  try {
+    const response = await apiFetch<IdpSessionResponse>("/auth/idp-session", {
+      method: "POST",
+    });
+    return response?.redirectUrl ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Load Keycloak's impersonation redirect in a hidden iframe so embedded OIDC apps
- * can complete silent SSO after a portal password (BFF) login.
+ * Warm the IdP session in a hidden iframe on the portal origin.
+ * Embedded OIDC apps still need the WinBox two-step navigation (see WindowManager).
  */
 export async function bootstrapIdpSession(): Promise<void> {
   if (!getAccessToken()) {
@@ -22,10 +37,7 @@ export async function bootstrapIdpSession(): Promise<void> {
 
   bootstrapPromise = (async () => {
     try {
-      const response = await apiFetch<IdpSessionResponse>("/auth/idp-session", {
-        method: "POST",
-      });
-      const redirectUrl = response?.redirectUrl;
+      const redirectUrl = await fetchIdpSessionRedirect();
       if (!redirectUrl) {
         return;
       }

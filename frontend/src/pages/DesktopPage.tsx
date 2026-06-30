@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, type PrefsResponse } from "@/api/client";
-import { bootstrapIdpSession } from "@/auth/idpSession";
+import { fetchIdpSessionRedirect } from "@/auth/idpSession";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { AdminConsole } from "@/admin/AdminConsole";
@@ -33,20 +33,24 @@ export function DesktopPage() {
       return;
     }
     const launchUrl = app.launchUrl;
-    void bootstrapIdpSession().finally(() => {
+    void (async () => {
       const linkTarget = options?.forceLogin ? "newwindow" : app.linkTarget;
-      const url = buildAppLaunchUrl(launchUrl, {
+      const appUrl = buildAppLaunchUrl(launchUrl, {
         username: me?.username,
         linkTarget,
         authMode: app.authMode,
       });
+      const useIdpBootstrap =
+        app.authMode === "oidc" && app.linkTarget === "embedded" && !options?.forceLogin;
+      const idpUrl = useIdpBootstrap ? await fetchIdpSessionRedirect() : null;
       openWindow({
         id: crypto.randomUUID(),
         appId: app.id,
         title: app.title,
-        url,
+        url: idpUrl ?? appUrl,
+        pendingUrl: idpUrl ? appUrl : undefined,
       });
-    });
+    })();
   }
 
   return (

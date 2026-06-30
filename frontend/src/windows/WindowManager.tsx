@@ -1,6 +1,13 @@
-import { useWindowsStore } from "@/stores/windows";
+import { useWindowsStore, type ShellWindow } from "@/stores/windows";
 import { APP_MENU_HEIGHT, WINDOW_HEADER_HEIGHT } from "@/lib/windows";
 import { useWindowDrag } from "@/windows/useWindowDrag";
+
+function handleIframeLoad(win: ShellWindow, advanceWindowNavigation: (id: string) => void) {
+  if (!win.pendingUrl) {
+    return;
+  }
+  advanceWindowNavigation(win.id);
+}
 
 function WindowChromeButton({
   label,
@@ -24,6 +31,7 @@ export function WindowManager() {
   const closeWindow = useWindowsStore((s) => s.closeWindow);
   const minimizeWindow = useWindowsStore((s) => s.minimizeWindow);
   const maximizeWindow = useWindowsStore((s) => s.maximizeWindow);
+  const advanceWindowNavigation = useWindowsStore((s) => s.advanceWindowNavigation);
   const {
     onHeaderPointerDown,
     onHeaderPointerMove,
@@ -77,11 +85,13 @@ export function WindowManager() {
             </div>
           </header>
           <iframe
+            key={win.url}
             title={win.title}
             src={win.url}
             className="shell-window__body"
             style={{ height: `calc(100% - ${WINDOW_HEADER_HEIGHT}px)` }}
             allow="geolocation; microphone; camera; encrypted-media; storage-access *"
+            onLoad={() => handleIframeLoad(win, advanceWindowNavigation)}
           />
         </div>
       ))}
