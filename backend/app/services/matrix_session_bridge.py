@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -64,21 +65,16 @@ def _bridge_password(settings: Settings) -> str:
     return settings.matrix_bridge_password or "portal-bridge-not-used-for-login"
 
 
-def _login_with_password(
-    matrix_url: str,
-    user_id: str,
-    password: str,
-) -> str:
+def _matrix_request(
+    method: str,
+    url: str,
+    *,
+    json_body: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    detail: str,
+) -> dict[str, Any]:
     try:
-        response = httpx.post(
-            f"{matrix_url.rstrip('/')}/_matrix/client/v3/login",
-            json={
-                "type": "m.login.password",
-                "identifier": {"type": "m.id.user", "user": user_id},
-                "password": password,
-            },
-            timeout=15.0,
-        )
+        response = httpx.request(method, url, json=json_body, headers=headers, timeout=15.0)
     except httpx.HTTPError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -88,76 +84,67 @@ def _login_with_password(
     if response.status_code >= 400:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Matrix bridge authentication failed",
+            detail=detail,
         )
 
     payload = response.json()
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=detail,
+        )
+    return payload
+
+
+def _login_with_password(
+    matrix_url: str,
+    user_id: str,
+    password: str,
+) -> dict[str, str]:
+    payload = _matrix_request(
+        "POST",
+        f"{matrix_url.rstrip('/')}/_matrix/client/v3/login",
+        json_body={
+            "type": "m.login.password",
+            "identifier": {"type": "m.id.user", "user": user_id},
+            "password": password,
+        },
+        detail="Matrix bridge authentication failed",
+    )
     access_token = payload.get("access_token")
     if not isinstance(access_token, str) or not access_token:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Matrix bridge authentication failed",
         )
-    return access_token
+    result = {
+        "accessToken": access_token,
+        "userId": str(payload.get("user_id") or user_id),
+    }
+    device_id = payload.get("device_id")
+    if isinstance(device_id, str) and device_id:
+        result["deviceId"] = device_id
+    return result
 
 
 def _ensure_matrix_user(
     matrix_url: str,
     admin_token: str,
     user_id: str,
+    *,
     display_name: str | None,
+    password: str,
 ) -> None:
-    body: dict[str, Any] = {"password": "unused", "admin": False}
+    body: dict[str, Any] = {"password": password, "admin": False}
     if display_name:
         body["displayname"] = display_name
-    try:
-        response = httpx.put(
-            f"{matrix_url.rstrip('/')}/_synapse/admin/v2/users/{user_id}",
-            headers={"Authorization": f"Bearer {admin_token}"},
-            json=body,
-            timeout=15.0,
-        )
-    except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Could not reach the Matrix homeserver",
-        ) from exc
-
-    if response.status_code >= 400:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not prepare Matrix account",
-        )
-
-
-def _login_as_user(matrix_url: str, admin_token: str, user_id: str) -> str:
-    try:
-        response = httpx.post(
-            f"{matrix_url.rstrip('/')}/_synapse/admin/v1/users/{user_id}/login",
-            headers={"Authorization": f"Bearer {admin_token}"},
-            json={},
-            timeout=15.0,
-        )
-    except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Could not reach the Matrix homeserver",
-        ) from exc
-
-    if response.status_code >= 400:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not create Matrix session",
-        )
-
-    payload = response.json()
-    access_token = payload.get("access_token")
-    if not isinstance(access_token, str) or not access_token:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not create Matrix session",
-        )
-    return access_token
+    _matrix_request(
+        "PUT",
+        f"{matrix_url.rstrip('/')}/_synapse/admin/v2/users/{user_id}",
+        json_body=body,
+        headers={"Authorization": f"Bearer {admin_token}"},
+        detail="Could not prepare Matrix account",
+    )
 
 
 def create_matrix_session(
@@ -177,17 +164,27 @@ def create_matrix_session(
     user_id = matrix_user_id(localpart, tenant, settings.kernel_domain)
     bridge_id = bridge_user_id(tenant, settings.kernel_domain)
     bridge_password = _bridge_password(settings)
+    portal_password = secrets.token_urlsafe(24)
 
-    admin_token = _login_with_password(matrix_url, bridge_id, bridge_password)
+    admin_token = _login_with_password(matrix_url, bridge_id, bridge_password)["accessToken"]
     display_name = str(claims.get("name") or "").strip() or None
-    _ensure_matrix_user(matrix_url, admin_token, user_id, display_name)
-    access_token = _login_as_user(matrix_url, admin_token, user_id)
+    _ensure_matrix_user(
+        matrix_url,
+        admin_token,
+        user_id,
+        display_name=display_name,
+        password=portal_password,
+    )
+    login = _login_with_password(matrix_url, user_id, portal_password)
 
-    return {
+    session = {
         "homeServerUrl": matrix_url,
-        "userId": user_id,
-        "accessToken": access_token,
+        "userId": login["userId"],
+        "accessToken": login["accessToken"],
     }
+    if device_id := login.get("deviceId"):
+        session["deviceId"] = device_id
+    return session
 
 
 def create_matrix_bridge_ticket(
@@ -205,6 +202,8 @@ def create_matrix_bridge_ticket(
         "uid": session["userId"],
         "at": session["accessToken"],
     }
+    if device_id := session.get("deviceId"):
+        payload["did"] = device_id
     return jwt.encode(payload, _ticket_secret(settings), algorithm="HS256")
 
 
@@ -230,8 +229,12 @@ def redeem_matrix_bridge_ticket(ticket: str, settings: Settings) -> dict[str, st
             detail="Invalid Matrix bridge ticket",
         )
 
-    return {
+    session = {
         "homeServerUrl": home_server,
         "userId": user_id,
         "accessToken": access_token,
     }
+    device_id = payload.get("did")
+    if isinstance(device_id, str) and device_id:
+        session["deviceId"] = device_id
+    return session

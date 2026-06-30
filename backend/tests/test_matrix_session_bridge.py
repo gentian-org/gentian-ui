@@ -57,3 +57,20 @@ def test_matrix_bridge_ticket_roundtrip():
     assert session["userId"] == "@john-doe:demo.desk.gentian.org"
     assert session["homeServerUrl"] == "https://matrix.demo.desk.gentian.org"
     assert session["accessToken"] == "syt_test_token"
+    assert "deviceId" not in session
+
+
+def test_matrix_bridge_ticket_includes_device_id():
+    settings = Settings(PORTAL_BFF_CLIENT_SECRET="bridge-test-secret")
+    ticket = jwt.encode(
+        {
+            "hs": "https://matrix.demo.desk.gentian.org",
+            "uid": "@john-doe:demo.desk.gentian.org",
+            "at": "syt_test_token",
+            "did": "PORTALDEVICE",
+        },
+        settings.portal_bff_client_secret,
+        algorithm="HS256",
+    )
+    session = redeem_matrix_bridge_ticket(ticket, settings)
+    assert session["deviceId"] == "PORTALDEVICE"
