@@ -14,6 +14,92 @@ const TOKEN_STORAGE_KEY = "gentian.access_token";
 const ID_TOKEN_STORAGE_KEY = "gentian.id_token";
 const PKCE_VERIFIER_KEY = "gentian.pkce_verifier";
 
+type JwtClaims = {
+  iss?: string;
+  azp?: string;
+};
+
+function decodeJwtPayload(token: string): JwtClaims | null {
+  try {
+    const part = token.split(".")[1];
+    if (!part) {
+      return null;
+    }
+    const padded = part + "=".repeat((4 - (part.length % 4)) % 4);
+    const json = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+    return JSON.parse(json) as JwtClaims;
+  } catch {
+    return null;
+  }
+}
+
+function realmFromIssuer(issuer: string): string | null {
+  const match = issuer.replace(/\/$/, "").match(/\/realms\/([^/]+)$/);
+  return match?.[1] ?? null;
+}
+
+/** Map in-cluster Keycloak issuers to the browser-facing id.* URL. */
+function externalLogoutIssuer(issuer: string): string {
+  const normalized = issuer.replace(/\/$/, "");
+  const config = getOidcConfig();
+  const kernelIssuer = (config.issuer || "").replace(/\/$/, "");
+  if (!kernelIssuer || !normalized.includes("/realms/")) {
+    return normalized;
+  }
+  if (!normalized.includes(".svc.cluster.local") && !normalized.includes("://gentian-idp")) {
+    return normalized;
+  }
+  const realm = realmFromIssuer(normalized);
+  const kernelBase = kernelIssuer.replace(/\/realms\/[^/]+$/, "");
+  return realm ? `${kernelBase}/realms/${realm}` : normalized;
+}
+
+/**
+ * Build a Keycloak end-session URL when browser logout is supported.
+ * Returns null for BFF password-login sessions (confidential client / tenant realm).
+ */
+export function resolveLogoutUrl(
+  idToken: string | null,
+  accessToken: string | null,
+): string | null {
+  const config = getOidcConfig();
+  const token = idToken ?? accessToken;
+  if (!token || !config.issuer || !config.clientId) {
+    return null;
+  }
+
+  const claims = decodeJwtPayload(token);
+  if (!claims) {
+    return null;
+  }
+
+  const issuer = typeof claims.iss === "string" ? claims.iss : config.issuer;
+  const clientId =
+    typeof claims.azp === "string" && claims.azp !== "gentian-portal-bff"
+      ? claims.azp
+      : config.clientId;
+  const kernelRealm = realmFromIssuer(config.issuer);
+  const tokenRealm = realmFromIssuer(issuer);
+
+  // Password login uses gentian-portal-bff in tenant (or kernel) realms — no public OIDC logout.
+  if (
+    claims.azp === "gentian-portal-bff" ||
+    (tokenRealm && kernelRealm && tokenRealm !== kernelRealm)
+  ) {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    post_logout_redirect_uri: `${window.location.origin}/login`,
+  });
+  if (idToken) {
+    params.set("id_token_hint", idToken);
+  }
+
+  return `${externalLogoutIssuer(issuer)}/protocol/openid-connect/logout?${params.toString()}`;
+}
+
 export function getOidcConfig(): OidcConfig {
   return {
     issuer: import.meta.env.VITE_OIDC_ISSUER ?? "",
@@ -103,23 +189,15 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
 }
 
 export function logoutRedirect(): void {
-  const config = getOidcConfig();
   const idToken = sessionStorage.getItem(ID_TOKEN_STORAGE_KEY);
+  const accessToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  const target = resolveLogoutUrl(idToken, accessToken);
   clearAccessToken();
-  if (!config.issuer || !config.clientId) {
-    window.location.replace("/login");
+  if (target) {
+    window.location.replace(target);
     return;
   }
-  const params = new URLSearchParams({
-    client_id: config.clientId,
-    post_logout_redirect_uri: config.redirectUri,
-  });
-  if (idToken) {
-    params.set("id_token_hint", idToken);
-  }
-  window.location.replace(
-    `${config.issuer.replace(/\/$/, "")}/protocol/openid-connect/logout?${params}`,
-  );
+  window.location.replace("/login");
 }
 
 export function isAuthenticated(): boolean {
