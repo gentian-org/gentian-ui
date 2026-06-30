@@ -96,12 +96,12 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
         ) from exc
 
-    claims["tenant"] = resolve_user_context(claims, settings)
     claims = _enrich_claims_from_userinfo(claims, credentials.credentials, settings)
     if not claims.get("groups"):
         groups = lookup_user_groups(claims, settings)
         if groups:
             claims["groups"] = groups
+    claims["tenant"] = resolve_user_context(claims, settings)
     return claims
 
 
