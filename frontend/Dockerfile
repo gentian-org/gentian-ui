@@ -1,4 +1,5 @@
-FROM node:22-alpine AS build
+# Pin digest to avoid flaky Docker Hub tag resolution in CI (node:24-alpine).
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS build
 WORKDIR /app
 
 ARG VITE_OIDC_ISSUER=""
@@ -18,7 +19,7 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-FROM node:22-alpine
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd
 RUN npm install -g serve@14.2.4
 COPY --from=build /app/dist /app/dist
 USER 65532
