@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, type PrefsResponse } from "@/api/client";
-import { prepareEmbeddedOidcSession } from "@/auth/idpSession";
+import { openIdpBootstrapPopup, prepareEmbeddedOidcSession } from "@/auth/idpSession";
 import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
@@ -38,6 +38,7 @@ export function DesktopPage() {
       app.authMode === "matrix-bridge" && app.linkTarget === "embedded" && !options?.forceLogin;
     const useIdpBootstrap =
       app.authMode === "oidc" && app.linkTarget === "embedded" && !options?.forceLogin;
+    const idpPopup = useIdpBootstrap ? openIdpBootstrapPopup() : null;
     void (async () => {
       const linkTarget = options?.forceLogin ? "newwindow" : app.linkTarget;
       const appUrl = buildAppLaunchUrl(appLaunchBase, {
@@ -53,7 +54,7 @@ export function DesktopPage() {
           launchUrl = matrixBridgeLaunchUrl(new URL(appUrl).origin, ticket);
         }
       } else if (useIdpBootstrap) {
-        await prepareEmbeddedOidcSession();
+        await prepareEmbeddedOidcSession(idpPopup);
       }
 
       openWindow({

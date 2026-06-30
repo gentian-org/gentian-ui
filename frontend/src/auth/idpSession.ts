@@ -8,7 +8,11 @@ type IdpSessionResponse = {
 
 let bootstrapPromise: Promise<void> | null = null;
 
+const BOOTSTRAP_POPUP_MS = 3500;
 const BOOTSTRAP_IFRAME_MS = 8000;
+// Off-screen 1×1 popup: first-party IdP cookies without a visible Keycloak window.
+const POPUP_FEATURES =
+  "popup=yes,width=1,height=1,left=-10000,top=-10000,toolbar=no,menubar=no,location=no,status=no";
 
 /** Fetch the Keycloak impersonation URL that establishes a browser SSO session. */
 export async function fetchIdpSessionRedirect(): Promise<string | null> {
@@ -44,6 +48,37 @@ async function requestStorageAccessIfNeeded(): Promise<void> {
   }
 }
 
+function waitForPopupBootstrap(popup: Window | null): Promise<void> {
+  if (!popup) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+      try {
+        popup.close();
+      } catch {
+        /* ignore */
+      }
+      resolve();
+    };
+
+    const timeout = window.setTimeout(finish, BOOTSTRAP_POPUP_MS);
+    const interval = window.setInterval(() => {
+      if (popup.closed) {
+        finish();
+      }
+    }, 200);
+  });
+}
+
 function bootstrapViaHiddenIframe(redirectUrl: string): Promise<void> {
   return new Promise((resolve) => {
     const iframe = document.createElement("iframe");
@@ -68,17 +103,41 @@ function bootstrapViaHiddenIframe(redirectUrl: string): Promise<void> {
   });
 }
 
-async function warmIdpBrowserSession(redirectUrl: string): Promise<void> {
+/**
+ * Open a popup synchronously in the click handler (required to avoid blockers).
+ * Must be called before any await in the same user-gesture turn.
+ */
+export function openIdpBootstrapPopup(): Window | null {
+  try {
+    return window.open("about:blank", "gentian-idp-bootstrap", POPUP_FEATURES);
+  } catch {
+    return null;
+  }
+}
+
+async function warmIdpBrowserSession(
+  redirectUrl: string,
+  popup: Window | null = null,
+): Promise<void> {
   await requestStorageAccessIfNeeded();
+
+  if (popup && !popup.closed) {
+    popup.location.replace(redirectUrl);
+    await waitForPopupBootstrap(popup);
+    return;
+  }
+
   await bootstrapViaHiddenIframe(redirectUrl);
 }
 
 /**
  * Establish the tenant-realm Keycloak browser session used by embedded OIDC apps.
- * Uses a hidden iframe only — never opens a popup without an explicit user gesture.
+ * Portal password login uses the BFF (no browser redirect), so this step is required
+ * before opening apps like Nextcloud in a WinBox iframe.
  */
-export async function bootstrapIdpSession(): Promise<void> {
+export async function bootstrapIdpSession(popup: Window | null = null): Promise<void> {
   if (!getAccessToken()) {
+    popup?.close();
     return;
   }
   if (bootstrapPromise) {
@@ -90,11 +149,12 @@ export async function bootstrapIdpSession(): Promise<void> {
     try {
       const redirectUrl = await fetchIdpSessionRedirect();
       if (!redirectUrl) {
+        popup?.close();
         return;
       }
-      await warmIdpBrowserSession(redirectUrl);
+      await warmIdpBrowserSession(redirectUrl, popup);
     } catch {
-      // Non-fatal: login_hint may still help when a browser session already exists.
+      popup?.close();
     } finally {
       bootstrapPromise = null;
     }
@@ -103,7 +163,7 @@ export async function bootstrapIdpSession(): Promise<void> {
   return bootstrapPromise;
 }
 
-/** Call before opening an embedded OIDC app tile (not used for Element matrix-bridge). */
-export async function prepareEmbeddedOidcSession(): Promise<void> {
-  await bootstrapIdpSession();
+/** Call from a user gesture before opening an embedded OIDC app tile. */
+export async function prepareEmbeddedOidcSession(popup: Window | null = null): Promise<void> {
+  await bootstrapIdpSession(popup);
 }
