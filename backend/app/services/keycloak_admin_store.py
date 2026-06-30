@@ -102,6 +102,7 @@ class KeycloakAdminStore:
         group_ids: list[str],
         require_totp: bool = False,
     ) -> Member:
+        await self._assert_realm_smtp_configured(realm)
         attributes: dict[str, list[str]] = {}
         if invite_email:
             attributes[INVITE_EMAIL_ATTR] = [invite_email]
@@ -132,18 +133,26 @@ class KeycloakAdminStore:
             if not users:
                 raise HTTPException(status_code=500, detail="Created user not found")
             member_id = users[0]["id"]
-        if group_ids:
-            await self.set_member_groups(realm, member_id, group_ids)
-        delivery = invite_email or email
-        actions = ["VERIFY_EMAIL", "UPDATE_PASSWORD"]
-        if require_totp:
-            actions.append(CONFIGURE_TOTP_ACTION)
-        await self._execute_actions_email(
-            realm,
-            member_id,
-            actions,
-            delivery_email=delivery,
-        )
+        try:
+            if group_ids:
+                await self.set_member_groups(realm, member_id, group_ids)
+            delivery = invite_email or email
+            actions = ["VERIFY_EMAIL", "UPDATE_PASSWORD"]
+            if require_totp:
+                actions.append(CONFIGURE_TOTP_ACTION)
+            await self._execute_actions_email(
+                realm,
+                member_id,
+                actions,
+                delivery_email=delivery,
+                require_delivery=True,
+            )
+        except Exception:
+            try:
+                await self.delete_member(realm, member_id)
+            except HTTPException:
+                pass
+            raise
         return await self.get_member(realm, member_id)
 
     async def send_password_reset(self, realm: str, member_id: str) -> None:
@@ -313,6 +322,7 @@ class KeycloakAdminStore:
         actions: list[str],
         *,
         delivery_email: str | None = None,
+        require_delivery: bool = False,
     ) -> None:
         current = await self._request(
             "GET",
@@ -358,9 +368,11 @@ class KeycloakAdminStore:
                         "enabled": current.get("enabled", True),
                     },
                 )
-            if self._execute_actions_email_degraded(response):
+            if not require_delivery and self._execute_actions_email_degraded(response):
                 await self._set_required_actions(realm, member_id, current, actions)
                 return
+            if require_delivery:
+                await self._raise_invite_email_failed(response)
             await self._raise_for_status(response)
         if restored and primary:
             await self._request(
@@ -531,6 +543,23 @@ class KeycloakAdminStore:
         if response.status_code == 204 or not response.content:
             return None
         return response.json()
+
+    async def _assert_realm_smtp_configured(self, realm: str) -> None:
+        raw = await self._request("GET", f"/admin/realms/{quote(realm, safe='')}")
+        smtp = raw.get("smtpServer") or {}
+        host = smtp.get("host")
+        if not host:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Invitation email is unavailable: tenant realm SMTP is not configured",
+            )
+
+    async def _raise_invite_email_failed(self, response: httpx.Response) -> None:
+        detail = response.text.strip() or response.reason_phrase
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Invitation email could not be sent: {detail}",
+        )
 
     async def _raise_for_status(self, response: httpx.Response) -> None:
         detail = response.text.strip() or response.reason_phrase

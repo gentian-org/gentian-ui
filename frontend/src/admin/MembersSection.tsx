@@ -55,9 +55,7 @@ export function MembersSection({ tenant, groups }: MembersSectionProps) {
     onSuccess: async () => {
       setForm({ email: "", inviteEmail: "", firstName: "", lastName: "", groupIds: [], requireTotp: false });
       setError(null);
-      setSuccess(
-        "Invite sent. The member will complete setup on first sign-in (email delivery requires SMTP).",
-      );
+      setSuccess("Invite sent.");
       await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
     },
     onError: (err: Error) => {
