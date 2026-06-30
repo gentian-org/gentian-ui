@@ -30,8 +30,14 @@ def _issuer_allowed(issuer: str, settings: Settings) -> bool:
     kernel = (settings.oidc_issuer or "").rstrip("/")
     if kernel and normalized == kernel:
         return True
-    prefix = f"https://id.{settings.kernel_domain}/auth/realms/"
-    return normalized.startswith(prefix)
+    external_prefix = f"https://id.{settings.kernel_domain}/auth/realms/"
+    if normalized.startswith(external_prefix):
+        return True
+    if settings.keycloak_admin_url:
+        internal_prefix = settings.keycloak_admin_url.rstrip("/") + "/realms/"
+        if normalized.startswith(internal_prefix):
+            return True
+    return False
 
 
 def _jwks_url_for_issuer(issuer: str, settings: Settings) -> str:
