@@ -1,4 +1,4 @@
-import { getAccessToken } from "@/auth/oidc";
+import { clearAccessToken, getAccessToken } from "@/auth/oidc";
 
 const API_BASE = "/api/v1";
 
@@ -26,6 +26,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       }
     } catch {
       // Response body is not JSON.
+    }
+    if (response.status === 401 && token) {
+      clearAccessToken();
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.replace("/login");
+      }
     }
     throw new Error(`API ${path} failed: ${response.status}${detail}`);
   }

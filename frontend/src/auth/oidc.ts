@@ -17,6 +17,7 @@ const PKCE_VERIFIER_KEY = "gentian.pkce_verifier";
 type JwtClaims = {
   iss?: string;
   azp?: string;
+  exp?: number;
 };
 
 function decodeJwtPayload(token: string): JwtClaims | null {
@@ -128,12 +129,30 @@ async function pkceChallengeFromVerifier(verifier: string): Promise<string> {
     .replace(/=+$/, "");
 }
 
+function isAccessTokenExpired(token: string): boolean {
+  const claims = decodeJwtPayload(token);
+  const exp = claims?.exp;
+  if (typeof exp !== "number") {
+    return false;
+  }
+  return Date.now() >= exp * 1000;
+}
+
+/** Return a stored access token, clearing it when missing or expired. */
 export function getAccessToken(): string | null {
   const config = getOidcConfig();
   if (config.authDisabled) {
     return null;
   }
-  return sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  if (!token) {
+    return null;
+  }
+  if (isAccessTokenExpired(token)) {
+    clearAccessToken();
+    return null;
+  }
+  return token;
 }
 
 export function setAccessToken(token: string): void {
@@ -205,7 +224,7 @@ export function isAuthenticated(): boolean {
   if (config.authDisabled) {
     return true;
   }
-  return Boolean(getAccessToken());
+  return getAccessToken() !== null;
 }
 
 export async function handleOAuthCallback(): Promise<boolean> {
