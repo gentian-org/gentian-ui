@@ -9,7 +9,6 @@ from app.core.gentian_groups import (
     is_bootstrap_tenant_admin,
     is_tenant_admin,
     normalize_groups,
-    tenant_admins_group,
     tenant_app_group,
     tenant_members_group,
     user_is_platform_admin,
@@ -63,6 +62,8 @@ def profile_auth_mode(profile_spec: dict[str, Any], profile_name: str) -> str | 
     if identity.get("oidc"):
         if profile_name == "element":
             return "matrix-bridge"
+        if profile_name == "nextcloud":
+            return "nextcloud-bridge"
         return "oidc"
     return None
 
@@ -77,6 +78,11 @@ def tile_icon(profile_spec: dict[str, Any], portal_tile: dict[str, Any]) -> str:
     return "app"
 
 
+def is_admin_portal_tile(allowed_group: str) -> bool:
+    normalized = (allowed_group or "").strip()
+    return normalized in {"Tenant Admins", "Domain Admins"}
+
+
 def user_can_see_portal_tile(
     groups: list[str],
     *,
@@ -85,18 +91,28 @@ def user_can_see_portal_tile(
     allowed_group: str,
     is_admin: bool,
 ) -> bool:
+    normalized = (allowed_group or "Domain Users").strip()
+
     if is_admin:
-        return True
+        return is_admin_portal_tile(normalized)
+
+    if is_admin_portal_tile(normalized):
+        return False
+
     if tenant_app_group(tenant, profile) in groups:
         return True
-    normalized = (allowed_group or "Domain Users").strip()
-    if normalized in {"Tenant Admins", "Domain Admins"}:
-        return tenant_admins_group(tenant) in groups
     if normalized in {"App Users", "Domain Users"}:
         return tenant_members_group(tenant) in groups
     if normalized.startswith("managed-by-attribute-"):
         return tenant_app_group(tenant, profile) in groups
     return tenant_members_group(tenant) in groups
+
+
+def _profiles_for_shell_tiles(tenant: str, *, is_admin: bool) -> list[str]:
+    profiles = list_installed_profiles(tenant)
+    if is_admin and "app-store" not in profiles:
+        profiles.append("app-store")
+    return profiles
 
 
 def tenant_shell_apps(
@@ -112,11 +128,11 @@ def tenant_shell_apps(
 
     apps: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for profile_name in list_installed_profiles(tenant):
+    for profile_name in _profiles_for_shell_tiles(tenant, is_admin=is_admin):
         profile = get_app_profile(profile_name)
         if profile is None:
             continue
-        if is_platform_app(profile):
+        if is_platform_app(profile) and not is_admin:
             continue
         spec = profile.get("spec") or {}
         portal_tiles = spec.get("portalTiles") or []
