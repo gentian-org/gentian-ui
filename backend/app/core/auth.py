@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import Settings, get_settings
 from app.core.tenant import resolve_user_context
+from app.services.keycloak_user_groups import lookup_user_groups
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -97,6 +98,10 @@ async def get_current_user(
 
     claims["tenant"] = resolve_user_context(claims, settings)
     claims = _enrich_claims_from_userinfo(claims, credentials.credentials, settings)
+    if not claims.get("groups"):
+        groups = lookup_user_groups(claims, settings)
+        if groups:
+            claims["groups"] = groups
     return claims
 
 
