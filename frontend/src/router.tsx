@@ -7,7 +7,6 @@ import {
 } from "@tanstack/react-router";
 import { getAccessToken, getOidcConfig } from "@/auth/oidc";
 import { RequireAuth } from "@/auth/RequireAuth";
-import { loginPathWithReturnTo } from "@/lib/returnTo";
 import { basePathFromLegacyRouter } from "@/lib/device";
 import { DesktopPage } from "@/pages/DesktopPage";
 import { LoginPage } from "@/pages/LoginPage";
@@ -21,7 +20,7 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   beforeLoad: () => {
-    throw redirect({ to: "/login" });
+    throw redirect({ to: "/login", search: { returnTo: undefined } });
   },
 });
 
@@ -70,7 +69,7 @@ const legacyUniventionOidcRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/univention/oidc",
   beforeLoad: () => {
-    throw redirect({ to: "/login" });
+    throw redirect({ to: "/login", search: { returnTo: undefined } });
   },
 });
 
