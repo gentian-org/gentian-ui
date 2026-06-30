@@ -2,6 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch, type PrefsResponse } from "@/api/client";
 import { openIdpBootstrapPopup, prepareEmbeddedOidcSession } from "@/auth/idpSession";
 import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
+import {
+  fetchNextcloudBridgeTicket,
+  nextcloudBridgeLaunchUrl,
+} from "@/auth/nextcloudBridge";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { AdminConsole } from "@/admin/AdminConsole";
@@ -36,6 +40,10 @@ export function DesktopPage() {
     const appLaunchBase = app.launchUrl;
     const useMatrixBridge =
       app.authMode === "matrix-bridge" && app.linkTarget === "embedded" && !options?.forceLogin;
+    const useNextcloudBridge =
+      app.authMode === "nextcloud-bridge" &&
+      app.linkTarget === "embedded" &&
+      !options?.forceLogin;
     const useIdpBootstrap =
       app.authMode === "oidc" && app.linkTarget === "embedded" && !options?.forceLogin;
     const idpPopup = useIdpBootstrap ? openIdpBootstrapPopup() : null;
@@ -52,6 +60,11 @@ export function DesktopPage() {
         const ticket = await fetchMatrixBridgeTicket();
         if (ticket) {
           launchUrl = matrixBridgeLaunchUrl(new URL(appUrl).origin, ticket);
+        }
+      } else if (useNextcloudBridge) {
+        const ticket = await fetchNextcloudBridgeTicket();
+        if (ticket) {
+          launchUrl = nextcloudBridgeLaunchUrl(new URL(appUrl).origin, ticket);
         }
       } else if (useIdpBootstrap) {
         await prepareEmbeddedOidcSession(idpPopup);
