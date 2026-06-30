@@ -10,6 +10,7 @@ def test_platform_admin_uses_kernel_native_login():
     )
     assert route.kind == "platform"
     assert route.idp_hint is None
+    assert route.keycloak_username == "administrator@desk.gentian.org"
 
 
 def test_bootstrap_tenant_admin_brokers_to_tenant():
@@ -19,6 +20,7 @@ def test_bootstrap_tenant_admin_brokers_to_tenant():
     )
     assert route.kind == "tenant"
     assert route.idp_hint == "demo"
+    assert route.keycloak_username == "admin-demo"
 
 
 def test_tenant_member_email_domain():

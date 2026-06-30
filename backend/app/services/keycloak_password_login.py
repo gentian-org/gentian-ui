@@ -44,9 +44,9 @@ def password_login(
         "grant_type": "password",
         "client_id": settings.portal_bff_client_id,
         "client_secret": settings.portal_bff_client_secret,
-        "username": route.login_hint,
+        "username": route.keycloak_username,
         "password": password,
-        "scope": "openid profile email groups",
+        "scope": "openid profile email",
     }
     try:
         response = httpx.post(token_url, data=data, timeout=15.0)

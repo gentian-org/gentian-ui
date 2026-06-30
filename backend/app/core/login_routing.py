@@ -12,6 +12,7 @@ _ADMIN_LOCAL_RE = re.compile(r"^admin-([a-z0-9-]+)$")
 @dataclass(frozen=True)
 class LoginRoute:
     login_hint: str
+    keycloak_username: str
     idp_hint: str | None
     kind: Literal["platform", "tenant"]
 
@@ -35,16 +36,27 @@ def resolve_login_route(email: str, *, kernel_domain: str, tenancy_mode: str = "
     if admin_match:
         return LoginRoute(
             login_hint=normalized,
+            keycloak_username=local,
             idp_hint=admin_match.group(1),
             kind="tenant",
         )
 
     if domain == kernel_domain:
-        return LoginRoute(login_hint=normalized, idp_hint=None, kind="platform")
+        return LoginRoute(
+            login_hint=normalized,
+            keycloak_username=normalized,
+            idp_hint=None,
+            kind="platform",
+        )
 
     if tenancy_mode.strip().lower() == "multi" and domain.endswith("." + kernel_domain):
         tenant = domain[: -(len(kernel_domain) + 1)]
         if tenant and "." not in tenant:
-            return LoginRoute(login_hint=normalized, idp_hint=tenant, kind="tenant")
+            return LoginRoute(
+                login_hint=normalized,
+                keycloak_username=normalized,
+                idp_hint=tenant,
+                kind="tenant",
+            )
 
     raise ValueError("No Gentian workspace found for this email address")
