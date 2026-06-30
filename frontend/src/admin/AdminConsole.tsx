@@ -11,7 +11,12 @@ import "./admin.css";
 
 type AdminTab = "members" | "groups" | "security" | "sessions" | "audit" | "notifications";
 
-export function AdminConsole() {
+type AdminConsoleProps = {
+  /** Render inside a desktop shell window instead of full-viewport overlay. */
+  embedded?: boolean;
+};
+
+export function AdminConsole({ embedded = false }: AdminConsoleProps) {
   const [tab, setTab] = useState<AdminTab>("members");
   const contextQuery = useQuery({
     queryKey: ["admin", "context"],
@@ -27,7 +32,7 @@ export function AdminConsole() {
 
   if (contextQuery.isLoading) {
     return (
-      <div className="admin-console">
+      <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
         <div className="admin-console__frame">
           <div className="admin-console__body">Loading admin console…</div>
         </div>
@@ -37,7 +42,7 @@ export function AdminConsole() {
 
   if (contextQuery.isError || !contextQuery.data) {
     return (
-      <div className="admin-console">
+      <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
         <div className="admin-console__frame">
           <div className="admin-console__body admin-console__error">
             Admin Console is not available for this account.
@@ -50,7 +55,7 @@ export function AdminConsole() {
   const { realm, isPlatformAdmin } = contextQuery.data;
 
   return (
-    <div className="admin-console">
+    <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
       <div className="admin-console__frame">
         <header className="admin-console__header">
           <div>

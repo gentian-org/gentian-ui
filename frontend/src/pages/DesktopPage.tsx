@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, type PrefsResponse } from "@/api/client";
 import { openIdpBootstrapPopup, prepareEmbeddedOidcSession } from "@/auth/idpSession";
@@ -8,7 +9,6 @@ import {
 } from "@/auth/nextcloudBridge";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
-import { AdminConsole } from "@/admin/AdminConsole";
 import { useShellApps } from "@/shell/useShellApps";
 import { useAppsStore } from "@/stores/apps";
 import { useWindowsStore } from "@/stores/windows";
@@ -25,13 +25,25 @@ export function DesktopPage() {
 
   const activeAppId = useAppsStore((s) => s.activeAppId);
   const setActiveAppId = useAppsStore((s) => s.setActiveAppId);
+  const windows = useWindowsStore((s) => s.windows);
+  const openOrFocusWindow = useWindowsStore((s) => s.openOrFocusWindow);
   const openWindow = useWindowsStore((s) => s.openWindow);
 
-  const adminOpen = activeAppId === "admin";
+  useEffect(() => {
+    if (activeAppId === "admin" && !windows.some((win) => win.appId === "admin")) {
+      setActiveAppId(null);
+    }
+  }, [activeAppId, setActiveAppId, windows]);
 
   function handleSelect(app: (typeof apps)[number], options?: { forceLogin?: boolean }) {
     setActiveAppId(app.id);
     if (app.builtin && app.id === "admin") {
+      openOrFocusWindow({
+        id: "admin-console",
+        appId: app.id,
+        title: app.title,
+        builtinComponent: "admin",
+      });
       return;
     }
     if (!app.launchUrl) {
@@ -82,11 +94,6 @@ export function DesktopPage() {
   return (
     <div className="gentian-shell shell-surface relative min-h-full">
       <Background imageUrl={prefs?.backgroundUrl} />
-      {adminOpen && (
-        <div className="relative z-20">
-          <AdminConsole />
-        </div>
-      )}
       <WindowManager />
       <AppMenu
         apps={apps}

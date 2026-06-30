@@ -3,11 +3,16 @@ import { createWindowGeometry, maximizedGeometry, type WindowGeometry } from "@/
 
 export type WindowVisualState = "normal" | "minimized" | "maximized";
 
+export type ShellWindowBuiltin = "admin";
+
 export type ShellWindow = {
   id: string;
   appId: string;
   title: string;
-  url: string;
+  /** Iframe address for external apps; omitted for built-in React surfaces. */
+  url?: string;
+  /** When set, render a first-party component instead of an iframe. */
+  builtinComponent?: ShellWindowBuiltin;
   /** When set, navigate the iframe to this URL after the current IdP bootstrap page loads. */
   pendingUrl?: string;
   geometry: WindowGeometry;
@@ -22,7 +27,8 @@ type OpenWindowInput = {
   id: string;
   appId: string;
   title: string;
-  url: string;
+  url?: string;
+  builtinComponent?: ShellWindowBuiltin;
   pendingUrl?: string;
   geometry?: WindowGeometry;
 };
@@ -33,6 +39,7 @@ type WindowsState = {
   openWindow: (win: OpenWindowInput) => void;
   closeWindow: (id: string) => void;
   focusWindow: (id: string) => void;
+  openOrFocusWindow: (win: OpenWindowInput) => void;
   minimizeWindow: (id: string) => void;
   maximizeWindow: (id: string) => void;
   restoreWindow: (id: string) => void;
@@ -90,6 +97,14 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
         }),
       };
     }),
+  openOrFocusWindow: (win) => {
+    const existing = get().windows.find((w) => w.appId === win.appId);
+    if (existing) {
+      get().focusWindow(existing.id);
+      return;
+    }
+    get().openWindow(win);
+  },
   minimizeWindow: (id) =>
     set((state) => ({
       windows: state.windows.map((w) =>

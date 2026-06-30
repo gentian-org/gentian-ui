@@ -6,6 +6,30 @@
   overflow: auto;
 }
 
+.admin-console--embedded {
+  z-index: auto;
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+.admin-console--embedded .admin-console__frame {
+  max-width: none;
+  height: 100%;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-console--embedded .admin-console__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
 .admin-console__frame {
   max-width: 1120px;
   margin: 0 auto;

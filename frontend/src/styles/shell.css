@@ -563,6 +563,12 @@
   background: var(--gtn-paper-0);
 }
 
+.shell-window__body--component {
+  display: block;
+  overflow: hidden;
+  background: var(--gtn-paper-3);
+}
+
 .shell-window-taskbar {
   position: fixed;
   left: 0;

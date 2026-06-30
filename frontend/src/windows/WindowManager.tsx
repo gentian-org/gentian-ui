@@ -1,5 +1,5 @@
 import { useWindowsStore, type ShellWindow } from "@/stores/windows";
-import { APP_MENU_HEIGHT, WINDOW_HEADER_HEIGHT } from "@/lib/windows";
+import { APP_MENU_HEIGHT } from "@/lib/windows";
 import { useWindowDrag } from "@/windows/useWindowDrag";
 import { useWindowResize } from "@/windows/useWindowResize";
 import {
@@ -9,6 +9,7 @@ import {
   WindowRestoreIcon,
 } from "@/windows/WindowChromeIcons";
 import { WindowResizeHandles } from "@/windows/WindowResizeHandles";
+import { WindowBody } from "@/windows/WindowBody";
 
 function handleIframeLoad(win: ShellWindow, advanceWindowNavigation: (id: string) => void) {
   if (!win.pendingUrl) {
@@ -102,14 +103,9 @@ export function WindowManager() {
               </WindowChromeButton>
             </div>
           </header>
-          <iframe
-            key={win.url}
-            title={win.title}
-            src={win.url}
-            className="shell-window__body"
-            style={{ height: `calc(100% - ${WINDOW_HEADER_HEIGHT}px)` }}
-            allow="geolocation; microphone; camera; encrypted-media; storage-access *"
-            onLoad={() => handleIframeLoad(win, advanceWindowNavigation)}
+          <WindowBody
+            win={win}
+            onIframeLoad={() => handleIframeLoad(win, advanceWindowNavigation)}
           />
           <WindowResizeHandles
             win={win}
