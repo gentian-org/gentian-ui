@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   getOidcConfig,
   handleOAuthCallback,
@@ -27,16 +28,21 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const config = getOidcConfig();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
     void (async () => {
       const fromCallback = await handleOAuthCallback();
-      setAuthenticated(fromCallback || isAuthenticated());
+      const authed = fromCallback || isAuthenticated();
+      setAuthenticated(authed);
       setIsLoading(false);
+      if (authed) {
+        await queryClient.invalidateQueries({ queryKey: ["me"] });
+      }
     })();
-  }, []);
+  }, [queryClient]);
 
   const login = useCallback((returnTo?: string) => {
     void loginRedirect({ returnTo });

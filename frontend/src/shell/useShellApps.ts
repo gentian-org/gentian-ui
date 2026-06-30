@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { apiFetch, type AppsResponse, type MeResponse, type ShellApp } from "@/api/client";
+import { apiFetch, type MeResponse, type ShellApp } from "@/api/client";
+import { useAuth } from "@/auth/AuthProvider";
+import { getAccessToken } from "@/auth/oidc";
 
 const ADMIN_APP: ShellApp = {
   id: "admin",
@@ -10,27 +12,36 @@ const ADMIN_APP: ShellApp = {
   builtin: true,
 };
 
+function shellAppsFromMe(me: MeResponse | undefined): ShellApp[] {
+  if (me?.shellApps && me.shellApps.length > 0) {
+    return me.shellApps;
+  }
+  if (me?.isPlatformAdmin || me?.isTenantAdmin) {
+    return [ADMIN_APP];
+  }
+  return [];
+}
+
 export function useShellApps() {
-  const { data: me, isLoading: meLoading } = useQuery({
+  const { isAuthenticated, isLoading: authLoading, authDisabled } = useAuth();
+  const sessionReady = authDisabled || (!authLoading && isAuthenticated);
+  const hasToken = authDisabled || Boolean(getAccessToken());
+
+  const {
+    data: me,
+    isLoading: meLoading,
+    isFetching,
+    isFetched,
+  } = useQuery({
     queryKey: ["me"],
     queryFn: () => apiFetch<MeResponse>("/session/me"),
-  });
-  const { data: appsData, isLoading: appsLoading } = useQuery({
-    queryKey: ["apps"],
-    queryFn: () => apiFetch<AppsResponse>("/apps/"),
-    retry: false,
+    enabled: sessionReady && hasToken,
+    staleTime: 0,
+    refetchOnMount: "always",
+    retry: 1,
   });
 
-  const apps = useMemo(() => {
-    const fromApi = appsData?.apps ?? [];
-    if (fromApi.length > 0) {
-      return fromApi;
-    }
-    if (me?.isPlatformAdmin || me?.isTenantAdmin) {
-      return [ADMIN_APP];
-    }
-    return fromApi;
-  }, [appsData?.apps, me?.isPlatformAdmin, me?.isTenantAdmin]);
+  const apps = useMemo(() => shellAppsFromMe(me), [me]);
 
   const isAdminUser = Boolean(me?.isPlatformAdmin || me?.isTenantAdmin);
   const adminOnly =
@@ -41,6 +52,6 @@ export function useShellApps() {
     apps,
     isAdminUser,
     adminOnly,
-    isLoading: meLoading || appsLoading,
+    isLoading: !sessionReady || !hasToken || meLoading || (isFetching && !isFetched),
   };
 }

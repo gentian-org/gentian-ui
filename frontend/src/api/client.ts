@@ -48,6 +48,7 @@ export type MeResponse = {
   groups?: string[];
   isPlatformAdmin?: boolean;
   isTenantAdmin?: boolean;
+  shellApps?: ShellApp[];
 };
 
 export type ShellApp = {

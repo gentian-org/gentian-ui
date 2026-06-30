@@ -10,6 +10,7 @@ from app.core.gentian_groups import (
     normalize_groups,
     user_is_platform_admin,
 )
+from app.core.shell_apps import shell_apps_for_user
 
 router = APIRouter(prefix="/session", tags=["session"])
 
@@ -33,4 +34,5 @@ def get_me(
         "isTenantAdmin": settings.auth_disabled
         or is_tenant_admin(groups)
         or is_bootstrap_tenant_admin(user),
+        "shellApps": shell_apps_for_user(user, settings),
     }
