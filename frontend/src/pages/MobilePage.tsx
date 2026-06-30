@@ -64,6 +64,8 @@ export function MobilePage() {
         const ticket = await fetchNextcloudBridgeTicket();
         if (ticket) {
           launchUrl = nextcloudBridgeLaunchUrl(new URL(appUrl).origin, ticket);
+        } else {
+          return;
         }
       }
 

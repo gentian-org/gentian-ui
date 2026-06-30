@@ -77,6 +77,8 @@ export function DesktopPage() {
         const ticket = await fetchNextcloudBridgeTicket();
         if (ticket) {
           launchUrl = nextcloudBridgeLaunchUrl(new URL(appUrl).origin, ticket);
+        } else {
+          return;
         }
       } else if (useIdpBootstrap) {
         await prepareEmbeddedOidcSession(idpPopup);

@@ -164,46 +164,6 @@ def _ensure_nextcloud_user(
         )
 
 
-def _verify_nextcloud_login(*, cloud_url: str, uid: str, password: str) -> None:
-    base = cloud_url.rstrip("/")
-    client = httpx.Client(follow_redirects=False, timeout=20.0)
-    try:
-        login_page = client.get(f"{base}/login?direct=1")
-        if login_page.status_code >= 400:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Could not reach Nextcloud login",
-            )
-        match = re.search(r'data-requesttoken="([^"]+)"', login_page.text)
-        if not match:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Could not prepare Nextcloud login token",
-            )
-        response = client.post(
-            f"{base}/login?direct=1",
-            data={
-                "user": uid,
-                "password": password,
-                "requesttoken": match.group(1),
-            },
-        )
-    finally:
-        client.close()
-
-    if response.status_code not in (301, 302, 303):
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Nextcloud bridge login verification failed",
-        )
-    location = response.headers.get("location", "")
-    if "login" in location.lower():
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Nextcloud bridge login verification failed",
-        )
-
-
 def create_nextcloud_bridge_session(
     claims: dict[str, Any],
     *,
@@ -230,7 +190,6 @@ def create_nextcloud_bridge_session(
         display_name=display_name,
         password=portal_password,
     )
-    _verify_nextcloud_login(cloud_url=cloud_url, uid=uid, password=portal_password)
 
     return {"username": uid, "password": portal_password}
 
