@@ -140,9 +140,9 @@ def _ensure_nextcloud_user(
     if create.status_code < 400:
         root = ElementTree.fromstring(create.text)
         status_text, detail = _ocs_status(root)
-        if status_text == "ok" or detail in {"100", "102"}:
+        if status_text == "ok" and detail == "100":
             return
-        if status_text != "failure":
+        if status_text == "ok" and detail != "102":
             return
 
     update = httpx.put(

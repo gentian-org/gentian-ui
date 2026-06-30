@@ -30,8 +30,18 @@
       async function fetchRequestToken() {
         const response = await fetch("/login?direct=1", { credentials: "same-origin" });
         const html = await response.text();
-        const match = html.match(/name="requesttoken"\s+value="([^"]+)"/);
-        return match?.[1] ?? "";
+        const patterns = [
+          /data-requesttoken="([^"]+)"/,
+          /name="requesttoken"\s+value="([^"]+)"/,
+          /requesttoken="([^"]+)"/,
+        ];
+        for (const pattern of patterns) {
+          const match = html.match(pattern);
+          if (match?.[1]) {
+            return match[1];
+          }
+        }
+        return "";
       }
 
       function submitLogin(username, password, requestToken) {

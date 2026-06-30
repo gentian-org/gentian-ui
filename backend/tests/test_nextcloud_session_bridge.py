@@ -28,6 +28,36 @@ def test_ocs_status_parses_unnamespaced_xml():
     assert _ocs_status(root) == ("ok", "100")
 
 
+def test_ensure_nextcloud_user_updates_password_when_user_exists():
+    from unittest.mock import MagicMock
+
+    from app.services import nextcloud_session_bridge as bridge
+
+    existing_user_xml = """<?xml version="1.0"?>
+    <ocs><meta><status>failure</status><statuscode>102</statuscode>
+    <message>User already exists</message></meta></ocs>"""
+    update_ok_xml = """<?xml version="1.0"?>
+    <ocs><meta><status>ok</status><statuscode>100</statuscode><message>OK</message></meta></ocs>"""
+
+    create_response = MagicMock(status_code=200, text=existing_user_xml)
+    update_response = MagicMock(status_code=200, text=update_ok_xml)
+
+    with patch("app.services.nextcloud_session_bridge.httpx.post", return_value=create_response) as post, patch(
+        "app.services.nextcloud_session_bridge.httpx.put", return_value=update_response
+    ) as put:
+        bridge._ensure_nextcloud_user(
+            cloud_url="https://cloud.demo.desk.gentian.org",
+            admin_user="admin",
+            admin_password="secret",
+            uid="john-doe",
+            display_name="John Doe",
+            password="portal-temp-password",
+        )
+
+    put.assert_called_once()
+    post.assert_called_once()
+
+
 def test_nextcloud_uid_from_claims_prefers_opendesk_username():
     assert (
         nextcloud_uid_from_claims(
