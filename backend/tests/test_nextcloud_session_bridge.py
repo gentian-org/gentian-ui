@@ -6,10 +6,26 @@ import jwt
 
 from app.core.config import Settings
 from app.services.nextcloud_session_bridge import (
+    _ocs_status,
     create_nextcloud_bridge_ticket,
     nextcloud_uid_from_claims,
     redeem_nextcloud_bridge_ticket,
 )
+from xml.etree import ElementTree
+
+
+def test_ocs_status_parses_unnamespaced_xml():
+    root = ElementTree.fromstring(
+        """<?xml version="1.0"?>
+        <ocs>
+          <meta>
+            <status>ok</status>
+            <statuscode>100</statuscode>
+            <message>OK</message>
+          </meta>
+        </ocs>"""
+    )
+    assert _ocs_status(root) == ("ok", "100")
 
 
 def test_nextcloud_uid_from_claims_prefers_opendesk_username():

@@ -89,13 +89,27 @@ def _read_nextcloud_admin_credentials(tenant: str) -> tuple[str, str]:
     return "admin", base64.b64decode(encoded).decode("utf-8")
 
 
-def _ocs_status(root: ElementTree.Element) -> tuple[str, str]:
+def _ocs_meta(root: ElementTree.Element) -> ElementTree.Element | None:
     meta = root.find("ocs:meta", _OCS_NS)
+    if meta is not None:
+        return meta
+    return root.find("meta")
+
+
+def _ocs_status(root: ElementTree.Element) -> tuple[str, str]:
+    meta = _ocs_meta(root)
     if meta is None:
         return "failure", "Invalid OCS response"
-    status_code = (meta.findtext("ocs:statuscode", default="", namespaces=_OCS_NS) or "").strip()
-    message = (meta.findtext("ocs:message", default="", namespaces=_OCS_NS) or "").strip()
-    status_text = (meta.findtext("ocs:status", default="", namespaces=_OCS_NS) or "").strip()
+
+    def _meta_text(tag: str) -> str:
+        namespaced = meta.findtext(f"ocs:{tag}", default="", namespaces=_OCS_NS)
+        if namespaced:
+            return namespaced.strip()
+        return (meta.findtext(tag, default="") or "").strip()
+
+    status_code = _meta_text("statuscode")
+    message = _meta_text("message")
+    status_text = _meta_text("status")
     return status_text, status_code or message
 
 
@@ -126,7 +140,7 @@ def _ensure_nextcloud_user(
     if create.status_code < 400:
         root = ElementTree.fromstring(create.text)
         status_text, detail = _ocs_status(root)
-        if status_text == "ok" or detail == "102":
+        if status_text == "ok" or detail in {"100", "102"}:
             return
         if status_text != "failure":
             return
