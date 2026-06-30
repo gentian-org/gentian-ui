@@ -20,8 +20,8 @@ def test_lookup_user_groups_from_admin_api():
         "sub": "user-123",
     }
     with patch(
-        "app.services.keycloak_user_groups._admin_headers",
-        return_value={"Authorization": "Bearer t"},
+        "app.services.keycloak_user_groups._fetch_admin_token",
+        return_value="token",
     ), patch(
         "app.services.keycloak_user_groups.httpx.get",
     ) as mock_get:
