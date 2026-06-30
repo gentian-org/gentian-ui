@@ -140,6 +140,7 @@ def get_admin_store(settings: Settings = Depends(get_settings)) -> AdminStore:
             password=settings.keycloak_admin_password or "",
             portal_client_id=settings.portal_client_id,
             portal_login_url=settings.portal_login_url,
+            idp_public_host=settings.idp_public_host,
         )
     if settings.auth_disabled:
         if _memory_admin_store is None:

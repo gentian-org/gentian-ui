@@ -38,6 +38,20 @@ def test_smtp_unavailable_covers_send_failures():
     assert KeycloakAdminStore._smtp_unavailable(Response()) is True
 
 
+def test_public_frontend_headers():
+    store = KeycloakAdminStore(
+        base_url="http://keycloak.internal:8080/auth",
+        username="admin",
+        password="secret",
+        idp_public_host="id.desk.gentian.org",
+    )
+    assert store._public_frontend_headers() == {
+        "X-Forwarded-Host": "id.desk.gentian.org",
+        "X-Forwarded-Proto": "https",
+        "X-Forwarded-Port": "443",
+    }
+
+
 def test_session_from_raw_maps_keycloak_fields():
     session = KeycloakAdminStore._session_from_raw(
         "user-1",

@@ -22,12 +22,14 @@ class KeycloakAdminStore:
         password: str,
         portal_client_id: str = "gentian-portal",
         portal_login_url: str = "https://portal.gentian.local/login",
+        idp_public_host: str | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._username = username
         self._password = password
         self._portal_client_id = portal_client_id
         self._portal_login_url = portal_login_url
+        self._idp_public_host = idp_public_host
         self._token = ""
         self._token_expiry = 0.0
         self._client = httpx.AsyncClient(timeout=30.0)
@@ -510,6 +512,16 @@ class KeycloakAdminStore:
         self._token_expiry = time.time() + int(payload.get("expires_in", 60))
         return self._token
 
+    def _public_frontend_headers(self) -> dict[str, str]:
+        """Keycloak uses forwarded headers for front-channel URLs in emails when called in-cluster."""
+        if not self._idp_public_host:
+            return {}
+        return {
+            "X-Forwarded-Host": self._idp_public_host,
+            "X-Forwarded-Proto": "https",
+            "X-Forwarded-Port": "443",
+        }
+
     async def _raw_request(
         self,
         method: str,
@@ -519,12 +531,13 @@ class KeycloakAdminStore:
         json: Any = None,
     ) -> httpx.Response:
         token = await self._admin_token()
+        headers = {"Authorization": f"Bearer {token}", **self._public_frontend_headers()}
         return await self._client.request(
             method,
             f"{self._base_url}{path}",
             params=params,
             json=json,
-            headers={"Authorization": f"Bearer {token}"},
+            headers=headers,
         )
 
     async def _request(

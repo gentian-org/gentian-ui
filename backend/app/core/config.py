@@ -46,6 +46,15 @@ class Settings(BaseSettings):
         return f"https://portal.{self.kernel_domain}/login"
 
     @property
+    def idp_public_base_url(self) -> str:
+        """Browser-facing Keycloak base URL (scheme + host + /auth)."""
+        return f"https://id.{self.kernel_domain}/auth"
+
+    @property
+    def idp_public_host(self) -> str:
+        return f"id.{self.kernel_domain}"
+
+    @property
     def oidc_realm_base_url(self) -> str | None:
         """Realm OIDC base URL for JWKS/userinfo (prefer in-cluster Keycloak)."""
         issuer = (self.oidc_issuer or "").rstrip("/")
