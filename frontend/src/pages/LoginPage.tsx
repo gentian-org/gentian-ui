@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/auth/AuthProvider";
 import { setAccessToken, setIdToken } from "@/auth/oidc";
 import { defaultBasePath } from "@/lib/device";
+import { resolvePostLoginPath } from "@/lib/postLogin";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -51,7 +52,8 @@ export function LoginPage() {
       if (payload.idToken) {
         setIdToken(payload.idToken);
       }
-      window.location.assign(defaultBasePath());
+      const target = await resolvePostLoginPath(payload.accessToken);
+      window.location.assign(target);
     } catch (error) {
       setIsSubmitting(false);
       setErrorMessage(error instanceof Error ? error.message : "Could not sign in.");

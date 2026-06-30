@@ -1,30 +1,26 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { apiFetch, type AppsResponse, type MeResponse, type PrefsResponse } from "@/api/client";
+import { apiFetch, type PrefsResponse } from "@/api/client";
+import { AdminConsole } from "@/admin/AdminConsole";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { MobileAppLayer } from "@/shell/MobileAppLayer";
+import { useAutoOpenAdminConsole, useShellApps } from "@/shell/useShellApps";
+import { useAppsStore } from "@/stores/apps";
+
 export function MobilePage() {
-  const { data: me } = useQuery({
-    queryKey: ["me"],
-    queryFn: () => apiFetch<MeResponse>("/session/me"),
-  });
+  const { me, apps, isAdminUser } = useShellApps();
+  useAutoOpenAdminConsole(apps, isAdminUser);
+
   const { data: prefs } = useQuery({
     queryKey: ["prefs"],
     queryFn: () => apiFetch<PrefsResponse>("/prefs/"),
   });
-  const { data: appsData } = useQuery({
-    queryKey: ["apps"],
-    queryFn: () => apiFetch<AppsResponse>("/apps/"),
-  });
 
-  const apps = appsData?.apps ?? [];
-  const [activeAppId, setActiveAppId] = useState<string | null>(null);
+  const activeAppId = useAppsStore((s) => s.activeAppId);
+  const setActiveAppId = useAppsStore((s) => s.setActiveAppId);
 
-  const activeApp = useMemo(
-    () => apps.find((a) => a.id === activeAppId) ?? null,
-    [apps, activeAppId],
-  );
+  const activeApp = apps.find((app) => app.id === activeAppId) ?? null;
+  const adminOpen = activeAppId === "admin";
 
   function handleSelect(app: (typeof apps)[number]) {
     setActiveAppId(app.id);
@@ -33,6 +29,11 @@ export function MobilePage() {
   return (
     <div className="gentian-shell shell-surface relative min-h-full">
       <Background imageUrl={prefs?.backgroundUrl} />
+      {adminOpen && (
+        <div className="relative z-20">
+          <AdminConsole />
+        </div>
+      )}
       {!activeAppId && (
         <div className="gentian-mobile__welcome" aria-live="polite">
           <p className="gentian-mobile__welcome-text">Tap an app below to get started</p>

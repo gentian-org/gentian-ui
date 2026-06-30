@@ -464,7 +464,9 @@ async def admin_context(
         tenant=resolved,
         realm=_realm_for_tenant(resolved),
         isPlatformAdmin=settings.auth_disabled or user_is_platform_admin(user),
-        isTenantAdmin=settings.auth_disabled or is_tenant_admin(groups),
+        isTenantAdmin=settings.auth_disabled
+        or is_tenant_admin(groups)
+        or is_bootstrap_tenant_admin(user),
         availableTenants=available,
         storeConfigured=settings.auth_disabled
         or bool(settings.keycloak_admin_url and settings.keycloak_admin_password),
