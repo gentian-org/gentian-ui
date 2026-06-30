@@ -4,12 +4,11 @@ import { AdminConsole } from "@/admin/AdminConsole";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { MobileAppLayer } from "@/shell/MobileAppLayer";
-import { useAutoOpenAdminConsole, useShellApps } from "@/shell/useShellApps";
+import { useShellApps } from "@/shell/useShellApps";
 import { useAppsStore } from "@/stores/apps";
 
 export function MobilePage() {
-  const { me, apps, isAdminUser } = useShellApps();
-  useAutoOpenAdminConsole(apps, isAdminUser);
+  const { me, apps } = useShellApps();
 
   const { data: prefs } = useQuery({
     queryKey: ["prefs"],

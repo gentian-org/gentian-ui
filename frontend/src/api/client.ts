@@ -18,7 +18,16 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     headers,
   });
   if (!response.ok) {
-    throw new Error(`API ${path} failed: ${response.status}`);
+    let detail = "";
+    try {
+      const body = (await response.json()) as { detail?: unknown };
+      if (typeof body.detail === "string" && body.detail) {
+        detail = `: ${body.detail}`;
+      }
+    } catch {
+      // Response body is not JSON.
+    }
+    throw new Error(`API ${path} failed: ${response.status}${detail}`);
   }
   if (response.status === 204) {
     return undefined as T;

@@ -1,7 +1,7 @@
 import type { MeResponse } from "@/api/client";
 import { defaultBasePath } from "@/lib/device";
 
-/** Resolve shell entry path after password login (admins always use desktop Admin Console). */
+/** Resolve shell entry path after password login. */
 export async function resolvePostLoginPath(accessToken: string): Promise<"/desktop" | "/mobile"> {
   try {
     const response = await fetch("/api/v1/session/me", {

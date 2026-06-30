@@ -22,6 +22,14 @@ def test_smtp_unavailable_ignores_other_errors():
     assert KeycloakAdminStore._smtp_unavailable(Response()) is False
 
 
+def test_execute_actions_email_degraded_on_missing_client():
+    class Response:
+        status_code = 400
+        text = '{"errorMessage":"Client doesn\'t exist"}'
+
+    assert KeycloakAdminStore._execute_actions_email_degraded(Response()) is True
+
+
 def test_session_from_raw_maps_keycloak_fields():
     session = KeycloakAdminStore._session_from_raw(
         "user-1",

@@ -3,14 +3,13 @@ import { apiFetch, type PrefsResponse } from "@/api/client";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { AdminConsole } from "@/admin/AdminConsole";
-import { useAutoOpenAdminConsole, useShellApps } from "@/shell/useShellApps";
+import { useShellApps } from "@/shell/useShellApps";
 import { useAppsStore } from "@/stores/apps";
 import { useWindowsStore } from "@/stores/windows";
 import { WindowManager } from "@/windows/WindowManager";
 
 export function DesktopPage() {
-  const { me, apps, isAdminUser } = useShellApps();
-  useAutoOpenAdminConsole(apps, isAdminUser);
+  const { me, apps } = useShellApps();
 
   const { data: prefs } = useQuery({
     queryKey: ["prefs"],

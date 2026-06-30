@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { apiFetch, type AppsResponse, type MeResponse, type ShellApp } from "@/api/client";
-import { useAppsStore } from "@/stores/apps";
 
 const ADMIN_APP: ShellApp = {
   id: "admin",
@@ -44,21 +43,4 @@ export function useShellApps() {
     adminOnly,
     isLoading: meLoading || appsLoading,
   };
-}
-
-/** Tenant/platform admins land in Admin Console (design: sign in → Admin Console). */
-export function useAutoOpenAdminConsole(apps: ShellApp[], enabled: boolean) {
-  const activeAppId = useAppsStore((s) => s.activeAppId);
-  const setActiveAppId = useAppsStore((s) => s.setActiveAppId);
-
-  useEffect(() => {
-    if (!enabled || activeAppId === "admin") {
-      return;
-    }
-    const hasAdmin = apps.some((app) => app.id === "admin");
-    const onlyAdmin = hasAdmin && apps.every((app) => app.id === "admin");
-    if (onlyAdmin) {
-      setActiveAppId("admin");
-    }
-  }, [enabled, apps, activeAppId, setActiveAppId]);
 }

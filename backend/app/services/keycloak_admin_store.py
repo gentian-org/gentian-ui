@@ -358,7 +358,7 @@ class KeycloakAdminStore:
                         "enabled": current.get("enabled", True),
                     },
                 )
-            if self._smtp_unavailable(response):
+            if self._execute_actions_email_degraded(response):
                 await self._set_required_actions(realm, member_id, current, actions)
                 return
             await self._raise_for_status(response)
@@ -463,6 +463,16 @@ class KeycloakAdminStore:
                 or "failed to send execute actions email" in text
                 or "failed to send email" in text
             )
+        )
+
+    @staticmethod
+    def _execute_actions_email_degraded(response: httpx.Response) -> bool:
+        """True when execute-actions-email cannot run; fall back to required actions."""
+        if KeycloakAdminStore._smtp_unavailable(response):
+            return True
+        text = response.text.lower()
+        return response.status_code >= 400 and (
+            "client doesn't exist" in text or "client doesnt exist" in text
         )
 
     async def _admin_token(self) -> str:
