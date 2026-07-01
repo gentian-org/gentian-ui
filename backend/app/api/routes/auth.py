@@ -82,6 +82,7 @@ def login(body: LoginRequest, settings: Settings = Depends(get_settings)) -> Log
 async def forgot_password(
     body: ForgotPasswordRequest,
     settings: Settings = Depends(get_settings),
+    *,
     store: AdminStoreDep,
 ) -> None:
     """Send a password-reset email when the account exists (always 204)."""

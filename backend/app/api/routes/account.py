@@ -156,6 +156,7 @@ async def account_revoke_all_sessions(
 async def account_request_totp(
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
+    *,
     store: AdminStoreDep,
 ) -> None:
     """Ask the user to configure TOTP on next sign-in (self-service)."""
