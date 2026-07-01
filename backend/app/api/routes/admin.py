@@ -39,6 +39,16 @@ from app.services.notification_audience import validate_publish_audience
 from app.services.notification_cloudevents import notification_to_cloudevent
 from app.services.notification_store import NotificationStoreDep
 from app.services.k8s_catalogue import request_tenant_app_privilege_reconcile
+from app.services.k8s_authorization import (
+    get_app_grant,
+    get_platform_security_policy,
+    list_app_grants,
+    list_app_profiles_with_mac_requests,
+    list_integration_bindings,
+    replace_app_grant,
+    replace_platform_security_policy,
+    tenant_namespace,
+)
 from app.services.security_policy_store import SecurityPolicyStoreDep
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -202,6 +212,16 @@ def _require_admin(user: dict[str, Any], settings: Settings) -> None:
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Admin Console access requires tenant or platform administrator privileges",
     )
+
+
+def _require_platform_admin(user: dict[str, Any], settings: Settings) -> None:
+    if settings.auth_disabled:
+        return
+    if not user_is_platform_admin(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Platform administrator privileges required",
+        )
 
 
 def _realm_for_tenant(tenant: str) -> str:
@@ -1141,3 +1161,197 @@ async def publish_notification(
         },
     )
     return _notification_response(notification)
+
+
+class MacWaiverRequestModel(BaseModel):
+    profile: str
+    policy: str
+    scope: str
+
+
+class MacWaiverCatalogueEntry(BaseModel):
+    name: str
+    displayName: str = ""
+    macWaivers: list[dict[str, str]] = Field(default_factory=list)
+
+
+class PlatformSecurityPolicyResponse(BaseModel):
+    allowedMacWaivers: list[MacWaiverRequestModel] = Field(default_factory=list)
+    catalogueRequests: list[MacWaiverCatalogueEntry] = Field(default_factory=list)
+
+
+class PlatformSecurityPolicyUpdateRequest(BaseModel):
+    allowedMacWaivers: list[MacWaiverRequestModel] = Field(default_factory=list)
+
+
+class IntegrationBindingResponse(BaseModel):
+    name: str
+    contract: str
+    provider: str
+    consumer: str
+    capabilities: list[str] = Field(default_factory=list)
+    state: str = ""
+
+
+class ConsumeGrantModel(BaseModel):
+    contract: str
+    granted: list[str] = Field(default_factory=list)
+
+
+class AllowConsumerModel(BaseModel):
+    app: str
+    contract: str
+    scope: list[str] = Field(default_factory=list)
+
+
+class AppGrantResponse(BaseModel):
+    name: str
+    app: str
+    consume: list[ConsumeGrantModel] = Field(default_factory=list)
+    allowConsumers: list[AllowConsumerModel] = Field(default_factory=list)
+    phase: str = ""
+
+
+class AppGrantUpdateRequest(BaseModel):
+    consume: list[ConsumeGrantModel] = Field(default_factory=list)
+    allowConsumers: list[AllowConsumerModel] = Field(default_factory=list)
+
+
+class IntegrationsOverviewResponse(BaseModel):
+    bindings: list[IntegrationBindingResponse] = Field(default_factory=list)
+    grants: list[AppGrantResponse] = Field(default_factory=list)
+
+
+@router.get("/platform/security-policy", response_model=PlatformSecurityPolicyResponse)
+async def get_platform_security_policy_route(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> PlatformSecurityPolicyResponse:
+    _require_admin(user, settings)
+    _require_platform_admin(user, settings)
+    try:
+        psp = get_platform_security_policy()
+    except Exception as exc:  # noqa: BLE001 — surface K8s API errors to admins
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    allowed = [
+        MacWaiverRequestModel(**item)
+        for item in (psp.get("spec") or {}).get("allowedMacWaivers") or []
+    ]
+    catalogue = [
+        MacWaiverCatalogueEntry(
+            name=entry["name"],
+            displayName=entry.get("displayName", ""),
+            macWaivers=entry.get("macWaivers") or [],
+        )
+        for entry in list_app_profiles_with_mac_requests()
+    ]
+    return PlatformSecurityPolicyResponse(allowedMacWaivers=allowed, catalogueRequests=catalogue)
+
+
+@router.put("/platform/security-policy", response_model=PlatformSecurityPolicyResponse)
+async def put_platform_security_policy_route(
+    body: PlatformSecurityPolicyUpdateRequest,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> PlatformSecurityPolicyResponse:
+    _require_admin(user, settings)
+    _require_platform_admin(user, settings)
+    spec = {
+        "allowedMacWaivers": [item.model_dump() for item in body.allowedMacWaivers],
+    }
+    try:
+        replace_platform_security_policy(spec)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    await record_admin_audit(
+        user,
+        tenant=settings.kernel_realm,
+        action="platform.security-policy.updated",
+        target="PlatformSecurityPolicy/default",
+        details={"allowedMacWaivers": len(body.allowedMacWaivers)},
+    )
+    return await get_platform_security_policy_route(user=user, settings=settings)
+
+
+@router.get("/integrations", response_model=IntegrationsOverviewResponse)
+async def list_integrations_overview(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> IntegrationsOverviewResponse:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    ns = tenant_namespace(resolved)
+    try:
+        bindings_raw = list_integration_bindings(ns)
+        grants_raw = list_app_grants(ns)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    bindings = [
+        IntegrationBindingResponse(
+            name=item.get("metadata", {}).get("name", ""),
+            contract=(item.get("spec") or {}).get("contract", ""),
+            provider=((item.get("spec") or {}).get("provider") or {}).get("app", ""),
+            consumer=((item.get("spec") or {}).get("consumer") or {}).get("app", ""),
+            capabilities=(item.get("spec") or {}).get("capabilities") or [],
+            state=(item.get("status") or {}).get("state", ""),
+        )
+        for item in bindings_raw
+    ]
+    grants = [
+        AppGrantResponse(
+            name=item.get("metadata", {}).get("name", ""),
+            app=(item.get("spec") or {}).get("app", ""),
+            consume=[
+                ConsumeGrantModel(**c) for c in (item.get("spec") or {}).get("consume") or []
+            ],
+            allowConsumers=[
+                AllowConsumerModel(**a)
+                for a in (item.get("spec") or {}).get("allowConsumers") or []
+            ],
+            phase=(item.get("status") or {}).get("phase", ""),
+        )
+        for item in grants_raw
+    ]
+    return IntegrationsOverviewResponse(bindings=bindings, grants=grants)
+
+
+@router.put("/grants/{app_name}", response_model=AppGrantResponse)
+async def update_app_grant(
+    app_name: str,
+    body: AppGrantUpdateRequest,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> AppGrantResponse:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    ns = tenant_namespace(resolved)
+    existing = get_app_grant(ns, app_name)
+    if existing is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="AppGrant not found")
+    spec = existing.get("spec") or {}
+    spec["consume"] = [item.model_dump() for item in body.consume]
+    spec["allowConsumers"] = [item.model_dump() for item in body.allowConsumers]
+    try:
+        updated = replace_app_grant(ns, app_name, spec)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="app-grant.updated",
+        target=app_name,
+        details={"consume": len(body.consume), "allowConsumers": len(body.allowConsumers)},
+    )
+    return AppGrantResponse(
+        name=app_name,
+        app=spec.get("app", app_name),
+        consume=body.consume,
+        allowConsumers=body.allowConsumers,
+        phase=(updated.get("status") or {}).get("phase", ""),
+    )
+

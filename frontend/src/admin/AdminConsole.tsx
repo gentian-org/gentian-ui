@@ -3,13 +3,23 @@ import { useState } from "react";
 import { fetchAdminContext, fetchGroups } from "@/api/admin";
 import { AuditSection } from "@/admin/AuditSection";
 import { GroupsSection } from "@/admin/GroupsSection";
+import { IntegrationsSection } from "@/admin/IntegrationsSection";
 import { MembersSection } from "@/admin/MembersSection";
 import { NotificationsSection } from "@/admin/NotificationsSection";
+import { PlatformSecuritySection } from "@/admin/PlatformSecuritySection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
 import { SessionsSection } from "@/admin/SessionsSection";
 import "./admin.css";
 
-type AdminTab = "members" | "groups" | "security" | "sessions" | "audit" | "notifications";
+type AdminTab =
+  | "members"
+  | "groups"
+  | "security"
+  | "integrations"
+  | "platform"
+  | "sessions"
+  | "audit"
+  | "notifications";
 
 type AdminConsoleProps = {
   /** Render inside a desktop shell window instead of full-viewport overlay. */
@@ -105,6 +115,22 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
           </button>
           <button
             type="button"
+            className={`admin-console__tab${tab === "integrations" ? " admin-console__tab--active" : ""}`}
+            onClick={() => setTab("integrations")}
+          >
+            Integrations
+          </button>
+          {isPlatformAdmin ? (
+            <button
+              type="button"
+              className={`admin-console__tab${tab === "platform" ? " admin-console__tab--active" : ""}`}
+              onClick={() => setTab("platform")}
+            >
+              Platform
+            </button>
+          ) : null}
+          <button
+            type="button"
             className={`admin-console__tab${tab === "sessions" ? " admin-console__tab--active" : ""}`}
             onClick={() => setTab("sessions")}
           >
@@ -138,6 +164,10 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <GroupsSection tenant={tenant} />
           ) : tab === "security" ? (
             <SecurityPoliciesSection tenant={tenant} />
+          ) : tab === "integrations" ? (
+            <IntegrationsSection tenant={tenant} />
+          ) : tab === "platform" ? (
+            <PlatformSecuritySection />
           ) : tab === "sessions" ? (
             <SessionsSection tenant={tenant} />
           ) : tab === "notifications" ? (

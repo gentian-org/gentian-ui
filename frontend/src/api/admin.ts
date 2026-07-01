@@ -333,3 +333,79 @@ export function publishNotification(
     body: JSON.stringify(body),
   });
 }
+
+export type MacWaiverEntry = {
+  profile: string;
+  policy: string;
+  scope: string;
+};
+
+export type MacWaiverCatalogueEntry = {
+  name: string;
+  displayName: string;
+  macWaivers: Array<{ policy: string; scope: string }>;
+};
+
+export type PlatformSecurityPolicy = {
+  allowedMacWaivers: MacWaiverEntry[];
+  catalogueRequests: MacWaiverCatalogueEntry[];
+};
+
+export function fetchPlatformSecurityPolicy() {
+  return apiFetch<PlatformSecurityPolicy>("/admin/platform/security-policy");
+}
+
+export function updatePlatformSecurityPolicy(allowedMacWaivers: MacWaiverEntry[]) {
+  return apiFetch<PlatformSecurityPolicy>("/admin/platform/security-policy", {
+    method: "PUT",
+    body: JSON.stringify({ allowedMacWaivers }),
+  });
+}
+
+export type IntegrationBinding = {
+  name: string;
+  contract: string;
+  provider: string;
+  consumer: string;
+  capabilities: string[];
+  state: string;
+};
+
+export type ConsumeGrant = {
+  contract: string;
+  granted: string[];
+};
+
+export type AllowConsumer = {
+  app: string;
+  contract: string;
+  scope: string[];
+};
+
+export type AppGrant = {
+  name: string;
+  app: string;
+  consume: ConsumeGrant[];
+  allowConsumers: AllowConsumer[];
+  phase: string;
+};
+
+export type IntegrationsOverview = {
+  bindings: IntegrationBinding[];
+  grants: AppGrant[];
+};
+
+export function fetchIntegrationsOverview(tenant?: string) {
+  return apiFetch<IntegrationsOverview>(`/admin/integrations${tenantQuery(tenant)}`);
+}
+
+export function updateAppGrant(
+  app: string,
+  body: { consume: ConsumeGrant[]; allowConsumers: AllowConsumer[] },
+  tenant?: string,
+) {
+  return apiFetch<AppGrant>(`/admin/grants/${encodeURIComponent(app)}${tenantQuery(tenant)}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
