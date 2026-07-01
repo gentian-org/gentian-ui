@@ -54,8 +54,6 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ .Values.existingSecret.name }}
-            - secretRef:
-                name: {{ .Values.databaseSecret.name }}
           volumeMounts:
             - name: tmp
               mountPath: /tmp

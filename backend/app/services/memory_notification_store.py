@@ -69,10 +69,12 @@ class MemoryNotificationStore:
         visible.sort(key=lambda item: item.published_at, reverse=True)
         return visible
 
-    async def dismiss(self, notification_id: str, user_sub: str) -> None:
+    async def dismiss(self, notification_id: str, user_sub: str, *, tenant: str) -> None:
+        _ = tenant
         self._dismissals.add((notification_id, user_sub))
 
-    async def get(self, notification_id: str) -> AdminNotification | None:
+    async def get(self, notification_id: str, *, tenant: str) -> AdminNotification | None:
+        _ = tenant
         for item in self._notifications:
             if item.id == notification_id:
                 return deepcopy(item)

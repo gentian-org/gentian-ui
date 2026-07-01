@@ -19,7 +19,7 @@ router = APIRouter(prefix="/prefs", tags=["prefs"])
 def get_prefs(user: dict = Depends(get_current_user), settings: Settings = Depends(get_settings)) -> dict:
     tenant = resolve_user_context(user, settings)
     user_sub = str(user.get("sub") or "anonymous")
-    summary = get_summary(user_sub, tenant, settings)
+    summary = get_summary(user_sub, tenant)
     return {
         "base": None,
         "theme": None,

@@ -15,17 +15,21 @@ get_settings.cache_clear()
 @pytest.fixture(autouse=True)
 def reset_stores():
     from app.db import engine as db_engine
+    from app.db.tenant_engine import reset_tenant_databases_for_tests
     from app.services import admin_store
     from app.services import audit_store as audit_store_module
 
     admin_store._memory_admin_store = None
     audit_store_module._keycloak_audit_fetcher = None
+    reset_tenant_databases_for_tests()
     db_engine._engine = None
     db_engine._session_factory = None
     settings = get_settings()
-    db_engine.init_portal_database(settings.database_url)
+    if settings.database_url:
+        db_engine.init_portal_database(settings.database_url)
     yield
     admin_store._memory_admin_store = None
     audit_store_module._keycloak_audit_fetcher = None
+    reset_tenant_databases_for_tests()
     db_engine._engine = None
     db_engine._session_factory = None

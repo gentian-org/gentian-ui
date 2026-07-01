@@ -3,6 +3,7 @@ from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.db.engine import audit_database_ready, get_db_session
+from app.db.tenant_engine import uses_shared_dev_database
 
 router = APIRouter(tags=["health"])
 
@@ -26,17 +27,20 @@ def readyz(response: Response) -> dict[str, object]:
         errors.append("OPENFGA_STORE_ID required when OPENFGA_API_URL is set")
 
     checks["oidc"] = "ok" if settings.oidc_issuer or not settings.is_production else "missing"
-    if audit_database_ready():
-        try:
-            with get_db_session() as session:
-                session.execute(text("SELECT 1"))
-            checks["database"] = "ok"
-        except Exception:
-            checks["database"] = "error"
-            errors.append("database unreachable")
+    if uses_shared_dev_database(settings):
+        if audit_database_ready():
+            try:
+                with get_db_session() as session:
+                    session.execute(text("SELECT 1"))
+                checks["database"] = "ok"
+            except Exception:
+                checks["database"] = "error"
+                errors.append("database unreachable")
+        else:
+            checks["database"] = "not_initialized"
+            errors.append("database not initialized")
     else:
-        checks["database"] = "not_initialized"
-        errors.append("database not initialized")
+        checks["database"] = "tenant_scoped"
     checks["openfga"] = (
         "configured" if settings.openfga_api_url and settings.openfga_store_id else "skipped"
     )

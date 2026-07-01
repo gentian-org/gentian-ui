@@ -6,7 +6,7 @@ import uuid
 
 from sqlalchemy import select
 
-from app.db.engine import get_db_session
+from app.db.tenant_engine import get_tenant_db_session
 from app.models.admin_audit_event import AdminAuditEventRow
 from app.services.audit_events import AuditCategory, AuditEvent, AuditEventFilters
 
@@ -50,7 +50,7 @@ class SqlAuditStore:
             success=event.success,
             details=event.details,
         )
-        with get_db_session() as session:
+        with get_tenant_db_session(tenant) as session:
             session.add(row)
         return event
 
@@ -72,7 +72,7 @@ class SqlAuditStore:
         if filters.to_epoch_ms is not None:
             stmt = stmt.where(AdminAuditEventRow.occurred_at <= filters.to_epoch_ms)
 
-        with get_db_session() as session:
+        with get_tenant_db_session(tenant) as session:
             rows = session.scalars(stmt).all()
             events = [_row_to_event(row) for row in rows]
 

@@ -15,7 +15,11 @@ class Settings(BaseSettings):
     kernel_realm: str = Field(default="kernel", alias="KERNEL_REALM")
     tenancy_mode: str = Field(default="multi", alias="TENANCY_MODE")
 
-    database_url: str = Field(alias="DATABASE_URL")
+    database_url: str | None = Field(default=None, alias="DATABASE_URL")
+    portal_shell_secrets_namespace: str = Field(
+        default="platform-kernel",
+        alias="PORTAL_SHELL_SECRETS_NAMESPACE",
+    )
 
     oidc_issuer: str | None = Field(default=None, alias="OIDC_ISSUER")
     oidc_client_id: str | None = Field(default=None, alias="OIDC_CLIENT_ID")
@@ -97,6 +101,8 @@ class Settings(BaseSettings):
             raise ValueError("BACKEND_CORS_ORIGINS must not be '*' in production (M9)")
         if self.is_production and self.auth_disabled:
             raise ValueError("AUTH_DISABLED must be false in production (M2)")
+        if self.is_production and not self.database_url and self.tenancy_mode.lower() != "multi":
+            raise ValueError("DATABASE_URL or multi-tenant portal shell secrets are required in production")
         return self
 
 

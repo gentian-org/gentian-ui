@@ -7,7 +7,7 @@ import uuid
 
 from sqlalchemy import select
 
-from app.db.engine import get_db_session
+from app.db.tenant_engine import get_tenant_db_session
 from app.models.admin_notification import AdminNotificationDismissalRow, AdminNotificationRow
 from app.services.admin_notifications import (
     AdminNotification,
@@ -61,7 +61,7 @@ class SqlNotificationStore:
             link_label=link_label,
             expires_at=expires_at,
         )
-        with get_db_session() as session:
+        with get_tenant_db_session(tenant) as session:
             session.add(row)
         return notification
 
@@ -71,7 +71,7 @@ class SqlNotificationStore:
             .where(AdminNotificationRow.tenant == tenant)
             .order_by(AdminNotificationRow.published_at.desc())
         )
-        with get_db_session() as session:
+        with get_tenant_db_session(tenant) as session:
             rows = session.scalars(stmt).all()
             return [_row_to_notification(row) for row in rows]
 
@@ -81,8 +81,10 @@ class SqlNotificationStore:
         *,
         user_tenant: str | None,
     ) -> list[AdminNotification]:
+        if not user_tenant:
+            return []
         user_sub = str(user.get("sub") or user.get("preferred_username") or "anonymous")
-        with get_db_session() as session:
+        with get_tenant_db_session(user_tenant) as session:
             rows = session.scalars(select(AdminNotificationRow)).all()
             dismissed = {
                 row.notification_id
@@ -103,8 +105,8 @@ class SqlNotificationStore:
         visible.sort(key=lambda item: item.published_at, reverse=True)
         return visible
 
-    async def dismiss(self, notification_id: str, user_sub: str) -> None:
-        with get_db_session() as session:
+    async def dismiss(self, notification_id: str, user_sub: str, *, tenant: str) -> None:
+        with get_tenant_db_session(tenant) as session:
             existing = session.scalar(
                 select(AdminNotificationDismissalRow).where(
                     AdminNotificationDismissalRow.notification_id == notification_id,
@@ -122,8 +124,8 @@ class SqlNotificationStore:
                 )
             )
 
-    async def get(self, notification_id: str) -> AdminNotification | None:
-        with get_db_session() as session:
+    async def get(self, notification_id: str, *, tenant: str) -> AdminNotification | None:
+        with get_tenant_db_session(tenant) as session:
             row = session.get(AdminNotificationRow, notification_id)
             return _row_to_notification(row) if row else None
 

@@ -7,7 +7,6 @@ from typing import Annotated, Protocol
 from fastapi import Depends
 
 from app.core.config import Settings, get_settings
-from app.db.engine import init_portal_database
 from app.services.admin_notifications import AdminNotification, NotificationAudience, NotificationSeverity
 from app.services.sql_notification_store import SqlNotificationStore
 
@@ -31,13 +30,12 @@ class NotificationStore(Protocol):
 
     async def list_inbox(self, user: dict, *, user_tenant: str | None) -> list[AdminNotification]: ...
 
-    async def dismiss(self, notification_id: str, user_sub: str) -> None: ...
+    async def dismiss(self, notification_id: str, user_sub: str, *, tenant: str) -> None: ...
 
-    async def get(self, notification_id: str) -> AdminNotification | None: ...
+    async def get(self, notification_id: str, *, tenant: str) -> AdminNotification | None: ...
 
 
 def get_notification_store(settings: Settings = Depends(get_settings)) -> NotificationStore:
-    init_portal_database(settings.database_url)
     return SqlNotificationStore()
 
 

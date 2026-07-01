@@ -82,13 +82,16 @@ async def dismiss_notification(
     store: NotificationStoreDep,
 ) -> None:
     user_sub = str(user.get("sub") or user.get("preferred_username") or "anonymous")
-    notification = await store.get(notification_id)
+    tenant = _user_tenant(user, settings)
+    if tenant is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tenant context required")
+    notification = await store.get(notification_id, tenant=tenant)
     if notification is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
     if not notification_visible_to_user(
         notification,
         user,
-        user_tenant=_user_tenant(user, settings),
+        user_tenant=tenant,
     ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Notification not in your inbox")
-    await store.dismiss(notification_id, user_sub)
+    await store.dismiss(notification_id, user_sub, tenant=tenant)

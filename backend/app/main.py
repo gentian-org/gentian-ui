@@ -13,7 +13,8 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    init_portal_database(settings.database_url)
+    if settings.database_url:
+        init_portal_database(settings.database_url)
     yield
 
 
