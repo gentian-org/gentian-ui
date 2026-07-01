@@ -16,10 +16,63 @@ import "./admin.css";
 
 type MembersSectionProps = {
   tenant: string;
-  groups: AdminGroup[];
+  privilegeGroups: AdminGroup[];
+  appEntitlementGroups: AdminGroup[];
+  customGroups: AdminGroup[];
 };
 
-export function MembersSection({ tenant, groups }: MembersSectionProps) {
+function groupLabel(name: string): string {
+  if (name.endsWith(":app-admins")) {
+    return "App administrator";
+  }
+  const appMatch = name.match(/:app:([^:]+)$/);
+  if (appMatch) {
+    return appMatch[1];
+  }
+  return name;
+}
+
+function GroupCheckboxList({
+  title,
+  groups,
+  selectedIds,
+  onToggle,
+}: {
+  title: string;
+  groups: AdminGroup[];
+  selectedIds: string[];
+  onToggle: (groupId: string, selected: boolean) => void;
+}) {
+  if (groups.length === 0) {
+    return null;
+  }
+  return (
+    <div className="admin-console__field">
+      <span>{title}</span>
+      {groups.map((group) => {
+        const selected = selectedIds.includes(group.id);
+        return (
+          <label key={group.id} style={{ display: "block", fontSize: "0.875rem" }}>
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => onToggle(group.id, selected)}
+            />{" "}
+            {groupLabel(group.name)}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+export function MembersSection({
+  tenant,
+  privilegeGroups,
+  appEntitlementGroups,
+  customGroups,
+}: MembersSectionProps) {
+  const assignableGroups = [...privilegeGroups, ...appEntitlementGroups, ...customGroups];
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftGroupIds, setDraftGroupIds] = useState<string[]>([]);
@@ -33,6 +86,9 @@ export function MembersSection({ tenant, groups }: MembersSectionProps) {
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const toggleGroupId = (groupIds: string[], groupId: string, selected: boolean) =>
+    selected ? groupIds.filter((id) => id !== groupId) : [...groupIds, groupId];
 
   const membersQuery = useQuery({
     queryKey: ["admin", "members", tenant],
@@ -177,31 +233,39 @@ export function MembersSection({ tenant, groups }: MembersSectionProps) {
             onChange={(e) => setForm((prev) => ({ ...prev, lastName: e.target.value }))}
           />
         </div>
-        {groups.length > 0 && (
-          <div className="admin-console__field">
-            <span>App entitlements</span>
-            {groups.map((group) => {
-              const selected = form.groupIds.includes(group.id);
-              return (
-                <label key={group.id} style={{ display: "block", fontSize: "0.875rem" }}>
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={() => {
-                      setForm((prev) => ({
-                        ...prev,
-                        groupIds: selected
-                          ? prev.groupIds.filter((id) => id !== group.id)
-                          : [...prev.groupIds, group.id],
-                      }));
-                    }}
-                  />{" "}
-                  {group.name}
-                </label>
-              );
-            })}
-          </div>
-        )}
+        <GroupCheckboxList
+          title="App administrators"
+          groups={privilegeGroups}
+          selectedIds={form.groupIds}
+          onToggle={(groupId, selected) =>
+            setForm((prev) => ({
+              ...prev,
+              groupIds: toggleGroupId(prev.groupIds, groupId, selected),
+            }))
+          }
+        />
+        <GroupCheckboxList
+          title="App entitlements"
+          groups={appEntitlementGroups}
+          selectedIds={form.groupIds}
+          onToggle={(groupId, selected) =>
+            setForm((prev) => ({
+              ...prev,
+              groupIds: toggleGroupId(prev.groupIds, groupId, selected),
+            }))
+          }
+        />
+        <GroupCheckboxList
+          title="Custom groups"
+          groups={customGroups}
+          selectedIds={form.groupIds}
+          onToggle={(groupId, selected) =>
+            setForm((prev) => ({
+              ...prev,
+              groupIds: toggleGroupId(prev.groupIds, groupId, selected),
+            }))
+          }
+        />
         <div className="admin-console__field">
           <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <input
@@ -264,31 +328,36 @@ export function MembersSection({ tenant, groups }: MembersSectionProps) {
                 ) : (
                   member.groups.map((group) => (
                     <span key={group} className="admin-console__chip">
-                      {group}
+                      {groupLabel(group)}
                     </span>
                   ))
                 )}
                 {editingId === member.id ? (
                   <div style={{ marginTop: "0.5rem" }}>
-                    {groups.map((group) => {
-                      const selected = draftGroupIds.includes(group.id);
-                      return (
-                        <label key={group.id} style={{ display: "block", fontSize: "0.75rem" }}>
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => {
-                              setDraftGroupIds((current) =>
-                                selected
-                                  ? current.filter((id) => id !== group.id)
-                                  : [...current, group.id],
-                              );
-                            }}
-                          />{" "}
-                          {group.name}
-                        </label>
-                      );
-                    })}
+                    <GroupCheckboxList
+                      title="App administrators"
+                      groups={privilegeGroups}
+                      selectedIds={draftGroupIds}
+                      onToggle={(groupId, selected) =>
+                        setDraftGroupIds((current) => toggleGroupId(current, groupId, selected))
+                      }
+                    />
+                    <GroupCheckboxList
+                      title="App entitlements"
+                      groups={appEntitlementGroups}
+                      selectedIds={draftGroupIds}
+                      onToggle={(groupId, selected) =>
+                        setDraftGroupIds((current) => toggleGroupId(current, groupId, selected))
+                      }
+                    />
+                    <GroupCheckboxList
+                      title="Custom groups"
+                      groups={customGroups}
+                      selectedIds={draftGroupIds}
+                      onToggle={(groupId, selected) =>
+                        setDraftGroupIds((current) => toggleGroupId(current, groupId, selected))
+                      }
+                    />
                     <button
                       type="button"
                       className="admin-console__btn admin-console__btn--primary"
@@ -313,7 +382,7 @@ export function MembersSection({ tenant, groups }: MembersSectionProps) {
                     className="admin-console__btn"
                     style={{ marginLeft: "0.5rem" }}
                     onClick={() => {
-                      const currentIds = groups
+                      const currentIds = assignableGroups
                         .filter((g) => member.groups.includes(g.name))
                         .map((g) => g.id);
                       setDraftGroupIds(currentIds);

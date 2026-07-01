@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any
 
@@ -11,6 +12,7 @@ from kubernetes.client.rest import ApiException
 GROUP = "gentianos.io"
 VERSION = "v1alpha1"
 PLATFORM_APP_ANNOTATION = "gentianos.io/platform-app"
+APP_PRIVILEGE_REQUESTED_ANNOTATION = "gentianos.io/app-privilege-requested-at"
 
 
 @lru_cache
@@ -66,3 +68,25 @@ def list_installed_profiles(tenant_name: str) -> list[str]:
 def is_platform_app(profile: dict[str, Any]) -> bool:
     annotations = profile.get("metadata", {}).get("annotations") or {}
     return annotations.get(PLATFORM_APP_ANNOTATION) == "true"
+
+
+def request_tenant_app_privilege_reconcile(tenant_name: str) -> None:
+    """Ask the tenant operator to re-sync app-admins into installed apps immediately."""
+    timestamp = (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+    try:
+        _custom_objects_api().patch_cluster_custom_object(
+            group=GROUP,
+            version=VERSION,
+            plural="tenants",
+            name=tenant_name,
+            body={"metadata": {"annotations": {APP_PRIVILEGE_REQUESTED_ANNOTATION: timestamp}}},
+        )
+    except ApiException as exc:
+        if exc.status == 404:
+            return
+        raise

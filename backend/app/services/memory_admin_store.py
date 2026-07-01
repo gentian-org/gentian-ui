@@ -7,7 +7,7 @@ from copy import deepcopy
 
 from fastapi import HTTPException, status
 
-from app.core.gentian_groups import tenant_members_group, tenant_prefix
+from app.core.gentian_groups import tenant_app_admins_group, tenant_members_group, tenant_prefix
 from app.services.admin_store import Group, Member, UserSession
 
 
@@ -30,6 +30,13 @@ class MemoryAdminStore:
                 id=group_id,
                 name=members_name,
                 path=f"/{members_name}",
+            )
+            app_admins_name = tenant_app_admins_group(realm)
+            app_admins_id = str(uuid.uuid4())
+            self._groups[realm][app_admins_id] = Group(
+                id=app_admins_id,
+                name=app_admins_name,
+                path=f"/{app_admins_name}",
             )
 
     async def list_members(self, realm: str) -> list[Member]:

@@ -46,6 +46,7 @@ export function GroupsSection({ tenant }: GroupsSectionProps) {
   });
 
   const groups = groupsQuery.data ?? [];
+  const isSystemGroup = (name: string) => name.endsWith(":members") || name.endsWith(":app-admins");
 
   return (
     <section>
@@ -92,25 +93,32 @@ export function GroupsSection({ tenant }: GroupsSectionProps) {
               <td className="admin-console__mono">{group.name}</td>
               <td className="admin-console__mono">{group.path}</td>
               <td style={{ whiteSpace: "nowrap" }}>
-                <button
-                  type="button"
-                  className="admin-console__btn"
-                  onClick={() => {
-                    const nextName = window.prompt("Rename group", group.name);
-                    if (nextName && nextName !== group.name) {
-                      renameMutation.mutate({ id: group.id, nextName });
-                    }
-                  }}
-                >
-                  Rename
-                </button>{" "}
-                <button
-                  type="button"
-                  className="admin-console__btn admin-console__btn--danger"
-                  onClick={() => deleteMutation.mutate(group.id)}
-                >
-                  Delete
-                </button>
+                {!isSystemGroup(group.name) && (
+                  <>
+                    <button
+                      type="button"
+                      className="admin-console__btn"
+                      onClick={() => {
+                        const nextName = window.prompt("Rename group", group.name);
+                        if (nextName && nextName !== group.name) {
+                          renameMutation.mutate({ id: group.id, nextName });
+                        }
+                      }}
+                    >
+                      Rename
+                    </button>{" "}
+                    <button
+                      type="button"
+                      className="admin-console__btn admin-console__btn--danger"
+                      onClick={() => deleteMutation.mutate(group.id)}
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
+                {isSystemGroup(group.name) && (
+                  <span style={{ fontSize: "0.75rem", opacity: 0.7 }}>System group</span>
+                )}
               </td>
             </tr>
           ))}

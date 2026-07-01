@@ -53,6 +53,17 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
   }
 
   const { realm, isPlatformAdmin } = contextQuery.data;
+  const allGroups = groupsQuery.data ?? [];
+  const privilegeGroups = allGroups.filter((group) => group.name.endsWith(":app-admins"));
+  const appEntitlementGroups = allGroups.filter(
+    (group) => group.name.includes(":app:") && !group.name.endsWith(":app-admins"),
+  );
+  const customGroups = allGroups.filter(
+    (group) =>
+      !group.name.endsWith(":members") &&
+      !group.name.endsWith(":app-admins") &&
+      !group.name.includes(":app:"),
+  );
 
   return (
     <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
@@ -117,7 +128,12 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
 
         <div className="admin-console__body">
           {tab === "members" ? (
-            <MembersSection tenant={tenant} groups={groupsQuery.data ?? []} />
+            <MembersSection
+              tenant={tenant}
+              privilegeGroups={privilegeGroups}
+              appEntitlementGroups={appEntitlementGroups}
+              customGroups={customGroups}
+            />
           ) : tab === "groups" ? (
             <GroupsSection tenant={tenant} />
           ) : tab === "security" ? (

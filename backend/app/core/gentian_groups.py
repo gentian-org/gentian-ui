@@ -27,11 +27,30 @@ def tenant_app_group(tenant: str, profile: str) -> str:
     return f"{tenant_prefix(tenant)}app:{profile}"
 
 
+def tenant_app_admins_group(tenant: str) -> str:
+    return f"{tenant_prefix(tenant)}app-admins"
+
+
+def is_system_tenant_group(name: str, tenant: str) -> bool:
+    return name in (tenant_members_group(tenant), tenant_app_admins_group(tenant))
+
+
+def is_app_entitlement_group(name: str, tenant: str) -> bool:
+    prefix = f"{tenant_prefix(tenant)}app:"
+    return name.startswith(prefix)
+
+
+def is_privilege_group(name: str, tenant: str) -> bool:
+    return name == tenant_app_admins_group(tenant)
+
+
 def is_tenant_managed_group(name: str, tenant: str) -> bool:
     prefix = tenant_prefix(tenant)
     if not name.startswith(prefix):
         return False
     if name == tenant_admins_group(tenant):
+        return False
+    if name == tenant_members_group(tenant):
         return False
     return True
 

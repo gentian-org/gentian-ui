@@ -20,9 +20,12 @@ from app.core.gentian_groups import (
     is_admin_managed_group,
     is_bootstrap_tenant_admin,
     is_platform_superadmin,
+    is_privilege_group,
+    is_system_tenant_group,
     is_tenant_admin,
     normalize_groups,
     tenant_admins_group,
+    tenant_app_admins_group,
     tenant_members_group,
     tenant_prefix,
     tenant_admin_tenants,
@@ -35,9 +38,8 @@ from app.services.audit_store import AuditStoreDep, audit_actor
 from app.services.notification_audience import validate_publish_audience
 from app.services.notification_cloudevents import notification_to_cloudevent
 from app.services.notification_store import NotificationStoreDep
+from app.services.k8s_catalogue import request_tenant_app_privilege_reconcile
 from app.services.security_policy_store import SecurityPolicyStoreDep
-
-router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 class MemberResponse(BaseModel):
@@ -370,6 +372,11 @@ def _validate_group_name(name: str, tenant: str, settings: Settings) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The tenant administrators group cannot be managed here",
         )
+    if normalized == tenant_app_admins_group(tenant):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The app administrators group is provisioned automatically",
+        )
     return normalized
 
 
@@ -380,10 +387,11 @@ async def _managed_groups(store: AdminStore, tenant: str, settings: Settings) ->
         g
         for g in groups
         if is_admin_managed_group(g.name, tenant, kernel_realm=settings.kernel_realm)
+        or is_privilege_group(g.name, tenant)
     ]
 
 
-async def _invite_group_ids(
+async def _member_group_ids(
     store: AdminStore,
     tenant: str,
     settings: Settings,
@@ -403,6 +411,32 @@ async def _invite_group_ids(
             group_ids.add(group.id)
             break
     return list(group_ids)
+
+
+def _app_admins_membership_changed(
+    groups: list[Any],
+    before_names: set[str],
+    after_group_ids: list[str],
+    tenant: str,
+) -> bool:
+    app_admins = tenant_app_admins_group(tenant)
+    by_id = {group.id: group.name for group in groups}
+    after_names = {by_id[group_id] for group_id in after_group_ids if group_id in by_id}
+    return (app_admins in before_names) != (app_admins in after_names)
+
+
+async def _request_app_privilege_reconcile_if_needed(
+    store: AdminStore,
+    tenant: str,
+    settings: Settings,
+    *,
+    before_names: set[str],
+    after_group_ids: list[str],
+) -> None:
+    groups = await _managed_groups(store, tenant, settings)
+    if not _app_admins_membership_changed(groups, before_names, after_group_ids, tenant):
+        return
+    request_tenant_app_privilege_reconcile(tenant)
 
 
 def _security_policies_response(policies: Any) -> SecurityPoliciesResponse:
@@ -533,7 +567,7 @@ async def invite_member(
             detail="Secondary invite emails are not supported; use the member workspace email",
         )
     realm = _realm_for_tenant(resolved)
-    group_ids = await _invite_group_ids(store, resolved, settings, body.groupIds)
+    group_ids = await _member_group_ids(store, resolved, settings, body.groupIds)
     member = await store.invite_member(
         realm,
         username=str(body.email),
@@ -543,6 +577,13 @@ async def invite_member(
         invite_email=str(body.inviteEmail) if body.inviteEmail else None,
         group_ids=group_ids,
         require_totp=body.requireTotp,
+    )
+    await _request_app_privilege_reconcile_if_needed(
+        store,
+        resolved,
+        settings,
+        before_names=set(),
+        after_group_ids=group_ids,
     )
     await record_admin_audit(
         user,
@@ -726,14 +767,17 @@ async def update_member_groups(
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
     realm = _realm_for_tenant(resolved)
-    allowed = {g.id for g in await _managed_groups(store, resolved, settings)}
-    invalid = [gid for gid in body.groupIds if gid not in allowed]
-    if invalid:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="One or more groups are outside this tenant scope",
-        )
-    member = await store.set_member_groups(realm, member_id, body.groupIds)
+    existing = await store.get_member(realm, member_id)
+    before_names = set(existing.groups)
+    group_ids = await _member_group_ids(store, resolved, settings, body.groupIds)
+    member = await store.set_member_groups(realm, member_id, group_ids)
+    await _request_app_privilege_reconcile_if_needed(
+        store,
+        resolved,
+        settings,
+        before_names=before_names,
+        after_group_ids=group_ids,
+    )
     await record_admin_audit(
         user,
         tenant=resolved,
@@ -796,8 +840,12 @@ async def update_group(
     resolved = resolve_admin_tenant(user, settings, tenant)
     realm = _realm_for_tenant(resolved)
     existing = await store.get_group(realm, group_id)
-    if not is_admin_managed_group(existing.name, resolved, kernel_realm=settings.kernel_realm):
+    if not is_admin_managed_group(existing.name, resolved, kernel_realm=settings.kernel_realm) and not is_privilege_group(
+        existing.name, resolved
+    ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Group is not manageable")
+    if is_system_tenant_group(existing.name, resolved):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System groups cannot be renamed")
     name = _validate_group_name(body.name, resolved, settings)
     group = await store.update_group(realm, group_id, name=name)
     await record_admin_audit(
@@ -823,8 +871,12 @@ async def delete_group(
     resolved = resolve_admin_tenant(user, settings, tenant)
     realm = _realm_for_tenant(resolved)
     existing = await store.get_group(realm, group_id)
-    if not is_admin_managed_group(existing.name, resolved, kernel_realm=settings.kernel_realm):
+    if not is_admin_managed_group(existing.name, resolved, kernel_realm=settings.kernel_realm) and not is_privilege_group(
+        existing.name, resolved
+    ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Group is not manageable")
+    if is_system_tenant_group(existing.name, resolved):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System groups cannot be deleted")
     await store.delete_group(realm, group_id)
     await record_admin_audit(
         user,
