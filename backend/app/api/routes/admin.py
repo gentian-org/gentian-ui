@@ -16,6 +16,7 @@ from app.core.admin_context import admin_tenant_query, resolve_admin_tenant
 from app.core.audit_log import record_admin_audit
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
+from app.core.openfga_client import OpenFGAClient
 from app.core.gentian_groups import (
     is_admin_managed_group,
     is_bootstrap_tenant_admin,
@@ -40,6 +41,8 @@ from app.services.notification_cloudevents import notification_to_cloudevent
 from app.services.notification_store import NotificationStoreDep
 from app.services.k8s_catalogue import request_tenant_app_privilege_reconcile
 from app.services.k8s_authorization import (
+    cluster_authorization_summary,
+    effective_contract_capabilities,
     get_app_grant,
     get_platform_security_policy,
     list_app_grants,
@@ -1217,9 +1220,51 @@ class AppGrantUpdateRequest(BaseModel):
     allowConsumers: list[AllowConsumerModel] = Field(default_factory=list)
 
 
+class IntegrationsSummaryResponse(BaseModel):
+    bindingCount: int = 0
+    grantCount: int = 0
+    grantReadyCount: int = 0
+
+
+class EffectiveAccessRow(BaseModel):
+    contract: str
+    consumer: str
+    provider: str
+    bindingCapabilities: list[str] = Field(default_factory=list)
+    grantedCapabilities: list[str] = Field(default_factory=list)
+    macAllowed: bool = False
+    grantPhase: str = ""
+    openfgaGranted: dict[str, bool] = Field(default_factory=dict)
+
+
 class IntegrationsOverviewResponse(BaseModel):
     bindings: list[IntegrationBindingResponse] = Field(default_factory=list)
     grants: list[AppGrantResponse] = Field(default_factory=list)
+    summary: IntegrationsSummaryResponse = Field(default_factory=IntegrationsSummaryResponse)
+    effectiveAccess: list[EffectiveAccessRow] = Field(default_factory=list)
+
+
+class PlatformAuthorizationSummaryResponse(BaseModel):
+    tenantCount: int = 0
+    bindingCount: int = 0
+    grantCount: int = 0
+    grantReadyCount: int = 0
+    allowedMacWaivers: int = 0
+    catalogueMacWaiverProfiles: int = 0
+
+
+@router.get("/platform/authorization-summary", response_model=PlatformAuthorizationSummaryResponse)
+async def get_platform_authorization_summary(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> PlatformAuthorizationSummaryResponse:
+    _require_admin(user, settings)
+    _require_platform_admin(user, settings)
+    try:
+        summary = cluster_authorization_summary()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    return PlatformAuthorizationSummaryResponse(**summary)
 
 
 @router.get("/platform/security-policy", response_model=PlatformSecurityPolicyResponse)
@@ -1315,7 +1360,55 @@ async def list_integrations_overview(
         )
         for item in grants_raw
     ]
-    return IntegrationsOverviewResponse(bindings=bindings, grants=grants)
+    grants_by_app = {
+        (item.get("spec") or {}).get("app", ""): item for item in grants_raw
+    }
+    grants_resp_by_app = {g.app: g for g in grants}
+
+    fga = OpenFGAClient(settings)
+    effective_access: list[EffectiveAccessRow] = []
+    for binding in bindings:
+        grant_raw = grants_by_app.get(binding.consumer)
+        grant_spec = grant_raw.get("spec") if grant_raw else None
+        granted = effective_contract_capabilities(
+            binding.capabilities,
+            binding.contract,
+            grant_spec,
+            binding.consumer,
+        )
+        grant_phase = grants_resp_by_app.get(binding.consumer).phase if binding.consumer in grants_resp_by_app else ""
+        openfga_granted: dict[str, bool] = {}
+        if fga.enabled and granted:
+            openfga_granted = await fga.capability_grants(
+                tenant=resolved,
+                consumer_app=binding.consumer,
+                contract=binding.contract,
+                capabilities=granted,
+            )
+        effective_access.append(
+            EffectiveAccessRow(
+                contract=binding.contract,
+                consumer=binding.consumer,
+                provider=binding.provider,
+                bindingCapabilities=binding.capabilities,
+                grantedCapabilities=granted,
+                macAllowed=len(granted) > 0,
+                grantPhase=grant_phase,
+                openfgaGranted=openfga_granted,
+            )
+        )
+
+    summary = IntegrationsSummaryResponse(
+        bindingCount=len(bindings),
+        grantCount=len(grants),
+        grantReadyCount=sum(1 for g in grants if g.phase == "Ready"),
+    )
+    return IntegrationsOverviewResponse(
+        bindings=bindings,
+        grants=grants,
+        summary=summary,
+        effectiveAccess=effective_access,
+    )
 
 
 @router.put("/grants/{app_name}", response_model=AppGrantResponse)

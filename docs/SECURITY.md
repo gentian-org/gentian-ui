@@ -16,7 +16,8 @@ to this repo and notes kernel-specific deployment differences.
 | M9 CORS | `backend/app/core/config.py`, `chart/values.yaml` |
 | M11–M13 pod hardening | `chart/templates/_helpers.tpl` |
 | M16–M17 Gateway API | `chart/templates/httproute.yaml` |
-| M22 / S1 OpenFGA stub | `backend/app/core/authz.py`, `openfga_client.py` |
+| M22 / S1 OpenFGA PEP | `backend/app/core/authz.py`, `openfga_client.py` |
+| AuthZEN PEP (Stage 2) | Enabled by default on fresh installs (`openfga.authzenEnabled` + OpenFGA `experimentals: [authzen]`). BFF uses `/access/v1/evaluation` instead of native `/check`. |
 | M26 DB scoping stub | `backend/app/db/session.py` |
 | M27 resource limits | `chart/values.yaml`, `values-production.yaml.example` |
 | Frontend bearer token | `frontend/src/api/client.ts` |

@@ -51,6 +51,10 @@ spec:
             - name: OPENFGA_STORE_ID
               value: {{ .Values.openfga.storeId | quote }}
             {{- end }}
+            {{- if .Values.openfga.authzenEnabled }}
+            - name: OPENFGA_AUTHZEN_ENABLED
+              value: "true"
+            {{- end }}
           envFrom:
             - secretRef:
                 name: {{ .Values.existingSecret.name }}

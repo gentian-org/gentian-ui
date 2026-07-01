@@ -139,6 +139,69 @@ def tenant_namespace(tenant: str) -> str:
     return tenant if tenant.startswith("tenant-") else f"tenant-{tenant}"
 
 
+def list_tenants() -> list[dict[str, Any]]:
+    try:
+        result = _custom_objects_api().list_cluster_custom_object(GROUP, VERSION, "tenants")
+    except ApiException as exc:
+        if exc.status == 404:
+            return []
+        raise
+    return result.get("items") or []
+
+
+def cluster_authorization_summary() -> dict[str, int]:
+    """Aggregate IntegrationBinding and AppGrant counts across tenant namespaces."""
+    tenants = list_tenants()
+    bindings = 0
+    grants = 0
+    grant_ready = 0
+    for tenant in tenants:
+        name = tenant.get("metadata", {}).get("name", "")
+        if not name:
+            continue
+        ns = tenant_namespace(name)
+        binding_items = list_integration_bindings(ns)
+        grant_items = list_app_grants(ns)
+        bindings += len(binding_items)
+        grants += len(grant_items)
+        grant_ready += sum(
+            1 for g in grant_items if (g.get("status") or {}).get("phase") == "Ready"
+        )
+    allowed_waivers = 0
+    try:
+        psp = get_platform_security_policy()
+        allowed_waivers = len((psp.get("spec") or {}).get("allowedMacWaivers") or [])
+    except ApiException:
+        pass
+    catalogue_requests = len(list_app_profiles_with_mac_requests())
+    return {
+        "tenantCount": len(tenants),
+        "bindingCount": bindings,
+        "grantCount": grants,
+        "grantReadyCount": grant_ready,
+        "allowedMacWaivers": allowed_waivers,
+        "catalogueMacWaiverProfiles": catalogue_requests,
+    }
+
+
+def effective_contract_capabilities(
+    binding_caps: list[str],
+    contract: str,
+    grant_spec: dict[str, Any] | None,
+    consumer_app: str,
+) -> list[str]:
+    """Mirror gentian-os netpolicy.EffectiveContractCapabilities for admin preview."""
+    if grant_spec is None:
+        return list(binding_caps)
+    for consume in grant_spec.get("consume") or []:
+        if consume.get("contract") != contract:
+            continue
+        granted = consume.get("granted") or []
+        return list(granted) if granted else []
+    _ = consumer_app
+    return list(binding_caps)
+
+
 def decode_json_field(value: Any, default: Any) -> Any:
     if value is None:
         return default

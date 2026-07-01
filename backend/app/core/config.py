@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     openfga_api_url: str | None = Field(default=None, alias="OPENFGA_API_URL")
     openfga_store_id: str | None = Field(default=None, alias="OPENFGA_STORE_ID")
     openfga_api_token: str | None = Field(default=None, alias="OPENFGA_API_TOKEN")
+    openfga_authzen_enabled: bool = Field(default=False, alias="OPENFGA_AUTHZEN_ENABLED")
 
     keycloak_admin_url: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_URL")
     keycloak_admin_username: str = Field(default="admin", alias="KEYCLOAK_ADMIN_USERNAME")

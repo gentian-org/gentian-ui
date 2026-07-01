@@ -37,3 +37,4 @@ web:
 openfga:
   apiUrl: ""
   storeId: ""
+  authzenEnabled: true  # requires OpenFGA experimentals: [authzen] in Suze values

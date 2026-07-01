@@ -11,6 +11,17 @@ type IntegrationsSectionProps = {
   tenant: string;
 };
 
+function formatOpenfga(cap: string, granted: Record<string, boolean>): string {
+  if (Object.keys(granted).length === 0) {
+    return "—";
+  }
+  const value = granted[cap];
+  if (value === undefined) {
+    return "—";
+  }
+  return value ? "yes" : "no";
+}
+
 export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
   const queryClient = useQueryClient();
   const overviewQuery = useQuery({
@@ -39,15 +50,62 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
     return <p className="admin-console__error">Integrations overview is unavailable.</p>;
   }
 
-  const { bindings, grants } = overviewQuery.data;
+  const { bindings, grants, summary, effectiveAccess } = overviewQuery.data;
 
   return (
     <section className="admin-section">
       <h2 className="admin-section__title">Integrations &amp; grants</h2>
       <p className="admin-section__lead">
         Active IntegrationBindings are operator-wired. AppGrants are tenant-approved capability
-        subsets synced to OpenFGA.
+        subsets synced to OpenFGA. Contract NetworkPolicies allow egress only for granted
+        capabilities.
       </p>
+
+      <p className="admin-section__meta">
+        {summary.bindingCount} binding{summary.bindingCount === 1 ? "" : "s"} ·{" "}
+        {summary.grantCount} grant{summary.grantCount === 1 ? "" : "s"} ·{" "}
+        {summary.grantReadyCount} OpenFGA-synced
+      </p>
+
+      <h3 className="admin-section__subtitle">Effective access</h3>
+      {effectiveAccess.length === 0 ? (
+        <p>No integration bindings to preview.</p>
+      ) : (
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Contract</th>
+              <th>Consumer → Provider</th>
+              <th>Bound</th>
+              <th>Granted</th>
+              <th>MAC egress</th>
+              <th>Grant phase</th>
+              <th>OpenFGA</th>
+            </tr>
+          </thead>
+          <tbody>
+            {effectiveAccess.map((row) => (
+              <tr key={`${row.consumer}-${row.contract}`}>
+                <td><code>{row.contract}</code></td>
+                <td>
+                  {row.consumer} → {row.provider}
+                </td>
+                <td>{row.bindingCapabilities.join(", ") || "—"}</td>
+                <td>{row.grantedCapabilities.join(", ") || "—"}</td>
+                <td>{row.macAllowed ? "allowed" : "denied"}</td>
+                <td>{row.grantPhase || "—"}</td>
+                <td>
+                  {row.grantedCapabilities.length === 0
+                    ? "—"
+                    : row.grantedCapabilities
+                        .map((cap) => `${cap}: ${formatOpenfga(cap, row.openfgaGranted)}`)
+                        .join("; ")}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       <h3 className="admin-section__subtitle">Bindings</h3>
       {bindings.length === 0 ? (

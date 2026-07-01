@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
+  fetchPlatformAuthorizationSummary,
   fetchPlatformSecurityPolicy,
   updatePlatformSecurityPolicy,
   type MacWaiverEntry,
-  type PlatformSecurityPolicy,
 } from "@/api/admin";
 
 export function PlatformSecuritySection() {
@@ -12,6 +12,10 @@ export function PlatformSecuritySection() {
   const policyQuery = useQuery({
     queryKey: ["admin", "platform", "security-policy"],
     queryFn: () => fetchPlatformSecurityPolicy(),
+  });
+  const summaryQuery = useQuery({
+    queryKey: ["admin", "platform", "authorization-summary"],
+    queryFn: () => fetchPlatformAuthorizationSummary(),
   });
   const [draft, setDraft] = useState<MacWaiverEntry[] | null>(null);
 
@@ -52,6 +56,21 @@ export function PlatformSecuritySection() {
         Approve MAC waivers requested by catalogue AppProfiles. Workloads receive waiver pod
         labels only when both the profile declares a request and the cluster allows it.
       </p>
+
+      {summaryQuery.data ? (
+        <p className="admin-section__meta">
+          {summaryQuery.data.tenantCount} tenant{summaryQuery.data.tenantCount === 1 ? "" : "s"} ·{" "}
+          {summaryQuery.data.bindingCount} integration binding
+          {summaryQuery.data.bindingCount === 1 ? "" : "s"} ·{" "}
+          {summaryQuery.data.grantCount} AppGrant
+          {summaryQuery.data.grantCount === 1 ? "" : "s"} (
+          {summaryQuery.data.grantReadyCount} OpenFGA-synced) ·{" "}
+          {summaryQuery.data.allowedMacWaivers} approved MAC waiver
+          {summaryQuery.data.allowedMacWaivers === 1 ? "" : "s"} ·{" "}
+          {summaryQuery.data.catalogueMacWaiverProfiles} catalogue profile
+          {summaryQuery.data.catalogueMacWaiverProfiles === 1 ? "" : "s"} requesting waivers
+        </p>
+      ) : null}
 
       {requests.length === 0 ? (
         <p>No catalogue profiles currently request MAC waivers.</p>

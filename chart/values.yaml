@@ -50,6 +50,7 @@ auth:
 openfga:
   apiUrl: ""
   storeId: ""
+  authzenEnabled: true
 
 rbac:
   create: true

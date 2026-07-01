@@ -393,7 +393,37 @@ export type AppGrant = {
 export type IntegrationsOverview = {
   bindings: IntegrationBinding[];
   grants: AppGrant[];
+  summary: {
+    bindingCount: number;
+    grantCount: number;
+    grantReadyCount: number;
+  };
+  effectiveAccess: EffectiveAccessRow[];
 };
+
+export type EffectiveAccessRow = {
+  contract: string;
+  consumer: string;
+  provider: string;
+  bindingCapabilities: string[];
+  grantedCapabilities: string[];
+  macAllowed: boolean;
+  grantPhase: string;
+  openfgaGranted: Record<string, boolean>;
+};
+
+export type PlatformAuthorizationSummary = {
+  tenantCount: number;
+  bindingCount: number;
+  grantCount: number;
+  grantReadyCount: number;
+  allowedMacWaivers: number;
+  catalogueMacWaiverProfiles: number;
+};
+
+export function fetchPlatformAuthorizationSummary() {
+  return apiFetch<PlatformAuthorizationSummary>("/admin/platform/authorization-summary");
+}
 
 export function fetchIntegrationsOverview(tenant?: string) {
   return apiFetch<IntegrationsOverview>(`/admin/integrations${tenantQuery(tenant)}`);
