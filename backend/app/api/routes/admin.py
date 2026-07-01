@@ -41,6 +41,8 @@ from app.services.notification_store import NotificationStoreDep
 from app.services.k8s_catalogue import request_tenant_app_privilege_reconcile
 from app.services.security_policy_store import SecurityPolicyStoreDep
 
+router = APIRouter(prefix="/admin", tags=["admin"])
+
 
 class MemberResponse(BaseModel):
     id: str
