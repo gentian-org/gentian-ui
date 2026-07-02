@@ -232,6 +232,30 @@ async def revoke_all_sessions(
     _ensure_account_success(response)
 
 
+def _totp_is_configured(credentials: Any) -> bool:
+    """Return True when the user has a configured OTP credential.
+
+    Keycloak's account API returns CredentialContainer objects (one per enabled
+    credential type). A container with ``type: otp`` is present even when the user
+    has not enrolled TOTP yet; configured credentials live in
+    ``userCredentialMetadatas`` / ``userCredentials``.
+    """
+    if not isinstance(credentials, list):
+        return False
+    for item in credentials:
+        if not isinstance(item, dict) or item.get("type") != "otp":
+            continue
+        user_creds = item.get("userCredentialMetadatas") or item.get("userCredentials")
+        if user_creds is not None:
+            if len(user_creds) > 0:
+                return True
+            continue
+        # Admin API shape: flat CredentialRepresentation entries.
+        if item.get("id"):
+            return True
+    return False
+
+
 async def _totp_status(
     token: str,
     realm: str,
@@ -246,7 +270,7 @@ async def _totp_status(
         return False, "CONFIGURE_TOTP" in required
 
     credentials = _read_account_json(response)
-    configured = any(item.get("type") == "otp" for item in credentials)
+    configured = _totp_is_configured(credentials)
     required = account_data.get("requiredActions") or []
     pending = "CONFIGURE_TOTP" in required and not configured
     return configured, pending

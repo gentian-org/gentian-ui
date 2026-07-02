@@ -2,7 +2,26 @@ import httpx
 import pytest
 
 from app.core.config import Settings
-from app.services.keycloak_account import AccountServiceError, get_profile
+from app.services.keycloak_account import (
+    AccountServiceError,
+    _totp_is_configured,
+    get_profile,
+)
+
+
+@pytest.mark.parametrize(
+    ("credentials", "expected"),
+    [
+        ([], False),
+        ([{"type": "password", "userCredentialMetadatas": [{"id": "pw"}]}], False),
+        ([{"type": "otp", "userCredentialMetadatas": []}], False),
+        ([{"type": "otp", "userCredentials": []}], False),
+        ([{"type": "otp", "userCredentialMetadatas": [{"id": "otp-1"}]}], True),
+        ([{"type": "otp", "id": "otp-1", "userLabel": "Authenticator"}], True),
+    ],
+)
+def test_totp_is_configured(credentials, expected):
+    assert _totp_is_configured(credentials) is expected
 
 
 @pytest.mark.anyio
@@ -20,7 +39,14 @@ async def test_get_profile_requires_accept_json_header(monkeypatch):
             captured["accept"] = (headers or {}).get("Accept", "")
             request = httpx.Request("GET", url)
             if url.endswith("/credentials"):
-                return httpx.Response(200, json=[], request=request)
+                return httpx.Response(
+                    200,
+                    json=[
+                        {"type": "password", "userCredentialMetadatas": [{"id": "pw"}]},
+                        {"type": "otp", "userCredentialMetadatas": []},
+                    ],
+                    request=request,
+                )
             captured["url"] = url
             return httpx.Response(
                 200,
@@ -55,6 +81,8 @@ async def test_get_profile_requires_accept_json_header(monkeypatch):
     assert captured["url"].endswith("/realms/demo/account/")
     assert profile["email"] == "user@example.com"
     assert profile["firstName"] == "Ada"
+    assert profile["totpConfigured"] is False
+    assert profile["totpPending"] is False
 
 
 @pytest.mark.anyio
