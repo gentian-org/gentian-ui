@@ -47,6 +47,14 @@ def test_smtp_unavailable_covers_send_failures():
     assert KeycloakAdminStore._smtp_unavailable(Response()) is True
 
 
+def test_with_profile_defaults_fills_missing_names():
+    raw = KeycloakAdminStore._with_profile_defaults(
+        {"username": "john-doe@demo.desk.gentian.org", "firstName": "", "lastName": ""},
+    )
+    assert raw["firstName"] == "John"
+    assert raw["lastName"] == "Doe"
+
+
 def test_public_frontend_headers():
     store = KeycloakAdminStore(
         base_url="http://keycloak.internal:8080/auth",

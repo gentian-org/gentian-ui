@@ -10,7 +10,7 @@ from urllib.parse import quote
 import httpx
 from fastapi import HTTPException, status
 
-from app.services.admin_store import CONFIGURE_TOTP_ACTION, INVITE_EMAIL_ATTR, UPDATE_PASSWORD_ACTION, Group, Member, UserSession
+from app.services.admin_store import CONFIGURE_TOTP_ACTION, INVITE_EMAIL_ATTR, PROFILE_PROMPT_ACTIONS, UPDATE_PASSWORD_ACTION, Group, Member, UserSession
 
 
 class KeycloakAdminStore:
@@ -365,6 +365,7 @@ class KeycloakAdminStore:
             "GET",
             f"/admin/realms/{quote(realm, safe='')}/users/{member_id}",
         )
+        current = self._with_profile_defaults(current)
         primary = current.get("email")
         target = delivery_email or primary
         swapped = False
@@ -399,8 +400,34 @@ class KeycloakAdminStore:
             if require_delivery:
                 await self._raise_invite_email_failed(response)
             await self._raise_for_status(response)
+        await self._finalize_action_email_user(realm, member_id, actions)
         # Keep the delivery email until required actions complete; restoring immediately
         # invalidates action-token links (Keycloak returns invalid_email on mismatch).
+
+    async def _finalize_action_email_user(
+        self,
+        realm: str,
+        member_id: str,
+        requested_actions: list[str],
+    ) -> None:
+        """Drop profile prompts Keycloak adds after admin email changes for delivery."""
+        raw = await self._request(
+            "GET",
+            f"/admin/realms/{quote(realm, safe='')}/users/{member_id}",
+        )
+        allowed = set(requested_actions)
+        required_actions = [
+            action
+            for action in (raw.get("requiredActions") or [])
+            if action in allowed and action not in PROFILE_PROMPT_ACTIONS
+        ]
+        body = self._user_update_body(self._with_profile_defaults(raw))
+        body["requiredActions"] = required_actions
+        await self._request(
+            "PUT",
+            f"/admin/realms/{quote(realm, safe='')}/users/{member_id}",
+            json=body,
+        )
 
     async def restore_workspace_email_for_login(self, realm: str, keycloak_username: str) -> None:
         """Restore workspace email after invite/reset links when actions are complete."""
@@ -625,6 +652,20 @@ class KeycloakAdminStore:
         detail = response.text.strip() or response.reason_phrase
         code = status.HTTP_502_BAD_GATEWAY if response.status_code >= 500 else status.HTTP_400_BAD_REQUEST
         raise HTTPException(status_code=code, detail=f"Keycloak admin API: {detail}")
+
+    @staticmethod
+    def _with_profile_defaults(raw: dict[str, Any]) -> dict[str, Any]:
+        first = str(raw.get("firstName") or "").strip()
+        last = str(raw.get("lastName") or "").strip()
+        if first and last:
+            return raw
+        handle = str(raw.get("username") or raw.get("email") or "member").split("@", 1)[0]
+        parts = [part for part in handle.replace("-", " ").replace("_", " ").split() if part]
+        return {
+            **raw,
+            "firstName": first or (parts[0].title() if parts else "Member"),
+            "lastName": last or (parts[-1].title() if len(parts) > 1 else "User"),
+        }
 
     @staticmethod
     def _user_update_body(raw: dict[str, Any], *, email: str | None = None) -> dict[str, Any]:
