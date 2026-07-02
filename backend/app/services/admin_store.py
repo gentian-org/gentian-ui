@@ -124,6 +124,8 @@ class AdminStore(Protocol):
 
     async def send_password_reset_by_email(self, realm: str, email: str) -> bool: ...
 
+    async def restore_workspace_email_for_login(self, realm: str, keycloak_username: str) -> None: ...
+
 
 def admin_store_configured(settings: Settings) -> bool:
     return bool(settings.keycloak_admin_url and settings.keycloak_admin_password)

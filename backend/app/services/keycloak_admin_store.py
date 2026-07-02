@@ -367,20 +367,14 @@ class KeycloakAdminStore:
         )
         primary = current.get("email")
         target = delivery_email or primary
-        restored = False
+        swapped = False
         if target and primary and target != primary:
             await self._request(
                 "PUT",
                 f"/admin/realms/{quote(realm, safe='')}/users/{member_id}",
-                json={
-                    "username": current.get("username"),
-                    "email": target,
-                    "firstName": current.get("firstName", ""),
-                    "lastName": current.get("lastName", ""),
-                    "enabled": current.get("enabled", True),
-                },
+                json=self._user_update_body(current, email=target),
             )
-            restored = True
+            swapped = True
         params = {
             "client_id": self._portal_client_id,
             "redirect_uri": self._portal_login_url,
@@ -393,17 +387,11 @@ class KeycloakAdminStore:
             json=actions,
         )
         if response.status_code >= 400:
-            if restored and primary:
+            if swapped and primary:
                 await self._request(
                     "PUT",
                     f"/admin/realms/{quote(realm, safe='')}/users/{member_id}",
-                    json={
-                        "username": current.get("username"),
-                        "email": primary,
-                        "firstName": current.get("firstName", ""),
-                        "lastName": current.get("lastName", ""),
-                        "enabled": current.get("enabled", True),
-                    },
+                    json=self._user_update_body(current, email=primary),
                 )
             if not require_delivery and self._execute_actions_email_degraded(response):
                 await self._set_required_actions(realm, member_id, current, actions)
@@ -411,18 +399,30 @@ class KeycloakAdminStore:
             if require_delivery:
                 await self._raise_invite_email_failed(response)
             await self._raise_for_status(response)
-        if restored and primary:
-            await self._request(
-                "PUT",
-                f"/admin/realms/{quote(realm, safe='')}/users/{member_id}",
-                json={
-                    "username": current.get("username"),
-                    "email": primary,
-                    "firstName": current.get("firstName", ""),
-                    "lastName": current.get("lastName", ""),
-                    "enabled": current.get("enabled", True),
-                },
-            )
+        # Keep the delivery email until required actions complete; restoring immediately
+        # invalidates action-token links (Keycloak returns invalid_email on mismatch).
+
+    async def restore_workspace_email_for_login(self, realm: str, keycloak_username: str) -> None:
+        """Restore workspace email after invite/reset links when actions are complete."""
+        users = await self._request(
+            "GET",
+            f"/admin/realms/{quote(realm, safe='')}/users",
+            params={"username": keycloak_username, "exact": "true", "max": "1"},
+        )
+        if not users:
+            return
+        raw = users[0]
+        if UPDATE_PASSWORD_ACTION in (raw.get("requiredActions") or []):
+            return
+        workspace = str(raw.get("username") or "")
+        current_email = str(raw.get("email") or "")
+        if not workspace or "@" not in workspace or current_email == workspace:
+            return
+        await self._request(
+            "PUT",
+            f"/admin/realms/{quote(realm, safe='')}/users/{raw['id']}",
+            json=self._user_update_body(raw, email=workspace),
+        )
 
     async def _list_user_groups(self, realm: str, member_id: str) -> list[dict[str, Any]]:
         raw = await self._request(
@@ -625,6 +625,21 @@ class KeycloakAdminStore:
         detail = response.text.strip() or response.reason_phrase
         code = status.HTTP_502_BAD_GATEWAY if response.status_code >= 500 else status.HTTP_400_BAD_REQUEST
         raise HTTPException(status_code=code, detail=f"Keycloak admin API: {detail}")
+
+    @staticmethod
+    def _user_update_body(raw: dict[str, Any], *, email: str | None = None) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "username": raw.get("username"),
+            "email": email if email is not None else raw.get("email"),
+            "firstName": raw.get("firstName", ""),
+            "lastName": raw.get("lastName", ""),
+            "enabled": raw.get("enabled", True),
+            "emailVerified": raw.get("emailVerified", True),
+        }
+        attributes = raw.get("attributes")
+        if attributes:
+            body["attributes"] = attributes
+        return body
 
     @staticmethod
     def _member_from_raw(raw: dict[str, Any]) -> Member:

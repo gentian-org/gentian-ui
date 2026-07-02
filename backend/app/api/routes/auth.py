@@ -56,7 +56,12 @@ def login_route(
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(body: LoginRequest, settings: Settings = Depends(get_settings)) -> LoginResponse:
+async def login(
+    body: LoginRequest,
+    settings: Settings = Depends(get_settings),
+    *,
+    store: AdminStoreDep,
+) -> LoginResponse:
     """Authenticate with email/password on the Gentian login page (no Keycloak redirect)."""
     try:
         route = resolve_login_route(
@@ -64,9 +69,18 @@ def login(body: LoginRequest, settings: Settings = Depends(get_settings)) -> Log
             kernel_domain=settings.kernel_domain,
             tenancy_mode=settings.tenancy_mode,
         )
-        tokens = password_login(body.email, body.password, route, settings)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    realm = settings.kernel_realm if route.idp_hint is None else route.idp_hint
+    if admin_store_configured(settings):
+        try:
+            await store.restore_workspace_email_for_login(realm, route.keycloak_username)
+        except Exception:
+            pass
+
+    try:
+        tokens = password_login(body.email, body.password, route, settings)
     except LoginFailedError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 

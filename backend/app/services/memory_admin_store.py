@@ -116,6 +116,9 @@ class MemoryAdminStore:
                 return True
         return False
 
+    async def restore_workspace_email_for_login(self, realm: str, keycloak_username: str) -> None:
+        return
+
     async def enable_totp(self, realm: str, member_id: str, *, send_email: bool) -> Member:
         member = await self.get_member(realm, member_id)
         if member.totp_configured:
