@@ -176,11 +176,11 @@ class KeycloakAdminStore:
         await self.send_password_reset(realm, str(users[0]["id"]))
         return True
 
-    async def send_password_reset(self, realm: str, member_id: str) -> None:
+    async def send_password_reset(self, realm: str, member_id: str) -> str:
         """Invalidate the current password and email a link to set a new one."""
         await self._assert_realm_smtp_configured(realm)
         raw = await self._request("GET", f"/admin/realms/{quote(realm, safe='')}/users/{member_id}")
-        delivery = self._delivery_email(raw)
+        delivery = self._delivery_email(raw) or raw.get("email") or raw.get("username") or ""
         await self.revoke_all_member_sessions(realm, member_id)
         await self._invalidate_password(realm, member_id)
         await self._execute_actions_email(
@@ -190,6 +190,7 @@ class KeycloakAdminStore:
             delivery_email=delivery,
             require_delivery=True,
         )
+        return delivery
 
     async def enable_totp(self, realm: str, member_id: str, *, send_email: bool) -> Member:
         raw = await self._request("GET", f"/admin/realms/{quote(realm, safe='')}/users/{member_id}")
@@ -240,14 +241,24 @@ class KeycloakAdminStore:
         first_name: str | None,
         last_name: str | None,
         enabled: bool | None,
+        invite_email: str | None = None,
+        invite_email_set: bool = False,
     ) -> Member:
         current = await self._request("GET", f"/admin/realms/{quote(realm, safe='')}/users/{member_id}")
+        attributes = dict(current.get("attributes") or {})
+        if invite_email_set:
+            normalized = (invite_email or "").strip()
+            if normalized:
+                attributes[INVITE_EMAIL_ATTR] = [normalized]
+            else:
+                attributes.pop(INVITE_EMAIL_ATTR, None)
         body = {
             "username": current.get("username"),
             "email": email if email is not None else current.get("email"),
             "firstName": first_name if first_name is not None else current.get("firstName", ""),
             "lastName": last_name if last_name is not None else current.get("lastName", ""),
             "enabled": enabled if enabled is not None else current.get("enabled", True),
+            "attributes": attributes,
         }
         await self._request(
             "PUT",

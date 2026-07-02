@@ -104,8 +104,9 @@ class MemoryAdminStore:
             await self.set_member_groups(realm, member.id, group_ids)
         return await self.get_member(realm, member.id)
 
-    async def send_password_reset(self, realm: str, member_id: str) -> None:
-        await self.get_member(realm, member_id)
+    async def send_password_reset(self, realm: str, member_id: str) -> str:
+        member = await self.get_member(realm, member_id)
+        return member.invite_email or member.email or member.username
 
     async def send_password_reset_by_email(self, realm: str, email: str) -> bool:
         self._ensure_realm(realm)
@@ -147,6 +148,8 @@ class MemoryAdminStore:
         first_name: str | None,
         last_name: str | None,
         enabled: bool | None,
+        invite_email: str | None = None,
+        invite_email_set: bool = False,
     ) -> Member:
         member = await self.get_member(realm, member_id)
         if email is not None:
@@ -157,6 +160,8 @@ class MemoryAdminStore:
             member.last_name = last_name
         if enabled is not None:
             member.enabled = enabled
+        if invite_email_set:
+            member.invite_email = invite_email.strip() if invite_email and invite_email.strip() else None
         self._members[realm][member_id] = member
         if enabled is False:
             self._sessions[realm][member_id] = []

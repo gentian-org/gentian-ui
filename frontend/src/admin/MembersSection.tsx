@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   deleteMember,
   enableMemberTotp,
@@ -76,6 +76,7 @@ export function MembersSection({
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftGroupIds, setDraftGroupIds] = useState<string[]>([]);
+  const [recoveryDrafts, setRecoveryDrafts] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
     email: "",
     inviteEmail: "",
@@ -93,6 +94,34 @@ export function MembersSection({
   const membersQuery = useQuery({
     queryKey: ["admin", "members", tenant],
     queryFn: () => fetchMembers(tenant),
+  });
+  const members = membersQuery.data ?? [];
+
+  useEffect(() => {
+    setRecoveryDrafts((current) => {
+      const next = { ...current };
+      for (const member of members) {
+        if (!(member.id in next)) {
+          next[member.id] = member.inviteEmail ?? "";
+        }
+      }
+      return next;
+    });
+  }, [members]);
+
+  const recoveryMutation = useMutation({
+    mutationFn: ({ memberId, inviteEmail }: { memberId: string; inviteEmail: string }) =>
+      updateMember(memberId, { inviteEmail: inviteEmail.trim() || null }, tenant),
+    onSuccess: async (updated) => {
+      setError(null);
+      setSuccess("Recovery email updated.");
+      setRecoveryDrafts((current) => ({ ...current, [updated.id]: updated.inviteEmail ?? "" }));
+      await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
+    },
+    onError: (err: Error) => {
+      setSuccess(null);
+      setError(err.message);
+    },
   });
 
   const inviteMutation = useMutation({
@@ -135,12 +164,17 @@ export function MembersSection({
   });
 
   const resetMutation = useMutation({
-    mutationFn: (id: string) => resetMemberPassword(id, tenant),
-    onSuccess: () => {
+    mutationFn: (member: AdminMember) => resetMemberPassword(member.id, tenant),
+    onSuccess: (data, member) => {
       setError(null);
-      setSuccess(
-        "Password reset link sent. The member must use the email link to set a new password.",
-      );
+      const workspaceOnly =
+        !member.inviteEmail && (member.email === data.deliveryEmail || member.username === data.deliveryEmail);
+      let message = `Password reset link sent to ${data.deliveryEmail}. The member must use that email link to set a new password.`;
+      if (workspaceOnly) {
+        message +=
+          " That is the workspace address only (not a personal inbox) — set a recovery email below, then reset again.";
+      }
+      setSuccess(message);
     },
     onError: (err: Error) => {
       setSuccess(null);
@@ -178,8 +212,6 @@ export function MembersSection({
       await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
     },
   });
-
-  const members = membersQuery.data ?? [];
 
   return (
     <section>
@@ -305,9 +337,37 @@ export function MembersSection({
                 {member.email ?? member.username}
                 {member.inviteEmail && member.inviteEmail !== member.email && (
                   <div style={{ fontSize: "0.75rem", opacity: 0.7 }}>
-                    invite: {member.inviteEmail}
+                    recovery: {member.inviteEmail}
                   </div>
                 )}
+                <div style={{ marginTop: "0.35rem", fontSize: "0.75rem" }}>
+                  <label style={{ display: "block", marginBottom: "0.2rem", opacity: 0.8 }}>
+                    Recovery email (invite &amp; reset delivery)
+                  </label>
+                  <input
+                    type="email"
+                    value={recoveryDrafts[member.id] ?? member.inviteEmail ?? ""}
+                    onChange={(e) =>
+                      setRecoveryDrafts((current) => ({ ...current, [member.id]: e.target.value }))
+                    }
+                    placeholder="personal@example.com"
+                    style={{ width: "100%", maxWidth: "16rem" }}
+                  />
+                  <button
+                    type="button"
+                    className="admin-console__btn"
+                    style={{ marginTop: "0.25rem" }}
+                    disabled={recoveryMutation.isPending}
+                    onClick={() =>
+                      recoveryMutation.mutate({
+                        memberId: member.id,
+                        inviteEmail: recoveryDrafts[member.id] ?? member.inviteEmail ?? "",
+                      })
+                    }
+                  >
+                    Save recovery email
+                  </button>
+                </div>
               </td>
               <td>
                 {[member.firstName, member.lastName].filter(Boolean).join(" ") || "—"}
@@ -427,7 +487,7 @@ export function MembersSection({
                   title="Invalidates the member's current password, signs them out everywhere, and emails a link to set a new password."
                   onClick={() => {
                     setSuccess(null);
-                    resetMutation.mutate(member.id);
+                    resetMutation.mutate(member);
                   }}
                 >
                   Reset Password

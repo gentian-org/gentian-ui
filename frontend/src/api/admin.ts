@@ -75,7 +75,7 @@ export function inviteMember(
 }
 
 export function resetMemberPassword(id: string, tenant?: string) {
-  return apiFetch<void>(`/admin/members/${id}/reset-password${tenantQuery(tenant)}`, {
+  return apiFetch<{ deliveryEmail: string }>(`/admin/members/${id}/reset-password${tenantQuery(tenant)}`, {
     method: "POST",
   });
 }
@@ -100,6 +100,7 @@ export function updateMember(
     firstName?: string;
     lastName?: string;
     enabled?: boolean;
+    inviteEmail?: string | null;
   },
   tenant?: string,
 ) {

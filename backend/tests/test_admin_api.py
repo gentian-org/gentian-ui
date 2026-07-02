@@ -45,7 +45,8 @@ async def test_admin_invite_member_in_auth_disabled_mode():
         assert member["inviteEmail"] == "bob-recovery@demo.desk.gentian.org"
 
         reset = await client.post(f"/api/v1/admin/members/{member['id']}/reset-password")
-        assert reset.status_code == 204
+        assert reset.status_code == 200
+        assert reset.json()["deliveryEmail"] == "bob-recovery@demo.desk.gentian.org"
 
 
 @pytest.mark.asyncio

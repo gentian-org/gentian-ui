@@ -111,6 +111,11 @@ class MemberUpdateRequest(BaseModel):
     firstName: str | None = None
     lastName: str | None = None
     enabled: bool | None = None
+    inviteEmail: EmailStr | None = None
+
+
+class PasswordResetResponse(BaseModel):
+    deliveryEmail: str
 
 
 class GroupCreateRequest(BaseModel):
@@ -664,7 +669,7 @@ async def remove_member_totp(
     return _member_response(member)
 
 
-@router.post("/members/{member_id}/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/members/{member_id}/reset-password", response_model=PasswordResetResponse)
 async def reset_member_password(
     member_id: str,
     user: dict = Depends(get_current_user),
@@ -672,19 +677,20 @@ async def reset_member_password(
     *,
     store: AdminStoreDep,
     tenant: str | None = Depends(admin_tenant_query),
-) -> None:
+) -> PasswordResetResponse:
     _require_admin(user, settings)
     resolved = resolve_admin_tenant(user, settings, tenant)
     realm = _realm_for_tenant(resolved)
     member = await store.get_member(realm, member_id)
-    await store.send_password_reset(realm, member_id)
+    delivery_email = await store.send_password_reset(realm, member_id)
     await record_admin_audit(
         user,
         tenant=resolved,
         action="member.password_reset",
         target=member.email or member.username,
-        details={"memberId": member_id},
+        details={"memberId": member_id, "deliveryEmail": delivery_email},
     )
+    return PasswordResetResponse(deliveryEmail=delivery_email)
 
 
 @router.get("/members/{member_id}", response_model=MemberResponse)
@@ -723,6 +729,8 @@ async def update_member(
         first_name=body.firstName,
         last_name=body.lastName,
         enabled=body.enabled,
+        invite_email=str(body.inviteEmail) if body.inviteEmail is not None else None,
+        invite_email_set="inviteEmail" in body.model_fields_set,
     )
     if body.enabled is False and before.enabled:
         await record_admin_audit(
