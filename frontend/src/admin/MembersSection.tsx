@@ -424,12 +424,13 @@ export function MembersSection({
                   type="button"
                   className="admin-console__btn"
                   disabled={resetMutation.isPending}
+                  title="Invalidates the member's current password, signs them out everywhere, and emails a link to set a new password."
                   onClick={() => {
                     setSuccess(null);
                     resetMutation.mutate(member.id);
                   }}
                 >
-                  Send reset link
+                  Reset Password
                 </button>{" "}
                 <button
                   type="button"

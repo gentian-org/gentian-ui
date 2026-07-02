@@ -182,7 +182,7 @@ class KeycloakAdminStore:
         raw = await self._request("GET", f"/admin/realms/{quote(realm, safe='')}/users/{member_id}")
         delivery = self._delivery_email(raw)
         await self.revoke_all_member_sessions(realm, member_id)
-        await self._clear_password_credentials(realm, member_id)
+        await self._invalidate_password(realm, member_id)
         await self._execute_actions_email(
             realm,
             member_id,
@@ -427,13 +427,17 @@ class KeycloakAdminStore:
         )
         return raw if isinstance(raw, list) else []
 
-    async def _clear_password_credentials(self, realm: str, member_id: str) -> None:
-        for credential in await self._list_credentials(realm, member_id):
-            if credential.get("type") == "password":
-                await self._request(
-                    "DELETE",
-                    f"/admin/realms/{quote(realm, safe='')}/users/{member_id}/credentials/{credential['id']}",
-                )
+    async def _invalidate_password(self, realm: str, member_id: str) -> None:
+        """Replace the password with an unknown temporary value so the old password stops working."""
+        await self._request(
+            "PUT",
+            f"/admin/realms/{quote(realm, safe='')}/users/{member_id}/reset-password",
+            json={
+                "type": "password",
+                "value": str(uuid.uuid4()),
+                "temporary": True,
+            },
+        )
 
     async def _apply_totp_status(
         self,
