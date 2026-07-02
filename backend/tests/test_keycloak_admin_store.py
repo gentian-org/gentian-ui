@@ -30,6 +30,15 @@ def test_execute_actions_email_degraded_on_missing_client():
     assert KeycloakAdminStore._execute_actions_email_degraded(Response()) is True
 
 
+def test_password_reset_requires_email_delivery_not_degraded_on_smtp_failure():
+    class Response:
+        status_code = 500
+        text = '{"errorMessage":"Failed to send execute actions email: connection refused"}'
+
+    assert KeycloakAdminStore._execute_actions_email_degraded(Response()) is True
+    assert KeycloakAdminStore._smtp_unavailable(Response()) is True
+
+
 def test_smtp_unavailable_covers_send_failures():
     class Response:
         status_code = 500

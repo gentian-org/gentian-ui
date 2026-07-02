@@ -177,13 +177,18 @@ class KeycloakAdminStore:
         return True
 
     async def send_password_reset(self, realm: str, member_id: str) -> None:
+        """Invalidate the current password and email a link to set a new one."""
+        await self._assert_realm_smtp_configured(realm)
         raw = await self._request("GET", f"/admin/realms/{quote(realm, safe='')}/users/{member_id}")
         delivery = self._delivery_email(raw)
+        await self.revoke_all_member_sessions(realm, member_id)
+        await self._clear_password_credentials(realm, member_id)
         await self._execute_actions_email(
             realm,
             member_id,
             [UPDATE_PASSWORD_ACTION],
             delivery_email=delivery,
+            require_delivery=True,
         )
 
     async def enable_totp(self, realm: str, member_id: str, *, send_email: bool) -> Member:
@@ -421,6 +426,14 @@ class KeycloakAdminStore:
             f"/admin/realms/{quote(realm, safe='')}/users/{member_id}/credentials",
         )
         return raw if isinstance(raw, list) else []
+
+    async def _clear_password_credentials(self, realm: str, member_id: str) -> None:
+        for credential in await self._list_credentials(realm, member_id):
+            if credential.get("type") == "password":
+                await self._request(
+                    "DELETE",
+                    f"/admin/realms/{quote(realm, safe='')}/users/{member_id}/credentials/{credential['id']}",
+                )
 
     async def _apply_totp_status(
         self,

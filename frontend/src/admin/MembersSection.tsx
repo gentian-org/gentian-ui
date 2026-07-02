@@ -139,7 +139,7 @@ export function MembersSection({
     onSuccess: () => {
       setError(null);
       setSuccess(
-        "Password reset initiated. The member will set a new password on next sign-in.",
+        "Password reset link sent. The member must use the email link to set a new password.",
       );
     },
     onError: (err: Error) => {
@@ -429,7 +429,7 @@ export function MembersSection({
                     resetMutation.mutate(member.id);
                   }}
                 >
-                  Reset password
+                  Send reset link
                 </button>{" "}
                 <button
                   type="button"
