@@ -21,6 +21,43 @@ def _account_base(settings: Settings, realm: str) -> str:
     return f"{realm_issuer(settings, realm)}/account"
 
 
+def _account_url(settings: Settings, realm: str, suffix: str = "") -> str:
+    base = _account_base(settings, realm).rstrip("/") + "/"
+    if not suffix:
+        return base
+    return base + suffix.lstrip("/")
+
+
+def _account_headers(*, token: str, json_body: bool = False) -> dict[str, str]:
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+    }
+    if json_body:
+        headers["Content-Type"] = "application/json"
+    return headers
+
+
+def _ensure_account_success(response: httpx.Response) -> None:
+    if response.status_code >= 400:
+        raise AccountServiceError(_detail_from_response(response))
+    if response.status_code == 204 or not response.content:
+        return
+    content_type = (response.headers.get("content-type") or "").lower()
+    if "application/json" not in content_type:
+        raise AccountServiceError(
+            "Account API returned an unexpected response. Try signing in again."
+        )
+
+
+def _read_account_json(response: httpx.Response) -> Any:
+    _ensure_account_success(response)
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise AccountServiceError("Account API returned invalid JSON.") from exc
+
+
 def realm_for_user(claims: dict[str, Any], settings: Settings) -> str:
     issuer = str(claims.get("iss") or "")
     realm = realm_from_issuer(issuer)
@@ -49,12 +86,10 @@ async def get_profile(
         }
 
     realm = realm_for_user(claims, settings)
-    url = _account_base(settings, realm)
+    url = _account_url(settings, realm)
     async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.get(url, headers={"Authorization": f"Bearer {token}"})
-    if response.status_code >= 400:
-        raise AccountServiceError(_detail_from_response(response))
-    data = response.json()
+        response = await client.get(url, headers=_account_headers(token=token))
+    data = _read_account_json(response)
     totp_configured, totp_pending = await _totp_status(token, realm, settings, data)
     return {
         "email": data.get("email") or claims.get("email"),
@@ -78,7 +113,7 @@ async def update_profile(
         return await get_profile(token=token, claims=claims, settings=settings)
 
     realm = realm_for_user(claims, settings)
-    url = _account_base(settings, realm)
+    url = _account_url(settings, realm)
     body = {
         "email": claims.get("email"),
         "username": claims.get("preferred_username"),
@@ -88,11 +123,10 @@ async def update_profile(
     async with httpx.AsyncClient(timeout=20.0) as client:
         response = await client.post(
             url,
-            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            headers=_account_headers(token=token, json_body=True),
             json=body,
         )
-    if response.status_code >= 400:
-        raise AccountServiceError(_detail_from_response(response))
+    _ensure_account_success(response)
     return await get_profile(token=token, claims=claims, settings=settings)
 
 
@@ -110,7 +144,7 @@ async def change_password(
         return
 
     realm = realm_for_user(claims, settings)
-    url = f"{_account_base(settings, realm)}/password"
+    url = _account_url(settings, realm, "password")
     body = {
         "currentPassword": current_password,
         "newPassword": new_password,
@@ -119,11 +153,10 @@ async def change_password(
     async with httpx.AsyncClient(timeout=20.0) as client:
         response = await client.post(
             url,
-            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            headers=_account_headers(token=token, json_body=True),
             json=body,
         )
-    if response.status_code >= 400:
-        raise AccountServiceError(_detail_from_response(response))
+    _ensure_account_success(response)
 
 
 async def list_sessions(
@@ -145,14 +178,13 @@ async def list_sessions(
         ]
 
     realm = realm_for_user(claims, settings)
-    url = f"{_account_base(settings, realm)}/sessions/devices"
+    url = _account_url(settings, realm, "sessions/devices")
     async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.get(url, headers={"Authorization": f"Bearer {token}"})
-    if response.status_code >= 400:
-        raise AccountServiceError(_detail_from_response(response))
+        response = await client.get(url, headers=_account_headers(token=token))
+    devices = _read_account_json(response)
 
     sessions: list[dict[str, Any]] = []
-    for device in response.json():
+    for device in devices:
         for session in device.get("sessions") or []:
             sessions.append(
                 {
@@ -178,11 +210,10 @@ async def revoke_session(
         return
 
     realm = realm_for_user(claims, settings)
-    url = f"{_account_base(settings, realm)}/sessions/{quote(session_id, safe='')}"
+    url = _account_url(settings, realm, f"sessions/{quote(session_id, safe='')}")
     async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.delete(url, headers={"Authorization": f"Bearer {token}"})
-    if response.status_code >= 400:
-        raise AccountServiceError(_detail_from_response(response))
+        response = await client.delete(url, headers=_account_headers(token=token))
+    _ensure_account_success(response)
 
 
 async def revoke_all_sessions(
@@ -195,11 +226,10 @@ async def revoke_all_sessions(
         return
 
     realm = realm_for_user(claims, settings)
-    url = f"{_account_base(settings, realm)}/sessions"
+    url = _account_url(settings, realm, "sessions")
     async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.delete(url, headers={"Authorization": f"Bearer {token}"})
-    if response.status_code >= 400:
-        raise AccountServiceError(_detail_from_response(response))
+        response = await client.delete(url, headers=_account_headers(token=token))
+    _ensure_account_success(response)
 
 
 async def _totp_status(
@@ -208,14 +238,15 @@ async def _totp_status(
     settings: Settings,
     account_data: dict[str, Any],
 ) -> tuple[bool, bool]:
-    url = f"{_account_base(settings, realm)}/credentials"
+    url = _account_url(settings, realm, "credentials")
     async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.get(url, headers={"Authorization": f"Bearer {token}"})
+        response = await client.get(url, headers=_account_headers(token=token))
     if response.status_code >= 400:
         required = account_data.get("requiredActions") or []
         return False, "CONFIGURE_TOTP" in required
 
-    configured = any(item.get("type") == "otp" for item in response.json())
+    credentials = _read_account_json(response)
+    configured = any(item.get("type") == "otp" for item in credentials)
     required = account_data.get("requiredActions") or []
     pending = "CONFIGURE_TOTP" in required and not configured
     return configured, pending

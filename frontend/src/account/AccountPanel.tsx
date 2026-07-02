@@ -156,7 +156,11 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
         <div className="shell-panel__body">
           {profileQuery.isLoading && <p>Loading account…</p>}
           {profileQuery.isError && (
-            <p className="shell-panel__error">Account settings are unavailable.</p>
+            <p className="shell-panel__error">
+              {profileQuery.error instanceof Error
+                ? profileQuery.error.message
+                : "Account settings are unavailable."}
+            </p>
           )}
 
           {message && <p className="shell-panel__success">{message}</p>}
