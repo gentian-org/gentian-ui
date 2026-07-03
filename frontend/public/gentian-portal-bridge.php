@@ -10,6 +10,112 @@ declare(strict_types=1);
  * does not depend on browser form POST + CSRF cookies (blocked as third-party).
  */
 
+/**
+ * Resolve the post-login landing URL from an optional ?open=<type> intent.
+ *
+ * The portal "Document / Spreadsheet / Presentation" tiles pass ?open=<type>.
+ * Collabora (richdocuments) exposes no URL that creates a blank file, so we open
+ * the user's most recently edited file of that type; when they have none yet we
+ * seed a blank one from the app's bundled empty template. Any other value (and the
+ * plain Files tile) lands on the file browser.
+ */
+function gentian_bridge_landing(string $username): string
+{
+    $default = '/apps/files/';
+    $open = isset($_GET['open']) ? (string) $_GET['open'] : '';
+
+    $types = [
+        'document' => [
+            'template' => 'template.odt',
+            'newName' => 'New Document.odt',
+            'mimes' => [
+                'application/vnd.oasis.opendocument.text',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ],
+        ],
+        'spreadsheet' => [
+            'template' => 'template.ods',
+            'newName' => 'New Spreadsheet.ods',
+            'mimes' => [
+                'application/vnd.oasis.opendocument.spreadsheet',
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ],
+        ],
+        'presentation' => [
+            'template' => 'template.odp',
+            'newName' => 'New Presentation.odp',
+            'mimes' => [
+                'application/vnd.oasis.opendocument.presentation',
+                'application/vnd.ms-powerpoint',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            ],
+        ],
+    ];
+
+    if (!isset($types[$open])) {
+        return $default;
+    }
+
+    $fileId = gentian_office_file_id($username, $types[$open]);
+    if ($fileId === null) {
+        return $default;
+    }
+
+    return '/apps/richdocuments/index?fileId=' . $fileId;
+}
+
+/**
+ * fileId of the user's newest file matching $type['mimes'], creating a blank one
+ * from the richdocuments empty template when none exists. Null on any failure so
+ * the caller falls back to the Files app.
+ */
+function gentian_office_file_id(string $username, array $type): ?int
+{
+    try {
+        $userFolder = \OC::$server->getUserFolder($username);
+    } catch (\Throwable $e) {
+        return null;
+    }
+
+    $newest = null;
+    foreach ($type['mimes'] as $mime) {
+        foreach ($userFolder->searchByMime($mime) as $node) {
+            if (!$node instanceof \OCP\Files\File) {
+                continue;
+            }
+            if ($newest === null || $node->getMTime() > $newest->getMTime()) {
+                $newest = $node;
+            }
+        }
+    }
+    if ($newest !== null) {
+        return $newest->getId();
+    }
+
+    try {
+        $appPath = \OC::$server->getAppManager()->getAppPath('richdocuments');
+    } catch (\Throwable $e) {
+        return null;
+    }
+    $templatePath = $appPath . '/emptyTemplates/' . $type['template'];
+    if (!is_file($templatePath)) {
+        return null;
+    }
+    $content = file_get_contents($templatePath);
+    if ($content === false) {
+        return null;
+    }
+
+    try {
+        $name = $userFolder->getNonExistingName($type['newName']);
+        return $userFolder->newFile($name, $content)->getId();
+    } catch (\Throwable $e) {
+        return null;
+    }
+}
+
 $ticket = isset($_GET['t']) ? (string) $_GET['t'] : '';
 if ($ticket === '') {
     http_response_code(400);
@@ -81,5 +187,5 @@ $userSession->createSessionToken(
     $user->getUID()
 );
 
-header('Location: /apps/files/');
+header('Location: ' . gentian_bridge_landing($username));
 exit;

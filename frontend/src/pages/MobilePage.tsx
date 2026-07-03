@@ -82,7 +82,12 @@ export function MobilePage() {
       } else if (useNextcloudBridge) {
         const ticket = await fetchNextcloudBridgeTicket();
         if (ticket) {
-          launchUrl = nextcloudBridgeLaunchUrl(new URL(appUrl).origin, ticket);
+          const parsed = new URL(appUrl);
+          launchUrl = nextcloudBridgeLaunchUrl(
+            parsed.origin,
+            ticket,
+            parsed.searchParams.get("open"),
+          );
         } else {
           return;
         }

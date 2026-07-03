@@ -21,8 +21,17 @@ export async function fetchNextcloudBridgeTicket(): Promise<string | null> {
   return payload?.ticket ?? null;
 }
 
-export function nextcloudBridgeLaunchUrl(cloudOrigin: string, ticket: string): string {
+export function nextcloudBridgeLaunchUrl(
+  cloudOrigin: string,
+  ticket: string,
+  open?: string | null,
+): string {
   const url = new URL("/nextcloud-portal-sso.html", cloudOrigin);
   url.searchParams.set("t", ticket);
+  // Document-type intent (document|spreadsheet|presentation) from the tile's
+  // linkSuffix; the bridge opens the matching Collabora file instead of Files.
+  if (open) {
+    url.searchParams.set("open", open);
+  }
   return url.toString();
 }

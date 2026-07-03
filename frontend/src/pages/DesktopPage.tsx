@@ -123,7 +123,12 @@ export function DesktopPage() {
       } else if (useNextcloudBridge) {
         const ticket = await fetchNextcloudBridgeTicket();
         if (ticket) {
-          launchUrl = nextcloudBridgeLaunchUrl(new URL(appUrl).origin, ticket);
+          const parsed = new URL(appUrl);
+          launchUrl = nextcloudBridgeLaunchUrl(
+            parsed.origin,
+            ticket,
+            parsed.searchParams.get("open"),
+          );
         } else {
           if (needsBridgeTicket) closeWindow(winId);
           window.alert("Could not open Files. Try signing in again.");
