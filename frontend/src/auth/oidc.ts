@@ -2,6 +2,8 @@
  * OIDC configuration from Vite env (M1, M3).
  * Public client + PKCE — no client secret in the browser.
  */
+import { loginPathWithReturnTo } from "@/lib/returnTo";
+
 export type OidcConfig = {
   issuer: string;
   clientId: string;
