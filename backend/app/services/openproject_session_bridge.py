@@ -103,6 +103,12 @@ def _stable_portal_password(login: str, tenant: str, settings: Settings) -> str:
     return digest[:32]
 
 
+def _openproject_session_cookie_set(response: httpx.Response) -> bool:
+    """OpenProject may return 422 while still issuing a session cookie."""
+    set_cookie = response.headers.get("set-cookie", "")
+    return "_open_project_session=" in set_cookie
+
+
 def _openproject_portal_login_ok(base: str, login: str, password: str) -> bool:
     response = httpx.post(
         f"{base}/login",
@@ -110,10 +116,30 @@ def _openproject_portal_login_ok(base: str, login: str, password: str) -> bool:
         follow_redirects=False,
         timeout=10.0,
     )
-    if response.status_code not in {302, 303}:
-        return False
-    set_cookie = response.headers.get("set-cookie", "")
-    return "_open_project_session" in set_cookie
+    return _openproject_session_cookie_set(response)
+
+
+def _find_openproject_user(
+    base: str,
+    auth: tuple[str, str],
+    login: str,
+) -> dict[str, Any] | None:
+    search = httpx.get(
+        f"{base}/api/v3/users",
+        auth=auth,
+        params={"filters": _openproject_user_filters(login)},
+        timeout=20.0,
+    )
+    if search.status_code >= 400:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not prepare OpenProject account",
+        )
+    elements = search.json().get("_embedded", {}).get("elements", [])
+    if not elements:
+        return None
+    user = elements[0]
+    return user if isinstance(user, dict) else None
 
 
 def _ensure_openproject_user(
@@ -128,6 +154,32 @@ def _ensure_openproject_user(
 ) -> None:
     auth = (admin_user, admin_password)
     base = projects_url.rstrip("/")
+
+    existing = _find_openproject_user(base, auth, login)
+    if existing is not None:
+        if _openproject_portal_login_ok(base, login, password):
+            return
+
+        user_id = existing.get("id")
+        if not isinstance(user_id, int):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Could not prepare OpenProject account",
+            )
+
+        update = httpx.patch(
+            f"{base}/api/v3/users/{user_id}",
+            auth=auth,
+            json={"password": password},
+            timeout=20.0,
+        )
+        if update.status_code >= 400:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Could not prepare OpenProject account",
+            )
+        return
+
     first_name, last_name = _split_display_name(display_name or login, login)
     payload = {
         "login": login,
@@ -146,47 +198,10 @@ def _ensure_openproject_user(
     if create.status_code in {200, 201}:
         return
 
-    search = httpx.get(
-        f"{base}/api/v3/users",
-        auth=auth,
-        params={"filters": _openproject_user_filters(login)},
-        timeout=20.0,
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail="Could not prepare OpenProject account",
     )
-    if search.status_code >= 400:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not prepare OpenProject account",
-        )
-
-    body = search.json()
-    elements = body.get("_embedded", {}).get("elements", [])
-    if not elements:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not prepare OpenProject account",
-        )
-
-    if _openproject_portal_login_ok(base, login, password):
-        return
-
-    user_id = elements[0].get("id")
-    if not isinstance(user_id, int):
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not prepare OpenProject account",
-        )
-
-    update = httpx.patch(
-        f"{base}/api/v3/users/{user_id}",
-        auth=auth,
-        json={"password": password},
-        timeout=20.0,
-    )
-    if update.status_code >= 400:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not prepare OpenProject account",
-        )
 
 
 def _split_display_name(display_name: str, login: str) -> tuple[str, str]:

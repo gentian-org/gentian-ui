@@ -25,20 +25,30 @@ def test_openproject_login_from_claims_prefers_gentian_username():
     )
 
 
+def test_openproject_portal_login_ok_accepts_422_with_session_cookie():
+    from app.services.openproject_session_bridge import _openproject_portal_login_ok
+
+    login_response = MagicMock(
+        status_code=422,
+        headers={"set-cookie": "_open_project_session=abc; path=/; secure; HttpOnly"},
+    )
+    with patch("app.services.openproject_session_bridge.httpx.post", return_value=login_response):
+        assert _openproject_portal_login_ok("https://projects.demo.desk.gentian.org", "john-doe", "pw")
+
+
 def test_ensure_openproject_user_skips_patch_when_login_already_works():
     from app.services import openproject_session_bridge as bridge
 
-    create_response = MagicMock(status_code=422, text="Unprocessable")
     search_response = MagicMock(
         status_code=200,
         json=lambda: {"_embedded": {"elements": [{"id": 5}]}},
     )
     login_response = MagicMock(
-        status_code=302,
+        status_code=422,
         headers={"set-cookie": "_open_project_session=abc; path=/"},
     )
 
-    with patch("app.services.openproject_session_bridge.httpx.post", side_effect=[create_response, login_response]) as post, patch(
+    with patch("app.services.openproject_session_bridge.httpx.post", return_value=login_response) as post, patch(
         "app.services.openproject_session_bridge.httpx.get", return_value=search_response
     ) as get, patch("app.services.openproject_session_bridge.httpx.patch") as patch_user:
         bridge._ensure_openproject_user(
@@ -51,7 +61,7 @@ def test_ensure_openproject_user_skips_patch_when_login_already_works():
             password="portal-stable-password",
         )
 
-    assert post.call_count == 2
+    post.assert_called_once()
     get.assert_called_once()
     patch_user.assert_not_called()
 
@@ -59,7 +69,6 @@ def test_ensure_openproject_user_skips_patch_when_login_already_works():
 def test_ensure_openproject_user_patches_when_login_fails():
     from app.services import openproject_session_bridge as bridge
 
-    create_response = MagicMock(status_code=422, text="Unprocessable")
     search_response = MagicMock(
         status_code=200,
         json=lambda: {"_embedded": {"elements": [{"id": 5}]}},
@@ -69,7 +78,7 @@ def test_ensure_openproject_user_patches_when_login_fails():
 
     with patch(
         "app.services.openproject_session_bridge.httpx.post",
-        side_effect=[create_response, login_response],
+        return_value=login_response,
     ) as post, patch(
         "app.services.openproject_session_bridge.httpx.get", return_value=search_response
     ) as get, patch(
@@ -85,9 +94,35 @@ def test_ensure_openproject_user_patches_when_login_fails():
             password="portal-stable-password",
         )
 
-    assert post.call_count == 2
+    post.assert_called_once()
     get.assert_called_once()
     patch_user.assert_called_once()
+
+
+def test_ensure_openproject_user_creates_when_user_missing():
+    from app.services import openproject_session_bridge as bridge
+
+    search_response = MagicMock(status_code=200, json=lambda: {"_embedded": {"elements": []}})
+    create_response = MagicMock(status_code=201, text="Created")
+
+    with patch(
+        "app.services.openproject_session_bridge.httpx.post", return_value=create_response
+    ) as post, patch(
+        "app.services.openproject_session_bridge.httpx.get", return_value=search_response
+    ) as get, patch("app.services.openproject_session_bridge.httpx.patch") as patch_user:
+        bridge._ensure_openproject_user(
+            projects_url="https://projects.demo.desk.gentian.org",
+            admin_user="api_admin",
+            admin_password="secret",
+            login="john-doe",
+            display_name="John Doe",
+            email="john-doe@demo.desk.gentian.org",
+            password="portal-stable-password",
+        )
+
+    post.assert_called_once()
+    get.assert_called_once()
+    patch_user.assert_not_called()
 
 
 def test_stable_portal_password_is_deterministic():
