@@ -63,7 +63,12 @@ function gentian_bridge_landing(string $username): string
         return $default;
     }
 
-    return '/apps/richdocuments/index?fileId=' . $fileId;
+    // richdocuments' document#index lacks NoCSRFRequired, so a top-level browser
+    // redirect there fails Nextcloud's CSRF check ("Access forbidden"). The
+    // private-link route (files.View.showFile) is CSRF-exempt and opens the file
+    // with its default editor (Collabora for office files) — this is exactly what
+    // richdocuments' own editOnline handler redirects to.
+    return '/index.php/f/' . $fileId;
 }
 
 /**
