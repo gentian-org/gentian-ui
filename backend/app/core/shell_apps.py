@@ -29,6 +29,22 @@ def tenant_host(tenant: str, kernel_domain: str) -> str:
     return f"{tenant}.{kernel_domain.strip().lower()}"
 
 
+def api_integration_launch_url(profile_spec: dict[str, Any], *, tenant: str, kernel_domain: str) -> str | None:
+    """Launch URL for an ApiProfile (deploymentMethod: api): redirect to an
+    external service, optionally bound to the tenant effective domain."""
+    if profile_spec.get("deploymentMethod") != "api":
+        return None
+    api = profile_spec.get("apiIntegration") or {}
+    base = str(api.get("baseUrl") or "").rstrip("/")
+    if not base:
+        return None
+    if str(api.get("tenantBinding") or "tenant-domain") == "tenant-domain":
+        host = tenant_host(tenant, kernel_domain)
+        sep = "&" if "?" in base else "?"
+        return f"{base}{sep}tenantDomain={host}"
+    return base
+
+
 def app_launch_url(
     profile_spec: dict[str, Any],
     *,
@@ -36,6 +52,9 @@ def app_launch_url(
     kernel_domain: str,
     link_suffix: str = "",
 ) -> str | None:
+    api_url = api_integration_launch_url(profile_spec, tenant=tenant, kernel_domain=kernel_domain)
+    if api_url is not None:
+        return api_url
     ingress = profile_spec.get("ingress") or {}
     sub_domain = ingress.get("subDomain")
     if not sub_domain:

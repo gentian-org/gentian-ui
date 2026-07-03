@@ -74,6 +74,32 @@ def test_app_launch_url_uses_tenant_subdomain():
     )
 
 
+def test_app_launch_url_api_profile_binds_tenant_domain():
+    spec = {
+        "deploymentMethod": "api",
+        "apiIntegration": {
+            "runtime": "redirect",
+            "baseUrl": "https://corp.gentian.org",
+            "tenantBinding": "tenant-domain",
+        },
+    }
+    assert (
+        app_launch_url(spec, tenant="demo", kernel_domain="desk.gentian.org")
+        == "https://corp.gentian.org?tenantDomain=demo.desk.gentian.org"
+    )
+
+
+def test_app_launch_url_api_profile_without_tenant_binding():
+    spec = {
+        "deploymentMethod": "api",
+        "apiIntegration": {"baseUrl": "https://corp.gentian.org/", "tenantBinding": "none"},
+    }
+    assert (
+        app_launch_url(spec, tenant="demo", kernel_domain="desk.gentian.org")
+        == "https://corp.gentian.org"
+    )
+
+
 def test_is_admin_portal_tile():
     assert is_admin_portal_tile("Tenant Admins")
     assert not is_admin_portal_tile("App Users")
