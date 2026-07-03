@@ -100,6 +100,7 @@ export function DesktopPage() {
         if (ticket) {
           launchUrl = nextcloudBridgeLaunchUrl(new URL(appUrl).origin, ticket);
         } else {
+          window.alert("Could not open Files. Try signing in again.");
           return;
         }
       } else if (useOpenprojectBridge) {

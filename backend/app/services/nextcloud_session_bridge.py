@@ -37,6 +37,11 @@ def nextcloud_origin(tenant: str, kernel_domain: str) -> str:
     return f"https://cloud.{tenant}.{kernel_domain.strip().lower()}"
 
 
+def nextcloud_admin_url(tenant: str) -> str:
+    """In-cluster Nextcloud base URL for server-side OCS admin calls."""
+    return f"http://nextcloud.tenant-{tenant}.svc.cluster.local:8080"
+
+
 def is_allowed_cloud_origin(origin: str, settings: Settings) -> bool:
     origin = origin.strip().rstrip("/")
     if not origin:
@@ -137,7 +142,7 @@ def _ensure_nextcloud_user(
         },
         timeout=20.0,
     )
-    if create.status_code < 400:
+    if create.status_code < 400 and create.text.strip():
         root = ElementTree.fromstring(create.text)
         status_text, detail = _ocs_status(root)
         if status_text == "ok" and detail == "100":
@@ -178,7 +183,7 @@ def create_nextcloud_bridge_session(
         )
 
     admin_user, admin_password = _read_nextcloud_admin_credentials(tenant)
-    cloud_url = nextcloud_origin(tenant, settings.kernel_domain)
+    cloud_url = nextcloud_admin_url(tenant)
     portal_password = secrets.token_urlsafe(24)
     display_name = str(claims.get("name") or "").strip() or None
 
