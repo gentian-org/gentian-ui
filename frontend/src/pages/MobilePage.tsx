@@ -5,6 +5,10 @@ import {
   fetchNextcloudBridgeTicket,
   nextcloudBridgeLaunchUrl,
 } from "@/auth/nextcloudBridge";
+import {
+  fetchOpenprojectBridgeTicket,
+  openprojectBridgeLaunchUrl,
+} from "@/auth/openprojectBridge";
 import { AccountPanel } from "@/account/AccountPanel";
 import { AdminConsole } from "@/admin/AdminConsole";
 import { AppMenu } from "@/shell/AppMenu";
@@ -53,6 +57,8 @@ export function MobilePage() {
       activeApp.authMode === "matrix-bridge" && activeApp.linkTarget === "embedded";
     const useNextcloudBridge =
       activeApp.authMode === "nextcloud-bridge" && activeApp.linkTarget === "embedded";
+    const useOpenprojectBridge =
+      activeApp.authMode === "openproject-bridge" && activeApp.linkTarget === "embedded";
 
     void (async () => {
       const launchBase = activeApp.launchUrl;
@@ -77,6 +83,13 @@ export function MobilePage() {
         const ticket = await fetchNextcloudBridgeTicket();
         if (ticket) {
           launchUrl = nextcloudBridgeLaunchUrl(new URL(appUrl).origin, ticket);
+        } else {
+          return;
+        }
+      } else if (useOpenprojectBridge) {
+        const ticket = await fetchOpenprojectBridgeTicket();
+        if (ticket) {
+          launchUrl = openprojectBridgeLaunchUrl(new URL(appUrl).origin, ticket);
         } else {
           return;
         }

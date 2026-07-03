@@ -5,6 +5,10 @@ import {
   fetchNextcloudBridgeTicket,
   nextcloudBridgeLaunchUrl,
 } from "@/auth/nextcloudBridge";
+import {
+  fetchOpenprojectBridgeTicket,
+  openprojectBridgeLaunchUrl,
+} from "@/auth/openprojectBridge";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { useShellApps } from "@/shell/useShellApps";
@@ -70,6 +74,10 @@ export function DesktopPage() {
       app.authMode === "nextcloud-bridge" &&
       app.linkTarget === "embedded" &&
       !options?.forceLogin;
+    const useOpenprojectBridge =
+      app.authMode === "openproject-bridge" &&
+      app.linkTarget === "embedded" &&
+      !options?.forceLogin;
     const useIdpBootstrap =
       app.authMode === "oidc" && app.linkTarget === "embedded" && !options?.forceLogin;
     const idpPopup = useIdpBootstrap ? openIdpBootstrapPopup() : null;
@@ -91,6 +99,13 @@ export function DesktopPage() {
         const ticket = await fetchNextcloudBridgeTicket();
         if (ticket) {
           launchUrl = nextcloudBridgeLaunchUrl(new URL(appUrl).origin, ticket);
+        } else {
+          return;
+        }
+      } else if (useOpenprojectBridge) {
+        const ticket = await fetchOpenprojectBridgeTicket();
+        if (ticket) {
+          launchUrl = openprojectBridgeLaunchUrl(new URL(appUrl).origin, ticket);
         } else {
           return;
         }

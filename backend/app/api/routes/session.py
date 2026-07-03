@@ -22,6 +22,11 @@ from app.services.nextcloud_session_bridge import (
     is_allowed_cloud_origin,
     redeem_nextcloud_bridge_ticket,
 )
+from app.services.openproject_session_bridge import (
+    create_openproject_bridge_ticket,
+    is_allowed_projects_origin,
+    redeem_openproject_bridge_ticket,
+)
 
 router = APIRouter(prefix="/session", tags=["session"])
 
@@ -38,6 +43,15 @@ def _apply_matrix_bridge_cors(request: Request, response: Response, settings: Se
 def _apply_nextcloud_bridge_cors(request: Request, response: Response, settings: Settings) -> None:
     origin = request.headers.get("origin")
     if origin and is_allowed_cloud_origin(origin, settings):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Vary"] = "Origin"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+
+
+def _apply_openproject_bridge_cors(request: Request, response: Response, settings: Settings) -> None:
+    origin = request.headers.get("origin")
+    if origin and is_allowed_projects_origin(origin, settings):
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Vary"] = "Origin"
         response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
@@ -157,3 +171,48 @@ def redeem_nextcloud_bridge_route(
     """Redeem a portal-issued ticket on the cloud.* origin (no portal cookie)."""
     _apply_nextcloud_bridge_cors(request, response, settings)
     return redeem_nextcloud_bridge_ticket(ticket, settings)
+
+
+@router.post("/openproject-bridge/ticket")
+def create_openproject_bridge_ticket_route(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    tenant = resolve_user_context(user, settings)
+    if settings.auth_disabled:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OpenProject bridge is unavailable while auth is disabled",
+        )
+
+    if tenant == settings.kernel_domain:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="OpenProject bridge is only available for tenant users",
+        )
+
+    ticket = create_openproject_bridge_ticket(user, tenant=tenant, settings=settings)
+    return {"ticket": ticket}
+
+
+@router.options("/openproject-bridge/redeem/{ticket}")
+def redeem_openproject_bridge_preflight(
+    ticket: str,
+    request: Request,
+    response: Response,
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    _apply_openproject_bridge_cors(request, response, settings)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/openproject-bridge/redeem/{ticket}")
+def redeem_openproject_bridge_route(
+    ticket: str,
+    request: Request,
+    response: Response,
+    settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    """Redeem a portal-issued ticket on the projects.* origin (no portal cookie)."""
+    _apply_openproject_bridge_cors(request, response, settings)
+    return redeem_openproject_bridge_ticket(ticket, settings)

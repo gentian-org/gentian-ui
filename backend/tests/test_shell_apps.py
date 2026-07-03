@@ -47,6 +47,24 @@ ELEMENT_PROFILE = {
     },
 }
 
+OPENPROJECT_PROFILE = {
+    "metadata": {"name": "openproject"},
+    "spec": {
+        "displayName": "OpenProject",
+        "ingress": {"subDomain": "projects"},
+        "tile": {"icon": "projects"},
+        "kernelRequirements": {"identity": {"oidc": {"clientId": "gentian-openproject"}}},
+        "portalTiles": [
+            {
+                "name": "openproject",
+                "displayName": {"en_US": "Projects"},
+                "allowedGroup": "App Users",
+                "linkTarget": "embedded",
+            }
+        ],
+    },
+}
+
 
 def test_app_launch_url_uses_tenant_subdomain():
     spec = {"ingress": {"subDomain": "chat"}}
@@ -152,6 +170,35 @@ def test_shell_apps_for_member_includes_entitled_app():
             "launchUrl": "https://chat.demo.desk.gentian.org",
             "linkTarget": "embedded",
             "authMode": "matrix-bridge",
+            "builtin": False,
+        }
+    ]
+
+
+def test_shell_apps_for_openproject_uses_bridge_auth_mode():
+    settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    user = {
+        "preferred_username": "john-doe@demo.desk.gentian.org",
+        "tenant": "demo",
+        "groups": [
+            "gentian:tenant:demo:members",
+            "gentian:tenant:demo:app:openproject",
+        ],
+    }
+    with (
+        patch("app.core.shell_apps.list_installed_profiles", return_value=["openproject"]),
+        patch("app.core.shell_apps.get_app_profile", return_value=OPENPROJECT_PROFILE),
+        patch("app.core.shell_apps.is_platform_app", return_value=False),
+    ):
+        apps = shell_apps_for_user(user, settings)
+    assert apps == [
+        {
+            "id": "openproject-openproject",
+            "title": "Projects",
+            "icon": "projects",
+            "launchUrl": "https://projects.demo.desk.gentian.org",
+            "linkTarget": "embedded",
+            "authMode": "openproject-bridge",
             "builtin": False,
         }
     ]

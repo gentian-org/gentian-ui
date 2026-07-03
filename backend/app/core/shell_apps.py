@@ -70,6 +70,8 @@ def profile_auth_mode(profile_spec: dict[str, Any], profile_name: str) -> str | 
             return "matrix-bridge"
         if profile_name == "nextcloud":
             return "nextcloud-bridge"
+        if profile_name == "openproject":
+            return "openproject-bridge"
         return "oidc"
     return None
 
