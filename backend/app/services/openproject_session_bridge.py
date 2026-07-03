@@ -33,6 +33,12 @@ def openproject_login_from_claims(claims: dict[str, Any]) -> str:
     return ""
 
 
+def openproject_admin_url(tenant: str, kernel_domain: str) -> str:
+    """Base URL for server-side OpenProject API calls from the portal API."""
+    _ = kernel_domain
+    return f"http://openproject.tenant-{tenant.strip().lower()}.svc.cluster.local:8080"
+
+
 def openproject_origin(tenant: str, kernel_domain: str) -> str:
     return f"https://projects.{tenant}.{kernel_domain.strip().lower()}"
 
@@ -227,7 +233,7 @@ def create_openproject_bridge_session(
         )
 
     admin_user, admin_password = _read_openproject_api_admin_credentials(tenant)
-    projects_url = openproject_origin(tenant, settings.kernel_domain)
+    projects_url = openproject_admin_url(tenant, settings.kernel_domain)
     portal_password = _stable_portal_password(login, tenant, settings)
     display_name = str(claims.get("name") or "").strip() or None
     email = str(claims.get("email") or "").strip() or None

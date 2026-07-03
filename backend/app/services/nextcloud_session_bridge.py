@@ -40,10 +40,13 @@ def nextcloud_origin(tenant: str, kernel_domain: str) -> str:
 def nextcloud_admin_url(tenant: str, kernel_domain: str) -> str:
     """Base URL for server-side OCS admin calls from the portal API.
 
-    The portal API runs in platform-kernel, which cannot reach tenant ClusterIPs
-    without extra egress policy, so use the public cloud URL (hairpin via gateway).
+    Use the in-cluster Nextcloud service over plain HTTP. CoreDNS hairpin sends
+    the public cloud hostname to the tenant gateway, which serves a staging TLS
+    cert that httpx rejects; direct service access avoids that and tenant-isolation
+    allows ingress from platform-kernel.
     """
-    return nextcloud_origin(tenant, kernel_domain)
+    _ = kernel_domain
+    return f"http://nextcloud.tenant-{tenant.strip().lower()}.svc.cluster.local:8080"
 
 
 def is_allowed_cloud_origin(origin: str, settings: Settings) -> bool:

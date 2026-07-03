@@ -8,6 +8,7 @@ from app.core.config import Settings
 from app.services.nextcloud_session_bridge import (
     _ocs_status,
     create_nextcloud_bridge_ticket,
+    nextcloud_admin_url,
     nextcloud_uid_from_claims,
     redeem_nextcloud_bridge_ticket,
 )
@@ -28,6 +29,13 @@ def test_ocs_status_parses_unnamespaced_xml():
     assert _ocs_status(root) == ("ok", "100")
 
 
+def test_nextcloud_admin_url_uses_in_cluster_service():
+    assert (
+        nextcloud_admin_url("demo", "desk.gentian.org")
+        == "http://nextcloud.tenant-demo.svc.cluster.local:8080"
+    )
+
+
 def test_ensure_nextcloud_user_updates_password_when_user_exists():
     from unittest.mock import MagicMock
 
@@ -46,7 +54,7 @@ def test_ensure_nextcloud_user_updates_password_when_user_exists():
         "app.services.nextcloud_session_bridge.httpx.put", return_value=update_response
     ) as put:
         bridge._ensure_nextcloud_user(
-            cloud_url="https://cloud.demo.desk.gentian.org",
+            cloud_url="http://nextcloud.tenant-demo.svc.cluster.local:8080",
             admin_user="admin",
             admin_password="secret",
             uid="john-doe",
