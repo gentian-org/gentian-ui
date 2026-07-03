@@ -134,6 +134,15 @@ def _ensure_nextcloud_user(
     display_name: str | None,
     password: str,
 ) -> None:
+    """Ensure the Nextcloud account exists.
+
+    The portal bridge logs the user in server-side via ``setUser()`` and never
+    checks the account password (see ``gentian-portal-bridge.php``), so we only
+    need to guarantee the user *exists*. We deliberately do **not** reset the
+    password on repeat opens: an OCS password update runs Nextcloud's
+    password_policy, whose breached-password check calls api.pwnedpasswords.com
+    and stalls ~5s per call when egress is blocked — felt on every Files open.
+    """
     auth = (admin_user, admin_password)
     headers = {"OCS-APIRequest": "true"}
     base = cloud_url.rstrip("/")
@@ -152,28 +161,15 @@ def _ensure_nextcloud_user(
     if create.status_code < 400 and create.text.strip():
         root = ElementTree.fromstring(create.text)
         status_text, detail = _ocs_status(root)
-        if status_text == "ok" and detail == "100":
+        # 100 = created; 102 = user already exists. Either way the account is
+        # usable and no password reset is needed.
+        if status_text == "ok" or detail == "102":
             return
 
-    update = httpx.put(
-        f"{base}/ocs/v1.php/cloud/users/{uid}",
-        auth=auth,
-        headers=headers,
-        data={"key": "password", "value": password},
-        timeout=20.0,
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail="Could not prepare Nextcloud account",
     )
-    if update.status_code >= 400:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not prepare Nextcloud account",
-        )
-    root = ElementTree.fromstring(update.text)
-    status_text, detail = _ocs_status(root)
-    if status_text != "ok":
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Could not prepare Nextcloud account ({detail})",
-        )
 
 
 def create_nextcloud_bridge_session(

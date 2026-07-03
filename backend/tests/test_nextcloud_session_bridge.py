@@ -36,7 +36,7 @@ def test_nextcloud_admin_url_uses_in_cluster_service():
     )
 
 
-def test_ensure_nextcloud_user_updates_password_when_user_exists():
+def test_ensure_nextcloud_user_skips_password_reset_when_user_exists():
     from unittest.mock import MagicMock
 
     from app.services import nextcloud_session_bridge as bridge
@@ -44,14 +44,11 @@ def test_ensure_nextcloud_user_updates_password_when_user_exists():
     existing_user_xml = """<?xml version="1.0"?>
     <ocs><meta><status>failure</status><statuscode>102</statuscode>
     <message>User already exists</message></meta></ocs>"""
-    update_ok_xml = """<?xml version="1.0"?>
-    <ocs><meta><status>ok</status><statuscode>100</statuscode><message>OK</message></meta></ocs>"""
 
     create_response = MagicMock(status_code=200, text=existing_user_xml)
-    update_response = MagicMock(status_code=200, text=update_ok_xml)
 
     with patch("app.services.nextcloud_session_bridge.httpx.post", return_value=create_response) as post, patch(
-        "app.services.nextcloud_session_bridge.httpx.put", return_value=update_response
+        "app.services.nextcloud_session_bridge.httpx.put"
     ) as put:
         bridge._ensure_nextcloud_user(
             cloud_url="http://nextcloud.tenant-demo.svc.cluster.local:8080",
@@ -62,8 +59,10 @@ def test_ensure_nextcloud_user_updates_password_when_user_exists():
             password="portal-temp-password",
         )
 
-    put.assert_called_once()
+    # The bridge never uses the account password, so an existing user must not
+    # trigger a (slow) password reset — only the create/existence check runs.
     post.assert_called_once()
+    put.assert_not_called()
 
 
 def test_nextcloud_uid_from_claims_prefers_opendesk_username():
