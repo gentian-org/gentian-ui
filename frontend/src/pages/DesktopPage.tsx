@@ -84,9 +84,9 @@ export function DesktopPage() {
       app.authMode === "oidc" && app.linkTarget === "embedded" && !options?.forceLogin;
     const idpPopup = useIdpBootstrap ? openIdpBootstrapPopup() : null;
     const loadingPage =
-      "data:text/html," +
+      "data:text/html;charset=utf-8," +
       encodeURIComponent(
-        "<!DOCTYPE html><html><body style='font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;color:#1a2e28'><p>Opening " +
+        "<!DOCTYPE html><html><head><meta charset='utf-8'></head><body style='font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;color:#1a2e28'><p>Opening " +
           app.title.replace(/</g, "") +
           "…</p></body></html>",
       );
