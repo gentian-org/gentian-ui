@@ -37,9 +37,13 @@ def nextcloud_origin(tenant: str, kernel_domain: str) -> str:
     return f"https://cloud.{tenant}.{kernel_domain.strip().lower()}"
 
 
-def nextcloud_admin_url(tenant: str) -> str:
-    """In-cluster Nextcloud base URL for server-side OCS admin calls."""
-    return f"http://nextcloud.tenant-{tenant}.svc.cluster.local:8080"
+def nextcloud_admin_url(tenant: str, kernel_domain: str) -> str:
+    """Base URL for server-side OCS admin calls from the portal API.
+
+    The portal API runs in platform-kernel, which cannot reach tenant ClusterIPs
+    without extra egress policy, so use the public cloud URL (hairpin via gateway).
+    """
+    return nextcloud_origin(tenant, kernel_domain)
 
 
 def is_allowed_cloud_origin(origin: str, settings: Settings) -> bool:
@@ -183,7 +187,7 @@ def create_nextcloud_bridge_session(
         )
 
     admin_user, admin_password = _read_nextcloud_admin_credentials(tenant)
-    cloud_url = nextcloud_admin_url(tenant)
+    cloud_url = nextcloud_admin_url(tenant, settings.kernel_domain)
     portal_password = secrets.token_urlsafe(24)
     display_name = str(claims.get("name") or "").strip() or None
 
