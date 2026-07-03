@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import json
 import re
-import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -17,7 +18,7 @@ from kubernetes.client.rest import ApiException
 
 from app.core.config import Settings
 
-_TICKET_TTL_SECONDS = 60
+_TICKET_TTL_SECONDS = 120
 _PROJECTS_ORIGIN_RE = re.compile(r"^https://projects\.[a-z0-9-]+\.[a-z0-9.-]+$")
 
 
@@ -92,6 +93,29 @@ def _openproject_user_filters(login: str) -> str:
     return json.dumps([{"login": {"operator": "=", "values": [login]}}])
 
 
+def _stable_portal_password(login: str, tenant: str, settings: Settings) -> str:
+    """Deterministic portal password so existing OpenProject users skip password PATCH."""
+    digest = hmac.new(
+        _ticket_secret(settings).encode(),
+        f"openproject-bridge:{tenant}:{login}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    return digest[:32]
+
+
+def _openproject_portal_login_ok(base: str, login: str, password: str) -> bool:
+    response = httpx.post(
+        f"{base}/login",
+        data={"username": login, "password": password},
+        follow_redirects=False,
+        timeout=10.0,
+    )
+    if response.status_code not in {302, 303}:
+        return False
+    set_cookie = response.headers.get("set-cookie", "")
+    return "_open_project_session" in set_cookie
+
+
 def _ensure_openproject_user(
     *,
     projects_url: str,
@@ -142,6 +166,9 @@ def _ensure_openproject_user(
             detail="Could not prepare OpenProject account",
         )
 
+    if _openproject_portal_login_ok(base, login, password):
+        return
+
     user_id = elements[0].get("id")
     if not isinstance(user_id, int):
         raise HTTPException(
@@ -186,7 +213,7 @@ def create_openproject_bridge_session(
 
     admin_user, admin_password = _read_openproject_api_admin_credentials(tenant)
     projects_url = openproject_origin(tenant, settings.kernel_domain)
-    portal_password = secrets.token_urlsafe(24)
+    portal_password = _stable_portal_password(login, tenant, settings)
     display_name = str(claims.get("name") or "").strip() or None
     email = str(claims.get("email") or "").strip() or None
 

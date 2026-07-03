@@ -91,6 +91,9 @@ export function MobilePage() {
         if (ticket) {
           launchUrl = openprojectBridgeLaunchUrl(new URL(appUrl).origin, ticket);
         } else {
+          if (!window.location.pathname.startsWith("/login")) {
+            window.alert("Could not open Projects. Try signing in again.");
+          }
           return;
         }
       }

@@ -46,6 +46,7 @@ type WindowsState = {
   moveWindow: (id: string, x: number, y: number) => void;
   resizeWindow: (id: string, geometry: WindowGeometry) => void;
   advanceWindowNavigation: (id: string) => void;
+  setWindowUrl: (id: string, url: string) => void;
 };
 
 const BASE_Z = 100;
@@ -176,5 +177,9 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
         }
         return { ...w, url: w.pendingUrl, pendingUrl: undefined };
       }),
+    })),
+  setWindowUrl: (id, url) =>
+    set((state) => ({
+      windows: state.windows.map((w) => (w.id === id ? { ...w, url } : w)),
     })),
 }));

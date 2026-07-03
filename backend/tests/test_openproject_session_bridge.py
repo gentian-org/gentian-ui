@@ -25,7 +25,7 @@ def test_openproject_login_from_claims_prefers_gentian_username():
     )
 
 
-def test_ensure_openproject_user_updates_password_when_user_exists():
+def test_ensure_openproject_user_skips_patch_when_login_already_works():
     from app.services import openproject_session_bridge as bridge
 
     create_response = MagicMock(status_code=422, text="Unprocessable")
@@ -33,9 +33,44 @@ def test_ensure_openproject_user_updates_password_when_user_exists():
         status_code=200,
         json=lambda: {"_embedded": {"elements": [{"id": 5}]}},
     )
+    login_response = MagicMock(
+        status_code=302,
+        headers={"set-cookie": "_open_project_session=abc; path=/"},
+    )
+
+    with patch("app.services.openproject_session_bridge.httpx.post", side_effect=[create_response, login_response]) as post, patch(
+        "app.services.openproject_session_bridge.httpx.get", return_value=search_response
+    ) as get, patch("app.services.openproject_session_bridge.httpx.patch") as patch_user:
+        bridge._ensure_openproject_user(
+            projects_url="https://projects.demo.desk.gentian.org",
+            admin_user="api_admin",
+            admin_password="secret",
+            login="john-doe",
+            display_name="John Doe",
+            email="john-doe@demo.desk.gentian.org",
+            password="portal-stable-password",
+        )
+
+    assert post.call_count == 2
+    get.assert_called_once()
+    patch_user.assert_not_called()
+
+
+def test_ensure_openproject_user_patches_when_login_fails():
+    from app.services import openproject_session_bridge as bridge
+
+    create_response = MagicMock(status_code=422, text="Unprocessable")
+    search_response = MagicMock(
+        status_code=200,
+        json=lambda: {"_embedded": {"elements": [{"id": 5}]}},
+    )
+    login_response = MagicMock(status_code=401, headers={})
     update_response = MagicMock(status_code=200, text="OK")
 
-    with patch("app.services.openproject_session_bridge.httpx.post", return_value=create_response) as post, patch(
+    with patch(
+        "app.services.openproject_session_bridge.httpx.post",
+        side_effect=[create_response, login_response],
+    ) as post, patch(
         "app.services.openproject_session_bridge.httpx.get", return_value=search_response
     ) as get, patch(
         "app.services.openproject_session_bridge.httpx.patch", return_value=update_response
@@ -47,12 +82,24 @@ def test_ensure_openproject_user_updates_password_when_user_exists():
             login="john-doe",
             display_name="John Doe",
             email="john-doe@demo.desk.gentian.org",
-            password="portal-temp-password",
+            password="portal-stable-password",
         )
 
-    post.assert_called_once()
+    assert post.call_count == 2
     get.assert_called_once()
     patch_user.assert_called_once()
+
+
+def test_stable_portal_password_is_deterministic():
+    from app.services.openproject_session_bridge import _stable_portal_password
+
+    settings = Settings(PORTAL_BFF_CLIENT_SECRET="secret")
+    first = _stable_portal_password("john-doe", "demo", settings)
+    second = _stable_portal_password("john-doe", "demo", settings)
+    other = _stable_portal_password("jane-doe", "demo", settings)
+    assert first == second
+    assert first != other
+    assert len(first) == 32
 
 
 def test_openproject_bridge_ticket_roundtrip():

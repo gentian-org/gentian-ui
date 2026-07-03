@@ -14,6 +14,7 @@ import {
   isAuthenticated,
   logoutRedirect,
 } from "@/auth/oidc";
+import { useSessionWatchdog } from "@/auth/useSessionWatchdog";
 import { loginPathWithReturnTo } from "@/lib/returnTo";
 
 type AuthContextValue = {
@@ -43,6 +44,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })();
   }, [queryClient]);
+
+  const handleSessionExpired = useCallback(() => {
+    setAuthenticated(false);
+  }, []);
+  useSessionWatchdog(authenticated, isLoading, handleSessionExpired);
 
   const login = useCallback((returnTo?: string) => {
     window.location.assign(loginPathWithReturnTo(returnTo));

@@ -1,8 +1,9 @@
-import { getAccessToken } from "@/auth/oidc";
+import { getAccessToken, redirectToLoginForExpiredSession } from "@/auth/oidc";
 
 export async function fetchOpenprojectBridgeTicket(): Promise<string | null> {
   const token = getAccessToken();
   if (!token) {
+    redirectToLoginForExpiredSession();
     return null;
   }
 
@@ -13,6 +14,11 @@ export async function fetchOpenprojectBridgeTicket(): Promise<string | null> {
     },
   });
 
+  if (response.status === 401) {
+    redirectToLoginForExpiredSession();
+    return null;
+  }
+
   if (!response.ok) {
     return null;
   }
@@ -22,7 +28,7 @@ export async function fetchOpenprojectBridgeTicket(): Promise<string | null> {
 }
 
 export function openprojectBridgeLaunchUrl(projectsOrigin: string, ticket: string): string {
-  const url = new URL("/openproject-portal-sso.html", projectsOrigin);
+  const url = new URL("/gentian-portal-bridge", projectsOrigin);
   url.searchParams.set("t", ticket);
   return url.toString();
 }

@@ -129,13 +129,32 @@ async function pkceChallengeFromVerifier(verifier: string): Promise<string> {
     .replace(/=+$/, "");
 }
 
-function isAccessTokenExpired(token: string): boolean {
+export function isAccessTokenExpired(token: string): boolean {
   const claims = decodeJwtPayload(token);
   const exp = claims?.exp;
   if (typeof exp !== "number") {
     return false;
   }
   return Date.now() >= exp * 1000;
+}
+
+export function getAccessTokenExpiryMs(token: string): number | null {
+  const claims = decodeJwtPayload(token);
+  const exp = claims?.exp;
+  if (typeof exp !== "number") {
+    return null;
+  }
+  return exp * 1000;
+}
+
+/** Clear portal tokens and send the user back to login (unless already there). */
+export function redirectToLoginForExpiredSession(): void {
+  clearAccessToken();
+  if (window.location.pathname.startsWith("/login")) {
+    return;
+  }
+  const returnTo = `${window.location.pathname}${window.location.search}`;
+  window.location.replace(loginPathWithReturnTo(returnTo));
 }
 
 /** Return a stored access token, clearing it when missing or expired. */

@@ -27,6 +27,8 @@ export function DesktopPage() {
   const windows = useWindowsStore((s) => s.windows);
   const openOrFocusWindow = useWindowsStore((s) => s.openOrFocusWindow);
   const openWindow = useWindowsStore((s) => s.openWindow);
+  const closeWindow = useWindowsStore((s) => s.closeWindow);
+  const setWindowUrl = useWindowsStore((s) => s.setWindowUrl);
 
   useEffect(() => {
     const builtinIds = ["admin", "account", "settings"] as const;
@@ -81,6 +83,13 @@ export function DesktopPage() {
     const useIdpBootstrap =
       app.authMode === "oidc" && app.linkTarget === "embedded" && !options?.forceLogin;
     const idpPopup = useIdpBootstrap ? openIdpBootstrapPopup() : null;
+    const loadingPage =
+      "data:text/html," +
+      encodeURIComponent(
+        "<!DOCTYPE html><html><body style='font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;color:#1a2e28'><p>Opening " +
+          app.title.replace(/</g, "") +
+          "…</p></body></html>",
+      );
     void (async () => {
       const linkTarget = options?.forceLogin ? "newwindow" : app.linkTarget;
       const appUrl = buildAppLaunchUrl(appLaunchBase, {
@@ -90,16 +99,33 @@ export function DesktopPage() {
       });
 
       let launchUrl = appUrl;
+      const needsBridgeTicket = useMatrixBridge || useNextcloudBridge || useOpenprojectBridge;
+      const winId = crypto.randomUUID();
+      if (needsBridgeTicket && !options?.forceLogin) {
+        openWindow({
+          id: winId,
+          appId: app.id,
+          title: app.title,
+          url: loadingPage,
+        });
+      }
+
+      document.body.style.cursor = "wait";
+      try {
       if (useMatrixBridge) {
         const ticket = await fetchMatrixBridgeTicket();
         if (ticket) {
           launchUrl = matrixBridgeLaunchUrl(new URL(appUrl).origin, ticket);
+        } else if (needsBridgeTicket) {
+          closeWindow(winId);
+          return;
         }
       } else if (useNextcloudBridge) {
         const ticket = await fetchNextcloudBridgeTicket();
         if (ticket) {
           launchUrl = nextcloudBridgeLaunchUrl(new URL(appUrl).origin, ticket);
         } else {
+          if (needsBridgeTicket) closeWindow(winId);
           window.alert("Could not open Files. Try signing in again.");
           return;
         }
@@ -108,18 +134,30 @@ export function DesktopPage() {
         if (ticket) {
           launchUrl = openprojectBridgeLaunchUrl(new URL(appUrl).origin, ticket);
         } else {
+          if (needsBridgeTicket) closeWindow(winId);
+          if (!window.location.pathname.startsWith("/login")) {
+            window.alert("Could not open Projects. Try signing in again.");
+          }
           return;
         }
       } else if (useIdpBootstrap) {
         await prepareEmbeddedOidcSession(idpPopup);
       }
 
+      if (needsBridgeTicket && !options?.forceLogin) {
+        setWindowUrl(winId, launchUrl);
+        return;
+      }
+
       openWindow({
-        id: crypto.randomUUID(),
+        id: winId,
         appId: app.id,
         title: app.title,
         url: launchUrl,
       });
+      } finally {
+        document.body.style.cursor = "";
+      }
     })();
   }
 
