@@ -109,15 +109,29 @@ def _stable_portal_password(login: str, tenant: str, settings: Settings) -> str:
     return digest[:32]
 
 
+def _openproject_headers(tenant: str, settings: Settings) -> dict[str, str]:
+    host = f"projects.{tenant.strip().lower()}.{settings.kernel_domain.strip().lower()}"
+    return {
+        "Host": host,
+        "X-Forwarded-Proto": "https",
+    }
+
+
 def _openproject_session_cookie_set(response: httpx.Response) -> bool:
     """OpenProject may return 422 while still issuing a session cookie."""
     set_cookie = response.headers.get("set-cookie", "")
     return "_open_project_session=" in set_cookie
 
 
-def _openproject_portal_login_ok(base: str, login: str, password: str) -> bool:
+def _openproject_portal_login_ok(
+    base: str,
+    login: str,
+    password: str,
+    headers: dict[str, str] | None = None,
+) -> bool:
     response = httpx.post(
         f"{base}/login",
+        headers=headers,
         data={"username": login, "password": password},
         follow_redirects=False,
         timeout=10.0,
@@ -129,10 +143,12 @@ def _find_openproject_user(
     base: str,
     auth: tuple[str, str],
     login: str,
+    headers: dict[str, str] | None = None,
 ) -> dict[str, Any] | None:
     search = httpx.get(
         f"{base}/api/v3/users",
         auth=auth,
+        headers=headers,
         params={"filters": _openproject_user_filters(login)},
         timeout=20.0,
     )
@@ -157,13 +173,14 @@ def _ensure_openproject_user(
     display_name: str | None,
     email: str | None,
     password: str,
+    headers: dict[str, str] | None = None,
 ) -> None:
     auth = (admin_user, admin_password)
     base = projects_url.rstrip("/")
 
-    existing = _find_openproject_user(base, auth, login)
+    existing = _find_openproject_user(base, auth, login, headers)
     if existing is not None:
-        if _openproject_portal_login_ok(base, login, password):
+        if _openproject_portal_login_ok(base, login, password, headers):
             return
 
         user_id = existing.get("id")
@@ -176,6 +193,7 @@ def _ensure_openproject_user(
         update = httpx.patch(
             f"{base}/api/v3/users/{user_id}",
             auth=auth,
+            headers=headers,
             json={"password": password},
             timeout=20.0,
         )
@@ -198,6 +216,7 @@ def _ensure_openproject_user(
     create = httpx.post(
         f"{base}/api/v3/users",
         auth=auth,
+        headers=headers,
         json=payload,
         timeout=20.0,
     )
@@ -238,6 +257,7 @@ def create_openproject_bridge_session(
     display_name = str(claims.get("name") or "").strip() or None
     email = str(claims.get("email") or "").strip() or None
 
+    headers = _openproject_headers(tenant, settings)
     _ensure_openproject_user(
         projects_url=projects_url,
         admin_user=admin_user,
@@ -246,6 +266,7 @@ def create_openproject_bridge_session(
         display_name=display_name,
         email=email,
         password=portal_password,
+        headers=headers,
     )
 
     return {"username": login, "password": portal_password}
