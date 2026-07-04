@@ -313,6 +313,32 @@
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
 }
 
+/* ── Invite section blocks (Rights / Apps / Requirements) ────────────────── */
+
+.admin-console__invite-section {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.625rem 0;
+  border-top: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+}
+
+.admin-console__invite-section-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--gtn-ink-4, #74779a);
+  padding-top: 0.3rem;
+}
+
+.admin-console__invite-section-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
 /* ── Member edit panel ───────────────────────────────────────────────────── */
 
 .admin-console__edit-panel {

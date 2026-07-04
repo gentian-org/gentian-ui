@@ -4,6 +4,7 @@ import { fetchAdminContext, fetchGroups } from "@/api/admin";
 import { AuditSection } from "@/admin/AuditSection";
 import { GroupsSection } from "@/admin/GroupsSection";
 import { IntegrationsSection } from "@/admin/IntegrationsSection";
+import { InvitationsSection } from "@/admin/InvitationsSection";
 import { MembersSection } from "@/admin/MembersSection";
 import { NotificationsSection } from "@/admin/NotificationsSection";
 import { PlatformSecuritySection } from "@/admin/PlatformSecuritySection";
@@ -13,6 +14,7 @@ import "./admin.css";
 
 type AdminTab =
   | "members"
+  | "invitations"
   | "groups"
   | "security"
   | "integrations"
@@ -101,6 +103,13 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
           </button>
           <button
             type="button"
+            className={`admin-console__tab${tab === "invitations" ? " admin-console__tab--active" : ""}`}
+            onClick={() => setTab("invitations")}
+          >
+            Invitations
+          </button>
+          <button
+            type="button"
             className={`admin-console__tab${tab === "groups" ? " admin-console__tab--active" : ""}`}
             onClick={() => setTab("groups")}
           >
@@ -155,6 +164,13 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
         <div className="admin-console__body">
           {tab === "members" ? (
             <MembersSection
+              tenant={tenant}
+              privilegeGroups={privilegeGroups}
+              appEntitlementGroups={appEntitlementGroups}
+              customGroups={customGroups}
+            />
+          ) : tab === "invitations" ? (
+            <InvitationsSection
               tenant={tenant}
               privilegeGroups={privilegeGroups}
               appEntitlementGroups={appEntitlementGroups}

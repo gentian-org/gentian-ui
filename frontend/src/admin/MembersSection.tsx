@@ -1,10 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   deleteMember,
   enableMemberTotp,
   fetchMembers,
-  inviteMember,
   removeMemberTotp,
   resetMemberPassword,
   updateMember,
@@ -22,295 +21,44 @@ type MembersSectionProps = {
   customGroups: AdminGroup[];
 };
 
-function groupLabel(name: string): string {
-  if (name.endsWith(":app-admins")) {
-    return "App administrator";
-  }
-  const appMatch = name.match(/:app:([^:]+)$/);
-  if (appMatch) {
-    return appMatch[1];
-  }
-  return name;
-}
-
 /** Extract the app-id slug from a group name like `...:app:xwiki` → `xwiki` */
 function appIdFromGroup(name: string): string | null {
   const m = name.match(/:app:([^:]+)$/);
   return m ? m[1] : null;
 }
 
-/** Toggle-button list for app entitlement groups, organised per installed app. */
-function AppToggleList({
-  title,
-  groups,
-  selectedIds,
+function groupLabel(name: string): string {
+  if (name.endsWith(":app-admins")) return "App Admin";
+  const appMatch = name.match(/:app:([^:]+)$/);
+  if (appMatch) return appMatch[1];
+  return name;
+}
+
+/** One toggle pill with an optional tooltip shown on hover. */
+function TogglePill({
+  label,
+  active,
   onToggle,
-  installedAppIds,
+  tooltip,
 }: {
-  title: string;
-  groups: AdminGroup[];
-  selectedIds: string[];
-  onToggle: (groupId: string, selected: boolean) => void;
-  installedAppIds: Set<string> | null;
+  label: string;
+  active: boolean;
+  onToggle: () => void;
+  tooltip?: string;
 }) {
-  // Filter to only installed apps when we know the list.
-  const visible =
-    installedAppIds !== null
-      ? groups.filter((g) => {
-          const appId = appIdFromGroup(g.name);
-          return appId !== null && installedAppIds.has(appId);
-        })
-      : groups;
-
-  if (visible.length === 0) return null;
-
   return (
-    <div className="admin-console__field">
-      <span>{title}</span>
-      <div className="admin-console__toggle-group">
-        {visible.map((group) => {
-          const selected = selectedIds.includes(group.id);
-          return (
-            <button
-              key={group.id}
-              type="button"
-              className={`admin-console__toggle${selected ? " admin-console__toggle--on" : ""}`}
-              onClick={() => onToggle(group.id, selected)}
-            >
-              {groupLabel(group.name)}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <button
+      type="button"
+      title={tooltip}
+      className={`admin-console__toggle${active ? " admin-console__toggle--on" : ""}`}
+      onClick={onToggle}
+    >
+      {label}
+    </button>
   );
 }
 
-/** Toggle-button list for privilege / custom groups (no app-id filter needed). */
-function GroupToggleList({
-  title,
-  groups,
-  selectedIds,
-  onToggle,
-}: {
-  title: string;
-  groups: AdminGroup[];
-  selectedIds: string[];
-  onToggle: (groupId: string, selected: boolean) => void;
-}) {
-  if (groups.length === 0) return null;
-  return (
-    <div className="admin-console__field">
-      <span>{title}</span>
-      <div className="admin-console__toggle-group">
-        {groups.map((group) => {
-          const selected = selectedIds.includes(group.id);
-          return (
-            <button
-              key={group.id}
-              type="button"
-              className={`admin-console__toggle${selected ? " admin-console__toggle--on" : ""}`}
-              onClick={() => onToggle(group.id, selected)}
-            >
-              {groupLabel(group.name)}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Invitation sub-section ──────────────────────────────────────────────────
-
-type InvitationProps = {
-  tenant: string;
-  privilegeGroups: AdminGroup[];
-  appEntitlementGroups: AdminGroup[];
-  customGroups: AdminGroup[];
-  installedAppIds: Set<string> | null;
-  onSuccess: () => void;
-};
-
-function InvitationSection({
-  tenant,
-  privilegeGroups,
-  appEntitlementGroups,
-  customGroups,
-  installedAppIds,
-  onSuccess,
-}: InvitationProps) {
-  // Default: all app entitlement groups for installed apps selected.
-  const defaultGroupIds = (installedAppIds: Set<string> | null, groups: AdminGroup[]) =>
-    groups
-      .filter((g) => {
-        if (installedAppIds === null) return true;
-        const appId = appIdFromGroup(g.name);
-        return appId !== null && installedAppIds.has(appId);
-      })
-      .map((g) => g.id);
-
-  const [form, setForm] = useState({
-    email: "",
-    inviteEmail: "",
-    firstName: "",
-    lastName: "",
-    groupIds: defaultGroupIds(installedAppIds, appEntitlementGroups),
-    requireTotp: false,
-  });
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  // Re-sync defaults when installed apps become known.
-  useEffect(() => {
-    setForm((prev) => ({
-      ...prev,
-      groupIds: defaultGroupIds(installedAppIds, appEntitlementGroups),
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [installedAppIds]);
-
-  const toggleGroupId = (groupIds: string[], groupId: string, selected: boolean) =>
-    selected ? groupIds.filter((id) => id !== groupId) : [...groupIds, groupId];
-
-  const inviteMutation = useMutation({
-    mutationFn: () =>
-      inviteMember(
-        {
-          email: form.email,
-          inviteEmail: form.inviteEmail || undefined,
-          firstName: form.firstName || undefined,
-          lastName: form.lastName || undefined,
-          groupIds: form.groupIds,
-          requireTotp: form.requireTotp,
-        },
-        tenant,
-      ),
-    onSuccess: async () => {
-      setForm({
-        email: "",
-        inviteEmail: "",
-        firstName: "",
-        lastName: "",
-        groupIds: defaultGroupIds(installedAppIds, appEntitlementGroups),
-        requireTotp: false,
-      });
-      setError(null);
-      setSuccess("Invite sent.");
-      onSuccess();
-    },
-    onError: (err: Error) => {
-      setSuccess(null);
-      setError(err.message);
-    },
-  });
-
-  const handleToggle = (groupId: string, selected: boolean) =>
-    setForm((prev) => ({ ...prev, groupIds: toggleGroupId(prev.groupIds, groupId, selected) }));
-
-  return (
-    <section>
-      <div className="admin-console__toolbar">
-        <h2 className="admin-console__title" style={{ fontSize: "1.125rem" }}>
-          Invite member
-        </h2>
-      </div>
-
-      <form
-        className="admin-console__form admin-console__form--invite"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setSuccess(null);
-          inviteMutation.mutate();
-        }}
-      >
-        <div className="admin-console__field-row">
-          <div className="admin-console__field">
-            <label htmlFor="member-email">Login email</label>
-            <input
-              id="member-email"
-              type="email"
-              required
-              value={form.email}
-              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-            />
-          </div>
-          <div className="admin-console__field">
-            <label htmlFor="member-invite-email">Invite email (optional)</label>
-            <input
-              id="member-invite-email"
-              type="email"
-              value={form.inviteEmail}
-              onChange={(e) => setForm((prev) => ({ ...prev, inviteEmail: e.target.value }))}
-              placeholder="Recovery / invite copy"
-            />
-          </div>
-          <div className="admin-console__field">
-            <label htmlFor="member-first">First name</label>
-            <input
-              id="member-first"
-              value={form.firstName}
-              onChange={(e) => setForm((prev) => ({ ...prev, firstName: e.target.value }))}
-            />
-          </div>
-          <div className="admin-console__field">
-            <label htmlFor="member-last">Last name</label>
-            <input
-              id="member-last"
-              value={form.lastName}
-              onChange={(e) => setForm((prev) => ({ ...prev, lastName: e.target.value }))}
-            />
-          </div>
-        </div>
-
-        <AppToggleList
-          title="App entitlements"
-          groups={appEntitlementGroups}
-          selectedIds={form.groupIds}
-          onToggle={handleToggle}
-          installedAppIds={installedAppIds}
-        />
-        <GroupToggleList
-          title="App administrators"
-          groups={privilegeGroups}
-          selectedIds={form.groupIds}
-          onToggle={handleToggle}
-        />
-        <GroupToggleList
-          title="Custom groups"
-          groups={customGroups}
-          selectedIds={form.groupIds}
-          onToggle={handleToggle}
-        />
-
-        <div className="admin-console__field">
-          <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <input
-              type="checkbox"
-              checked={form.requireTotp}
-              onChange={(e) => setForm((prev) => ({ ...prev, requireTotp: e.target.checked }))}
-            />
-            Require TOTP setup on first login
-          </label>
-        </div>
-
-        {error && <p className="admin-console__error">{error}</p>}
-        {success && <p className="admin-console__success">{success}</p>}
-        <div>
-          <button
-            className="admin-console__btn admin-console__btn--primary"
-            type="submit"
-            disabled={inviteMutation.isPending}
-          >
-            {inviteMutation.isPending ? "Sending invite…" : "Send invite"}
-          </button>
-        </div>
-      </form>
-    </section>
-  );
-}
-
-// ─── Member edit drawer ───────────────────────────────────────────────────────
+// ─── Member edit panel ────────────────────────────────────────────────────────
 
 type MemberEditProps = {
   member: AdminMember;
@@ -321,7 +69,6 @@ type MemberEditProps = {
   assignableGroups: AdminGroup[];
   installedAppIds: Set<string> | null;
   onClose: () => void;
-  onUpdate: () => void;
   setGlobalSuccess: (msg: string | null) => void;
   setGlobalError: (msg: string | null) => void;
 };
@@ -335,7 +82,6 @@ function MemberEditPanel({
   assignableGroups,
   installedAppIds,
   onClose,
-  onUpdate,
   setGlobalSuccess,
   setGlobalError,
 }: MemberEditProps) {
@@ -348,11 +94,17 @@ function MemberEditPanel({
   const [draftGroupIds, setDraftGroupIds] = useState<string[]>(currentIds);
   const [inviteEmailDraft, setInviteEmailDraft] = useState(member.inviteEmail ?? "");
 
-  const toggleGroupId = (groupIds: string[], groupId: string, selected: boolean) =>
-    selected ? groupIds.filter((id) => id !== groupId) : [...groupIds, groupId];
+  const toggleId = (ids: string[], id: string) =>
+    ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
 
-  const handleToggle = (groupId: string, selected: boolean) =>
-    setDraftGroupIds((current) => toggleGroupId(current, groupId, selected));
+  // Visible app groups (only installed apps).
+  const visibleAppGroups =
+    installedAppIds !== null
+      ? appEntitlementGroups.filter((g) => {
+          const appId = appIdFromGroup(g.name);
+          return appId !== null && installedAppIds.has(appId);
+        })
+      : appEntitlementGroups;
 
   const recoveryMutation = useMutation({
     mutationFn: () =>
@@ -361,7 +113,6 @@ function MemberEditPanel({
       setGlobalError(null);
       setGlobalSuccess("Recovery email updated.");
       await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
-      onUpdate();
     },
     onError: (err: Error) => {
       setGlobalSuccess(null);
@@ -375,7 +126,6 @@ function MemberEditPanel({
       setGlobalError(null);
       setGlobalSuccess("Groups updated.");
       await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
-      onUpdate();
     },
     onError: (err: Error) => {
       setGlobalSuccess(null);
@@ -385,12 +135,13 @@ function MemberEditPanel({
 
   const totpMutation = useMutation({
     mutationFn: (action: "enable" | "remove") =>
-      action === "enable" ? enableMemberTotp(member.id, true, tenant) : removeMemberTotp(member.id, tenant),
+      action === "enable"
+        ? enableMemberTotp(member.id, true, tenant)
+        : removeMemberTotp(member.id, tenant),
     onSuccess: async () => {
       setGlobalError(null);
       setGlobalSuccess("TOTP settings updated.");
       await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
-      onUpdate();
     },
     onError: (err: Error) => {
       setGlobalSuccess(null);
@@ -426,7 +177,6 @@ function MemberEditPanel({
       }
       await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
       await queryClient.invalidateQueries({ queryKey: ["admin", "sessions", tenant] });
-      onUpdate();
     },
   });
 
@@ -466,6 +216,7 @@ function MemberEditPanel({
                 onChange={(e) => setInviteEmailDraft(e.target.value)}
                 placeholder="personal@example.com"
                 style={{ flex: "1", minWidth: "12rem" }}
+                title="Personal inbox used to deliver invite links and password-reset emails. Set this when the member's login email is a workspace address."
               />
               <button
                 type="button"
@@ -479,29 +230,55 @@ function MemberEditPanel({
           </div>
         </div>
 
-        {/* App entitlements */}
+        {/* Rights */}
         <div className="admin-console__edit-row">
-          <div className="admin-console__edit-row-label">App entitlements</div>
+          <div className="admin-console__edit-row-label">Rights</div>
           <div className="admin-console__edit-row-value">
-            <AppToggleList
-              title=""
-              groups={appEntitlementGroups}
-              selectedIds={draftGroupIds}
-              onToggle={handleToggle}
-              installedAppIds={installedAppIds}
-            />
-            <GroupToggleList
-              title="App administrators"
-              groups={privilegeGroups}
-              selectedIds={draftGroupIds}
-              onToggle={handleToggle}
-            />
-            <GroupToggleList
-              title="Custom groups"
-              groups={customGroups}
-              selectedIds={draftGroupIds}
-              onToggle={handleToggle}
-            />
+            <div className="admin-console__toggle-group">
+              {privilegeGroups.map((g) => (
+                <TogglePill
+                  key={g.id}
+                  label="App Admin"
+                  active={draftGroupIds.includes(g.id)}
+                  onToggle={() => setDraftGroupIds((cur) => toggleId(cur, g.id))}
+                  tooltip="Grants administrator access to a specific application. App admins can manage app-level settings and users within that app."
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* App access */}
+        <div className="admin-console__edit-row">
+          <div className="admin-console__edit-row-label">Apps</div>
+          <div className="admin-console__edit-row-value">
+            <div className="admin-console__toggle-group">
+              {visibleAppGroups.map((g) => {
+                const appId = appIdFromGroup(g.name) ?? groupLabel(g.name);
+                return (
+                  <TogglePill
+                    key={g.id}
+                    label={appId}
+                    active={draftGroupIds.includes(g.id)}
+                    onToggle={() => setDraftGroupIds((cur) => toggleId(cur, g.id))}
+                    tooltip={`Grant or revoke access to the "${appId}" application. When active, the member belongs to the app's entitlement group and can sign in to ${appId}.`}
+                  />
+                );
+              })}
+            </div>
+            {customGroups.length > 0 && (
+              <div className="admin-console__toggle-group" style={{ marginTop: "0.5rem" }}>
+                {customGroups.map((g) => (
+                  <TogglePill
+                    key={g.id}
+                    label={groupLabel(g.name)}
+                    active={draftGroupIds.includes(g.id)}
+                    onToggle={() => setDraftGroupIds((cur) => toggleId(cur, g.id))}
+                    tooltip={`Add or remove the member from the custom group "${g.name}".`}
+                  />
+                ))}
+              </div>
+            )}
             <div style={{ marginTop: "0.5rem" }}>
               <button
                 type="button"
@@ -516,6 +293,7 @@ function MemberEditPanel({
                 type="button"
                 className="admin-console__btn"
                 onClick={() => setDraftGroupIds(currentIds)}
+                title="Discard unsaved changes and restore the current group memberships."
               >
                 Reset
               </button>
@@ -523,7 +301,7 @@ function MemberEditPanel({
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Account actions */}
         <div className="admin-console__edit-row">
           <div className="admin-console__edit-row-label">Account actions</div>
           <div className="admin-console__edit-row-value admin-console__edit-actions">
@@ -533,6 +311,7 @@ function MemberEditPanel({
                 className="admin-console__btn"
                 disabled={totpMutation.isPending}
                 onClick={() => totpMutation.mutate("enable")}
+                title="Require the member to set up a TOTP authenticator (e.g. Google Authenticator) on next login."
               >
                 Require TOTP
               </button>
@@ -543,6 +322,7 @@ function MemberEditPanel({
                 className="admin-console__btn"
                 disabled={totpMutation.isPending}
                 onClick={() => totpMutation.mutate("remove")}
+                title="Remove the member's existing TOTP configuration so they can log in with password only."
               >
                 Remove TOTP
               </button>
@@ -560,14 +340,24 @@ function MemberEditPanel({
               type="button"
               className="admin-console__btn"
               onClick={() => toggleMutation.mutate()}
+              title={
+                member.enabled
+                  ? "Disable this account. All active sessions are revoked immediately."
+                  : "Re-enable this account so the member can sign in again."
+              }
             >
               {member.enabled ? "Disable" : "Enable"}
             </button>
             <button
               type="button"
               className="admin-console__btn admin-console__btn--danger"
+              title="Permanently delete this member and all their sessions. This cannot be undone."
               onClick={() => {
-                if (window.confirm(`Delete member ${member.email ?? member.username}? This cannot be undone.`)) {
+                if (
+                  window.confirm(
+                    `Delete member ${member.email ?? member.username}? This cannot be undone.`,
+                  )
+                ) {
                   deleteMutation.mutate();
                 }
               }}
@@ -581,34 +371,28 @@ function MemberEditPanel({
   );
 }
 
-// ─── Members list sub-section ─────────────────────────────────────────────────
+// ─── Top-level export ─────────────────────────────────────────────────────────
 
-type MembersListProps = {
-  tenant: string;
-  privilegeGroups: AdminGroup[];
-  appEntitlementGroups: AdminGroup[];
-  customGroups: AdminGroup[];
-  assignableGroups: AdminGroup[];
-  installedAppIds: Set<string> | null;
-  globalError: string | null;
-  globalSuccess: string | null;
-  setGlobalError: (msg: string | null) => void;
-  setGlobalSuccess: (msg: string | null) => void;
-};
-
-function MembersList({
+export function MembersSection({
   tenant,
   privilegeGroups,
   appEntitlementGroups,
   customGroups,
-  assignableGroups,
-  installedAppIds,
-  globalError,
-  globalSuccess,
-  setGlobalError,
-  setGlobalSuccess,
-}: MembersListProps) {
+}: MembersSectionProps) {
+  const assignableGroups = [...privilegeGroups, ...appEntitlementGroups, ...customGroups];
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [globalError, setGlobalError] = useState<string | null>(null);
+  const [globalSuccess, setGlobalSuccess] = useState<string | null>(null);
+
+  // Derive installed app IDs from the cached /session/me response.
+  const meQuery = useQuery({
+    queryKey: ["me"],
+    queryFn: () => apiFetch<MeResponse>("/session/me"),
+    staleTime: Infinity,
+  });
+  const shellApps: ShellApp[] = meQuery.data?.shellApps ?? [];
+  const installedAppIds: Set<string> | null =
+    shellApps.length > 0 ? new Set(shellApps.map((a) => a.id)) : null;
 
   const membersQuery = useQuery({
     queryKey: ["admin", "members", tenant],
@@ -619,7 +403,7 @@ function MembersList({
   const editingMember = editingId ? members.find((m) => m.id === editingId) ?? null : null;
 
   return (
-    <section style={{ marginTop: "2rem" }}>
+    <section>
       <div className="admin-console__toolbar">
         <h2 className="admin-console__title" style={{ fontSize: "1.125rem" }}>
           Members
@@ -639,9 +423,6 @@ function MembersList({
           assignableGroups={assignableGroups}
           installedAppIds={installedAppIds}
           onClose={() => setEditingId(null)}
-          onUpdate={() => {
-            /* keep panel open, data refreshes via query invalidation */
-          }}
           setGlobalSuccess={setGlobalSuccess}
           setGlobalError={setGlobalError}
         />
@@ -660,7 +441,10 @@ function MembersList({
         </thead>
         <tbody>
           {members.map((member) => (
-            <tr key={member.id} className={editingId === member.id ? "admin-console__row--editing" : ""}>
+            <tr
+              key={member.id}
+              className={editingId === member.id ? "admin-console__row--editing" : ""}
+            >
               <td className="admin-console__mono">{member.email ?? member.username}</td>
               <td>{[member.firstName, member.lastName].filter(Boolean).join(" ") || "—"}</td>
               <td>{member.enabled ? "Enabled" : "Disabled"}</td>
@@ -672,15 +456,13 @@ function MembersList({
                     : "—"}
               </td>
               <td>
-                {member.groups.length === 0 ? (
-                  "—"
-                ) : (
-                  member.groups.map((group) => (
-                    <span key={group} className="admin-console__chip">
-                      {groupLabel(group)}
-                    </span>
-                  ))
-                )}
+                {member.groups.length === 0
+                  ? "—"
+                  : member.groups.map((group) => (
+                      <span key={group} className="admin-console__chip">
+                        {groupLabel(group)}
+                      </span>
+                    ))}
               </td>
               <td style={{ whiteSpace: "nowrap" }}>
                 <button
@@ -696,58 +478,5 @@ function MembersList({
         </tbody>
       </table>
     </section>
-  );
-}
-
-// ─── Top-level export ─────────────────────────────────────────────────────────
-
-export function MembersSection({
-  tenant,
-  privilegeGroups,
-  appEntitlementGroups,
-  customGroups,
-}: MembersSectionProps) {
-  const queryClient = useQueryClient();
-  const assignableGroups = [...privilegeGroups, ...appEntitlementGroups, ...customGroups];
-  const [globalError, setGlobalError] = useState<string | null>(null);
-  const [globalSuccess, setGlobalSuccess] = useState<string | null>(null);
-
-  // Derive installed app IDs from the cached /session/me response.
-  const meQuery = useQuery({
-    queryKey: ["me"],
-    queryFn: () => apiFetch<MeResponse>("/session/me"),
-    staleTime: Infinity, // already fresh from shell bootstrap
-  });
-  const shellApps: ShellApp[] = meQuery.data?.shellApps ?? [];
-  const installedAppIds: Set<string> | null =
-    shellApps.length > 0 ? new Set(shellApps.map((a) => a.id)) : null;
-
-  const invalidateMembers = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
-  };
-
-  return (
-    <div>
-      <InvitationSection
-        tenant={tenant}
-        privilegeGroups={privilegeGroups}
-        appEntitlementGroups={appEntitlementGroups}
-        customGroups={customGroups}
-        installedAppIds={installedAppIds}
-        onSuccess={invalidateMembers}
-      />
-      <MembersList
-        tenant={tenant}
-        privilegeGroups={privilegeGroups}
-        appEntitlementGroups={appEntitlementGroups}
-        customGroups={customGroups}
-        assignableGroups={assignableGroups}
-        installedAppIds={installedAppIds}
-        globalError={globalError}
-        globalSuccess={globalSuccess}
-        setGlobalError={setGlobalError}
-        setGlobalSuccess={setGlobalSuccess}
-      />
-    </div>
   );
 }
