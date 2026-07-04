@@ -29,7 +29,7 @@ type AdminConsoleProps = {
 };
 
 export function AdminConsole({ embedded = false }: AdminConsoleProps) {
-  const [tab, setTab] = useState<AdminTab>("members");
+  const [tab, setTab] = useState<AdminTab>("invitations");
   const contextQuery = useQuery({
     queryKey: ["admin", "context"],
     queryFn: () => fetchAdminContext(),
@@ -80,15 +80,12 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
   return (
     <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
       <div className="admin-console__frame">
-        <header className="admin-console__header">
-          <div>
-            <div className="admin-console__eyebrow">
-              Gentian admin · tenant {tenant}
-              {isPlatformAdmin ? " · platform scope" : ""}
-            </div>
-            <h1 className="admin-console__title">Workspace access</h1>
+        <header className="admin-console__header" style={{ padding: "0.85rem 1.5rem", alignItems: "center" }}>
+          <div className="admin-console__mono" style={{ fontWeight: 600, textTransform: "uppercase", fontSize: "0.8125rem", color: "var(--gtn-ink-1)" }}>
+            tenant {tenant}
+            {isPlatformAdmin ? " · platform scope" : ""}
           </div>
-          <div className="admin-console__mono" style={{ color: "var(--gtn-ink-4)" }}>
+          <div className="admin-console__mono" style={{ color: "var(--gtn-ink-4)", fontSize: "0.8125rem" }}>
             realm/{realm}
           </div>
         </header>

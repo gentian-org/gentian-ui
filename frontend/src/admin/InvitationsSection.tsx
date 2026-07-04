@@ -62,6 +62,19 @@ function TogglePill({
   );
 }
 
+function getTenantDomain(tenant: string): string {
+  const hostname = window.location.hostname;
+  let baseDomain = "desk.gentian.org";
+  if (hostname.includes(".")) {
+    if (hostname.startsWith("portal.")) {
+      baseDomain = hostname.substring("portal.".length);
+    } else {
+      baseDomain = hostname;
+    }
+  }
+  return `${tenant}.${baseDomain}`;
+}
+
 export function InvitationsSection({
   tenant,
   privilegeGroups,
@@ -69,6 +82,7 @@ export function InvitationsSection({
   customGroups,
 }: InvitationsSectionProps) {
   const queryClient = useQueryClient();
+  const tenantDomain = getTenantDomain(tenant);
 
   // ── Derive installed app IDs ──────────────────────────────────────────────
   const meQuery = useQuery({
@@ -77,38 +91,64 @@ export function InvitationsSection({
     staleTime: Infinity,
   });
   const shellApps: ShellApp[] = meQuery.data?.shellApps ?? [];
-  const installedAppIds: Set<string> | null =
-    shellApps.length > 0 ? new Set(shellApps.map((a) => a.id)) : null;
+
+  const isInstalled = (appId: string) => {
+    return shellApps.some((a) => a.id === appId || a.id.startsWith(appId + "-"));
+  };
 
   // Only show entitlement groups for currently installed apps.
-  const visibleAppGroups =
-    installedAppIds !== null
-      ? appEntitlementGroups.filter((g) => {
-          const appId = appIdFromGroup(g.name);
-          return appId !== null && installedAppIds.has(appId);
-        })
-      : appEntitlementGroups;
+  const visibleAppGroups = appEntitlementGroups.filter((g) => {
+    const appId = appIdFromGroup(g.name);
+    return appId !== null && isInstalled(appId);
+  });
 
   // ── Default group selection: all app entitlement groups ON, others OFF ────
   const defaultAppGroupIds = () => visibleAppGroups.map((g) => g.id);
 
   const [form, setForm] = useState({
-    email: "",
-    inviteEmail: "",
     firstName: "",
     lastName: "",
-    appGroupIds: defaultAppGroupIds(),   // installed-app toggles (default ON)
-    adminGroupIds: [] as string[],        // privilege toggles (default OFF)
-    requireTotp: false,                   // requirements (default OFF)
+    inviteEmail: "",
+    appGroupIds: [] as string[],
+    adminGroupIds: [] as string[],
+    requireTotp: false,
   });
+
+  const [localPart, setLocalPart] = useState("");
+  const [hasManuallyEditedLocalPart, setHasManuallyEditedLocalPart] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Re-sync app defaults once shellApps load.
+  // Sync app defaults when visibleAppGroups or shellApps load/change.
   useEffect(() => {
     setForm((prev) => ({ ...prev, appGroupIds: defaultAppGroupIds() }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [installedAppIds]);
+  }, [shellApps]);
+
+  // Handle name updates and auto-population of Login email
+  const handleNameChange = (field: "firstName" | "lastName", val: string) => {
+    setForm((prev) => {
+      const next = { ...prev, [field]: val };
+      if (!hasManuallyEditedLocalPart) {
+        const first = field === "firstName" ? val : prev.firstName;
+        const last = field === "lastName" ? val : prev.lastName;
+        
+        // Clean and format local part
+        const cleanFirst = first.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+        const cleanLast = last.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+        const generated = cleanFirst && cleanLast ? `${cleanFirst}-${cleanLast}` : cleanFirst || cleanLast || "";
+        setLocalPart(generated);
+      }
+      return next;
+    });
+  };
+
+  const handleLocalPartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, "");
+    setLocalPart(val);
+    setHasManuallyEditedLocalPart(true);
+  };
 
   const toggleId = (ids: string[], id: string) =>
     ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
@@ -117,7 +157,7 @@ export function InvitationsSection({
     mutationFn: () =>
       inviteMember(
         {
-          email: form.email,
+          email: `${localPart}@${tenantDomain}`,
           inviteEmail: form.inviteEmail || undefined,
           firstName: form.firstName || undefined,
           lastName: form.lastName || undefined,
@@ -128,14 +168,15 @@ export function InvitationsSection({
       ),
     onSuccess: async () => {
       setForm({
-        email: "",
-        inviteEmail: "",
         firstName: "",
         lastName: "",
+        inviteEmail: "",
         appGroupIds: defaultAppGroupIds(),
         adminGroupIds: [],
         requireTotp: false,
       });
+      setLocalPart("");
+      setHasManuallyEditedLocalPart(false);
       setError(null);
       setSuccess("Invite sent.");
       await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
@@ -162,42 +203,56 @@ export function InvitationsSection({
           inviteMutation.mutate();
         }}
       >
-        {/* ── Identity fields ──────────────────────────────────────────── */}
-        <div className="admin-console__field-row">
-          <div className="admin-console__field">
-            <label htmlFor="inv-email">Login email</label>
-            <input
-              id="inv-email"
-              type="email"
-              required
-              value={form.email}
-              onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-            />
+        {/* ── Identity fields stacked in ordered rows ──────────────────── */}
+        <div className="admin-console__invite-fields">
+          {/* Row 1: First Name and Last Name */}
+          <div className="admin-console__field-row">
+            <div className="admin-console__field">
+              <label htmlFor="inv-first">First name</label>
+              <input
+                id="inv-first"
+                value={form.firstName}
+                onChange={(e) => handleNameChange("firstName", e.target.value)}
+                placeholder="John"
+              />
+            </div>
+            <div className="admin-console__field">
+              <label htmlFor="inv-last">Last name</label>
+              <input
+                id="inv-last"
+                value={form.lastName}
+                onChange={(e) => handleNameChange("lastName", e.target.value)}
+                placeholder="Doe"
+              />
+            </div>
           </div>
+
+          {/* Row 2: Login email (Custom editable localpart + static domain) */}
           <div className="admin-console__field">
-            <label htmlFor="inv-invite-email">Invite email (optional)</label>
+            <label htmlFor="inv-email-local">Login email</label>
+            <div className="admin-console__email-input-wrapper">
+              <input
+                id="inv-email-local"
+                type="text"
+                required
+                value={localPart}
+                onChange={handleLocalPartChange}
+                placeholder="john-doe"
+              />
+              <span className="admin-console__email-domain">@{tenantDomain}</span>
+            </div>
+          </div>
+
+          {/* Row 3: Invite email */}
+          <div className="admin-console__field">
+            <label htmlFor="inv-invite-email">Invite email</label>
             <input
               id="inv-invite-email"
               type="email"
+              required
               value={form.inviteEmail}
               onChange={(e) => setForm((p) => ({ ...p, inviteEmail: e.target.value }))}
-              placeholder="Personal inbox for the invite link"
-            />
-          </div>
-          <div className="admin-console__field">
-            <label htmlFor="inv-first">First name</label>
-            <input
-              id="inv-first"
-              value={form.firstName}
-              onChange={(e) => setForm((p) => ({ ...p, firstName: e.target.value }))}
-            />
-          </div>
-          <div className="admin-console__field">
-            <label htmlFor="inv-last">Last name</label>
-            <input
-              id="inv-last"
-              value={form.lastName}
-              onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))}
+              placeholder="personal@example.com"
             />
           </div>
         </div>
@@ -226,7 +281,7 @@ export function InvitationsSection({
         <FormSection title="Apps">
           {visibleAppGroups.length === 0 ? (
             <span style={{ fontSize: "0.8125rem", color: "var(--gtn-ink-4)" }}>
-              {installedAppIds === null ? "Loading apps…" : "No installed apps found."}
+              No installed apps found.
             </span>
           ) : (
             visibleAppGroups.map((g) => {
@@ -276,7 +331,7 @@ export function InvitationsSection({
         {error && <p className="admin-console__error">{error}</p>}
         {success && <p className="admin-console__success">{success}</p>}
 
-        <div>
+        <div className="admin-console__form-footer">
           <button
             className="admin-console__btn admin-console__btn--primary"
             type="submit"

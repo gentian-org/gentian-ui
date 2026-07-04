@@ -313,6 +313,48 @@
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
 }
 
+.admin-console__invite-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-console__email-input-wrapper {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-radius: 2px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.admin-console__email-input-wrapper input {
+  border: none !important;
+  outline: none !important;
+  flex: 1;
+  padding: 0.5rem 0.6rem;
+  font: inherit;
+  background: transparent;
+}
+
+.admin-console__email-domain {
+  padding: 0.5rem 0.65rem;
+  background: var(--gtn-paper-1, #ece8df);
+  color: var(--gtn-ink-3, #45486b);
+  font-family: "Commit Mono", ui-monospace, monospace;
+  font-size: 0.8125rem;
+  border-left: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  user-select: none;
+  white-space: nowrap;
+}
+
+.admin-console__form-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+
 /* ── Invite section blocks (Rights / Apps / Requirements) ────────────────── */
 
 .admin-console__invite-section {
