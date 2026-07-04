@@ -274,3 +274,111 @@
   font-family: "Commit Mono", ui-monospace, monospace;
   font-size: 0.6875rem;
 }
+
+/* ── Toggle buttons ──────────────────────────────────────────────────────── */
+
+.admin-console__toggle-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.25rem;
+}
+
+.admin-console__toggle {
+  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-radius: 2px;
+  background: var(--gtn-paper-1, #ece8df);
+  color: var(--gtn-ink-3, #45486b);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.3rem 0.65rem;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  line-height: 1.4;
+}
+
+.admin-console__toggle--on {
+  background: var(--gtn-gentian-600, #1b1a82);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* ── Invitation form layout ──────────────────────────────────────────────── */
+
+.admin-console__form--invite {
+  max-width: none;
+}
+
+.admin-console__form--invite .admin-console__field-row {
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+/* ── Member edit panel ───────────────────────────────────────────────────── */
+
+.admin-console__edit-panel {
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-radius: 4px;
+  background: var(--gtn-paper-0, #f4f1ea);
+  overflow: hidden;
+}
+
+.admin-console__edit-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  background: var(--gtn-paper-1, #ece8df);
+}
+
+.admin-console__edit-panel-body {
+  padding: 0;
+}
+
+.admin-console__edit-row {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  align-items: start;
+}
+
+.admin-console__edit-row:last-child {
+  border-bottom: none;
+}
+
+.admin-console__edit-row-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gtn-ink-3, #45486b);
+  padding-top: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.admin-console__edit-row-value {
+  font-size: 0.875rem;
+}
+
+.admin-console__edit-row-value input {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-radius: 2px;
+  font: inherit;
+  background: #fff;
+}
+
+.admin-console__edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ── Editing row highlight ───────────────────────────────────────────────── */
+
+.admin-console__row--editing > td {
+  background: var(--gtn-paper-1, #ece8df);
+}
