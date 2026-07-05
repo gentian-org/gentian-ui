@@ -140,8 +140,8 @@ def idp_session(
         response.set_cookie(
             key=c["key"],
             value=c["value"],
-            domain=f".{settings.kernel_domain}",
-            path=c["path"],
+            domain=settings.kernel_domain,
+            path="/auth",
             httponly=c["httponly"],
             samesite="none",
             secure=True,
