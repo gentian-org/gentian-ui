@@ -64,6 +64,7 @@ class KeycloakAdminStore:
         last_name: str | None,
         enabled: bool,
     ) -> Member:
+        localpart = username.split("@", 1)[0]
         body = {
             "username": username,
             "email": email,
@@ -71,6 +72,7 @@ class KeycloakAdminStore:
             "lastName": last_name or "",
             "enabled": enabled,
             "emailVerified": False,
+            "attributes": {"uid": [localpart]},
         }
         response = await self._raw_request(
             "POST",
@@ -105,7 +107,8 @@ class KeycloakAdminStore:
         require_totp: bool = False,
     ) -> Member:
         await self._assert_realm_smtp_configured(realm)
-        attributes: dict[str, list[str]] = {}
+        localpart = username.split("@", 1)[0]
+        attributes: dict[str, list[str]] = {"uid": [localpart]}
         delivery_email = (invite_email or email).strip()
         if invite_email and invite_email.strip().lower() != email.strip().lower():
             attributes[INVITE_EMAIL_ATTR] = [invite_email.strip()]
