@@ -1,7 +1,7 @@
 """Unauthenticated auth helpers for the portal login page."""
 
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
@@ -124,6 +124,7 @@ async def forgot_password(
 
 @router.post("/idp-session", response_model=IdpSessionResponse)
 def idp_session(
+    response: Response,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> IdpSessionResponse:
@@ -131,7 +132,17 @@ def idp_session(
     if settings.auth_disabled:
         return IdpSessionResponse(skipped=True)
 
-    redirect_url = create_idp_session_redirect(user, settings)
-    if redirect_url is None:
+    res = create_idp_session_redirect(user, settings)
+    if res is None:
         return IdpSessionResponse(skipped=True)
+    redirect_url, cookies_to_set = res
+    for c in cookies_to_set:
+        response.set_cookie(
+            key=c["key"],
+            value=c["value"],
+            path=c["path"],
+            httponly=c["httponly"],
+            samesite="none",
+            secure=True,
+        )
     return IdpSessionResponse(redirectUrl=redirect_url)

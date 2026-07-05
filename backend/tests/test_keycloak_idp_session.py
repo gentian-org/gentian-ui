@@ -49,5 +49,8 @@ def test_create_idp_session_redirect_returns_redirect_url():
         ),
         patch("app.services.keycloak_idp_session.httpx.post", return_value=mock_response),
     ):
-        redirect = create_idp_session_redirect(claims, settings)
+        res = create_idp_session_redirect(claims, settings)
+    assert res is not None
+    redirect, cookies = res
     assert redirect == "https://id.desk.gentian.org/auth/realms/demo/account"
+    assert cookies == []
