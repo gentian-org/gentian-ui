@@ -29,26 +29,35 @@ function GroupEditPanel({ group, tenant, members, onClose }: GroupEditProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Group members are those whose `groups` array contains the group's name.
-  const currentMembers = members.filter((m) => m.groups.includes(group.name));
+  const initialMembers = members.filter((m) => m.groups.includes(group.name)).map((m) => m.id);
+  const [draftMemberIds, setDraftMemberIds] = useState<string[]>(initialMembers);
 
-  const toggleMemberMutation = useMutation({
-    mutationFn: async ({ member, add }: { member: AdminMember; add: boolean }) => {
+  const saveMutation = useMutation({
+    mutationFn: async () => {
       // Fetch all groups to resolve group paths/IDs
       const allGroups = queryClient.getQueryData<AdminGroup[]>(["admin", "groups", tenant]) ?? [];
       
-      // Resolve member's current groups as IDs
-      const currentGroupIds = allGroups
-        .filter((g) => member.groups.includes(g.name))
-        .map((g) => g.id);
+      const promises = members.map(async (member) => {
+        const wasInGroup = member.groups.includes(group.name);
+        const shouldBeInGroup = draftMemberIds.includes(member.id);
 
-      const nextGroupIds = add
-        ? [...currentGroupIds, group.id]
-        : currentGroupIds.filter((id) => id !== group.id);
+        if (wasInGroup === shouldBeInGroup) return;
 
-      await updateMemberGroups(member.id, nextGroupIds, tenant);
+        const currentGroupIds = allGroups
+          .filter((g) => member.groups.includes(g.name))
+          .map((g) => g.id);
+
+        const nextGroupIds = shouldBeInGroup
+          ? [...currentGroupIds, group.id]
+          : currentGroupIds.filter((id) => id !== group.id);
+
+        await updateMemberGroups(member.id, nextGroupIds, tenant);
+      });
+
+      await Promise.all(promises);
     },
     onSuccess: async () => {
-      setSuccess("Group membership updated.");
+      setSuccess("Group membership saved.");
       setError(null);
       await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
       await queryClient.invalidateQueries({ queryKey: ["admin", "groups", tenant] });
@@ -58,6 +67,12 @@ function GroupEditPanel({ group, tenant, members, onClose }: GroupEditProps) {
       setError(err.message);
     },
   });
+
+  const toggleMemberId = (id: string) => {
+    setDraftMemberIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   return (
     <div className="admin-console__edit-panel" style={{ marginTop: "1rem", marginBottom: "1.5rem" }}>
@@ -83,9 +98,9 @@ function GroupEditPanel({ group, tenant, members, onClose }: GroupEditProps) {
         {success && <p className="admin-console__success">{success}</p>}
         {error && <p className="admin-console__error">{error}</p>}
 
-        <div className="admin-console__toggle-group" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(14rem, 1fr))", gap: "0.5rem" }}>
+        <div className="admin-console__toggle-group" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(14rem, 1fr))", gap: "0.5rem", marginBottom: "1rem" }}>
           {members.map((member) => {
-            const isMember = currentMembers.some((m) => m.id === member.id);
+            const isChecked = draftMemberIds.includes(member.id);
             const shortName = member.username.split("@")[0];
             return (
               <label
@@ -97,18 +112,18 @@ function GroupEditPanel({ group, tenant, members, onClose }: GroupEditProps) {
                   padding: "0.4rem 0.6rem",
                   border: "1px solid var(--gtn-border, rgba(14, 18, 38, 0.12))",
                   borderRadius: "2px",
-                  background: isMember ? "var(--gtn-paper-1, #ece8df)" : "#fff",
+                  background: isChecked ? "var(--gtn-paper-1, #ece8df)" : "#fff",
                   cursor: "pointer",
                   userSelect: "none"
                 }}
               >
                 <input
                   type="checkbox"
-                  checked={isMember}
-                  disabled={toggleMemberMutation.isPending}
-                  onChange={(e) => {
+                  checked={isChecked}
+                  disabled={saveMutation.isPending}
+                  onChange={() => {
                     setSuccess(null);
-                    toggleMemberMutation.mutate({ member, add: e.target.checked });
+                    toggleMemberId(member.id);
                   }}
                 />
                 <span className="admin-console__mono" style={{ fontSize: "0.8125rem" }}>
@@ -122,6 +137,26 @@ function GroupEditPanel({ group, tenant, members, onClose }: GroupEditProps) {
               No members found in this tenant.
             </span>
           )}
+        </div>
+
+        <div className="admin-console__form-footer">
+          <button
+            type="button"
+            className="admin-console__btn admin-console__btn--primary"
+            style={{ marginRight: "0.5rem" }}
+            disabled={saveMutation.isPending}
+            onClick={() => saveMutation.mutate()}
+          >
+            {saveMutation.isPending ? "Saving..." : "Save members"}
+          </button>
+          <button
+            type="button"
+            className="admin-console__btn"
+            disabled={saveMutation.isPending}
+            onClick={() => setDraftMemberIds(initialMembers)}
+          >
+            Reset
+          </button>
         </div>
       </div>
     </div>

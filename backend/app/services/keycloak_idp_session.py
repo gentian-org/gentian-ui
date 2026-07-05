@@ -14,13 +14,19 @@ from app.services.keycloak_user_groups import _fetch_admin_token
 _REALM_RE = re.compile(r"/realms/([^/]+)/?$")
 
 
+from http.cookies import SimpleCookie
+
+
 def realm_from_issuer(issuer: str) -> str | None:
     match = _REALM_RE.search(issuer.rstrip("/"))
     return match.group(1) if match else None
 
 
-def create_idp_session_redirect(claims: dict[str, Any], settings: Settings) -> str | None:
-    """Return a browser URL that sets the user's Keycloak SSO cookie in their realm.
+def create_idp_session_redirect(
+    claims: dict[str, Any],
+    settings: Settings,
+) -> tuple[str, list[dict[str, Any]]] | None:
+    """Return a browser URL and Keycloak cookies to set user's Keycloak SSO session.
 
     Portal password login uses the direct access grant and does not create browser
     cookies. Embedded OIDC apps (Element, XWiki, …) need that cookie for silent SSO.
@@ -70,4 +76,17 @@ def create_idp_session_redirect(claims: dict[str, Any], settings: Settings) -> s
     redirect = payload.get("redirect")
     if not isinstance(redirect, str) or not redirect.strip():
         return None
-    return redirect.strip()
+
+    cookies_to_set = []
+    for set_cookie in response.headers.get_list("set-cookie"):
+        cookie = SimpleCookie()
+        cookie.load(set_cookie)
+        for key, morsel in cookie.items():
+            cookies_to_set.append({
+                "key": key,
+                "value": morsel.value,
+                "path": morsel["path"] or "/",
+                "httponly": bool(morsel["httponly"]),
+            })
+
+    return redirect.strip(), cookies_to_set
