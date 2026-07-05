@@ -41,6 +41,11 @@ export function DesktopPage() {
     }
   }, [activeAppId, setActiveAppId, windows]);
 
+  useEffect(() => {
+    // Warm up Keycloak OIDC sessions silently in the background on load
+    void prepareEmbeddedOidcSession(null);
+  }, []);
+
   function openBuiltinPanel(
     id: "account" | "settings",
     title: string,
