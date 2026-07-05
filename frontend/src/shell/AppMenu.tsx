@@ -108,6 +108,7 @@ export function AppMenu({
                 type="button"
                 role="menuitem"
                 className="user-menu__item"
+                style={{ fontWeight: 700 }}
                 onClick={() => {
                   closeUserMenu();
                   logout();

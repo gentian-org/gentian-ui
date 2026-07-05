@@ -112,11 +112,16 @@ export function InvitationsSection({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Initialize app defaults
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Initialize app defaults once when apps are loaded
   useEffect(() => {
-    setForm((prev) => ({ ...prev, appGroupIds: defaultAppGroupIds() }));
+    if (visibleAppGroups.length > 0 && !isInitialized) {
+      setForm((prev) => ({ ...prev, appGroupIds: defaultAppGroupIds() }));
+      setIsInitialized(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appEntitlementGroups]);
+  }, [visibleAppGroups, isInitialized]);
 
   // Handle name updates and auto-population of Login email
   const handleNameChange = (field: "firstName" | "lastName", val: string) => {

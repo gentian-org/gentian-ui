@@ -41,7 +41,21 @@ export function useShellApps() {
     retry: 1,
   });
 
-  const apps = useMemo(() => shellAppsFromMe(me), [me]);
+  const apps = useMemo(() => {
+    const list = shellAppsFromMe(me);
+    const order = ["admin", "app-store", "subscriptions", "gentian-subscriptions"];
+    
+    const adminApps = list.filter((a) => order.includes(a.id));
+    const userApps = list.filter((a) => !order.includes(a.id));
+    
+    adminApps.sort((a, b) => {
+      const idxA = order.indexOf(a.id);
+      const idxB = order.indexOf(b.id);
+      return idxA - idxB;
+    });
+    
+    return [...adminApps, ...userApps];
+  }, [me]);
 
   const isAdminUser = Boolean(me?.isPlatformAdmin || me?.isTenantAdmin);
   const adminOnly =
