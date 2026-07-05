@@ -140,6 +140,7 @@ def idp_session(
         response.set_cookie(
             key=c["key"],
             value=c["value"],
+            domain=f".{settings.kernel_domain}",
             path=c["path"],
             httponly=c["httponly"],
             samesite="none",
