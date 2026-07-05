@@ -52,6 +52,9 @@ function TogglePill({
       className={`admin-console__toggle${active ? " admin-console__toggle--on" : ""}`}
       onClick={onToggle}
     >
+      <span className="admin-console__toggle-icon">
+        {active ? "☑" : "☐"}
+      </span>
       {label}
     </button>
   );
