@@ -15,8 +15,8 @@ export function createWindowGeometry(
   openCount: number,
   viewport = { width: window.innerWidth, height: window.innerHeight },
 ): WindowGeometry {
-  const w = Math.min(960, Math.max(480, viewport.width - 48));
-  const h = Math.min(640, Math.max(360, viewport.height - APP_MENU_HEIGHT - 48));
+  const w = Math.min(1200, Math.max(800, viewport.width - 96));
+  const h = Math.min(800, Math.max(500, viewport.height - APP_MENU_HEIGHT - 96));
   const maxX = Math.max(16, viewport.width - w - 16);
   const maxY = Math.max(16, viewport.height - h - APP_MENU_HEIGHT - 16);
 

@@ -6,6 +6,7 @@ import {
   type AppGrant,
   type ConsumeGrant,
 } from "@/api/admin";
+import "./admin.css";
 
 type IntegrationsSectionProps = {
   tenant: string;
@@ -53,25 +54,31 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
   const { bindings, grants, summary, effectiveAccess } = overviewQuery.data;
 
   return (
-    <section className="admin-section">
-      <h2 className="admin-section__title">Integrations &amp; grants</h2>
-      <p className="admin-section__lead">
+    <section>
+      <div className="admin-console__toolbar">
+        <h2 className="admin-console__title" style={{ fontSize: "1.125rem" }}>
+          Integrations &amp; grants
+        </h2>
+      </div>
+      <p className="admin-console__hint" style={{ marginBottom: "1rem" }}>
         Active IntegrationBindings are operator-wired. AppGrants are tenant-approved capability
         subsets synced to OpenFGA. Contract NetworkPolicies allow egress only for granted
         capabilities.
       </p>
 
-      <p className="admin-section__meta">
+      <p className="admin-console__mono" style={{ fontSize: "0.8125rem", color: "var(--gtn-ink-4)", marginBottom: "1.5rem" }}>
         {summary.bindingCount} binding{summary.bindingCount === 1 ? "" : "s"} ·{" "}
         {summary.grantCount} grant{summary.grantCount === 1 ? "" : "s"} ·{" "}
         {summary.grantReadyCount} OpenFGA-synced
       </p>
 
-      <h3 className="admin-section__subtitle">Effective access</h3>
+      <h3 className="admin-console__subtitle">Effective access</h3>
       {effectiveAccess.length === 0 ? (
-        <p>No integration bindings to preview.</p>
+        <p style={{ fontSize: "0.875rem", color: "var(--gtn-ink-4)", marginBottom: "1.5rem" }}>
+          No integration bindings to preview.
+        </p>
       ) : (
-        <table className="admin-table">
+        <table className="admin-console__table" style={{ marginBottom: "2rem" }}>
           <thead>
             <tr>
               <th>Contract</th>
@@ -107,11 +114,13 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
         </table>
       )}
 
-      <h3 className="admin-section__subtitle">Bindings</h3>
+      <h3 className="admin-console__subtitle">Bindings</h3>
       {bindings.length === 0 ? (
-        <p>No active integration bindings.</p>
+        <p style={{ fontSize: "0.875rem", color: "var(--gtn-ink-4)", marginBottom: "1.5rem" }}>
+          No active integration bindings.
+        </p>
       ) : (
-        <table className="admin-table">
+        <table className="admin-console__table" style={{ marginBottom: "2rem" }}>
           <thead>
             <tr>
               <th>Contract</th>
@@ -135,65 +144,98 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
         </table>
       )}
 
-      <h3 className="admin-section__subtitle">App grants</h3>
+      <h3 className="admin-console__subtitle">App grants</h3>
       {grants.length === 0 ? (
-        <p>No AppGrant objects yet (created when consumer bindings exist).</p>
+        <p style={{ fontSize: "0.875rem", color: "var(--gtn-ink-4)" }}>
+          No AppGrant objects yet (created when consumer bindings exist).
+        </p>
       ) : (
-        <ul className="admin-list">
-          {grants.map((grant) => (
-            <li key={grant.name} className="admin-list__item">
-              <div>
-                <strong>{grant.app}</strong> · phase {grant.phase || "Pending"}
-              </div>
-              <button
-                type="button"
-                className="admin-button"
-                onClick={() => setEditing(grant)}
-              >
-                Edit grant
-              </button>
-            </li>
-          ))}
-        </ul>
+        <table className="admin-console__table" style={{ maxWidth: "36rem", marginBottom: "2rem" }}>
+          <thead>
+            <tr>
+              <th>App</th>
+              <th>Phase</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {grants.map((grant) => (
+              <tr key={grant.name}>
+                <td style={{ fontWeight: 600 }}>{grant.app}</td>
+                <td>{grant.phase || "Pending"}</td>
+                <td style={{ textAlign: "right" }}>
+                  <button
+                    type="button"
+                    className="admin-console__btn"
+                    onClick={() => setEditing(grant)}
+                  >
+                    Edit grant
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
 
       {editing ? (
-        <div className="admin-modal">
-          <h3>Edit grant — {editing.app}</h3>
-          {editing.consume.map((entry, index) => (
-            <div key={entry.contract} className="admin-field">
-              <label htmlFor={`grant-${entry.contract}`}>
-                {entry.contract} capabilities (comma-separated)
-              </label>
-              <input
-                id={`grant-${entry.contract}`}
-                className="admin-input"
-                value={entry.granted.join(", ")}
-                onChange={(event) => {
-                  const granted = event.target.value
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean);
-                  const consume = editing.consume.map((c, i) =>
-                    i === index ? { ...c, granted } : c,
-                  ) satisfies ConsumeGrant[];
-                  setEditing({ ...editing, consume });
-                }}
-              />
+        <div className="admin-console__edit-panel" style={{ maxWidth: "36rem", marginTop: "1rem" }}>
+          <div className="admin-console__edit-panel-header">
+            <div>
+              <div style={{ fontWeight: 600, fontSize: "0.9375rem" }}>
+                Edit Grant
+              </div>
+              <div className="admin-console__mono" style={{ fontSize: "0.8125rem", color: "var(--gtn-ink-4)" }}>
+                {editing.app}
+              </div>
             </div>
-          ))}
-          <div className="admin-section__actions">
-            <button
-              type="button"
-              className="admin-button admin-button--primary"
-              disabled={saveMutation.isPending}
-              onClick={() => saveMutation.mutate(editing)}
+            <button type="button" className="admin-console__btn" onClick={() => setEditing(null)}>
+              ✕ Close
+            </button>
+          </div>
+
+          <div className="admin-console__edit-panel-body" style={{ padding: "1rem" }}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveMutation.mutate(editing);
+              }}
             >
-              Save
-            </button>
-            <button type="button" className="admin-button" onClick={() => setEditing(null)}>
-              Cancel
-            </button>
+              {editing.consume.map((entry, index) => (
+                <div key={entry.contract} className="admin-console__field" style={{ marginBottom: "1rem" }}>
+                  <label htmlFor={`grant-${entry.contract}`}>
+                    {entry.contract} capabilities (comma-separated)
+                  </label>
+                  <input
+                    id={`grant-${entry.contract}`}
+                    value={entry.granted.join(", ")}
+                    onChange={(event) => {
+                      const granted = event.target.value
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter(Boolean);
+                      const consume = editing.consume.map((c, i) =>
+                        i === index ? { ...c, granted } : c,
+                      ) satisfies ConsumeGrant[];
+                      setEditing({ ...editing, consume });
+                    }}
+                  />
+                </div>
+              ))}
+              <div className="admin-console__form-footer">
+                <button
+                  type="submit"
+                  className="admin-console__btn admin-console__btn--primary"
+                  style={{ marginRight: "0.5rem" }}
+                  disabled={saveMutation.isPending}
+                >
+                  {saveMutation.isPending ? "Saving…" : "Save"}
+                </button>
+                <button type="button" className="admin-console__btn" onClick={() => setEditing(null)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       ) : null}

@@ -93,17 +93,17 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
         <nav className="admin-console__tabs">
           <button
             type="button"
-            className={`admin-console__tab${tab === "members" ? " admin-console__tab--active" : ""}`}
-            onClick={() => setTab("members")}
-          >
-            Members
-          </button>
-          <button
-            type="button"
             className={`admin-console__tab${tab === "invitations" ? " admin-console__tab--active" : ""}`}
             onClick={() => setTab("invitations")}
           >
             Invitations
+          </button>
+          <button
+            type="button"
+            className={`admin-console__tab${tab === "members" ? " admin-console__tab--active" : ""}`}
+            onClick={() => setTab("members")}
+          >
+            Member
           </button>
           <button
             type="button"

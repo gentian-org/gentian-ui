@@ -1,10 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   inviteMember,
   type AdminGroup,
 } from "@/api/admin";
-import { apiFetch, type MeResponse, type ShellApp } from "@/api/client";
 import "./admin.css";
 
 type InvitationsSectionProps = {
@@ -84,22 +83,12 @@ export function InvitationsSection({
   const queryClient = useQueryClient();
   const tenantDomain = getTenantDomain(tenant);
 
-  // ── Derive installed app IDs ──────────────────────────────────────────────
-  const meQuery = useQuery({
-    queryKey: ["me"],
-    queryFn: () => apiFetch<MeResponse>("/session/me"),
-    staleTime: Infinity,
-  });
-  const shellApps: ShellApp[] = meQuery.data?.shellApps ?? [];
-
-  const isInstalled = (appId: string) => {
-    return shellApps.some((a) => a.id === appId || a.id.startsWith(appId + "-"));
-  };
-
-  // Only show entitlement groups for currently installed apps.
+  // ── Filter out admin-only app IDs from the visible entitlement groups ──────
   const visibleAppGroups = appEntitlementGroups.filter((g) => {
     const appId = appIdFromGroup(g.name);
-    return appId !== null && isInstalled(appId);
+    if (appId === null) return false;
+    const adminAppIds = ["app-store", "subscriptions", "gentian-subscriptions", "admin"];
+    return !adminAppIds.includes(appId);
   });
 
   // ── Default group selection: all app entitlement groups ON, others OFF ────
@@ -120,11 +109,11 @@ export function InvitationsSection({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Sync app defaults when visibleAppGroups or shellApps load/change.
+  // Initialize app defaults
   useEffect(() => {
     setForm((prev) => ({ ...prev, appGroupIds: defaultAppGroupIds() }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shellApps]);
+  }, [appEntitlementGroups]);
 
   // Handle name updates and auto-population of Login email
   const handleNameChange = (field: "firstName" | "lastName", val: string) => {
