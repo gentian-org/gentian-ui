@@ -43,16 +43,25 @@ export function useShellApps() {
 
   const apps = useMemo(() => {
     const list = shellAppsFromMe(me);
-    const order = ["admin", "app-store", "subscriptions", "gentian-subscriptions"];
     
-    const adminApps = list.filter((a) => order.includes(a.id));
-    const userApps = list.filter((a) => !order.includes(a.id));
+    const getSortIndex = (id: string) => {
+      if (id === "admin") return 0;
+      if (id === "app-store" || id.startsWith("app-store-")) return 1;
+      if (
+        id === "subscriptions" ||
+        id.startsWith("subscriptions-") ||
+        id === "gentian-subscriptions" ||
+        id.startsWith("gentian-subscriptions-")
+      ) {
+        return 2;
+      }
+      return -1;
+    };
     
-    adminApps.sort((a, b) => {
-      const idxA = order.indexOf(a.id);
-      const idxB = order.indexOf(b.id);
-      return idxA - idxB;
-    });
+    const adminApps = list.filter((a) => getSortIndex(a.id) !== -1);
+    const userApps = list.filter((a) => getSortIndex(a.id) === -1);
+    
+    adminApps.sort((a, b) => getSortIndex(a.id) - getSortIndex(b.id));
     
     return [...adminApps, ...userApps];
   }, [me]);
