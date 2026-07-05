@@ -11,7 +11,6 @@ import {
   type AdminGroup,
   type AdminMember,
 } from "@/api/admin";
-import { apiFetch, type MeResponse, type ShellApp } from "@/api/client";
 import "./admin.css";
 
 type MembersSectionProps = {
@@ -67,7 +66,6 @@ type MemberEditProps = {
   appEntitlementGroups: AdminGroup[];
   customGroups: AdminGroup[];
   assignableGroups: AdminGroup[];
-  installedAppIds: Set<string> | null;
   onClose: () => void;
   setGlobalSuccess: (msg: string | null) => void;
   setGlobalError: (msg: string | null) => void;
@@ -80,7 +78,6 @@ function MemberEditPanel({
   appEntitlementGroups,
   customGroups,
   assignableGroups,
-  installedAppIds,
   onClose,
   setGlobalSuccess,
   setGlobalError,
@@ -97,14 +94,13 @@ function MemberEditPanel({
   const toggleId = (ids: string[], id: string) =>
     ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
 
-  // Visible app groups (only installed apps).
-  const visibleAppGroups =
-    installedAppIds !== null
-      ? appEntitlementGroups.filter((g) => {
-          const appId = appIdFromGroup(g.name);
-          return appId !== null && installedAppIds.has(appId);
-        })
-      : appEntitlementGroups;
+  // Filter out admin-only app IDs from the visible entitlement groups
+  const visibleAppGroups = appEntitlementGroups.filter((g) => {
+    const appId = appIdFromGroup(g.name);
+    if (appId === null) return false;
+    const adminAppIds = ["app-store", "subscriptions", "gentian-subscriptions", "admin"];
+    return !adminAppIds.includes(appId);
+  });
 
   const recoveryMutation = useMutation({
     mutationFn: () =>
@@ -384,16 +380,6 @@ export function MembersSection({
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [globalSuccess, setGlobalSuccess] = useState<string | null>(null);
 
-  // Derive installed app IDs from the cached /session/me response.
-  const meQuery = useQuery({
-    queryKey: ["me"],
-    queryFn: () => apiFetch<MeResponse>("/session/me"),
-    staleTime: Infinity,
-  });
-  const shellApps: ShellApp[] = meQuery.data?.shellApps ?? [];
-  const installedAppIds: Set<string> | null =
-    shellApps.length > 0 ? new Set(shellApps.map((a) => a.id)) : null;
-
   const membersQuery = useQuery({
     queryKey: ["admin", "members", tenant],
     queryFn: () => fetchMembers(tenant),
@@ -421,7 +407,6 @@ export function MembersSection({
           appEntitlementGroups={appEntitlementGroups}
           customGroups={customGroups}
           assignableGroups={assignableGroups}
-          installedAppIds={installedAppIds}
           onClose={() => setEditingId(null)}
           setGlobalSuccess={setGlobalSuccess}
           setGlobalError={setGlobalError}
