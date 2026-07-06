@@ -195,3 +195,7 @@
   border-top: 1px solid var(--gtn-border);
   margin: 0.25rem 0;
 }
+
+.user-menu__item--bold {
+  font-weight: 700 !important;
+}
