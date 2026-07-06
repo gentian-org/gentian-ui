@@ -72,9 +72,17 @@ def _matrix_request(
     json_body: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
     detail: str,
+    verify: bool = True,
 ) -> dict[str, Any]:
     try:
-        response = httpx.request(method, url, json=json_body, headers=headers, timeout=15.0)
+        response = httpx.request(
+            method,
+            url,
+            json=json_body,
+            headers=headers,
+            timeout=15.0,
+            verify=verify,
+        )
     except httpx.HTTPError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -100,6 +108,7 @@ def _login_with_password(
     matrix_url: str,
     user_id: str,
     password: str,
+    verify: bool = True,
 ) -> dict[str, str]:
     payload = _matrix_request(
         "POST",
@@ -110,6 +119,7 @@ def _login_with_password(
             "password": password,
         },
         detail="Matrix bridge authentication failed",
+        verify=verify,
     )
     access_token = payload.get("access_token")
     if not isinstance(access_token, str) or not access_token:
@@ -134,6 +144,7 @@ def _ensure_matrix_user(
     *,
     display_name: str | None,
     password: str,
+    verify: bool = True,
 ) -> None:
     body: dict[str, Any] = {"password": password, "admin": False}
     if display_name:
@@ -144,6 +155,7 @@ def _ensure_matrix_user(
         json_body=body,
         headers={"Authorization": f"Bearer {admin_token}"},
         detail="Could not prepare Matrix account",
+        verify=verify,
     )
 
 
@@ -165,8 +177,14 @@ def create_matrix_session(
     bridge_id = bridge_user_id(tenant, settings.kernel_domain)
     bridge_password = _bridge_password(settings)
     portal_password = secrets.token_urlsafe(24)
+    verify = settings.is_production
 
-    admin_token = _login_with_password(matrix_url, bridge_id, bridge_password)["accessToken"]
+    admin_token = _login_with_password(
+        matrix_url,
+        bridge_id,
+        bridge_password,
+        verify=verify,
+    )["accessToken"]
     display_name = str(claims.get("name") or "").strip() or None
     _ensure_matrix_user(
         matrix_url,
@@ -174,8 +192,9 @@ def create_matrix_session(
         user_id,
         display_name=display_name,
         password=portal_password,
+        verify=verify,
     )
-    login = _login_with_password(matrix_url, user_id, portal_password)
+    login = _login_with_password(matrix_url, user_id, portal_password, verify=verify)
 
     session = {
         "homeServerUrl": matrix_url,
