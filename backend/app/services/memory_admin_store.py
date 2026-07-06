@@ -184,7 +184,13 @@ class MemoryAdminStore:
     async def create_group(self, realm: str, *, name: str) -> Group:
         self._ensure_realm(realm)
         group_id = str(uuid.uuid4())
-        group = Group(id=group_id, name=name, path=f"/{name}")
+        group = Group(
+            id=group_id,
+            name=name,
+            path=f"/{name}",
+            gentian_odoo_modules=[],
+            gentian_odoo_group_roles=[],
+        )
         self._groups[realm][group_id] = group
         return deepcopy(group)
 
@@ -195,10 +201,22 @@ class MemoryAdminStore:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
         return deepcopy(group)
 
-    async def update_group(self, realm: str, group_id: str, *, name: str) -> Group:
+    async def update_group(
+        self,
+        realm: str,
+        group_id: str,
+        *,
+        name: str,
+        gentian_odoo_modules: list[str] | None = None,
+        gentian_odoo_group_roles: list[str] | None = None,
+    ) -> Group:
         group = await self.get_group(realm, group_id)
         group.name = name
         group.path = f"/{name}"
+        if gentian_odoo_modules is not None:
+            group.gentian_odoo_modules = gentian_odoo_modules
+        if gentian_odoo_group_roles is not None:
+            group.gentian_odoo_group_roles = gentian_odoo_group_roles
         self._groups[realm][group_id] = group
         return deepcopy(group)
 

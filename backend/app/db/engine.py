@@ -26,7 +26,15 @@ def init_portal_database(database_url: str) -> None:
     global _engine, _session_factory
     if _engine is not None:
         return
-    _engine = create_engine(database_url, pool_pre_ping=True)
+    if database_url.startswith("sqlite"):
+        from sqlalchemy.pool import StaticPool
+        _engine = create_engine(
+            database_url,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+    else:
+        _engine = create_engine(database_url, pool_pre_ping=True)
     Base.metadata.create_all(_engine)
     _session_factory = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
 

@@ -24,18 +24,27 @@ def test_oidc_realm_base_url_prefers_internal_keycloak():
 
 def test_validate_client_id_accepts_azp():
     claims = {"azp": "gentian-portal"}
-    _validate_client_id(claims, "gentian-portal")
+    settings = Settings()
+    settings.oidc_client_id = "gentian-portal"
+    settings.portal_bff_client_id = "gentian-portal-bff"
+    _validate_client_id(claims, settings)
 
 
 def test_validate_client_id_accepts_audience_list():
     claims = {"aud": ["account", "gentian-portal"]}
-    _validate_client_id(claims, "gentian-portal")
+    settings = Settings()
+    settings.oidc_client_id = "gentian-portal"
+    settings.portal_bff_client_id = "gentian-portal-bff"
+    _validate_client_id(claims, settings)
 
 
 def test_validate_client_id_rejects_wrong_client():
     claims = {"azp": "other-client"}
+    settings = Settings()
+    settings.oidc_client_id = "gentian-portal"
+    settings.portal_bff_client_id = "gentian-portal-bff"
     with pytest.raises(jwt.InvalidAudienceError):
-        _validate_client_id(claims, "gentian-portal")
+        _validate_client_id(claims, settings)
 
 
 def test_issuer_allowed_accepts_kernel_and_tenant_realms():

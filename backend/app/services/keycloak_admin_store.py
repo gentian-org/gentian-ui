@@ -277,7 +277,14 @@ class KeycloakAdminStore:
 
     async def list_groups(self, realm: str) -> list[Group]:
         raw = await self._request("GET", f"/admin/realms/{quote(realm, safe='')}/groups", params={"max": "1000"})
-        return [self._group_from_raw(item) for item in raw]
+        import asyncio
+        async def fetch_group(item):
+            try:
+                detail = await self._request("GET", f"/admin/realms/{quote(realm, safe='')}/groups/{item['id']}")
+                return self._group_from_raw(detail)
+            except Exception:
+                return self._group_from_raw(item)
+        return await asyncio.gather(*(fetch_group(item) for item in raw))
 
     async def create_group(self, realm: str, *, name: str) -> Group:
         await self._request(
@@ -295,9 +302,25 @@ class KeycloakAdminStore:
         raw = await self._request("GET", f"/admin/realms/{quote(realm, safe='')}/groups/{group_id}")
         return self._group_from_raw(raw)
 
-    async def update_group(self, realm: str, group_id: str, *, name: str) -> Group:
+    async def update_group(
+        self,
+        realm: str,
+        group_id: str,
+        *,
+        name: str,
+        gentian_odoo_modules: list[str] | None = None,
+        gentian_odoo_group_roles: list[str] | None = None,
+    ) -> Group:
         current = await self._request("GET", f"/admin/realms/{quote(realm, safe='')}/groups/{group_id}")
         current["name"] = name
+        
+        attributes = current.setdefault("attributes", {})
+        if gentian_odoo_modules is not None:
+            attributes["gentianOdooModules"] = [",".join(gentian_odoo_modules)]
+        if gentian_odoo_group_roles is not None:
+            import json
+            attributes["gentianOdooGroupRoles"] = [json.dumps(gentian_odoo_group_roles)]
+            
         await self._request(
             "PUT",
             f"/admin/realms/{quote(realm, safe='')}/groups/{group_id}",
@@ -709,11 +732,43 @@ class KeycloakAdminStore:
 
     @staticmethod
     def _group_from_raw(raw: dict[str, Any]) -> Group:
+        attributes = raw.get("attributes") or {}
+        
+        modules_val = attributes.get("gentianOdooModules") or []
+        modules = []
+        for val in modules_val:
+            if isinstance(val, str):
+                modules.extend([m.strip() for m in val.split(",") if m.strip()])
+            else:
+                modules.append(str(val))
+        
+        roles_val = attributes.get("gentianOdooGroupRoles") or []
+        roles = []
+        for val in roles_val:
+            if isinstance(val, str):
+                val_str = val.strip()
+                if val_str.startswith("[") and val_str.endswith("]"):
+                    import json
+                    try:
+                        parsed = json.loads(val_str)
+                        if isinstance(parsed, list):
+                            roles.extend([str(r).strip() for r in parsed if r])
+                        else:
+                            roles.append(str(parsed).strip())
+                    except Exception:
+                        roles.append(val_str)
+                else:
+                    roles.extend([r.strip() for r in val_str.split(",") if r.strip()])
+            else:
+                roles.append(str(val))
+
         return Group(
             id=raw["id"],
             name=raw.get("name") or "",
             path=raw.get("path") or raw.get("name") or "",
             member_count=int(raw.get("subGroupCount") or 0),
+            gentian_odoo_modules=modules,
+            gentian_odoo_group_roles=roles,
         )
 
     @staticmethod

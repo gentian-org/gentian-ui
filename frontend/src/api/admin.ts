@@ -28,6 +28,8 @@ export type AdminGroup = {
   name: string;
   path: string;
   memberCount: number;
+  gentianOdooModules?: string[];
+  gentianOdooGroupRoles?: string[];
 };
 
 function tenantQuery(tenant?: string) {
@@ -134,10 +136,16 @@ export function createGroup(name: string, tenant?: string) {
   });
 }
 
-export function updateGroup(id: string, name: string, tenant?: string) {
+export function updateGroup(
+  id: string,
+  name: string,
+  gentianOdooModules?: string[],
+  gentianOdooGroupRoles?: string[],
+  tenant?: string,
+) {
   return apiFetch<AdminGroup>(`/admin/groups/${id}${tenantQuery(tenant)}`, {
     method: "PATCH",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, gentianOdooModules, gentianOdooGroupRoles }),
   });
 }
 

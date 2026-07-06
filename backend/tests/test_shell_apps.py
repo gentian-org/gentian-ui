@@ -138,8 +138,9 @@ def test_member_does_not_see_admin_app_tile():
     )
 
 
-def test_shell_apps_for_tenant_admin_includes_admin_and_app_store_only():
+async def test_shell_apps_for_tenant_admin_includes_admin_and_app_store_only():
     settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    settings.auth_disabled = False
     user = {
         "preferred_username": "admin-demo",
         "tenant": "demo",
@@ -164,7 +165,7 @@ def test_shell_apps_for_tenant_admin_includes_admin_and_app_store_only():
             == "true",
         ),
     ):
-        apps = shell_apps_for_user(user, settings)
+        apps = await shell_apps_for_user(user, settings)
 
     assert [app["id"] for app in apps] == ["app-store-app-store", "admin"]
     assert all(app["id"] != "element-element" for app in apps)
@@ -172,8 +173,9 @@ def test_shell_apps_for_tenant_admin_includes_admin_and_app_store_only():
     assert store_app["authMode"] is None
 
 
-def test_shell_apps_for_member_includes_entitled_app():
+async def test_shell_apps_for_member_includes_entitled_app():
     settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    settings.auth_disabled = False
     user = {
         "preferred_username": "john-doe@demo.desk.gentian.org",
         "tenant": "demo",
@@ -187,7 +189,7 @@ def test_shell_apps_for_member_includes_entitled_app():
         patch("app.core.shell_apps.get_app_profile", return_value=ELEMENT_PROFILE),
         patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
-        apps = shell_apps_for_user(user, settings)
+        apps = await shell_apps_for_user(user, settings)
     assert apps == [
         {
             "id": "element-element",
@@ -201,8 +203,9 @@ def test_shell_apps_for_member_includes_entitled_app():
     ]
 
 
-def test_shell_apps_for_openproject_uses_bridge_auth_mode():
+async def test_shell_apps_for_openproject_uses_bridge_auth_mode():
     settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    settings.auth_disabled = False
     user = {
         "preferred_username": "john-doe@demo.desk.gentian.org",
         "tenant": "demo",
@@ -216,7 +219,7 @@ def test_shell_apps_for_openproject_uses_bridge_auth_mode():
         patch("app.core.shell_apps.get_app_profile", return_value=OPENPROJECT_PROFILE),
         patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
-        apps = shell_apps_for_user(user, settings)
+        apps = await shell_apps_for_user(user, settings)
     assert apps == [
         {
             "id": "openproject-openproject",
@@ -230,8 +233,9 @@ def test_shell_apps_for_openproject_uses_bridge_auth_mode():
     ]
 
 
-def test_shell_apps_for_member_without_entitlement_empty():
+async def test_shell_apps_for_member_without_entitlement_empty():
     settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    settings.auth_disabled = False
     user = {
         "preferred_username": "member-demo",
         "tenant": "demo",
@@ -255,5 +259,48 @@ def test_shell_apps_for_member_without_entitlement_empty():
         patch("app.core.shell_apps.get_app_profile", return_value=element_profile),
         patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
-        apps = shell_apps_for_user(user, settings)
+        apps = await shell_apps_for_user(user, settings)
     assert apps == []
+
+
+async def test_shell_apps_for_odoo_module_visibility():
+    settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    settings.auth_disabled = False
+    user = {
+        "preferred_username": "crm-user@demo.desk.gentian.org",
+        "tenant": "demo",
+        "groups": ["/sales-team"],
+    }
+    
+    crm_profile = {
+        "metadata": {"name": "odoo-cb-crm"},
+        "spec": {
+            "displayName": "Odoo CRM",
+            "ingress": {"subDomain": "erp"},
+            "portalTiles": [{"name": "crm", "allowedGroup": "App Users"}],
+        }
+    }
+    
+    # Mock AdminStore list_groups
+    from unittest.mock import AsyncMock
+    from app.services.admin_store import Group
+    
+    mock_store = AsyncMock()
+    mock_store.list_groups.return_value = [
+        Group(
+            id="g1",
+            name="sales-team",
+            path="/sales-team",
+            gentian_odoo_modules=["crm"],
+        )
+    ]
+    
+    with (
+        patch("app.core.shell_apps.list_installed_profiles", return_value=["odoo-cb-crm"]),
+        patch("app.core.shell_apps.get_app_profile", return_value=crm_profile),
+        patch("app.core.shell_apps.is_platform_app", return_value=False),
+    ):
+        apps = await shell_apps_for_user(user, settings, store=mock_store)
+        
+    assert len(apps) == 1
+    assert apps[0]["id"] == "odoo-cb-crm-crm"

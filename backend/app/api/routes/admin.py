@@ -75,6 +75,8 @@ class GroupResponse(BaseModel):
     name: str
     path: str
     memberCount: int = 0
+    gentianOdooModules: list[str] = Field(default_factory=list)
+    gentianOdooGroupRoles: list[str] = Field(default_factory=list)
 
 
 class AdminContextResponse(BaseModel):
@@ -124,6 +126,8 @@ class GroupCreateRequest(BaseModel):
 
 class GroupUpdateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+    gentianOdooModules: list[str] | None = None
+    gentianOdooGroupRoles: list[str] | None = None
 
 
 class MemberGroupsUpdateRequest(BaseModel):
@@ -257,6 +261,8 @@ def _group_response(group: Any) -> GroupResponse:
         name=group.name,
         path=group.path,
         memberCount=group.member_count,
+        gentianOdooModules=getattr(group, "gentian_odoo_modules", []),
+        gentianOdooGroupRoles=getattr(group, "gentian_odoo_group_roles", []),
     )
 
 
@@ -875,7 +881,13 @@ async def update_group(
     if is_system_tenant_group(existing.name, resolved):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System groups cannot be renamed")
     name = _validate_group_name(body.name, resolved, settings)
-    group = await store.update_group(realm, group_id, name=name)
+    group = await store.update_group(
+        realm,
+        group_id,
+        name=name,
+        gentian_odoo_modules=body.gentianOdooModules,
+        gentian_odoo_group_roles=body.gentianOdooGroupRoles,
+    )
     await record_admin_audit(
         user,
         tenant=resolved,

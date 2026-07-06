@@ -46,6 +46,6 @@ def test_tenant_privilege_group_helpers():
     app_admins = tenant_app_admins_group(tenant)
     assert is_privilege_group(app_admins, tenant)
     assert is_system_tenant_group(app_admins, tenant)
-    assert is_admin_managed_group(app_admins, tenant)
+    assert is_admin_managed_group(app_admins, tenant, kernel_realm="kernel")
     assert is_app_entitlement_group("gentian:tenant:demo:app:nextcloud", tenant)
     assert not is_app_entitlement_group(app_admins, tenant)

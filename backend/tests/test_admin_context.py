@@ -8,12 +8,15 @@ from app.core.config import Settings
 
 
 def _settings(**overrides) -> Settings:
-    return Settings(
+    s = Settings(
         ENVIRONMENT="local",
         KERNEL_DOMAIN="desk.gentian.org",
-        AUTH_DISABLED=False,
-        **overrides,
     )
+    s.auth_disabled = overrides.get("auth_disabled", overrides.get("AUTH_DISABLED", False))
+    for k, v in overrides.items():
+        if k.upper() != "AUTH_DISABLED":
+            setattr(s, k.lower(), v)
+    return s
 
 
 def test_tenant_admin_scoped_to_own_tenant():

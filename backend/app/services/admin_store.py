@@ -36,6 +36,8 @@ class Group:
     name: str
     path: str
     member_count: int = 0
+    gentian_odoo_modules: list[str] = field(default_factory=list)
+    gentian_odoo_group_roles: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -107,7 +109,15 @@ class AdminStore(Protocol):
 
     async def get_group(self, realm: str, group_id: str) -> Group: ...
 
-    async def update_group(self, realm: str, group_id: str, *, name: str) -> Group: ...
+    async def update_group(
+        self,
+        realm: str,
+        group_id: str,
+        *,
+        name: str,
+        gentian_odoo_modules: list[str] | None = None,
+        gentian_odoo_group_roles: list[str] | None = None,
+    ) -> Group: ...
 
     async def delete_group(self, realm: str, group_id: str) -> None: ...
 

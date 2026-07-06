@@ -14,6 +14,7 @@ from app.core.gentian_groups import (
     user_is_platform_admin,
 )
 from app.core.tenant import extract_tenant_from_claims
+from app.services.admin_store import AdminStore
 from app.services.k8s_catalogue import get_app_profile, is_platform_app, list_installed_profiles
 
 ADMIN_SHELL_APP = {
@@ -142,9 +143,10 @@ def _profiles_for_shell_tiles(tenant: str, *, is_admin: bool) -> list[str]:
     return profiles
 
 
-def tenant_shell_apps(
+async def tenant_shell_apps(
     user: dict[str, Any],
     settings: Settings,
+    store: AdminStore | None = None,
     *,
     groups: list[str],
     is_admin: bool,
@@ -166,14 +168,40 @@ def tenant_shell_apps(
         if not portal_tiles:
             continue
         for portal_tile in portal_tiles:
-            if not user_can_see_portal_tile(
-                groups,
-                tenant=tenant,
-                profile=profile_name,
-                allowed_group=str(portal_tile.get("allowedGroup") or ""),
-                is_admin=is_admin,
-            ):
-                continue
+            is_odoo_module = profile_name.startswith("odoo-cb-") and profile_name != "odoo-cb-base"
+            if is_odoo_module and not is_admin:
+                module_name = profile_name.removeprefix("odoo-cb-")
+                realm = f"tenant-{tenant}"
+                all_kc_groups = []
+                if store is not None:
+                    try:
+                        all_kc_groups = await store.list_groups(realm)
+                    except Exception:
+                        pass
+                
+                user_group_paths = {g.lstrip("/") for g in groups}
+                user_kc_groups = [
+                    g for g in all_kc_groups
+                    if g.path.lstrip("/") in user_group_paths or g.name in user_group_paths
+                ]
+                
+                has_grant = False
+                for g in user_kc_groups:
+                    if "*" in g.gentian_odoo_modules or module_name in g.gentian_odoo_modules:
+                        has_grant = True
+                        break
+                
+                if not has_grant:
+                    continue
+            else:
+                if not user_can_see_portal_tile(
+                    groups,
+                    tenant=tenant,
+                    profile=profile_name,
+                    allowed_group=str(portal_tile.get("allowedGroup") or ""),
+                    is_admin=is_admin,
+                ):
+                    continue
             tile_name = str(portal_tile.get("name") or profile_name)
             app_id = f"{profile_name}-{tile_name}"
             if app_id in seen:
@@ -201,7 +229,11 @@ def tenant_shell_apps(
     return apps
 
 
-def shell_apps_for_user(user: dict[str, Any], settings: Settings) -> list[dict[str, Any]]:
+async def shell_apps_for_user(
+    user: dict[str, Any],
+    settings: Settings,
+    store: AdminStore | None = None,
+) -> list[dict[str, Any]]:
     groups = normalize_groups(user)
     if settings.auth_disabled:
         groups = groups or ["gentian:tenant:demo:admins", "gentian:tenant:demo:members"]
@@ -212,7 +244,7 @@ def shell_apps_for_user(user: dict[str, Any], settings: Settings) -> list[dict[s
         or is_bootstrap_tenant_admin(user)
     )
 
-    apps = tenant_shell_apps(user, settings, groups=groups, is_admin=is_admin)
+    apps = await tenant_shell_apps(user, settings, store, groups=groups, is_admin=is_admin)
     if is_admin:
         apps.append(dict(ADMIN_SHELL_APP))
     return apps

@@ -45,7 +45,15 @@ def ensure_tenant_database(tenant: str, settings: Settings | None = None) -> Non
         if engine is None:
             from sqlalchemy import create_engine
 
-            engine = create_engine(database_url, pool_pre_ping=True)
+            if database_url.startswith("sqlite"):
+                from sqlalchemy.pool import StaticPool
+                engine = create_engine(
+                    database_url,
+                    connect_args={"check_same_thread": False},
+                    poolclass=StaticPool,
+                )
+            else:
+                engine = create_engine(database_url, pool_pre_ping=True)
             _engines[tenant] = engine
             _session_factories[tenant] = sessionmaker(bind=engine, autoflush=False, autocommit=False)
         Base.metadata.create_all(engine)
