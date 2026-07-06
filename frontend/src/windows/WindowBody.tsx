@@ -43,7 +43,7 @@ export function WindowBody({ win, onIframeLoad }: WindowBodyProps) {
       title={win.title}
       src={win.url}
       className="shell-window__body"
-      allow="geolocation; microphone; camera; encrypted-media; storage-access *"
+      allow="geolocation; microphone; camera; encrypted-media; storage-access *; notifications"
       onLoad={onIframeLoad}
     />
   );

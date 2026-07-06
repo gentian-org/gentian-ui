@@ -9,7 +9,7 @@ export function IframeContent({ title, url }: IframeContentProps) {
       title={title}
       src={url}
       className="h-full w-full border-0"
-      allow="geolocation; microphone; camera; encrypted-media; storage-access *"
+      allow="geolocation; microphone; camera; encrypted-media; storage-access *; notifications"
     />
   );
 }

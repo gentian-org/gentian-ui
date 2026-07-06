@@ -14,7 +14,7 @@ export function MobileAppLayer({ url, title }: MobileAppLayerProps) {
         title={title}
         src={url}
         className="h-full w-full flex-1 border-0 bg-white"
-        allow="geolocation; microphone; camera; encrypted-media; storage-access *"
+        allow="geolocation; microphone; camera; encrypted-media; storage-access *; notifications"
       />
     </div>
   );
