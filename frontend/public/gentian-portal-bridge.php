@@ -23,6 +23,13 @@ function gentian_bridge_landing(string $username): string
 {
     $default = '/apps/files/';
     $open = isset($_GET['open']) ? (string) $_GET['open'] : '';
+    $app = isset($_GET['app']) ? (string) $_GET['app'] : '';
+
+    if ($app !== '') {
+        if (preg_match('/^[a-zA-Z0-9_-]+$/', $app)) {
+            return '/apps/' . $app . '/';
+        }
+    }
 
     $types = [
         'document' => [
