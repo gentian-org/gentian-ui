@@ -171,7 +171,8 @@ async def tenant_shell_apps(
             is_odoo_module = profile_name.startswith("odoo-cb-") and profile_name != "odoo-cb-base"
             if is_odoo_module and not is_admin:
                 module_name = profile_name.removeprefix("odoo-cb-")
-                realm = f"tenant-{tenant}"
+                from app.services.keycloak_user_groups import realm_from_issuer
+                realm = realm_from_issuer(user.get("iss") or "") or f"tenant-{tenant}"
                 all_kc_groups = []
                 if store is not None:
                     try:
