@@ -207,8 +207,15 @@ async def tenant_shell_apps(
             app_id = f"{profile_name}-{tile_name}"
             if app_id in seen:
                 continue
+            url_spec = spec
+            if not spec.get("ingress") and not spec.get("apiIntegration"):
+                req_profile_name = profile.get("metadata", {}).get("annotations", {}).get("gentianos.io/requires-profile")
+                if req_profile_name:
+                    base_profile = get_app_profile(req_profile_name)
+                    if base_profile and base_profile.get("spec"):
+                        url_spec = base_profile["spec"]
             launch_url = app_launch_url(
-                spec,
+                url_spec,
                 tenant=tenant,
                 kernel_domain=settings.kernel_domain,
                 link_suffix=str(portal_tile.get("linkSuffix") or ""),

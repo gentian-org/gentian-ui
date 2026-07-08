@@ -320,13 +320,29 @@ async def test_shell_apps_for_odoo_module_visibility():
     }
     
     crm_profile = {
-        "metadata": {"name": "odoo-cb-crm"},
+        "metadata": {
+            "name": "odoo-cb-crm",
+            "annotations": {"gentianos.io/requires-profile": "odoo-cb-base"},
+        },
         "spec": {
             "displayName": "Odoo CRM",
-            "ingress": {"subDomain": "erp"},
             "portalTiles": [{"name": "crm", "allowedGroup": "App Users"}],
         }
     }
+    
+    base_profile = {
+        "metadata": {"name": "odoo-cb-base"},
+        "spec": {
+            "ingress": {"subDomain": "erp"},
+        }
+    }
+    
+    def fake_profile(name: str):
+        if name == "odoo-cb-crm":
+            return crm_profile
+        if name == "odoo-cb-base":
+            return base_profile
+        return None
     
     # Mock AdminStore list_groups
     from unittest.mock import AsyncMock
@@ -344,10 +360,11 @@ async def test_shell_apps_for_odoo_module_visibility():
     
     with (
         patch("app.core.shell_apps.list_installed_profiles", return_value=["odoo-cb-crm"]),
-        patch("app.core.shell_apps.get_app_profile", return_value=crm_profile),
+        patch("app.core.shell_apps.get_app_profile", side_effect=fake_profile),
         patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings, store=mock_store)
         
     assert len(apps) == 1
     assert apps[0]["id"] == "odoo-cb-crm-crm"
+    assert apps[0]["launchUrl"] == "https://erp.demo.desk.gentian.org"
