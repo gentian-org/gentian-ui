@@ -23,15 +23,17 @@ type DesktopShortcutsProps = {
 };
 
 export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: DesktopShortcutsProps) {
-  const { customPrefs, updateCustomPrefs } = usePrefsStore();
+  const rawTiles = usePrefsStore((s) => s.customPrefs.desktopTiles);
+  const rawCustomizations = usePrefsStore((s) => s.customPrefs.tileCustomizations);
+  const updateCustomPrefs = usePrefsStore((s) => s.updateCustomPrefs);
+
+  const tiles = rawTiles || [];
+  const customizations = rawCustomizations || {};
   const [editingTile, setEditingTile] = useState<DesktopTile | null>(null);
   const [isCreatingLink, setIsCreatingLink] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; tile?: DesktopTile } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const tiles = customPrefs.desktopTiles || [];
-  const customizations = customPrefs.tileCustomizations || {};
 
   // Close context menu on click
   useEffect(() => {

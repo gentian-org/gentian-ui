@@ -9,8 +9,8 @@ type AppMenuSlotProps = {
 };
 
 export function AppMenuSlot({ app, isActive, onSelect }: AppMenuSlotProps) {
-  const tileCustomizations = usePrefsStore((s) => s.customPrefs.tileCustomizations || {});
-  const custom = tileCustomizations[app.id];
+  const customizations = usePrefsStore((s) => s.customPrefs.tileCustomizations);
+  const custom = customizations?.[app.id];
   const displayTitle = custom?.title || app.title;
   const displayIcon = custom?.icon || app.icon;
 

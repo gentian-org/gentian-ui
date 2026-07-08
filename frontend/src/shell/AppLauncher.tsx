@@ -9,7 +9,7 @@ type AppLauncherProps = {
 };
 
 export function AppLauncher({ apps, onSelect, onClose }: AppLauncherProps) {
-  const tileCustomizations = usePrefsStore((s) => s.customPrefs.tileCustomizations || {});
+  const customizations = usePrefsStore((s) => s.customPrefs.tileCustomizations);
 
   return (
     <div
@@ -26,7 +26,7 @@ export function AppLauncher({ apps, onSelect, onClose }: AppLauncherProps) {
       <div className="app-launcher__panel">
         <div className="app-launcher__grid">
           {apps.map((app) => {
-            const custom = tileCustomizations[app.id];
+            const custom = customizations?.[app.id];
             const displayTitle = custom?.title || app.title;
             const displayIcon = custom?.icon || app.icon;
 
