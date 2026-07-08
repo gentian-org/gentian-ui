@@ -57,6 +57,8 @@ def ensure_tenant_database(tenant: str, settings: Settings | None = None) -> Non
             _engines[tenant] = engine
             _session_factories[tenant] = sessionmaker(bind=engine, autoflush=False, autocommit=False)
         Base.metadata.create_all(engine)
+        from app.db.engine import migrate_database_add_prefs_json
+        migrate_database_add_prefs_json(engine)
         _initialized_tenants.add(tenant)
 
 

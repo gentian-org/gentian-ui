@@ -21,6 +21,18 @@ _engine: Engine | None = None
 _session_factory: sessionmaker[Session] | None = None
 
 
+def migrate_database_add_prefs_json(engine) -> None:
+    from sqlalchemy import text
+    try:
+        with engine.begin() as conn:
+            if "postgresql" in str(engine.url):
+                conn.execute(text("ALTER TABLE user_shell_prefs ADD COLUMN IF NOT EXISTS prefs_json JSONB"))
+            else:
+                conn.execute(text("ALTER TABLE user_shell_prefs ADD COLUMN prefs_json JSON"))
+    except Exception:
+        pass
+
+
 def init_portal_database(database_url: str) -> None:
     """Create engine and portal persistence tables if they do not exist."""
     global _engine, _session_factory
@@ -36,6 +48,7 @@ def init_portal_database(database_url: str) -> None:
     else:
         _engine = create_engine(database_url, pool_pre_ping=True)
     Base.metadata.create_all(_engine)
+    migrate_database_add_prefs_json(_engine)
     _session_factory = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
 
 

@@ -46,7 +46,7 @@ export function DesktopPage() {
 
   useEffect(() => {
     void loadPrefs();
-  }, [loadPrefs]);
+  }, []);
 
   useEffect(() => {
     const builtinIds = ["admin", "account", "settings"] as const;
