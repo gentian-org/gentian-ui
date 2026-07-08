@@ -88,7 +88,7 @@ def profile_auth_mode(profile_spec: dict[str, Any], profile_name: str) -> str | 
     if identity.get("oidc"):
         if profile_name == "element":
             return "matrix-bridge"
-        if profile_name == "nextcloud":
+        if profile_name == "nextcloud" or profile_name.startswith("nextcloud-"):
             return "nextcloud-bridge"
         if profile_name == "openproject":
             return "openproject-bridge"

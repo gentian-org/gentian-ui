@@ -233,6 +233,53 @@ async def test_shell_apps_for_openproject_uses_bridge_auth_mode():
     ]
 
 
+async def test_shell_apps_for_nextcloud_uses_bridge_auth_mode():
+    settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    settings.auth_disabled = False
+    user = {
+        "preferred_username": "john-doe@demo.desk.gentian.org",
+        "tenant": "demo",
+        "groups": [
+            "gentian:tenant:demo:members",
+            "gentian:tenant:demo:app:nextcloud-office",
+        ],
+    }
+    nextcloud_profile = {
+        "metadata": {"name": "nextcloud-office"},
+        "spec": {
+            "displayName": "Nextcloud Office",
+            "ingress": {"subDomain": "cloud"},
+            "tile": {"icon": "files"},
+            "kernelRequirements": {"identity": {"oidc": {"clientId": "gentian-nextcloud-office"}}},
+            "portalTiles": [
+                {
+                    "name": "nextcloud-office",
+                    "displayName": {"en_US": "Files"},
+                    "allowedGroup": "App Users",
+                    "linkTarget": "embedded",
+                }
+            ],
+        },
+    }
+    with (
+        patch("app.core.shell_apps.list_installed_profiles", return_value=["nextcloud-office"]),
+        patch("app.core.shell_apps.get_app_profile", return_value=nextcloud_profile),
+        patch("app.core.shell_apps.is_platform_app", return_value=False),
+    ):
+        apps = await shell_apps_for_user(user, settings)
+    assert apps == [
+        {
+            "id": "nextcloud-office-nextcloud-office",
+            "title": "Files",
+            "icon": "files",
+            "launchUrl": "https://cloud.demo.desk.gentian.org",
+            "linkTarget": "embedded",
+            "authMode": "nextcloud-bridge",
+            "builtin": False,
+        }
+    ]
+
+
 async def test_shell_apps_for_member_without_entitlement_empty():
     settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
     settings.auth_disabled = False
