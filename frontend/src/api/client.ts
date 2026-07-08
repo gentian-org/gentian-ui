@@ -73,4 +73,5 @@ export type PrefsResponse = {
   theme: unknown;
   hasBackground: boolean;
   backgroundUrl: string | null;
+  customPrefs?: Record<string, any>;
 };

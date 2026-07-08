@@ -50,3 +50,10 @@ export async function fetchBackgroundBlob(): Promise<Blob> {
   }
   return response.blob();
 }
+
+export async function savePrefs(data: Record<string, any>): Promise<void> {
+  await apiFetch<void>("/prefs/", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}

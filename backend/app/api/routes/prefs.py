@@ -25,7 +25,27 @@ def get_prefs(user: dict = Depends(get_current_user), settings: Settings = Depen
         "theme": None,
         "hasBackground": summary.has_background,
         "backgroundUrl": f"{settings.api_v1_str}/prefs/background" if summary.has_background else None,
+        "customPrefs": summary.prefs_json,
     }
+
+
+@router.put("/", status_code=status.HTTP_204_NO_CONTENT)
+def update_custom_prefs(
+    data: dict,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> None:
+    tenant = resolve_user_context(user, settings)
+    user_sub = str(user.get("sub") or "anonymous")
+    from app.db.tenant_engine import get_tenant_db_session
+    from app.models.user_shell_prefs import UserShellPrefsRow
+    with get_tenant_db_session(tenant) as session:
+        row = session.get(UserShellPrefsRow, {"user_sub": user_sub, "tenant": tenant})
+        if row is None:
+            row = UserShellPrefsRow(user_sub=user_sub, tenant=tenant)
+            session.add(row)
+        row.prefs_json = data
+
 
 
 @router.get("/background")

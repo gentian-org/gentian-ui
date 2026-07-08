@@ -761,3 +761,387 @@
   background: var(--gtn-50);
 }
 
+/* Desktop shortcuts container */
+.desktop-shortcuts-container {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.desktop-tile-wrapper {
+  position: absolute;
+  width: 92px;
+  height: 98px;
+  user-select: none;
+}
+
+.desktop-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  background: rgba(236, 232, 223, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--gtn-r2);
+  cursor: grab;
+  text-align: center;
+  transition: background var(--gtn-dur-2) var(--gtn-ease-out), box-shadow var(--gtn-dur-2), transform var(--gtn-dur-1) var(--gtn-ease-out);
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.desktop-tile:hover {
+  background: rgba(236, 232, 223, 0.35);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 12px rgba(20, 21, 46, 0.1);
+}
+
+.desktop-tile:active {
+  cursor: grabbing;
+  transform: scale(0.95);
+}
+
+.desktop-tile__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--gtn-r2);
+  object-fit: cover;
+  box-shadow: 0 2px 6px rgba(20, 21, 46, 0.15);
+}
+
+.desktop-tile__label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--gtn-ink-1);
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8), 0 0 4px rgba(255, 255, 255, 0.5);
+}
+
+/* Edit button on hover */
+.desktop-tile__edit-btn {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gtn-paper-3);
+  border: 1px solid var(--gtn-border);
+  border-radius: 50%;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--gtn-dur-2);
+  color: var(--gtn-ink-2);
+  box-shadow: 0 1px 3px rgba(20, 21, 46, 0.15);
+}
+
+.desktop-tile-wrapper:hover .desktop-tile__edit-btn {
+  opacity: 1;
+}
+
+.desktop-tile__edit-btn:hover {
+  background: var(--gtn-50);
+  color: var(--gtn-accent);
+}
+
+/* Desktop add shortcut floating button */
+.desktop-add-shortcut-floating-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  padding: 8px 14px;
+  background: rgba(236, 232, 223, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 30px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gtn-ink-1);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(20, 21, 46, 0.08);
+  transition: background var(--gtn-dur-2), transform var(--gtn-dur-1);
+}
+
+.desktop-add-shortcut-floating-btn:hover {
+  background: rgba(236, 232, 223, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(20, 21, 46, 0.12);
+}
+
+/* Context menu */
+.desktop-context-menu {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--gtn-paper-3);
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  box-shadow: var(--gtn-shadow-3);
+  min-width: 140px;
+  backdrop-filter: blur(8px);
+}
+
+.desktop-context-menu button {
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--gtn-r1);
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gtn-ink-1);
+  cursor: pointer;
+  transition: background var(--gtn-dur-1);
+}
+
+.desktop-context-menu button:hover {
+  background: var(--gtn-50);
+}
+
+.desktop-context-menu__delete {
+  color: #c53030 !important;
+}
+
+.desktop-context-menu__delete:hover {
+  background: #fff5f5 !important;
+}
+
+/* Customize Modal styling */
+.customize-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 21, 46, 0.4);
+  backdrop-filter: blur(8px);
+}
+
+.customize-modal-panel {
+  width: 100%;
+  max-width: 440px;
+  background: var(--gtn-paper-3);
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r3);
+  box-shadow: 0 10px 40px rgba(20, 21, 46, 0.2);
+  overflow: hidden;
+  animation: modal-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modal-fade-in {
+  from { opacity: 0; transform: scale(0.96) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.customize-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gtn-border);
+}
+
+.customize-modal-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gtn-ink-1);
+  margin: 0;
+}
+
+.customize-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: var(--gtn-ink-3);
+  cursor: pointer;
+}
+
+.customize-modal-close:hover {
+  color: var(--gtn-ink-1);
+}
+
+.customize-modal-form {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.customize-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.customize-modal-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gtn-ink-2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.customize-modal-input,
+.customize-modal-select {
+  padding: 8px 12px;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-2);
+  font-size: 13px;
+  color: var(--gtn-ink-1);
+}
+
+.customize-modal-input:focus,
+.customize-modal-select:focus {
+  outline: none;
+  border-color: var(--gtn-accent);
+  box-shadow: 0 0 0 2px rgba(38, 38, 150, 0.15);
+}
+
+.customize-modal-icon-preview-container {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  background: var(--gtn-paper-2);
+  border-radius: var(--gtn-r2);
+  border: 1px solid var(--gtn-border);
+}
+
+.customize-modal-icon-preview {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--gtn-r2);
+  object-fit: cover;
+  box-shadow: 0 2px 6px rgba(20, 21, 46, 0.1);
+}
+
+.customize-modal-upload-btn {
+  display: inline-block;
+  padding: 6px 12px;
+  background: var(--gtn-paper-3);
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gtn-ink-1);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.customize-modal-upload-btn:hover {
+  background: var(--gtn-50);
+}
+
+.customize-modal-hint {
+  display: block;
+  font-size: 10px;
+  color: var(--gtn-ink-3);
+  margin-top: 4px;
+}
+
+.customize-modal-error {
+  font-size: 10px;
+  color: #c53030;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.customize-modal-icons-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-2);
+}
+
+.customize-modal-grid-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: var(--gtn-r2);
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.1s;
+}
+
+.customize-modal-grid-icon-btn:hover {
+  transform: scale(1.05);
+  background: rgba(236, 232, 223, 0.4);
+}
+
+.customize-modal-grid-icon-btn--selected {
+  border-color: var(--gtn-accent);
+  background: rgba(236, 232, 223, 0.6) !important;
+}
+
+.customize-modal-grid-icon-btn img {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+}
+
+.customize-modal-footer {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--gtn-border);
+  padding: 16px 20px;
+}
+
+.customize-modal-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--gtn-paper-3);
+  color: var(--gtn-ink-1);
+  cursor: pointer;
+}
+
+.customize-modal-btn:hover {
+  background: var(--gtn-50);
+}
+
+.customize-modal-btn--primary {
+  background: var(--gtn-accent);
+  color: #ffffff;
+  border-color: var(--gtn-accent);
+}
+
+.customize-modal-btn--primary:hover {
+  background: #1c1c73;
+}
+
+.customize-modal-delete-btn {
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c53030;
+  cursor: pointer;
+}
+
+.customize-modal-delete-btn:hover {
+  text-decoration: underline;
+}
+

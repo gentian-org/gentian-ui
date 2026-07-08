@@ -21,12 +21,17 @@ ALLOWED_BACKGROUND_MIMES = {
 @dataclass
 class ShellPrefsSummary:
     has_background: bool
+    prefs_json: dict | None
 
 
 def get_summary(user_sub: str, tenant: str) -> ShellPrefsSummary:
     with get_tenant_db_session(tenant) as session:
         row = session.get(UserShellPrefsRow, {"user_sub": user_sub, "tenant": tenant})
-        return ShellPrefsSummary(has_background=bool(row and row.background))
+        return ShellPrefsSummary(
+            has_background=bool(row and row.background),
+            prefs_json=row.prefs_json if (row and row.prefs_json) else {}
+        )
+
 
 
 def get_background(user_sub: str, tenant: str) -> tuple[bytes, str] | None:

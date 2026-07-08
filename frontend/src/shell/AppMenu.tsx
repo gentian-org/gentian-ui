@@ -10,7 +10,7 @@ type AppMenuProps = {
   apps: ShellApp[];
   activeAppId: string | null;
   username?: string;
-  onSelect: (app: ShellApp) => void;
+  onSelect: (app: ShellApp, options?: { forceNewWindow?: boolean }) => void;
   onOpenAccount?: () => void;
   onOpenSettings?: () => void;
 };

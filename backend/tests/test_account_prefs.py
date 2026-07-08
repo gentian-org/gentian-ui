@@ -61,3 +61,24 @@ async def test_forgot_password_auth_disabled():
             json={"email": "nobody@demo.desk.gentian.org"},
         )
     assert response.status_code == 204
+
+
+@pytest.mark.anyio
+async def test_custom_prefs_roundtrip_auth_disabled():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. Get initial preferences
+        get_res = await client.get("/api/v1/prefs/")
+        assert get_res.status_code == 200
+        assert get_res.json()["customPrefs"] == {}
+
+        # 2. Update preferences
+        payload = {"desktopTiles": [{"id": "1", "type": "link", "title": "Test", "position": {"x": 10, "y": 20}}]}
+        put_res = await client.put("/api/v1/prefs/", json=payload)
+        assert put_res.status_code == 204
+
+        # 3. Verify updated preferences
+        get_res2 = await client.get("/api/v1/prefs/")
+        assert get_res2.status_code == 200
+        assert get_res2.json()["customPrefs"] == payload
+
