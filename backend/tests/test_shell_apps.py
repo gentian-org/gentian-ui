@@ -30,7 +30,10 @@ APP_STORE_PROFILE = {
 }
 
 ELEMENT_PROFILE = {
-    "metadata": {"name": "element"},
+    "metadata": {
+        "name": "element",
+        "annotations": {"gentianos.io/portal-auth-mode": "matrix-bridge"},
+    },
     "spec": {
         "displayName": "Element (Matrix)",
         "ingress": {"subDomain": "chat"},
@@ -48,7 +51,10 @@ ELEMENT_PROFILE = {
 }
 
 OPENPROJECT_PROFILE = {
-    "metadata": {"name": "openproject"},
+    "metadata": {
+        "name": "openproject",
+        "annotations": {"gentianos.io/portal-auth-mode": "openproject-bridge"},
+    },
     "spec": {
         "displayName": "OpenProject",
         "ingress": {"subDomain": "projects"},
@@ -245,7 +251,10 @@ async def test_shell_apps_for_nextcloud_uses_bridge_auth_mode():
         ],
     }
     nextcloud_profile = {
-        "metadata": {"name": "nextcloud-office"},
+        "metadata": {
+            "name": "nextcloud-office",
+            "annotations": {"gentianos.io/portal-auth-mode": "portal-bridge"},
+        },
         "spec": {
             "displayName": "Nextcloud Office",
             "ingress": {"subDomain": "cloud"},

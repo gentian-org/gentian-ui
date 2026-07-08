@@ -94,12 +94,6 @@ def profile_auth_mode(profile: dict[str, Any], profile_name: str) -> str | None:
 
     identity = (profile_spec.get("kernelRequirements") or {}).get("identity") or {}
     if identity.get("oidc"):
-        if profile_name == "element":
-            return "matrix-bridge"
-        if profile_name == "nextcloud" or profile_name.startswith("nextcloud-"):
-            return "portal-bridge"
-        if profile_name == "openproject":
-            return "openproject-bridge"
         return "oidc"
     return None
 
