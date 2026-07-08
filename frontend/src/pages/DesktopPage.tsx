@@ -160,6 +160,11 @@ export function DesktopPage() {
         return;
       }
 
+      if (linkTarget === "newwindow") {
+        window.open(launchUrl, "_blank");
+        return;
+      }
+
       openWindow({
         id: winId,
         appId: app.id,
