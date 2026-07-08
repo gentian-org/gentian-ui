@@ -77,7 +77,15 @@ def tile_title(profile_spec: dict[str, Any], portal_tile: dict[str, Any]) -> str
     return str(portal_tile.get("name") or profile_spec.get("compositionRef") or "App")
 
 
-def profile_auth_mode(profile_spec: dict[str, Any], profile_name: str) -> str | None:
+def profile_auth_mode(profile: dict[str, Any], profile_name: str) -> str | None:
+    # First check: generic metadata annotation override
+    annotations = profile.get("metadata", {}).get("annotations") or {}
+    portal_auth_mode = annotations.get("gentianos.io/portal-auth-mode")
+    if portal_auth_mode:
+        return portal_auth_mode
+
+    # Backwards compatibility: fallback to hardcoded matching
+    profile_spec = profile.get("spec") or {}
     # App Store runs with auth.disabled when embedded in the portal shell; the portal
     # already authenticated the tenant admin — no Keycloak browser bootstrap needed.
     extra_values = profile_spec.get("extraValues") or {}
@@ -168,7 +176,8 @@ async def tenant_shell_apps(
         if not portal_tiles:
             continue
         for portal_tile in portal_tiles:
-            is_odoo_module = profile_name.startswith("odoo-cb-") and profile_name != "odoo-cb-base"
+            requires_profile = profile.get("metadata", {}).get("annotations", {}).get("gentianos.io/requires-profile")
+            is_odoo_module = (requires_profile == "odoo-cb-base")
             if is_odoo_module and not is_admin:
                 module_name = profile_name.removeprefix("odoo-cb-")
                 from app.services.keycloak_user_groups import realm_from_issuer
@@ -230,7 +239,7 @@ async def tenant_shell_apps(
                     "icon": tile_icon(spec, portal_tile),
                     "launchUrl": launch_url,
                     "linkTarget": str(portal_tile.get("linkTarget") or "newwindow"),
-                    "authMode": profile_auth_mode(spec, profile_name),
+                    "authMode": profile_auth_mode(profile, profile_name),
                     "builtin": False,
                 }
             )

@@ -280,6 +280,47 @@ async def test_shell_apps_for_nextcloud_uses_bridge_auth_mode():
     ]
 
 
+async def test_shell_apps_uses_annotated_portal_auth_mode():
+    settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    settings.auth_disabled = False
+    user = {
+        "preferred_username": "john-doe@demo.desk.gentian.org",
+        "tenant": "demo",
+        "groups": [
+            "gentian:tenant:demo:members",
+            "gentian:tenant:demo:app:some-app",
+        ],
+    }
+    custom_profile = {
+        "metadata": {
+            "name": "some-app",
+            "annotations": {"gentianos.io/portal-auth-mode": "custom-bridge"},
+        },
+        "spec": {
+            "displayName": "Custom App",
+            "ingress": {"subDomain": "custom"},
+            "tile": {"icon": "app"},
+            "kernelRequirements": {"identity": {"oidc": {"clientId": "some-client"}}},
+            "portalTiles": [
+                {
+                    "name": "some-app",
+                    "displayName": {"en_US": "Custom"},
+                    "allowedGroup": "App Users",
+                    "linkTarget": "embedded",
+                }
+            ],
+        },
+    }
+    with (
+        patch("app.core.shell_apps.list_installed_profiles", return_value=["some-app"]),
+        patch("app.core.shell_apps.get_app_profile", return_value=custom_profile),
+        patch("app.core.shell_apps.is_platform_app", return_value=False),
+    ):
+        apps = await shell_apps_for_user(user, settings)
+    assert len(apps) == 1
+    assert apps[0]["authMode"] == "custom-bridge"
+
+
 async def test_shell_apps_for_member_without_entitlement_empty():
     settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
     settings.auth_disabled = False
