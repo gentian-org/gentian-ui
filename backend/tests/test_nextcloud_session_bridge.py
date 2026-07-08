@@ -98,3 +98,24 @@ def test_nextcloud_bridge_ticket_rejects_tampered_token():
     except Exception:
         raised = True
     assert raised
+
+
+def test_read_nextcloud_admin_credentials_dynamic_resolution():
+    from app.services.nextcloud_session_bridge import _read_nextcloud_admin_credentials
+    from unittest.mock import MagicMock
+
+    mock_secret = MagicMock()
+    mock_secret.data = {
+        "internal-admin_password": "cGFzc3dvcmQ="
+    }
+
+    with (
+        patch("app.services.k8s_catalogue.list_installed_profiles", return_value=["nextcloud-office"]),
+        patch("app.services.nextcloud_session_bridge._core_v1_api") as mock_core,
+    ):
+        mock_api = mock_core.return_value
+        mock_api.read_namespaced_secret.return_value = mock_secret
+
+        _read_nextcloud_admin_credentials("demo")
+
+        mock_api.read_namespaced_secret.assert_called_once_with("nextcloud-office-sensitive-values", "tenant-demo")

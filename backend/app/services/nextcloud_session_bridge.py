@@ -78,13 +78,28 @@ def _core_v1_api() -> client.CoreV1Api:
 
 def _read_nextcloud_admin_credentials(tenant: str) -> tuple[str, str]:
     namespace = f"tenant-{tenant}"
+    from app.services.k8s_catalogue import list_installed_profiles
+    installed = list_installed_profiles(tenant)
+    nextcloud_flavor = None
+    for name in installed:
+        if name == "nextcloud" or name.startswith("nextcloud-"):
+            nextcloud_flavor = name
+            break
+
+    if not nextcloud_flavor:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Nextcloud is not installed for this tenant",
+        )
+
+    secret_name = f"{nextcloud_flavor}-sensitive-values"
     try:
-        secret = _core_v1_api().read_namespaced_secret("nextcloud-sensitive-values", namespace)
+        secret = _core_v1_api().read_namespaced_secret(secret_name, namespace)
     except ApiException as exc:
         if exc.status == 404:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Nextcloud admin credentials are not available for this tenant",
+                detail=f"Nextcloud admin credentials ({secret_name}) are not available for this tenant",
             ) from exc
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
