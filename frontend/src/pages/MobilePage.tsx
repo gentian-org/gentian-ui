@@ -2,13 +2,9 @@ import { useEffect, useState } from "react";
 import { prepareEmbeddedOidcSession } from "@/auth/idpSession";
 import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
 import {
-  fetchNextcloudBridgeTicket,
-  nextcloudBridgeLaunchUrl,
-} from "@/auth/nextcloudBridge";
-import {
-  fetchOpenprojectBridgeTicket,
-  openprojectBridgeLaunchUrl,
-} from "@/auth/openprojectBridge";
+  fetchPortalBridgeTicket,
+  portalBridgeLaunchUrl,
+} from "@/auth/portalBridge";
 import { AccountPanel } from "@/account/AccountPanel";
 import { AdminConsole } from "@/admin/AdminConsole";
 import { AppMenu } from "@/shell/AppMenu";
@@ -55,10 +51,8 @@ export function MobilePage() {
 
     const useMatrixBridge =
       activeApp.authMode === "matrix-bridge" && activeApp.linkTarget === "embedded";
-    const useNextcloudBridge =
-      activeApp.authMode === "nextcloud-bridge" && activeApp.linkTarget === "embedded";
-    const useOpenprojectBridge =
-      activeApp.authMode === "openproject-bridge" && activeApp.linkTarget === "embedded";
+    const usePortalBridge =
+      activeApp.authMode === "portal-bridge" && activeApp.linkTarget === "embedded";
 
     void (async () => {
       const launchBase = activeApp.launchUrl;
@@ -79,26 +73,16 @@ export function MobilePage() {
         if (ticket) {
           launchUrl = matrixBridgeLaunchUrl(new URL(appUrl).origin, ticket);
         }
-      } else if (useNextcloudBridge) {
-        const ticket = await fetchNextcloudBridgeTicket();
+      } else if (usePortalBridge) {
+        const ticket = await fetchPortalBridgeTicket();
         if (ticket) {
           const parsed = new URL(appUrl);
-          launchUrl = nextcloudBridgeLaunchUrl(
+          launchUrl = portalBridgeLaunchUrl(
             parsed.origin,
             ticket,
             parsed.searchParams.get("open"),
           );
         } else {
-          return;
-        }
-      } else if (useOpenprojectBridge) {
-        const ticket = await fetchOpenprojectBridgeTicket();
-        if (ticket) {
-          launchUrl = openprojectBridgeLaunchUrl(new URL(appUrl).origin, ticket);
-        } else {
-          if (!window.location.pathname.startsWith("/login")) {
-            window.alert("Could not open Projects. Try signing in again.");
-          }
           return;
         }
       }

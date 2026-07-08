@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Signing in to Files…</title>
+    <title>Signing in...</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       body {
@@ -17,7 +17,7 @@
     </style>
   </head>
   <body>
-    <p>Signing in to Files…</p>
+    <p>Signing in...</p>
     <script>
       (async () => {
         const params = new URLSearchParams(window.location.search);
@@ -27,15 +27,18 @@
           return;
         }
 
-        // Optional document-type intent from Document/Spreadsheet/Presentation tiles.
+        // Optional target parameters/intent from the tile launch
         const open = params.get("open");
-        let target = `/gentian-portal-bridge.php?t=${encodeURIComponent(ticket)}`;
+        const app = params.get("app");
+        let target = `/portal-bridge.php?t=${encodeURIComponent(ticket)}`;
         if (open) {
           target += `&open=${encodeURIComponent(open)}`;
         }
+        if (app) {
+          target += `&app=${encodeURIComponent(app)}`;
+        }
 
-        // Server-side session establishment avoids iframe third-party cookie /
-        // CSRF failures from posting the login form in an embedded WinBox.
+        // Redirect to the portal bridge handler same-origin
         window.location.replace(target);
       })();
     </script>

@@ -2,13 +2,9 @@ import { useEffect } from "react";
 import { prepareEmbeddedOidcSession } from "@/auth/idpSession";
 import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
 import {
-  fetchNextcloudBridgeTicket,
-  nextcloudBridgeLaunchUrl,
-} from "@/auth/nextcloudBridge";
-import {
-  fetchOpenprojectBridgeTicket,
-  openprojectBridgeLaunchUrl,
-} from "@/auth/openprojectBridge";
+  fetchPortalBridgeTicket,
+  portalBridgeLaunchUrl,
+} from "@/auth/portalBridge";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { useShellApps } from "@/shell/useShellApps";
@@ -77,12 +73,8 @@ export function DesktopPage() {
     const appLaunchBase = app.launchUrl;
     const useMatrixBridge =
       app.authMode === "matrix-bridge" && app.linkTarget === "embedded" && !options?.forceLogin;
-    const useNextcloudBridge =
-      app.authMode === "nextcloud-bridge" &&
-      app.linkTarget === "embedded" &&
-      !options?.forceLogin;
-    const useOpenprojectBridge =
-      app.authMode === "openproject-bridge" &&
+    const usePortalBridge =
+      app.authMode === "portal-bridge" &&
       app.linkTarget === "embedded" &&
       !options?.forceLogin;
     const useIdpBootstrap =
@@ -105,7 +97,7 @@ export function DesktopPage() {
       });
 
       let launchUrl = appUrl;
-      const needsBridgeTicket = useMatrixBridge || useNextcloudBridge || useOpenprojectBridge;
+      const needsBridgeTicket = useMatrixBridge || usePortalBridge;
       const winId = crypto.randomUUID();
       if (needsBridgeTicket && !options?.forceLogin) {
         openWindow({
@@ -126,29 +118,18 @@ export function DesktopPage() {
           closeWindow(winId);
           return;
         }
-      } else if (useNextcloudBridge) {
-        const ticket = await fetchNextcloudBridgeTicket();
+      } else if (usePortalBridge) {
+        const ticket = await fetchPortalBridgeTicket();
         if (ticket) {
           const parsed = new URL(appUrl);
-          launchUrl = nextcloudBridgeLaunchUrl(
+          launchUrl = portalBridgeLaunchUrl(
             parsed.origin,
             ticket,
             parsed.searchParams.get("open"),
           );
         } else {
           if (needsBridgeTicket) closeWindow(winId);
-          window.alert("Could not open Files. Try signing in again.");
-          return;
-        }
-      } else if (useOpenprojectBridge) {
-        const ticket = await fetchOpenprojectBridgeTicket();
-        if (ticket) {
-          launchUrl = openprojectBridgeLaunchUrl(new URL(appUrl).origin, ticket);
-        } else {
-          if (needsBridgeTicket) closeWindow(winId);
-          if (!window.location.pathname.startsWith("/login")) {
-            window.alert("Could not open Projects. Try signing in again.");
-          }
+          window.alert(`Could not open ${app.title}. Try signing in again.`);
           return;
         }
       } else if (useIdpBootstrap) {

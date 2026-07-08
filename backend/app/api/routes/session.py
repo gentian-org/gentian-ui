@@ -18,10 +18,10 @@ from app.services.matrix_session_bridge import (
     is_allowed_app_origin,
     redeem_matrix_bridge_ticket,
 )
-from app.services.nextcloud_session_bridge import (
-    create_nextcloud_bridge_ticket,
-    is_allowed_cloud_origin,
-    redeem_nextcloud_bridge_ticket,
+from app.services.portal_session_bridge import (
+    create_portal_bridge_ticket,
+    is_allowed_tenant_origin,
+    redeem_portal_bridge_ticket,
 )
 from app.services.openproject_session_bridge import (
     create_openproject_bridge_ticket,
@@ -41,9 +41,9 @@ def _apply_matrix_bridge_cors(request: Request, response: Response, settings: Se
         response.headers["Access-Control-Allow-Headers"] = "Content-Type"
 
 
-def _apply_nextcloud_bridge_cors(request: Request, response: Response, settings: Settings) -> None:
+def _apply_portal_bridge_cors(request: Request, response: Response, settings: Settings) -> None:
     origin = request.headers.get("origin")
-    if origin and is_allowed_cloud_origin(origin, settings):
+    if origin and is_allowed_tenant_origin(origin, settings):
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Vary"] = "Origin"
         response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
@@ -129,50 +129,50 @@ def redeem_matrix_bridge_route(
     return redeem_matrix_bridge_ticket(ticket, settings)
 
 
-@router.post("/nextcloud-bridge/ticket")
-def create_nextcloud_bridge_ticket_route(
+@router.post("/bridge/ticket")
+def create_portal_bridge_ticket_route(
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> dict[str, str]:
-    """Mint a one-time ticket for cloud.* to redeem into a Nextcloud session."""
+    """Mint a one-time ticket for embedded apps to redeem into a session."""
     if settings.auth_disabled:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Nextcloud bridge is unavailable while auth is disabled",
+            detail="Portal bridge is unavailable while auth is disabled",
         )
 
     tenant = resolve_user_context(user, settings)
     if tenant == settings.kernel_domain:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Nextcloud bridge is only available for tenant users",
+            detail="Portal bridge is only available for tenant users",
         )
 
-    ticket = create_nextcloud_bridge_ticket(user, tenant=tenant, settings=settings)
+    ticket = create_portal_bridge_ticket(user, tenant=tenant, settings=settings)
     return {"ticket": ticket}
 
 
-@router.options("/nextcloud-bridge/redeem/{ticket}")
-def redeem_nextcloud_bridge_preflight(
+@router.options("/bridge/redeem/{ticket}")
+def redeem_portal_bridge_preflight(
     ticket: str,
     request: Request,
     response: Response,
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    _apply_nextcloud_bridge_cors(request, response, settings)
+    _apply_portal_bridge_cors(request, response, settings)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/nextcloud-bridge/redeem/{ticket}")
-def redeem_nextcloud_bridge_route(
+@router.get("/bridge/redeem/{ticket}")
+def redeem_portal_bridge_route(
     ticket: str,
     request: Request,
     response: Response,
     settings: Settings = Depends(get_settings),
-) -> dict[str, str]:
-    """Redeem a portal-issued ticket on the cloud.* origin (no portal cookie)."""
-    _apply_nextcloud_bridge_cors(request, response, settings)
-    return redeem_nextcloud_bridge_ticket(ticket, settings)
+) -> dict[str, Any]:
+    """Redeem a portal-issued ticket on the app origin (no portal cookie)."""
+    _apply_portal_bridge_cors(request, response, settings)
+    return redeem_portal_bridge_ticket(ticket, settings)
 
 
 @router.post("/openproject-bridge/ticket")
@@ -218,3 +218,5 @@ def redeem_openproject_bridge_route(
     """Redeem a portal-issued ticket on the projects.* origin (no portal cookie)."""
     _apply_openproject_bridge_cors(request, response, settings)
     return redeem_openproject_bridge_ticket(ticket, settings)
+
+

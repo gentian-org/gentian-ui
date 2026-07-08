@@ -274,7 +274,7 @@ async def test_shell_apps_for_nextcloud_uses_bridge_auth_mode():
             "icon": "files",
             "launchUrl": "https://cloud.demo.desk.gentian.org",
             "linkTarget": "embedded",
-            "authMode": "nextcloud-bridge",
+            "authMode": "portal-bridge",
             "builtin": False,
         }
     ]
