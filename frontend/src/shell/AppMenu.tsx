@@ -110,34 +110,51 @@ export function AppMenu({
   function handleTrackDrop(e: React.DragEvent) {
     e.preventDefault();
     try {
-      const rawData = e.dataTransfer.getData("application/json");
+      let rawData = e.dataTransfer.getData("application/json");
+      if (!rawData) {
+        rawData = e.dataTransfer.getData("text/plain");
+      }
       if (!rawData) return;
       const data = JSON.parse(rawData);
 
-      if (data.type === "app") {
-        const appId = data.id;
+      if (data.type === "app" || data.type === "existing") {
+        const itemId = data.type === "app"
+          ? data.id
+          : (() => {
+              const tile = desktopTiles.find((t) => t.id === data.id);
+              return tile ? (tile.type === "app" && tile.appId ? tile.appId : `link:${tile.id}`) : null;
+            })();
+        if (!itemId) return;
+
+        // Check if dropped on a specific menu item slot
+        const targetElement = (e.target as HTMLElement).closest(".app-menu-slot");
+        const targetId = targetElement ? targetElement.getAttribute("data-id") : null;
+
         void updateCustomPrefs((prev) => {
-          const currentIds = prev.menuAppIds || apps.map((a) => a.id);
-          if (currentIds.includes(appId)) return prev;
+          const currentIds = [...(prev.menuAppIds || apps.map((a) => a.id))];
+
+          // If it already exists in the menu, remove it so we can insert/reposition it
+          const existingIdx = currentIds.indexOf(itemId);
+          if (existingIdx !== -1) {
+            currentIds.splice(existingIdx, 1);
+          }
+
+          if (targetId) {
+            const targetIdx = currentIds.indexOf(targetId);
+            if (targetIdx !== -1) {
+              currentIds.splice(targetIdx, 0, itemId);
+            } else {
+              currentIds.push(itemId);
+            }
+          } else {
+            currentIds.push(itemId);
+          }
+
           return {
             ...prev,
-            menuAppIds: [...currentIds, appId],
+            menuAppIds: currentIds,
           };
         });
-      } else if (data.type === "existing") {
-        const tileId = data.id;
-        const tile = desktopTiles.find((t) => t.id === tileId);
-        if (tile) {
-          const itemId = tile.type === "app" && tile.appId ? tile.appId : `link:${tile.id}`;
-          void updateCustomPrefs((prev) => {
-            const currentIds = prev.menuAppIds || apps.map((a) => a.id);
-            if (currentIds.includes(itemId)) return prev;
-            return {
-              ...prev,
-              menuAppIds: [...currentIds, itemId],
-            };
-          });
-        }
       } else if (data.type === "menu-app") {
         // Dragging existing slot inside the menu bar to reorder
         const dragId = data.id;

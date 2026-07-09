@@ -37,10 +37,9 @@ export function AppLauncher({ apps, onSelect, onClose }: AppLauncherProps) {
                 className="app-launcher__tile"
                 draggable
                 onDragStart={(e) => {
-                  e.dataTransfer.setData(
-                    "application/json",
-                    JSON.stringify({ type: "app", id: app.id }),
-                  );
+                  const payload = JSON.stringify({ type: "app", id: app.id });
+                  e.dataTransfer.setData("application/json", payload);
+                  e.dataTransfer.setData("text/plain", payload);
                 }}
                 onClick={(e) => {
                   const forceNewWindow = e.ctrlKey || e.metaKey;

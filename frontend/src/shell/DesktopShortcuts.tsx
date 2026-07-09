@@ -45,7 +45,9 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
   }, []);
 
   function handleTileDragStart(e: React.DragEvent, tile: DesktopTile) {
-    e.dataTransfer.setData("application/json", JSON.stringify({ type: "existing", id: tile.id }));
+    const payload = JSON.stringify({ type: "existing", id: tile.id });
+    e.dataTransfer.setData("application/json", payload);
+    e.dataTransfer.setData("text/plain", payload);
     e.dataTransfer.effectAllowed = "move";
   }
 

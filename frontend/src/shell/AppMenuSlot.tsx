@@ -47,10 +47,9 @@ export function AppMenuSlot({ item, isActive, onSelect, onUnpin }: AppMenuSlotPr
         title={displayTitle}
         draggable
         onDragStart={(e) => {
-          e.dataTransfer.setData(
-            "application/json",
-            JSON.stringify({ type: "menu-app", id: item.id }),
-          );
+          const payload = JSON.stringify({ type: "menu-app", id: item.id });
+          e.dataTransfer.setData("application/json", payload);
+          e.dataTransfer.setData("text/plain", payload);
         }}
         onContextMenu={handleContextMenu}
         onClick={(e) => {
