@@ -29,7 +29,7 @@ export function buildAppLaunchUrl(
 
   try {
     const url = new URL(rawLink);
-    if (username.includes("@")) {
+    if (username) {
       url.searchParams.set("login_hint", username);
     }
     // Embedded tiles: allow silent SSO in the iframe (broker / tenant-realm cookie).
