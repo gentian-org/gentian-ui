@@ -48,7 +48,7 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
     const payload = JSON.stringify({ type: "existing", id: tile.id });
     e.dataTransfer.setData("application/json", payload);
     e.dataTransfer.setData("text/plain", payload);
-    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.effectAllowed = "copyMove";
   }
 
   function handleTileClick(e: React.MouseEvent, tile: DesktopTile) {

@@ -50,6 +50,7 @@ export function AppMenuSlot({ item, isActive, onSelect, onUnpin }: AppMenuSlotPr
           const payload = JSON.stringify({ type: "menu-app", id: item.id });
           e.dataTransfer.setData("application/json", payload);
           e.dataTransfer.setData("text/plain", payload);
+          e.dataTransfer.effectAllowed = "copyMove";
         }}
         onContextMenu={handleContextMenu}
         onClick={(e) => {

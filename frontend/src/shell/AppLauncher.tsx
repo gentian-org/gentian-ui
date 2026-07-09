@@ -40,6 +40,7 @@ export function AppLauncher({ apps, onSelect, onClose }: AppLauncherProps) {
                   const payload = JSON.stringify({ type: "app", id: app.id });
                   e.dataTransfer.setData("application/json", payload);
                   e.dataTransfer.setData("text/plain", payload);
+                  e.dataTransfer.effectAllowed = "copyMove";
                 }}
                 onClick={(e) => {
                   const forceNewWindow = e.ctrlKey || e.metaKey;
