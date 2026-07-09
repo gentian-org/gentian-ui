@@ -793,10 +793,6 @@
   height: 100%;
 }
 
-.desktop-tile:hover {
-  transform: translateY(-2px);
-}
-
 .desktop-tile:active {
   cursor: grabbing;
   transform: scale(0.95);

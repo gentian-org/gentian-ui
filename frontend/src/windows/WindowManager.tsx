@@ -7,6 +7,7 @@ import {
   WindowMaximizeIcon,
   WindowMinimizeIcon,
   WindowRestoreIcon,
+  WindowExternalIcon,
 } from "@/windows/WindowChromeIcons";
 import { WindowResizeHandles } from "@/windows/WindowResizeHandles";
 import { WindowBody } from "@/windows/WindowBody";
@@ -98,6 +99,14 @@ export function WindowManager() {
                   <WindowMaximizeIcon className="shell-window__control-icon" />
                 )}
               </WindowChromeButton>
+              {win.url && (
+                <WindowChromeButton
+                  label="Open in new tab"
+                  onClick={() => window.open(win.url, "_blank")}
+                >
+                  <WindowExternalIcon className="shell-window__control-icon" />
+                </WindowChromeButton>
+              )}
               <WindowChromeButton label="Close" onClick={() => closeWindow(win.id)}>
                 <WindowCloseIcon className="shell-window__control-icon shell-window__control-icon--close" />
               </WindowChromeButton>
