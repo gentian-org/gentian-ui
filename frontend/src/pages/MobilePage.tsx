@@ -81,6 +81,7 @@ export function MobilePage() {
             parsed.origin,
             ticket,
             parsed.searchParams.get("open"),
+            parsed.searchParams.get("app"),
           );
         } else {
           return;

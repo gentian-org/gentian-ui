@@ -25,11 +25,15 @@ export function portalBridgeLaunchUrl(
   appOrigin: string,
   ticket: string,
   open?: string | null,
+  app?: string | null,
 ): string {
   const url = new URL("/portal-sso.html", appOrigin);
   url.searchParams.set("t", ticket);
   if (open) {
     url.searchParams.set("open", open);
+  }
+  if (app) {
+    url.searchParams.set("app", app);
   }
   return url.toString();
 }

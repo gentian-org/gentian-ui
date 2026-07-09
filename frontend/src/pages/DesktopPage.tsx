@@ -180,6 +180,7 @@ export function DesktopPage() {
               parsed.origin,
               ticket,
               parsed.searchParams.get("open"),
+              parsed.searchParams.get("app"),
             );
           } else {
             if (needsBridgeTicket) closeWindow(winId);
