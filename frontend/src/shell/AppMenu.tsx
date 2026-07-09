@@ -5,6 +5,7 @@ import { AppLauncher } from "@/shell/AppLauncher";
 import { AppMenuSlot } from "@/shell/AppMenuSlot";
 import { NotificationInbox } from "@/shell/NotificationInbox";
 import { AppsGridIcon, MenuIcon, TrayButton } from "@/shell/TrayButton";
+import { usePrefsStore } from "@/stores/prefs";
 
 type AppMenuProps = {
   apps: ShellApp[];
@@ -28,6 +29,17 @@ export function AppMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const { logout } = useAuth();
 
+  const menuAppIds = usePrefsStore((s) => s.customPrefs.menuAppIds);
+  const updateCustomPrefs = usePrefsStore((s) => s.updateCustomPrefs);
+
+  // If menuAppIds is defined, show only those apps in specified order.
+  // Otherwise, show all apps by default.
+  const visibleApps = menuAppIds
+    ? menuAppIds
+        .map((id) => apps.find((a) => a.id === id))
+        .filter((a): a is ShellApp => Boolean(a))
+    : apps;
+
   useEffect(() => {
     if (!userMenuOpen) {
       return;
@@ -45,6 +57,66 @@ export function AppMenu({
     setUserMenuOpen(false);
   }
 
+  function handleTrackDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }
+
+  function handleTrackDrop(e: React.DragEvent) {
+    e.preventDefault();
+    try {
+      const rawData = e.dataTransfer.getData("application/json");
+      if (!rawData) return;
+      const data = JSON.parse(rawData);
+
+      if (data.type === "app") {
+        const appId = data.id;
+        void updateCustomPrefs((prev) => {
+          const currentIds = prev.menuAppIds || apps.map((a) => a.id);
+          if (currentIds.includes(appId)) return prev;
+          return {
+            ...prev,
+            menuAppIds: [...currentIds, appId],
+          };
+        });
+      } else if (data.type === "menu-app") {
+        // Dragging existing slot inside the menu bar to reorder
+        const dragId = data.id;
+        const targetElement = (e.target as HTMLElement).closest(".app-menu-slot");
+        if (!targetElement) return;
+        const targetId = targetElement.getAttribute("data-id");
+        if (!targetId || targetId === dragId) return;
+
+        void updateCustomPrefs((prev) => {
+          const currentIds = [...(prev.menuAppIds || apps.map((a) => a.id))];
+          const dragIdx = currentIds.indexOf(dragId);
+          const targetIdx = currentIds.indexOf(targetId);
+          if (dragIdx === -1 || targetIdx === -1) return prev;
+
+          currentIds.splice(dragIdx, 1);
+          currentIds.splice(targetIdx, 0, dragId);
+
+          return {
+            ...prev,
+            menuAppIds: currentIds,
+          };
+        });
+      }
+    } catch (err) {
+      console.error("Failed to handle track drop:", err);
+    }
+  }
+
+  function handleUnpin(appId: string) {
+    void updateCustomPrefs((prev) => {
+      const currentIds = prev.menuAppIds || apps.map((a) => a.id);
+      return {
+        ...prev,
+        menuAppIds: currentIds.filter((id) => id !== appId),
+      };
+    });
+  }
+
   return (
     <>
       <nav className="app-menu" aria-label="App launcher">
@@ -58,13 +130,18 @@ export function AppMenu({
           <AppsGridIcon />
         </button>
 
-        <div className="app-menu__track">
-          {apps.map((app) => (
+        <div
+          className="app-menu__track"
+          onDragOver={handleTrackDragOver}
+          onDrop={handleTrackDrop}
+        >
+          {visibleApps.map((app) => (
             <AppMenuSlot
               key={app.id}
               app={app}
               isActive={activeAppId === app.id}
               onSelect={onSelect}
+              onUnpin={() => handleUnpin(app.id)}
             />
           ))}
         </div>

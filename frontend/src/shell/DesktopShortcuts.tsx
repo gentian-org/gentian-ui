@@ -183,42 +183,17 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
             onClick={(e) => handleTileClick(e, tile)}
           >
             <div className="desktop-tile" title={tile.type === "link" ? tile.url : displayTitle}>
-              <img
-                src={displayIcon.startsWith("data:") ? displayIcon : tileIconUrl(displayIcon)}
-                alt=""
-                className="desktop-tile__icon"
-                draggable={false}
-              />
-              <span className="desktop-tile__label">{displayTitle}</span>
-
-              <button
-                type="button"
-                className="desktop-tile__edit-btn"
-                aria-label="Edit shortcut"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleTileEdit(tile);
-                }}
-              >
-                &#9998;
-              </button>
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Floating Add Shortcut button for discoverability */}
-      <button
-        type="button"
-        className="desktop-add-shortcut-floating-btn"
-        onClick={(e) => {
-          e.stopPropagation();
-          setContextMenu({ x: 100, y: 100 });
-          setIsCreatingLink(true);
-        }}
-      >
-        <span>+ Add Shortcut</span>
-      </button>
+               <img
+                 src={displayIcon.startsWith("data:") ? displayIcon : tileIconUrl(displayIcon)}
+                 alt=""
+                 className="desktop-tile__icon"
+                 draggable={false}
+               />
+               <span className="desktop-tile__label">{displayTitle}</span>
+             </div>
+           </div>
+         );
+       })}
 
       {/* Context Menu */}
       {contextMenu && (

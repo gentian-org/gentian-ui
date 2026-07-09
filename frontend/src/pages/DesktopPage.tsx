@@ -228,7 +228,7 @@ export function DesktopPage() {
       if (!rawData) return;
       const data = JSON.parse(rawData);
 
-      if (data.type === "app") {
+      if (data.type === "app" || data.type === "menu-app") {
         const app = apps.find((a) => a.id === data.id);
         if (!app) return;
 
@@ -237,12 +237,19 @@ export function DesktopPage() {
         // Check if there is already a shortcut for this app on the desktop
         const existing = (customPrefs.desktopTiles || []).find((t) => t.appId === app.id);
         if (existing) {
-          updateCustomPrefs((prev) => ({
-            ...prev,
-            desktopTiles: (prev.desktopTiles || []).map((t) =>
-              t.id === existing.id ? { ...t, position: snapped } : t
-            ),
-          }));
+          void updateCustomPrefs((prev) => {
+            let nextMenuAppIds = prev.menuAppIds;
+            if (data.type === "menu-app" && nextMenuAppIds) {
+              nextMenuAppIds = nextMenuAppIds.filter((id) => id !== app.id);
+            }
+            return {
+              ...prev,
+              desktopTiles: (prev.desktopTiles || []).map((t) =>
+                t.id === existing.id ? { ...t, position: snapped } : t
+              ),
+              menuAppIds: nextMenuAppIds,
+            };
+          });
         } else {
           const newTile: DesktopTile = {
             id: crypto.randomUUID(),
@@ -252,14 +259,21 @@ export function DesktopPage() {
             icon: app.icon,
             position: snapped,
           };
-          updateCustomPrefs((prev) => ({
-            ...prev,
-            desktopTiles: [...(prev.desktopTiles || []), newTile],
-          }));
+          void updateCustomPrefs((prev) => {
+            let nextMenuAppIds = prev.menuAppIds;
+            if (data.type === "menu-app" && nextMenuAppIds) {
+              nextMenuAppIds = nextMenuAppIds.filter((id) => id !== app.id);
+            }
+            return {
+              ...prev,
+              desktopTiles: [...(prev.desktopTiles || []), newTile],
+              menuAppIds: nextMenuAppIds,
+            };
+          });
         }
       } else if (data.type === "existing") {
         const snapped = snapToGrid(x - 46, y - 49);
-        updateCustomPrefs((prev) => ({
+        void updateCustomPrefs((prev) => ({
           ...prev,
           desktopTiles: (prev.desktopTiles || []).map((t) =>
             t.id === data.id ? { ...t, position: snapped } : t

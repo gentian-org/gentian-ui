@@ -67,6 +67,7 @@ export function inviteMember(
     inviteEmail?: string;
     groupIds?: string[];
     requireTotp?: boolean;
+    settingsTemplateId?: string;
   },
   tenant?: string,
 ) {

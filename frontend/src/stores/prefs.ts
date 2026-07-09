@@ -21,6 +21,7 @@ type PrefsState = {
   customPrefs: {
     desktopTiles?: DesktopTile[];
     tileCustomizations?: Record<string, TileCustomization>;
+    menuAppIds?: string[];
   };
   isLoading: boolean;
   loadPrefs: () => Promise<void>;

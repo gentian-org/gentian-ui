@@ -102,6 +102,7 @@ class MemberInviteRequest(BaseModel):
     inviteEmail: EmailStr | None = None
     groupIds: list[str] = Field(default_factory=list)
     requireTotp: bool = False
+    settingsTemplateId: str | None = None
 
 
 class TotpEnableRequest(BaseModel):
@@ -609,6 +610,20 @@ async def invite_member(
         group_ids=group_ids,
         require_totp=body.requireTotp,
     )
+    if body.settingsTemplateId:
+        from app.db.tenant_engine import get_tenant_db_session
+        from app.models.user_shell_prefs import UserShellPrefsRow, ShellPrefsTemplateRow
+        with get_tenant_db_session(resolved) as session:
+            template = session.get(ShellPrefsTemplateRow, {"id": body.settingsTemplateId, "tenant": resolved})
+            if template:
+                row = session.get(UserShellPrefsRow, {"user_sub": member.id, "tenant": resolved})
+                if row is None:
+                    row = UserShellPrefsRow(user_sub=member.id, tenant=resolved)
+                    session.add(row)
+                row.background = template.background
+                row.background_mime = template.background_mime
+                row.prefs_json = template.prefs_json
+                session.commit()
     await _request_app_privilege_reconcile_if_needed(
         store,
         resolved,

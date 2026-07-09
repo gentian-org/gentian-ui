@@ -57,3 +57,34 @@ export async function savePrefs(data: Record<string, any>): Promise<void> {
     body: JSON.stringify(data),
   });
 }
+
+export type SettingsTemplate = {
+  id: string;
+  name: string;
+  hasBackground: boolean;
+  prefs_json: Record<string, any>;
+};
+
+export function fetchTemplates() {
+  return apiFetch<SettingsTemplate[]>("/prefs/templates");
+}
+
+export function createTemplate(name: string, sourceUserSub: string) {
+  return apiFetch<SettingsTemplate>("/prefs/templates", {
+    method: "POST",
+    body: JSON.stringify({ name, source_user_sub: sourceUserSub }),
+  });
+}
+
+export function deleteTemplate(id: string) {
+  return apiFetch<void>(`/prefs/templates/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function applyTemplate(templateId: string, targetUserSub: string) {
+  return apiFetch<void>(`/prefs/templates/${templateId}/apply`, {
+    method: "POST",
+    body: JSON.stringify({ target_user_sub: targetUserSub }),
+  });
+}

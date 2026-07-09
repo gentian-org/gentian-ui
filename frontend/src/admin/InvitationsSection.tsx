@@ -1,9 +1,10 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   inviteMember,
   type AdminGroup,
 } from "@/api/admin";
+import { fetchTemplates } from "@/api/prefs";
 import "./admin.css";
 
 type InvitationsSectionProps = {
@@ -111,6 +112,13 @@ export function InvitationsSection({
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [settingsTemplateId, setSettingsTemplateId] = useState("");
+
+  const templatesQuery = useQuery({
+    queryKey: ["admin", "templates", tenant],
+    queryFn: () => fetchTemplates(),
+  });
+  const templates = templatesQuery.data ?? [];
 
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -160,6 +168,7 @@ export function InvitationsSection({
           lastName: form.lastName || undefined,
           groupIds: [...form.appGroupIds, ...form.adminGroupIds],
           requireTotp: form.requireTotp,
+          settingsTemplateId: settingsTemplateId || undefined,
         },
         tenant,
       ),
@@ -174,6 +183,7 @@ export function InvitationsSection({
       });
       setLocalPart("");
       setHasManuallyEditedLocalPart(false);
+      setSettingsTemplateId("");
       setError(null);
       setSuccess("Invite sent.");
       await queryClient.invalidateQueries({ queryKey: ["admin", "members", tenant] });
@@ -251,6 +261,24 @@ export function InvitationsSection({
               onChange={(e) => setForm((p) => ({ ...p, inviteEmail: e.target.value }))}
               placeholder="personal@example.com"
             />
+          </div>
+
+          {/* Row 4: Settings template */}
+          <div className="admin-console__field">
+            <label htmlFor="inv-settings-template">Settings template to apply</label>
+            <select
+              id="inv-settings-template"
+              value={settingsTemplateId}
+              onChange={(e) => setSettingsTemplateId(e.target.value)}
+              style={{ width: "100%", padding: "0.5rem", borderRadius: "var(--gtn-r1)", border: "1px solid var(--gtn-border)", background: "var(--gtn-paper-3)", color: "var(--gtn-ink-1)" }}
+            >
+              <option value="">-- None (use defaults) --</option>
+              {templates.map((tpl) => (
+                <option key={tpl.id} value={tpl.id}>
+                  {tpl.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

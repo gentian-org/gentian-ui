@@ -18,3 +18,15 @@ class UserShellPrefsRow(Base):
     background_mime: Mapped[str | None] = mapped_column(String(64), nullable=True)
     prefs_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
+
+class ShellPrefsTemplateRow(Base):
+    __tablename__ = "shell_prefs_templates"
+    __table_args__ = (Index("ix_shell_prefs_templates_tenant", "tenant"),)
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    tenant: Mapped[str] = mapped_column(String(128), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    background: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    background_mime: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    prefs_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+

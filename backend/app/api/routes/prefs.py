@@ -95,3 +95,118 @@ def delete_prefs_background(
     tenant = resolve_user_context(user, settings)
     user_sub = str(user.get("sub") or "anonymous")
     clear_background(user_sub, tenant)
+
+
+from pydantic import BaseModel
+import uuid
+
+class CreateTemplateRequest(BaseModel):
+    name: str
+    source_user_sub: str
+
+class ApplyTemplateRequest(BaseModel):
+    target_user_sub: str
+
+def require_admin(user: dict, settings: Settings) -> None:
+    if settings.auth_disabled:
+        return
+    roles = user.get("roles") or []
+    if "portal-admin" in roles or "platform-admin" in roles:
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin permissions required")
+
+@router.get("/templates")
+def list_templates(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> list:
+    require_admin(user, settings)
+    tenant = resolve_user_context(user, settings)
+    from app.db.tenant_engine import get_tenant_db_session
+    from app.models.user_shell_prefs import ShellPrefsTemplateRow
+    with get_tenant_db_session(tenant) as session:
+        rows = session.query(ShellPrefsTemplateRow).filter(ShellPrefsTemplateRow.tenant == tenant).all()
+        return [
+            {
+                "id": r.id,
+                "name": r.name,
+                "hasBackground": r.background is not None,
+                "prefs_json": r.prefs_json or {},
+            }
+            for r in rows
+        ]
+
+@router.post("/templates", status_code=status.HTTP_201_CREATED)
+def create_template(
+    body: CreateTemplateRequest,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    require_admin(user, settings)
+    tenant = resolve_user_context(user, settings)
+    from app.db.tenant_engine import get_tenant_db_session
+    from app.models.user_shell_prefs import UserShellPrefsRow, ShellPrefsTemplateRow
+    with get_tenant_db_session(tenant) as session:
+        source = session.get(UserShellPrefsRow, {"user_sub": body.source_user_sub, "tenant": tenant})
+        bg_data = source.background if source else None
+        bg_mime = source.background_mime if source else None
+        prefs = source.prefs_json if source else None
+
+        template_id = str(uuid.uuid4())
+        template = ShellPrefsTemplateRow(
+            id=template_id,
+            tenant=tenant,
+            name=body.name,
+            background=bg_data,
+            background_mime=bg_mime,
+            prefs_json=prefs,
+        )
+        session.add(template)
+        session.commit()
+        return {
+            "id": template_id,
+            "name": template.name,
+            "hasBackground": template.background is not None,
+            "prefs_json": template.prefs_json or {},
+        }
+
+@router.delete("/templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_template(
+    template_id: str,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> None:
+    require_admin(user, settings)
+    tenant = resolve_user_context(user, settings)
+    from app.db.tenant_engine import get_tenant_db_session
+    from app.models.user_shell_prefs import ShellPrefsTemplateRow
+    with get_tenant_db_session(tenant) as session:
+        row = session.get(ShellPrefsTemplateRow, {"id": template_id, "tenant": tenant})
+        if row:
+            session.delete(row)
+            session.commit()
+
+@router.post("/templates/{template_id}/apply", status_code=status.HTTP_204_NO_CONTENT)
+def apply_template(
+    template_id: str,
+    body: ApplyTemplateRequest,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> None:
+    require_admin(user, settings)
+    tenant = resolve_user_context(user, settings)
+    from app.db.tenant_engine import get_tenant_db_session
+    from app.models.user_shell_prefs import UserShellPrefsRow, ShellPrefsTemplateRow
+    with get_tenant_db_session(tenant) as session:
+        template = session.get(ShellPrefsTemplateRow, {"id": template_id, "tenant": tenant})
+        if not template:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+        
+        target = session.get(UserShellPrefsRow, {"user_sub": body.target_user_sub, "tenant": tenant})
+        if target is None:
+            target = UserShellPrefsRow(user_sub=body.target_user_sub, tenant=tenant)
+            session.add(target)
+        target.background = template.background
+        target.background_mime = template.background_mime
+        target.prefs_json = template.prefs_json
+        session.commit()

@@ -10,12 +10,14 @@ import { NotificationsSection } from "@/admin/NotificationsSection";
 import { PlatformSecuritySection } from "@/admin/PlatformSecuritySection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
 import { SessionsSection } from "@/admin/SessionsSection";
+import { TemplatesSection } from "@/admin/TemplatesSection";
 import "./admin.css";
 
 type AdminTab =
   | "members"
   | "invitations"
   | "groups"
+  | "templates"
   | "security"
   | "integrations"
   | "platform"
@@ -114,6 +116,13 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
           </button>
           <button
             type="button"
+            className={`admin-console__tab${tab === "templates" ? " admin-console__tab--active" : ""}`}
+            onClick={() => setTab("templates")}
+          >
+            Templates
+          </button>
+          <button
+            type="button"
             className={`admin-console__tab${tab === "security" ? " admin-console__tab--active" : ""}`}
             onClick={() => setTab("security")}
           >
@@ -175,6 +184,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             />
           ) : tab === "groups" ? (
             <GroupsSection tenant={tenant} />
+          ) : tab === "templates" ? (
+            <TemplatesSection tenant={tenant} />
           ) : tab === "security" ? (
             <SecurityPoliciesSection tenant={tenant} />
           ) : tab === "integrations" ? (
