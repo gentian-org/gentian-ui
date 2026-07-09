@@ -172,6 +172,7 @@
   --gtn-font-sans:var(--font-sans);
   --gtn-font-mono:var(--font-mono);
   --gtn-focus-ring: var(--focus-ring);
+  --gtn-accent: var(--accent);
 
   /* WinBox + app menu layout */
   --winbox-header-height: 40px;
