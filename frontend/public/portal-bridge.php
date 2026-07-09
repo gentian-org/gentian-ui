@@ -153,7 +153,10 @@ if (file_exists(__DIR__ . '/lib/base.php')) {
                     $default = '/index.php/f/' . $newest->getId();
                 } else {
                     // Create default file
-                    $richdoc_template = \OC::$SERVERROOT . '/apps/richdocuments/assets/odxtemplates/' . $types[$open]['template'];
+                    $richdoc_template = \OC::$SERVERROOT . '/custom_apps/richdocuments/emptyTemplates/' . $types[$open]['template'];
+                    if (!file_exists($richdoc_template)) {
+                        $richdoc_template = \OC::$SERVERROOT . '/apps/richdocuments/emptyTemplates/' . $types[$open]['template'];
+                    }
                     if (!file_exists($richdoc_template)) {
                         $richdoc_template = \OC::$SERVERROOT . '/core/templates/' . $types[$open]['template'];
                     }
