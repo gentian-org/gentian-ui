@@ -150,8 +150,15 @@ export function AppMenu({
             currentIds.push(itemId);
           }
 
+          // If the item was dragged from the desktop ("existing"), we must remove it from desktopTiles
+          let nextDesktopTiles = prev.desktopTiles || [];
+          if (data.type === "existing") {
+            nextDesktopTiles = nextDesktopTiles.filter((t) => t.id !== data.id);
+          }
+
           return {
             ...prev,
+            desktopTiles: nextDesktopTiles,
             menuAppIds: currentIds,
           };
         });
