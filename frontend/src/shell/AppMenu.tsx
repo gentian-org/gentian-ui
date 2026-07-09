@@ -31,6 +31,7 @@ export function AppMenu({
 
   const menuAppIds = usePrefsStore((s) => s.customPrefs.menuAppIds);
   const updateCustomPrefs = usePrefsStore((s) => s.updateCustomPrefs);
+  const desktopTiles = usePrefsStore((s) => s.customPrefs.desktopTiles) || [];
 
   // If menuAppIds is defined, show only those apps in specified order.
   // Otherwise, show all apps by default.
@@ -79,6 +80,20 @@ export function AppMenu({
             menuAppIds: [...currentIds, appId],
           };
         });
+      } else if (data.type === "existing") {
+        const tileId = data.id;
+        const tile = desktopTiles.find((t) => t.id === tileId);
+        if (tile && tile.type === "app" && tile.appId) {
+          const appId = tile.appId;
+          void updateCustomPrefs((prev) => {
+            const currentIds = prev.menuAppIds || apps.map((a) => a.id);
+            if (currentIds.includes(appId)) return prev;
+            return {
+              ...prev,
+              menuAppIds: [...currentIds, appId],
+            };
+          });
+        }
       } else if (data.type === "menu-app") {
         // Dragging existing slot inside the menu bar to reorder
         const dragId = data.id;
