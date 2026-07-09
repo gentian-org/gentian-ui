@@ -2,19 +2,20 @@ import { useEffect, useState } from "react";
 import type { ShellApp } from "@/api/client";
 import { tileIconUrl } from "@/lib/tiles";
 import { usePrefsStore } from "@/stores/prefs";
+import type { MenuItem } from "@/shell/AppMenu";
 
 type AppMenuSlotProps = {
-  app: ShellApp;
+  item: MenuItem;
   isActive: boolean;
   onSelect: (app: ShellApp, options?: { forceNewWindow?: boolean }) => void;
   onUnpin: () => void;
 };
 
-export function AppMenuSlot({ app, isActive, onSelect, onUnpin }: AppMenuSlotProps) {
+export function AppMenuSlot({ item, isActive, onSelect, onUnpin }: AppMenuSlotProps) {
   const customizations = usePrefsStore((s) => s.customPrefs.tileCustomizations);
-  const custom = customizations?.[app.id];
-  const displayTitle = custom?.title || app.title;
-  const displayIcon = custom?.icon || app.icon;
+  const custom = item.isLink ? null : customizations?.[item.id];
+  const displayTitle = custom?.title || item.title;
+  const displayIcon = custom?.icon || item.icon;
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -36,7 +37,7 @@ export function AppMenuSlot({ app, isActive, onSelect, onUnpin }: AppMenuSlotPro
   return (
     <div
       className="app-menu-slot"
-      data-id={app.id}
+      data-id={item.id}
       style={{ position: "relative", display: "inline-block" }}
     >
       <button
@@ -48,13 +49,13 @@ export function AppMenuSlot({ app, isActive, onSelect, onUnpin }: AppMenuSlotPro
         onDragStart={(e) => {
           e.dataTransfer.setData(
             "application/json",
-            JSON.stringify({ type: "menu-app", id: app.id }),
+            JSON.stringify({ type: "menu-app", id: item.id }),
           );
         }}
         onContextMenu={handleContextMenu}
         onClick={(e) => {
           const forceNewWindow = e.ctrlKey || e.metaKey;
-          onSelect(app, { forceNewWindow });
+          onSelect(item.app as ShellApp, { forceNewWindow });
         }}
         style={{
           width: "var(--app-menu-slot-width, 44px)",

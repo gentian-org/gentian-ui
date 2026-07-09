@@ -5,15 +5,26 @@ import { AppLauncher } from "@/shell/AppLauncher";
 import { AppMenuSlot } from "@/shell/AppMenuSlot";
 import { NotificationInbox } from "@/shell/NotificationInbox";
 import { AppsGridIcon, MenuIcon, TrayButton } from "@/shell/TrayButton";
-import { usePrefsStore } from "@/stores/prefs";
+import { usePrefsStore, type DesktopTile } from "@/stores/prefs";
 
 type AppMenuProps = {
   apps: ShellApp[];
   activeAppId: string | null;
   username?: string;
   onSelect: (app: ShellApp, options?: { forceNewWindow?: boolean }) => void;
+  onOpenLinkWindow?: (tile: DesktopTile) => void;
   onOpenAccount?: () => void;
   onOpenSettings?: () => void;
+};
+
+export type MenuItem = {
+  id: string;
+  title: string;
+  icon: string;
+  isLink: boolean;
+  url?: string;
+  openMode?: "iframe" | "tab";
+  app?: ShellApp;
 };
 
 export function AppMenu({
@@ -21,6 +32,7 @@ export function AppMenu({
   activeAppId,
   username,
   onSelect,
+  onOpenLinkWindow,
   onOpenAccount,
   onOpenSettings,
 }: AppMenuProps) {
@@ -33,13 +45,45 @@ export function AppMenu({
   const updateCustomPrefs = usePrefsStore((s) => s.updateCustomPrefs);
   const desktopTiles = usePrefsStore((s) => s.customPrefs.desktopTiles) || [];
 
-  // If menuAppIds is defined, show only those apps in specified order.
-  // Otherwise, show all apps by default.
-  const visibleApps = menuAppIds
+  const visibleItems: MenuItem[] = menuAppIds
     ? menuAppIds
-        .map((id) => apps.find((a) => a.id === id))
-        .filter((a): a is ShellApp => Boolean(a))
-    : apps;
+        .map((id): MenuItem | null => {
+          if (id.startsWith("link:")) {
+            const tileId = id.substring(5);
+            const tile = desktopTiles.find((t) => t.id === tileId);
+            if (tile) {
+              return {
+                id,
+                title: tile.title,
+                icon: tile.icon,
+                isLink: true,
+                url: tile.url,
+                openMode: tile.openMode,
+              };
+            }
+            return null;
+          } else {
+            const app = apps.find((a) => a.id === id);
+            if (app) {
+              return {
+                id: app.id,
+                title: app.title,
+                icon: app.icon,
+                isLink: false,
+                app,
+              };
+            }
+            return null;
+          }
+        })
+        .filter((item): item is MenuItem => item !== null)
+    : apps.map((app) => ({
+        id: app.id,
+        title: app.title,
+        icon: app.icon,
+        isLink: false,
+        app,
+      }));
 
   useEffect(() => {
     if (!userMenuOpen) {
@@ -83,14 +127,14 @@ export function AppMenu({
       } else if (data.type === "existing") {
         const tileId = data.id;
         const tile = desktopTiles.find((t) => t.id === tileId);
-        if (tile && tile.type === "app" && tile.appId) {
-          const appId = tile.appId;
+        if (tile) {
+          const itemId = tile.type === "app" && tile.appId ? tile.appId : `link:${tile.id}`;
           void updateCustomPrefs((prev) => {
             const currentIds = prev.menuAppIds || apps.map((a) => a.id);
-            if (currentIds.includes(appId)) return prev;
+            if (currentIds.includes(itemId)) return prev;
             return {
               ...prev,
-              menuAppIds: [...currentIds, appId],
+              menuAppIds: [...currentIds, itemId],
             };
           });
         }
@@ -122,12 +166,12 @@ export function AppMenu({
     }
   }
 
-  function handleUnpin(appId: string) {
+  function handleUnpin(itemId: string) {
     void updateCustomPrefs((prev) => {
       const currentIds = prev.menuAppIds || apps.map((a) => a.id);
       return {
         ...prev,
-        menuAppIds: currentIds.filter((id) => id !== appId),
+        menuAppIds: currentIds.filter((id) => id !== itemId),
       };
     });
   }
@@ -150,13 +194,31 @@ export function AppMenu({
           onDragOver={handleTrackDragOver}
           onDrop={handleTrackDrop}
         >
-          {visibleApps.map((app) => (
+          {visibleItems.map((item) => (
             <AppMenuSlot
-              key={app.id}
-              app={app}
-              isActive={activeAppId === app.id}
-              onSelect={onSelect}
-              onUnpin={() => handleUnpin(app.id)}
+              key={item.id}
+              item={item}
+              isActive={item.isLink ? false : activeAppId === item.id}
+              onSelect={(_app, options) => {
+                if (item.isLink && item.url) {
+                  if (item.openMode === "tab" || options?.forceNewWindow || !onOpenLinkWindow) {
+                    window.open(item.url, "_blank");
+                  } else {
+                    onOpenLinkWindow({
+                      id: item.id.substring(5),
+                      type: "link",
+                      title: item.title,
+                      icon: item.icon,
+                      url: item.url,
+                      openMode: item.openMode,
+                      position: { x: 0, y: 0 },
+                    });
+                  }
+                } else if (item.app) {
+                  onSelect(item.app, options);
+                }
+              }}
+              onUnpin={() => handleUnpin(item.id)}
             />
           ))}
         </div>

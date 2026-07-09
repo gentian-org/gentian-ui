@@ -217,13 +217,20 @@ import httpx
 @router.get("/check-iframe")
 async def check_iframe_embeddable(url: str) -> dict:
     try:
-        async with httpx.AsyncClient() as client:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        async with httpx.AsyncClient(headers=headers) as client:
             resp = await client.head(url, timeout=2.0, follow_redirects=True)
             if resp.status_code in {404, 405}:
                 resp = await client.get(url, timeout=2.0, follow_redirects=True)
-            headers = resp.headers
-            x_frame = headers.get("x-frame-options", "").lower()
-            csp = headers.get("content-security-policy", "").lower()
+            
+            if resp.status_code in {401, 403}:
+                return {"embeddable": False}
+
+            resp_headers = resp.headers
+            x_frame = resp_headers.get("x-frame-options", "").lower()
+            csp = resp_headers.get("content-security-policy", "").lower()
             if "deny" in x_frame or "sameorigin" in x_frame:
                 return {"embeddable": False}
             if "frame-ancestors" in csp:

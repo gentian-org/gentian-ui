@@ -229,6 +229,25 @@ export function DesktopPage() {
       const data = JSON.parse(rawData);
 
       if (data.type === "app" || data.type === "menu-app") {
+        if (data.type === "menu-app" && data.id.startsWith("link:")) {
+          const tileId = data.id.substring(5);
+          const snapped = snapToGrid(x - 46, y - 49);
+          void updateCustomPrefs((prev) => {
+            let nextMenuAppIds = prev.menuAppIds;
+            if (nextMenuAppIds) {
+              nextMenuAppIds = nextMenuAppIds.filter((id) => id !== data.id);
+            }
+            return {
+              ...prev,
+              desktopTiles: (prev.desktopTiles || []).map((t) =>
+                t.id === tileId ? { ...t, position: snapped } : t
+              ),
+              menuAppIds: nextMenuAppIds,
+            };
+          });
+          return;
+        }
+
         const app = apps.find((a) => a.id === data.id);
         if (!app) return;
 
@@ -303,6 +322,7 @@ export function DesktopPage() {
         activeAppId={activeAppId}
         username={me?.username}
         onSelect={handleSelect}
+        onOpenLinkWindow={handleOpenLinkWindow}
         onOpenAccount={() => openBuiltinPanel("account", "Account", "account")}
         onOpenSettings={() => openBuiltinPanel("settings", "Settings", "settings")}
       />
