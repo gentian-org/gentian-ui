@@ -210,3 +210,25 @@ def apply_template(
         target.background_mime = template.background_mime
         target.prefs_json = template.prefs_json
         session.commit()
+
+
+import httpx
+
+@router.get("/check-iframe")
+async def check_iframe_embeddable(url: str) -> dict:
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.head(url, timeout=2.0, follow_redirects=True)
+            if resp.status_code in {404, 405}:
+                resp = await client.get(url, timeout=2.0, follow_redirects=True)
+            headers = resp.headers
+            x_frame = headers.get("x-frame-options", "").lower()
+            csp = headers.get("content-security-policy", "").lower()
+            if "deny" in x_frame or "sameorigin" in x_frame:
+                return {"embeddable": False}
+            if "frame-ancestors" in csp:
+                if "frame-ancestors *" not in csp and ("frame-ancestors 'none'" in csp or "self" in csp or "'self'" in csp):
+                    return {"embeddable": False}
+            return {"embeddable": True}
+    except Exception:
+        return {"embeddable": True}

@@ -154,3 +154,13 @@ async def test_templates_crud_and_apply():
         assert list_res3.json() == []
 
 
+@pytest.mark.asyncio
+async def test_check_iframe_embeddable():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get("/api/v1/prefs/check-iframe?url=https://www.google.com")
+        assert res.status_code == 200
+        data = res.json()
+        assert "embeddable" in data
+
+

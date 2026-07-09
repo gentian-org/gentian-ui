@@ -1085,3 +1085,56 @@
   text-decoration: underline;
 }
 
+/* Custom scrollbar styling inside shell windows */
+.shell-window *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.shell-window *::-webkit-scrollbar-track {
+  background: var(--gtn-paper-0);
+}
+.shell-window *::-webkit-scrollbar-thumb {
+  background: var(--gtn-ink-5);
+  border-radius: var(--gtn-r1);
+  border: 2px solid var(--gtn-paper-0);
+}
+.shell-window *::-webkit-scrollbar-thumb:hover {
+  background: var(--gtn-ink-4);
+}
+
+.iframe-fallback-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--gtn-paper-1);
+  padding: 2rem;
+  text-align: center;
+  gap: 1.5rem;
+}
+
+.iframe-fallback-text {
+  font-size: 14px;
+  color: var(--gtn-ink-2);
+  max-width: 400px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.iframe-fallback-button {
+  padding: 8px 16px;
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-accent);
+  color: #ffffff;
+  border: none;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: var(--gtn-shadow-1);
+  transition: background var(--gtn-dur-1);
+}
+
+.iframe-fallback-button:hover {
+  background: var(--gtn-600);
+}
+

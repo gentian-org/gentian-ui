@@ -88,3 +88,7 @@ export function applyTemplate(templateId: string, targetUserSub: string) {
     body: JSON.stringify({ target_user_sub: targetUserSub }),
   });
 }
+
+export function checkIframeEmbeddable(url: string) {
+  return apiFetch<{ embeddable: boolean }>(`/prefs/check-iframe?url=${encodeURIComponent(url)}`);
+}
