@@ -52,14 +52,25 @@ export function CustomizeTileModal({
 
   function handleFormSave(e: React.FormEvent) {
     e.preventDefault();
-    if (isLink && !url) {
-      alert("Please enter a URL.");
-      return;
+    let finalUrl = url.trim();
+    if (isLink) {
+      if (!finalUrl) {
+        alert("Please enter a URL.");
+        return;
+      }
+      // Auto-prefix protocol if missing
+      if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(finalUrl)) {
+        if (finalUrl.startsWith("//")) {
+          finalUrl = `https:${finalUrl}`;
+        } else {
+          finalUrl = `https://${finalUrl}`;
+        }
+      }
     }
     onSave({
       title: title.trim() || initialTitle,
       icon,
-      ...(isLink ? { url: url.trim(), openMode } : {}),
+      ...(isLink ? { url: finalUrl, openMode } : {}),
     });
   }
 
@@ -98,10 +109,20 @@ export function CustomizeTileModal({
               <div className="customize-modal-field">
                 <label className="customize-modal-label">URL</label>
                 <input
-                  type="url"
+                  type="text"
                   className="customize-modal-input"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
+                  onBlur={(e) => {
+                    const trimmed = e.target.value.trim();
+                    if (trimmed && !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)) {
+                      if (trimmed.startsWith("//")) {
+                        setUrl(`https:${trimmed}`);
+                      } else {
+                        setUrl(`https://${trimmed}`);
+                      }
+                    }
+                  }}
                   placeholder="https://example.com"
                   required
                 />
