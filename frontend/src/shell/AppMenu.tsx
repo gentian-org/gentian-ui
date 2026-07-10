@@ -150,11 +150,10 @@ export function AppMenu({
             currentIds.push(itemId);
           }
 
-          // If the item was dragged from the desktop ("existing"), we must remove it from desktopTiles
-          let nextDesktopTiles = prev.desktopTiles || [];
-          if (data.type === "existing") {
-            nextDesktopTiles = nextDesktopTiles.filter((t) => t.id !== data.id);
-          }
+          // If the item was dragged from the desktop ("existing"), we keep it in desktopTiles
+          // so its metadata is preserved, but it is filtered out of DesktopShortcuts rendering
+          // since its ID is now in menuAppIds.
+          const nextDesktopTiles = prev.desktopTiles || [];
 
           return {
             ...prev,
