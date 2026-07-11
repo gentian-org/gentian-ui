@@ -39,6 +39,9 @@ export function AppMenu({
   const [launcherOpen, setLauncherOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  // dragOverIndex: insertion position (0 = before first slot, N = after last slot)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const { logout } = useAuth();
 
   const menuAppIds = usePrefsStore((s) => s.customPrefs.menuAppIds);
@@ -102,9 +105,29 @@ export function AppMenu({
     setUserMenuOpen(false);
   }
 
+  /** Compute which insertion index (0..N) corresponds to the current mouse X in the track. */
+  function computeDropIndex(clientX: number): number {
+    if (!trackRef.current) return visibleItems.length;
+    const slots = Array.from(trackRef.current.querySelectorAll<HTMLElement>(".app-menu-slot"));
+    for (let i = 0; i < slots.length; i++) {
+      const rect = slots[i].getBoundingClientRect();
+      const mid = rect.left + rect.width / 2;
+      if (clientX < mid) return i;
+    }
+    return slots.length;
+  }
+
   function handleTrackDragOver(e: React.DragEvent) {
     e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
+    e.dataTransfer.dropEffect = "move";
+    setDragOverIndex(computeDropIndex(e.clientX));
+  }
+
+  function handleTrackDragLeave(e: React.DragEvent) {
+    // Only clear if leaving the track entirely (not entering a child)
+    if (!trackRef.current?.contains(e.relatedTarget as Node)) {
+      setDragOverIndex(null);
+    }
   }
 
   function handleTrackDrop(e: React.DragEvent) {
@@ -117,6 +140,9 @@ export function AppMenu({
       if (!rawData) return;
       const data = JSON.parse(rawData);
 
+      // Compute insertion index from pointer position
+      const insertAt = computeDropIndex(e.clientX);
+
       if (data.type === "app" || data.type === "existing") {
         const itemId = data.type === "app"
           ? data.id
@@ -126,33 +152,20 @@ export function AppMenu({
             })();
         if (!itemId) return;
 
-        // Check if dropped on a specific menu item slot
-        const targetElement = (e.target as HTMLElement).closest(".app-menu-slot");
-        const targetId = targetElement ? targetElement.getAttribute("data-id") : null;
-
         void updateCustomPrefs((prev) => {
           const currentIds = [...(prev.menuAppIds || apps.map((a) => a.id))];
 
-          // If it already exists in the menu, remove it so we can insert/reposition it
+          // Remove if already present (so re-pin replaces)
           const existingIdx = currentIds.indexOf(itemId);
+          let adjustedInsert = insertAt;
           if (existingIdx !== -1) {
             currentIds.splice(existingIdx, 1);
+            // Adjust insertion index if we removed an item before the target
+            if (existingIdx < adjustedInsert) adjustedInsert--;
           }
+          currentIds.splice(Math.min(adjustedInsert, currentIds.length), 0, itemId);
 
-          if (targetId) {
-            const targetIdx = currentIds.indexOf(targetId);
-            if (targetIdx !== -1) {
-              currentIds.splice(targetIdx, 0, itemId);
-            } else {
-              currentIds.push(itemId);
-            }
-          } else {
-            currentIds.push(itemId);
-          }
-
-          // If the item was dragged from the desktop ("existing"), we keep it in desktopTiles
-          // so its metadata is preserved, but it is filtered out of DesktopShortcuts rendering
-          // since its ID is now in menuAppIds.
+          // Keep desktopTiles metadata intact for link tiles
           const nextDesktopTiles = prev.desktopTiles || [];
 
           return {
@@ -162,21 +175,18 @@ export function AppMenu({
           };
         });
       } else if (data.type === "menu-app") {
-        // Dragging existing slot inside the menu bar to reorder
+        // Reordering existing slot inside the menu bar
         const dragId = data.id;
-        const targetElement = (e.target as HTMLElement).closest(".app-menu-slot");
-        if (!targetElement) return;
-        const targetId = targetElement.getAttribute("data-id");
-        if (!targetId || targetId === dragId) return;
 
         void updateCustomPrefs((prev) => {
           const currentIds = [...(prev.menuAppIds || apps.map((a) => a.id))];
           const dragIdx = currentIds.indexOf(dragId);
-          const targetIdx = currentIds.indexOf(targetId);
-          if (dragIdx === -1 || targetIdx === -1) return prev;
+          if (dragIdx === -1) return prev;
 
+          let adjustedInsert = insertAt;
           currentIds.splice(dragIdx, 1);
-          currentIds.splice(targetIdx, 0, dragId);
+          if (dragIdx < adjustedInsert) adjustedInsert--;
+          currentIds.splice(Math.min(adjustedInsert, currentIds.length), 0, dragId);
 
           return {
             ...prev,
@@ -186,6 +196,8 @@ export function AppMenu({
       }
     } catch (err) {
       console.error("Failed to handle track drop:", err);
+    } finally {
+      setDragOverIndex(null);
     }
   }
 
@@ -213,37 +225,49 @@ export function AppMenu({
         </button>
 
         <div
+          ref={trackRef}
           className="app-menu__track"
           onDragOver={handleTrackDragOver}
+          onDragLeave={handleTrackDragLeave}
           onDrop={handleTrackDrop}
         >
-          {visibleItems.map((item) => (
-            <AppMenuSlot
-              key={item.id}
-              item={item}
-              isActive={item.isLink ? false : activeAppId === item.id}
-              onSelect={(_app, options) => {
-                if (item.isLink && item.url) {
-                  if (item.openMode === "tab" || options?.forceNewWindow || !onOpenLinkWindow) {
-                    window.open(item.url, "_blank");
-                  } else {
-                    onOpenLinkWindow({
-                      id: item.id.substring(5),
-                      type: "link",
-                      title: item.title,
-                      icon: item.icon,
-                      url: item.url,
-                      openMode: item.openMode,
-                      position: { x: 0, y: 0 },
-                    });
+          {visibleItems.map((item, idx) => (
+            <>
+              {/* Drop indicator: rendered before each slot when dragging */}
+              {dragOverIndex === idx && (
+                <div className="app-menu__drop-indicator" key={`indicator-${idx}`} />
+              )}
+              <AppMenuSlot
+                key={item.id}
+                item={item}
+                isActive={item.isLink ? false : activeAppId === item.id}
+                onSelect={(_app, options) => {
+                  if (item.isLink && item.url) {
+                    if (item.openMode === "tab" || options?.forceNewWindow || !onOpenLinkWindow) {
+                      window.open(item.url, "_blank");
+                    } else {
+                      onOpenLinkWindow({
+                        id: item.id.substring(5),
+                        type: "link",
+                        title: item.title,
+                        icon: item.icon,
+                        url: item.url,
+                        openMode: item.openMode,
+                        position: { x: 0, y: 0 },
+                      });
+                    }
+                  } else if (item.app) {
+                    onSelect(item.app, options);
                   }
-                } else if (item.app) {
-                  onSelect(item.app, options);
-                }
-              }}
-              onUnpin={() => handleUnpin(item.id)}
-            />
+                }}
+                onUnpin={() => handleUnpin(item.id)}
+              />
+            </>
           ))}
+          {/* Drop indicator at the end of the list */}
+          {dragOverIndex === visibleItems.length && (
+            <div className="app-menu__drop-indicator" />
+          )}
         </div>
 
         <div className="app-menu__tray" ref={menuRef}>

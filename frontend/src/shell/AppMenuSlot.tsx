@@ -9,9 +9,10 @@ type AppMenuSlotProps = {
   isActive: boolean;
   onSelect: (app: ShellApp, options?: { forceNewWindow?: boolean }) => void;
   onUnpin: () => void;
+  onDragStarted?: () => void;
 };
 
-export function AppMenuSlot({ item, isActive, onSelect, onUnpin }: AppMenuSlotProps) {
+export function AppMenuSlot({ item, isActive, onSelect, onUnpin, onDragStarted }: AppMenuSlotProps) {
   const customizations = usePrefsStore((s) => s.customPrefs.tileCustomizations);
   const custom = item.isLink ? null : customizations?.[item.id];
   const displayTitle = custom?.title || item.title;
@@ -47,6 +48,7 @@ export function AppMenuSlot({ item, isActive, onSelect, onUnpin }: AppMenuSlotPr
         title={displayTitle}
         draggable
         onDragStart={(e) => {
+          onDragStarted?.();
           const payload = JSON.stringify({ type: "menu-app", id: item.id });
           e.dataTransfer.setData("application/json", payload);
           e.dataTransfer.setData("text/plain", payload);

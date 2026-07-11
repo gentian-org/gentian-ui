@@ -261,6 +261,23 @@
   display: none;
 }
 
+/* Vertical insertion-cursor shown during drag-reorder in the menu bar */
+.app-menu__drop-indicator {
+  width: 2px;
+  height: 32px;
+  border-radius: 1px;
+  background: var(--gtn-accent, #6b73ff);
+  flex-shrink: 0;
+  pointer-events: none;
+  box-shadow: 0 0 6px 1px color-mix(in srgb, var(--gtn-accent, #6b73ff) 60%, transparent);
+  animation: menu-drop-fade-in 80ms ease;
+}
+
+@keyframes menu-drop-fade-in {
+  from { opacity: 0; transform: scaleY(0.5); }
+  to   { opacity: 1; transform: scaleY(1); }
+}
+
 .app-menu__tray {
   position: relative;
   flex-shrink: 0;
