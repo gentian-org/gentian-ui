@@ -9,7 +9,7 @@ export function MobileAppLayer({ url, title }: MobileAppLayerProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-10 flex flex-col pb-20 pt-4">
+    <div className="fixed inset-0 z-10 flex flex-col pb-14">
       <iframe
         title={title}
         src={url}

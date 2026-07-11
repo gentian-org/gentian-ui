@@ -252,8 +252,9 @@
   gap: 2px;
   flex: 1;
   overflow-x: auto;
-  justify-content: center;
+  justify-content: safe center;
   scrollbar-width: none;
+  padding: 0 4px;
 }
 
 .app-menu__track::-webkit-scrollbar {
