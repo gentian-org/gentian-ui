@@ -41,6 +41,10 @@ export function AppLauncher({ apps, onSelect, onClose }: AppLauncherProps) {
                   e.dataTransfer.setData("application/json", payload);
                   e.dataTransfer.setData("text/plain", payload);
                   e.dataTransfer.effectAllowed = "copyMove";
+                  // Close the launcher so its full-screen overlay doesn't block
+                  // the subsequent dragover/drop events on the desktop and menu bar.
+                  // The drag ghost remains active after the launcher unmounts.
+                  setTimeout(onClose, 0);
                 }}
                 onClick={(e) => {
                   const forceNewWindow = e.ctrlKey || e.metaKey;

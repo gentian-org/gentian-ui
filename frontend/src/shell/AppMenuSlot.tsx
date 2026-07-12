@@ -91,7 +91,7 @@ export function AppMenuSlot({ item, isActive, onSelect, onUnpin, onDragStarted }
           style={{
             position: "fixed",
             left: contextMenu.x,
-            top: contextMenu.y - 45, // offset up to display above bottom bar
+            bottom: window.innerHeight - contextMenu.y + 6,
             zIndex: 1000,
           }}
           onClick={(e) => e.stopPropagation()}
