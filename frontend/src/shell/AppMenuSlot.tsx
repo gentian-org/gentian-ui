@@ -31,8 +31,8 @@ export function AppMenuSlot({ item, isActive, onSelect, onUnpin, onDragStarted }
     function closeMenu() {
       setContextMenu(null);
     }
-    document.addEventListener("click", closeMenu);
-    return () => document.removeEventListener("click", closeMenu);
+    document.addEventListener("pointerdown", closeMenu);
+    return () => document.removeEventListener("pointerdown", closeMenu);
   }, [contextMenu]);
 
   return (
@@ -98,13 +98,14 @@ export function AppMenuSlot({ item, isActive, onSelect, onUnpin, onDragStarted }
         >
           <button
             type="button"
+            className="desktop-context-menu__delete"
             onClick={(e) => {
               e.stopPropagation();
               setContextMenu(null);
               onUnpin();
             }}
           >
-            Unpin from menu bar
+            Remove
           </button>
         </div>
       )}
