@@ -106,7 +106,15 @@ export function AppMenuSlot({ item, isActive, onSelect, onUnpin, onDragStarted }
           <button
             type="button"
             className="desktop-context-menu__delete"
-            onClick={() => {
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setContextMenu(null);
+              onUnpin();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
               setContextMenu(null);
               onUnpin();
             }}

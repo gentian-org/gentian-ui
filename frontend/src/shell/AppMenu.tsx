@@ -119,11 +119,13 @@ export function AppMenu({
 
   function handleTrackDragOver(e: React.DragEvent) {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = "move";
     setDragOverIndex(computeDropIndex(e.clientX));
   }
 
   function handleTrackDragLeave(e: React.DragEvent) {
+    e.stopPropagation();
     // Only clear if leaving the track entirely (not entering a child)
     if (!trackRef.current?.contains(e.relatedTarget as Node)) {
       setDragOverIndex(null);
@@ -132,6 +134,7 @@ export function AppMenu({
 
   function handleTrackDrop(e: React.DragEvent) {
     e.preventDefault();
+    e.stopPropagation();
     try {
       let rawData = e.dataTransfer.getData("application/json");
       if (!rawData) {
