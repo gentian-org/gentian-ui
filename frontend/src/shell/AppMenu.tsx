@@ -143,36 +143,39 @@ export function AppMenu({
       // Compute insertion index from pointer position
       const insertAt = computeDropIndex(e.clientX);
 
-      if (data.type === "app" || data.type === "existing") {
-        const itemId = data.type === "app"
-          ? data.id
-          : (() => {
-              const tile = desktopTiles.find((t) => t.id === data.id);
-              return tile ? (tile.type === "app" && tile.appId ? tile.appId : `link:${tile.id}`) : null;
-            })();
-        if (!itemId) return;
+      if (data.type === "app") {
+        // Drag from app launcher → quick bar: COPY (app stays in launcher)
+        const itemId = data.id;
 
         void updateCustomPrefs((prev) => {
           const currentIds = [...(prev.menuAppIds || apps.map((a) => a.id))];
-
-          // Remove if already present (so re-pin replaces)
           const existingIdx = currentIds.indexOf(itemId);
           let adjustedInsert = insertAt;
           if (existingIdx !== -1) {
             currentIds.splice(existingIdx, 1);
-            // Adjust insertion index if we removed an item before the target
             if (existingIdx < adjustedInsert) adjustedInsert--;
           }
           currentIds.splice(Math.min(adjustedInsert, currentIds.length), 0, itemId);
+          return { ...prev, menuAppIds: currentIds };
+        });
+      } else if (data.type === "existing") {
+        // Drag from desktop → quick bar: MOVE (remove desktop tile, pin to bar)
+        const tile = desktopTiles.find((t) => t.id === data.id);
+        if (!tile) return;
+        const itemId = tile.type === "app" && tile.appId ? tile.appId : `link:${tile.id}`;
 
-          // Keep desktopTiles metadata intact for link tiles
-          const nextDesktopTiles = prev.desktopTiles || [];
-
-          return {
-            ...prev,
-            desktopTiles: nextDesktopTiles,
-            menuAppIds: currentIds,
-          };
+        void updateCustomPrefs((prev) => {
+          const currentIds = [...(prev.menuAppIds || apps.map((a) => a.id))];
+          const existingIdx = currentIds.indexOf(itemId);
+          let adjustedInsert = insertAt;
+          if (existingIdx !== -1) {
+            currentIds.splice(existingIdx, 1);
+            if (existingIdx < adjustedInsert) adjustedInsert--;
+          }
+          currentIds.splice(Math.min(adjustedInsert, currentIds.length), 0, itemId);
+          // Remove from desktop (MOVE semantics)
+          const nextDesktopTiles = (prev.desktopTiles || []).filter((t) => t.id !== data.id);
+          return { ...prev, menuAppIds: currentIds, desktopTiles: nextDesktopTiles };
         });
       } else if (data.type === "menu-app") {
         // Reordering existing slot inside the menu bar

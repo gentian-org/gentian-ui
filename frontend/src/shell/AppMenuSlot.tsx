@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ShellApp } from "@/api/client";
 import { tileIconUrl } from "@/lib/tiles";
 import { usePrefsStore } from "@/stores/prefs";
@@ -19,6 +19,7 @@ export function AppMenuSlot({ item, isActive, onSelect, onUnpin, onDragStarted }
   const displayIcon = custom?.icon || item.icon;
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   function handleContextMenu(e: React.MouseEvent) {
     e.preventDefault();
@@ -26,13 +27,19 @@ export function AppMenuSlot({ item, isActive, onSelect, onUnpin, onDragStarted }
     setContextMenu({ x: e.clientX, y: e.clientY });
   }
 
+  // Close context menu when pointer goes down outside the menu div.
+  // We use a ref + containment check so the "Remove" button's click handler
+  // is never blocked by the dismiss listener (robust against React 18's
+  // root-level synthetic event delegation, where stopPropagation on React
+  // synthetic events cannot stop a native document listener that fires first).
   useEffect(() => {
     if (!contextMenu) return;
-    function closeMenu() {
+    function handleOutsidePointer(e: PointerEvent) {
+      if (contextMenuRef.current?.contains(e.target as Node)) return;
       setContextMenu(null);
     }
-    document.addEventListener("pointerdown", closeMenu);
-    return () => document.removeEventListener("pointerdown", closeMenu);
+    document.addEventListener("pointerdown", handleOutsidePointer);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointer);
   }, [contextMenu]);
 
   return (
@@ -87,6 +94,7 @@ export function AppMenuSlot({ item, isActive, onSelect, onUnpin, onDragStarted }
 
       {contextMenu && (
         <div
+          ref={contextMenuRef}
           className="desktop-context-menu"
           style={{
             position: "fixed",
@@ -94,14 +102,11 @@ export function AppMenuSlot({ item, isActive, onSelect, onUnpin, onDragStarted }
             bottom: window.innerHeight - contextMenu.y + 6,
             zIndex: 1000,
           }}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
         >
           <button
             type="button"
             className="desktop-context-menu__delete"
-            onClick={(e) => {
-              e.stopPropagation();
+            onClick={() => {
               setContextMenu(null);
               onUnpin();
             }}
