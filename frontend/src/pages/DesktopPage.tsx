@@ -234,21 +234,16 @@ export function DesktopPage() {
 
       if (data.type === "app" || data.type === "menu-app") {
         if (data.type === "menu-app" && data.id.startsWith("link:")) {
+          // Link tile dragged from the quick bar: move its desktop position
           const tileId = data.id.substring(5);
           const snapped = snapToGrid(x - 46, y - 49);
-          void updateCustomPrefs((prev) => {
-            let nextMenuAppIds = prev.menuAppIds;
-            if (nextMenuAppIds) {
-              nextMenuAppIds = nextMenuAppIds.filter((id) => id !== data.id);
-            }
-            return {
-              ...prev,
-              desktopTiles: (prev.desktopTiles || []).map((t) =>
-                t.id === tileId ? { ...t, position: snapped } : t
-              ),
-              menuAppIds: nextMenuAppIds,
-            };
-          });
+          void updateCustomPrefs((prev) => ({
+            ...prev,
+            desktopTiles: (prev.desktopTiles || []).map((t) =>
+              t.id === tileId ? { ...t, position: snapped } : t
+            ),
+            // keep menuAppIds unchanged — tile stays pinned in the quick bar too
+          }));
           return;
         }
 
@@ -260,20 +255,16 @@ export function DesktopPage() {
         // Check if there is already a shortcut for this app on the desktop
         const existing = (customPrefs.desktopTiles || []).find((t) => t.appId === app.id);
         if (existing) {
-          void updateCustomPrefs((prev) => {
-            let nextMenuAppIds = prev.menuAppIds;
-            if (data.type === "menu-app" && nextMenuAppIds) {
-              nextMenuAppIds = nextMenuAppIds.filter((id) => id !== app.id);
-            }
-            return {
-              ...prev,
-              desktopTiles: (prev.desktopTiles || []).map((t) =>
-                t.id === existing.id ? { ...t, position: snapped } : t
-              ),
-              menuAppIds: nextMenuAppIds,
-            };
-          });
+          // Move the existing desktop tile to the new position
+          void updateCustomPrefs((prev) => ({
+            ...prev,
+            desktopTiles: (prev.desktopTiles || []).map((t) =>
+              t.id === existing.id ? { ...t, position: snapped } : t
+            ),
+            // keep menuAppIds unchanged
+          }));
         } else {
+          // Create a new desktop shortcut — app stays in quick bar if it was there
           const newTile: DesktopTile = {
             id: crypto.randomUUID(),
             appId: app.id,
@@ -282,17 +273,11 @@ export function DesktopPage() {
             icon: app.icon,
             position: snapped,
           };
-          void updateCustomPrefs((prev) => {
-            let nextMenuAppIds = prev.menuAppIds;
-            if (data.type === "menu-app" && nextMenuAppIds) {
-              nextMenuAppIds = nextMenuAppIds.filter((id) => id !== app.id);
-            }
-            return {
-              ...prev,
-              desktopTiles: [...(prev.desktopTiles || []), newTile],
-              menuAppIds: nextMenuAppIds,
-            };
-          });
+          void updateCustomPrefs((prev) => ({
+            ...prev,
+            desktopTiles: [...(prev.desktopTiles || []), newTile],
+            // keep menuAppIds unchanged
+          }));
         }
       } else if (data.type === "existing") {
         const snapped = snapToGrid(x - 46, y - 49);

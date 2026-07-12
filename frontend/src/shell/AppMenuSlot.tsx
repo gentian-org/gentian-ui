@@ -94,6 +94,7 @@ export function AppMenuSlot({ item, isActive, onSelect, onUnpin, onDragStarted }
             bottom: window.innerHeight - contextMenu.y + 6,
             zIndex: 1000,
           }}
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
           <button

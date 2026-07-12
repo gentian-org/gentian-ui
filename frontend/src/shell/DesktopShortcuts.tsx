@@ -25,14 +25,9 @@ type DesktopShortcutsProps = {
 export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: DesktopShortcutsProps) {
   const rawTiles = usePrefsStore((s) => s.customPrefs.desktopTiles);
   const rawCustomizations = usePrefsStore((s) => s.customPrefs.tileCustomizations);
-  const menuAppIds = usePrefsStore((s) => s.customPrefs.menuAppIds);
   const updateCustomPrefs = usePrefsStore((s) => s.updateCustomPrefs);
 
   const tiles = rawTiles || [];
-  const visibleTiles = tiles.filter(
-    (t) =>
-      !menuAppIds?.includes(t.type === "app" && t.appId ? t.appId : `link:${t.id}`)
-  );
   const customizations = rawCustomizations || {};
   const [editingTile, setEditingTile] = useState<DesktopTile | null>(null);
   const [isCreatingLink, setIsCreatingLink] = useState(false);
@@ -164,7 +159,7 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
       className="desktop-shortcuts-container"
       onContextMenu={handleDesktopContextMenu}
     >
-      {visibleTiles.map((tile) => {
+      {tiles.map((tile) => {
         let displayTitle = tile.title;
         let displayIcon = tile.icon;
 
