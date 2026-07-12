@@ -100,9 +100,13 @@ def profile_auth_mode(profile: dict[str, Any], profile_name: str) -> str | None:
 
 def tile_icon(profile_spec: dict[str, Any], portal_tile: dict[str, Any]) -> str:
     tile_spec = portal_tile.get("tile") or {}
+    if tile_spec.get("logo"):
+        return str(tile_spec["logo"])
     if tile_spec.get("icon"):
         return str(tile_spec["icon"])
     profile_tile = profile_spec.get("tile") or {}
+    if profile_tile.get("logo"):
+        return str(profile_tile["logo"])
     if profile_tile.get("icon"):
         return str(profile_tile["icon"])
     return "app"
