@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { prepareEmbeddedOidcSession } from "@/auth/idpSession";
+import { prepareEmbeddedOidcSession, openIdpBootstrapPopup } from "@/auth/idpSession";
 import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
 import {
   fetchPortalBridgeTicket,
@@ -92,8 +92,16 @@ export function DesktopPage() {
       }
     }
 
+    const useIdpBootstrap =
+      app.authMode === "oidc" && app.linkTarget === "embedded" && !options?.forceLogin;
+    
+    // Open a blank off-screen popup synchronously during the user gesture to bypass popup blockers.
+    // This allows Keycloak to drop first-party cookies for embedded OIDC apps on privacy-strict browsers (e.g. mobile).
+    const idpPopup = useIdpBootstrap ? openIdpBootstrapPopup() : null;
+
     setActiveAppId(app.id);
     if (app.builtin && app.id === "admin") {
+      idpPopup?.close();
       if (options?.forceNewWindow) {
         // Builtins can't run in separate browser tab directly without routing wrapper, so we focus or open normal
         openOrFocusWindow({
@@ -113,6 +121,7 @@ export function DesktopPage() {
       return;
     }
     if (!app.launchUrl) {
+      idpPopup?.close();
       return;
     }
     const appLaunchBase = app.launchUrl;
@@ -122,9 +131,6 @@ export function DesktopPage() {
       app.authMode === "portal-bridge" &&
       app.linkTarget === "embedded" &&
       !options?.forceLogin;
-    const useIdpBootstrap =
-      app.authMode === "oidc" && app.linkTarget === "embedded" && !options?.forceLogin;
-    
     // Silent bootstrap loader template
     const loadingPage =
       "data:text/html;charset=utf-8," +
@@ -147,6 +153,7 @@ export function DesktopPage() {
       // If opening in a new window/tab, redirect top-level or open window immediately
       const openInNewTab = options?.forceNewWindow || linkTarget === "newwindow";
       if (openInNewTab) {
+        idpPopup?.close();
         window.open(appUrl, "_blank");
         return;
       }
@@ -188,7 +195,7 @@ export function DesktopPage() {
             return;
           }
         } else if (useIdpBootstrap) {
-          await prepareEmbeddedOidcSession(null);
+          await prepareEmbeddedOidcSession(idpPopup);
         }
 
         if (needsBridgeTicket && !options?.forceLogin) {

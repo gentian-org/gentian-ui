@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { prepareEmbeddedOidcSession } from "@/auth/idpSession";
+import { prepareEmbeddedOidcSession, openIdpBootstrapPopup } from "@/auth/idpSession";
 import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
 import {
   fetchPortalBridgeTicket,
@@ -99,8 +99,10 @@ export function MobilePage() {
       return;
     }
     if (app.authMode === "oidc" && app.linkTarget === "embedded") {
-      // Bootstrap Keycloak session silently in a same-site hidden iframe
-      void prepareEmbeddedOidcSession(null);
+      // Open the 1x1 off-screen popup during the user gesture to avoid popup blockers,
+      // and use it to bootstrap the first-party Keycloak session on mobile.
+      const popup = openIdpBootstrapPopup();
+      void prepareEmbeddedOidcSession(popup);
     }
   }
 
