@@ -100,6 +100,10 @@ async def reverse_proxy(
         resp_headers.pop("transfer-encoding", None)
         resp_headers.pop("content-length", None)
 
+        location = resp_headers.get("location")
+        if location and location.startswith(base_url):
+            resp_headers["location"] = location.replace(base_url, f"https://{hostname}", 1)
+
         async def generate():
             async for chunk in resp.aiter_bytes():
                 yield chunk
