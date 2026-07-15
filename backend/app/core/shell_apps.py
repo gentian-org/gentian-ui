@@ -36,6 +36,8 @@ def api_integration_launch_url(profile_spec: dict[str, Any], *, tenant: str, ker
     if profile_spec.get("deploymentMethod") != "api":
         return None
     api = profile_spec.get("apiIntegration") or {}
+    if api.get("runtime") == "portal-proxy" and profile_spec.get("ingress", {}).get("subDomain"):
+        return None
     base = str(api.get("baseUrl") or "").rstrip("/")
     if not base:
         return None
