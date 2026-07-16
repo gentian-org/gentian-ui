@@ -86,7 +86,7 @@ export function resolveLogoutUrl(
     client_id: clientId,
     post_logout_redirect_uri: `${window.location.origin}/login`,
   });
-  if (idToken) {
+  if (idToken && claims.azp !== "gentian-portal-bff") {
     params.set("id_token_hint", idToken);
   }
 
