@@ -147,3 +147,50 @@ def idp_session(
             secure=True,
         )
     return IdpSessionResponse(redirectUrl=redirect_url)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> None:
+    """Terminate the Keycloak SSO session of the current user via the Admin API."""
+    if settings.auth_disabled:
+        return
+
+    user_id = user.get("sub")
+    issuer = user.get("iss")
+    if not user_id or not issuer:
+        return
+
+    from app.services.keycloak_idp_session import realm_from_issuer
+    realm = realm_from_issuer(issuer)
+    if not realm:
+        return
+
+    from app.services.keycloak_user_groups import _fetch_admin_token
+    try:
+        admin_token = _fetch_admin_token(settings)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not reach the identity service",
+        ) from exc
+
+    if not admin_token:
+        return
+
+    import httpx
+    base = settings.keycloak_admin_url.rstrip("/")
+    url = f"{base}/admin/realms/{realm}/users/{user_id}/logout"
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, timeout=15.0)
+            response.raise_for_status()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to terminate identity session",
+        ) from exc
+

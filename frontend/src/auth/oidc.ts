@@ -219,17 +219,24 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
   window.location.href = `${config.issuer.replace(/\/$/, "")}/protocol/openid-connect/auth?${params}`;
 }
 
-export function logoutRedirect(): void {
-  const idToken = sessionStorage.getItem(ID_TOKEN_STORAGE_KEY);
+export async function logoutRedirect(): Promise<void> {
   const accessToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
-  const target = resolveLogoutUrl(idToken, accessToken);
-  clearAccessToken();
-  if (target) {
-    window.location.replace(target);
-    return;
+  if (accessToken) {
+    try {
+      await fetch("/api/v1/auth/logout", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+    } catch (e) {
+      console.error("Backchannel logout failed", e);
+    }
   }
+  clearAccessToken();
   window.location.replace("/login");
 }
+
 
 export function isAuthenticated(): boolean {
   const config = getOidcConfig();

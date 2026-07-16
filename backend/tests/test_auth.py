@@ -68,3 +68,14 @@ def test_issuer_allowed_rejects_unknown_issuer():
         KEYCLOAK_ADMIN_URL="http://keycloak.platform-kernel.svc:8080/auth",
     )
     assert not _issuer_allowed("https://evil.example/auth/realms/demo", settings)
+
+
+@pytest.mark.asyncio
+async def test_logout_endpoint_auth_disabled():
+    from httpx import ASGITransport, AsyncClient
+    from app.main import app
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/api/v1/auth/logout")
+        assert response.status_code == 204
+
