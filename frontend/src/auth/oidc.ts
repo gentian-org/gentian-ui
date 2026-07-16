@@ -77,16 +77,13 @@ export function resolveLogoutUrl(
   }
 
   const issuer = typeof claims.iss === "string" ? claims.iss : config.issuer;
-  const clientId =
-    typeof claims.azp === "string" && claims.azp !== "gentian-portal-bff"
-      ? claims.azp
-      : config.clientId;
+  const clientId = typeof claims.azp === "string" ? claims.azp : config.clientId;
 
   const params = new URLSearchParams({
     client_id: clientId,
     post_logout_redirect_uri: `${window.location.origin}/login`,
   });
-  if (idToken && claims.azp !== "gentian-portal-bff") {
+  if (idToken) {
     params.set("id_token_hint", idToken);
   }
 
