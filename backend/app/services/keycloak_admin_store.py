@@ -112,6 +112,9 @@ class KeycloakAdminStore:
         delivery_email = (invite_email or email).strip()
         if invite_email and invite_email.strip().lower() != email.strip().lower():
             attributes[INVITE_EMAIL_ATTR] = [invite_email.strip()]
+        actions = [UPDATE_PASSWORD_ACTION]
+        if require_totp:
+            actions.append(CONFIGURE_TOTP_ACTION)
         body = {
             "username": username,
             "email": email,
@@ -120,6 +123,7 @@ class KeycloakAdminStore:
             "enabled": True,
             "emailVerified": True,
             "attributes": attributes,
+            "requiredActions": actions,
         }
         response = await self._raw_request(
             "POST",
@@ -140,11 +144,13 @@ class KeycloakAdminStore:
                 raise HTTPException(status_code=500, detail="Created user not found")
             member_id = users[0]["id"]
         try:
+            raw_user = await self._request(
+                "GET",
+                f"/admin/realms/{quote(realm, safe='')}/users/{member_id}",
+            )
+            await self._set_required_actions(realm, member_id, raw_user, actions)
             if group_ids:
                 await self.set_member_groups(realm, member_id, group_ids)
-            actions = [UPDATE_PASSWORD_ACTION]
-            if require_totp:
-                actions.append(CONFIGURE_TOTP_ACTION)
             await self._execute_actions_email(
                 realm,
                 member_id,

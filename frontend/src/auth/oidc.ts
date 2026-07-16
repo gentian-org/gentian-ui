@@ -81,16 +81,6 @@ export function resolveLogoutUrl(
     typeof claims.azp === "string" && claims.azp !== "gentian-portal-bff"
       ? claims.azp
       : config.clientId;
-  const kernelRealm = realmFromIssuer(config.issuer);
-  const tokenRealm = realmFromIssuer(issuer);
-
-  // Password login uses gentian-portal-bff in tenant (or kernel) realms — no public OIDC logout.
-  if (
-    claims.azp === "gentian-portal-bff" ||
-    (tokenRealm && kernelRealm && tokenRealm !== kernelRealm)
-  ) {
-    return null;
-  }
 
   const params = new URLSearchParams({
     client_id: clientId,

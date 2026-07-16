@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   inviteMember,
   type AdminGroup,
@@ -88,15 +88,17 @@ export function InvitationsSection({
   const tenantDomain = getTenantDomain(tenant);
 
   // ── Filter out admin-only app IDs from the visible entitlement groups ──────
-  const visibleAppGroups = appEntitlementGroups.filter((g) => {
-    const appId = appIdFromGroup(g.name);
-    if (appId === null) return false;
-    const adminAppIds = ["app-store", "subscriptions", "gentian-subscriptions", "admin"];
-    return !adminAppIds.includes(appId);
-  });
+  const visibleAppGroups = useMemo(() => {
+    return appEntitlementGroups.filter((g) => {
+      const appId = appIdFromGroup(g.name);
+      if (appId === null) return false;
+      const adminAppIds = ["app-store", "subscriptions", "gentian-subscriptions", "admin"];
+      return !adminAppIds.includes(appId);
+    });
+  }, [appEntitlementGroups]);
 
   // ── Default group selection: all app entitlement groups ON, others OFF ────
-  const defaultAppGroupIds = () => visibleAppGroups.map((g) => g.id);
+  const defaultAppGroupIds = useCallback(() => visibleAppGroups.map((g) => g.id), [visibleAppGroups]);
 
   const [form, setForm] = useState({
     firstName: "",
@@ -257,6 +259,7 @@ export function InvitationsSection({
               id="inv-invite-email"
               type="email"
               required
+              autoComplete="off"
               value={form.inviteEmail}
               onChange={(e) => setForm((p) => ({ ...p, inviteEmail: e.target.value }))}
               placeholder="personal@example.com"
