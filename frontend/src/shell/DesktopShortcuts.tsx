@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { usePrefsStore, type DesktopTile } from "@/stores/prefs";
 import { tileIconUrl } from "@/lib/tiles";
 import { CustomizeTileModal } from "@/shell/CustomizeTileModal";
+import { AiWidget } from "@/shell/AiWidget";
 import type { ShellApp } from "@/api/client";
 
 const GRID_X = 100;
@@ -184,15 +185,27 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
             onDragStart={(e) => handleTileDragStart(e, tile)}
             onClick={(e) => handleTileClick(e, tile)}
           >
-            <div className="desktop-tile" title={tile.type === "link" ? tile.url : displayTitle}>
-               <img
-                 src={displayIcon.startsWith("data:") ? displayIcon : tileIconUrl(displayIcon)}
-                 alt=""
-                 className="desktop-tile__icon"
-                 draggable={false}
-               />
-               <span className="desktop-tile__label">{displayTitle}</span>
-             </div>
+            {tile.type === "app" && tile.appId === "open-webui" ? (
+              <div onClick={(e) => e.stopPropagation()}>
+                <AiWidget
+                  isDesktop={true}
+                  onExpand={() => {
+                    const app = apps.find((a) => a.id === "open-webui");
+                    if (app) onSelectApp(app);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="desktop-tile" title={tile.type === "link" ? tile.url : displayTitle}>
+                <img
+                  src={displayIcon.startsWith("data:") ? displayIcon : tileIconUrl(displayIcon)}
+                  alt=""
+                  className="desktop-tile__icon"
+                  draggable={false}
+                />
+                <span className="desktop-tile__label">{displayTitle}</span>
+              </div>
+            )}
            </div>
          );
        })}

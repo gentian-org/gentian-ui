@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { AppLauncher } from "@/shell/AppLauncher";
 import { AppMenuSlot } from "@/shell/AppMenuSlot";
 import { NotificationInbox } from "@/shell/NotificationInbox";
+import { AiWidget } from "@/shell/AiWidget";
 import { AppsGridIcon, MenuIcon, TrayButton } from "@/shell/TrayButton";
 import { usePrefsStore, type DesktopTile } from "@/stores/prefs";
 
@@ -243,31 +244,54 @@ export function AppMenu({
               {dragOverIndex === idx && (
                 <div className="app-menu__drop-indicator" key={`indicator-${idx}`} />
               )}
-              <AppMenuSlot
-                key={item.id}
-                item={item}
-                isActive={item.isLink ? false : activeAppId === item.id}
-                onSelect={(_app, options) => {
-                  if (item.isLink && item.url) {
-                    if (item.openMode === "tab" || options?.forceNewWindow || !onOpenLinkWindow) {
-                      window.open(item.url, "_blank");
-                    } else {
-                      onOpenLinkWindow({
-                        id: item.id.substring(5),
-                        type: "link",
-                        title: item.title,
-                        icon: item.icon,
-                        url: item.url,
-                        openMode: item.openMode,
-                        position: { x: 0, y: 0 },
-                      });
+              {item.id === "open-webui" ? (
+                <div
+                  key={item.id}
+                  className="app-menu-slot"
+                  data-id={item.id}
+                  draggable
+                  onDragStart={(e) => {
+                    const payload = JSON.stringify({ type: "menu-app", id: item.id });
+                    e.dataTransfer.setData("application/json", payload);
+                    e.dataTransfer.setData("text/plain", payload);
+                    e.dataTransfer.effectAllowed = "copyMove";
+                  }}
+                  style={{ display: "inline-block", verticalAlign: "top" }}
+                >
+                  <AiWidget
+                    isDesktop={false}
+                    onExpand={() => {
+                      if (item.app) onSelect(item.app);
+                    }}
+                  />
+                </div>
+              ) : (
+                <AppMenuSlot
+                  key={item.id}
+                  item={item}
+                  isActive={item.isLink ? false : activeAppId === item.id}
+                  onSelect={(_app, options) => {
+                    if (item.isLink && item.url) {
+                      if (item.openMode === "tab" || options?.forceNewWindow || !onOpenLinkWindow) {
+                        window.open(item.url, "_blank");
+                      } else {
+                        onOpenLinkWindow({
+                          id: item.id.substring(5),
+                          type: "link",
+                          title: item.title,
+                          icon: item.icon,
+                          url: item.url,
+                          openMode: item.openMode,
+                          position: { x: 0, y: 0 },
+                        });
+                      }
+                    } else if (item.app) {
+                      onSelect(item.app, options);
                     }
-                  } else if (item.app) {
-                    onSelect(item.app, options);
-                  }
-                }}
-                onUnpin={() => handleUnpin(item.id)}
-              />
+                  }}
+                  onUnpin={() => handleUnpin(item.id)}
+                />
+              )}
             </>
           ))}
           {/* Drop indicator at the end of the list */}

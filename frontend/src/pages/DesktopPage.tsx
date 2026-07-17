@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { prepareEmbeddedOidcSession, openIdpBootstrapPopup } from "@/auth/idpSession";
 import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
 import {
@@ -59,9 +59,11 @@ export function DesktopPage() {
     }
   }, [activeAppId, setActiveAppId, windows]);
 
+  const [oidcReady, setOidcReady] = useState(false);
+
   useEffect(() => {
     // Warm up Keycloak OIDC sessions silently in the background on load
-    void prepareEmbeddedOidcSession(null);
+    void prepareEmbeddedOidcSession(null).finally(() => setOidcReady(true));
   }, []);
 
   function openBuiltinPanel(
@@ -336,6 +338,16 @@ export function DesktopPage() {
         onSelectApp={handleSelect}
         onOpenLinkWindow={handleOpenLinkWindow}
       />
+      
+      {/* Preload Open WebUI after OIDC is ready to ensure instant response */}
+      {oidcReady && apps.some((a) => a.id === "open-webui") && (
+        <iframe
+          src={apps.find((a) => a.id === "open-webui")?.launchUrl || ""}
+          style={{ display: "none" }}
+          title="open-webui-preload"
+        />
+      )}
+
       <WindowManager />
       <AppMenu
         apps={apps}
