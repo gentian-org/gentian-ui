@@ -41,6 +41,13 @@ spec:
       linkTarget: embedded
       allowedGroup: "App Users"
 
+    - name: open-webui-admin
+      displayName:
+        de_DE: "AI Config"
+        en_US: "AI Config"
+      linkTarget: newwindow
+      allowedGroup: "Tenant Admins"
+
   chart:
     repository: "https://helm.openwebui.com"
     name: open-webui

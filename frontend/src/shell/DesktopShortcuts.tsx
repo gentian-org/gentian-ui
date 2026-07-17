@@ -185,12 +185,12 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
             onDragStart={(e) => handleTileDragStart(e, tile)}
             onClick={(e) => handleTileClick(e, tile)}
           >
-            {tile.type === "app" && tile.appId === "open-webui" ? (
+            {tile.type === "app" && tile.appId === "open-webui-open-webui" ? (
               <div onClick={(e) => e.stopPropagation()}>
                 <AiWidget
                   isDesktop={true}
                   onExpand={() => {
-                    const app = apps.find((a) => a.id === "open-webui");
+                    const app = apps.find((a) => a.id === "open-webui-open-webui");
                     if (app) onSelectApp(app);
                   }}
                 />

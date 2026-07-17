@@ -244,7 +244,7 @@ export function AppMenu({
               {dragOverIndex === idx && (
                 <div className="app-menu__drop-indicator" key={`indicator-${idx}`} />
               )}
-              {item.id === "open-webui" ? (
+              {item.id === "open-webui-open-webui" ? (
                 <div
                   key={item.id}
                   className="app-menu-slot"

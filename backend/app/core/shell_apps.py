@@ -15,7 +15,7 @@ from app.core.gentian_groups import (
 )
 from app.core.tenant import extract_tenant_from_claims
 from app.services.admin_store import AdminStore
-from app.services.k8s_catalogue import get_app_profile, is_platform_app, list_installed_profiles
+from app.services.k8s_catalogue import get_app_profile, is_platform_app, list_installed_profiles, list_platform_app_profiles
 
 ADMIN_SHELL_APP = {
     "id": "admin",
@@ -130,8 +130,6 @@ def user_can_see_portal_tile(
     normalized = (allowed_group or "Domain Users").strip()
 
     if is_admin:
-        if profile == "open-webui":
-            return True
         return is_admin_portal_tile(normalized)
 
     if is_admin_portal_tile(normalized):
@@ -148,10 +146,10 @@ def user_can_see_portal_tile(
 
 def _profiles_for_shell_tiles(tenant: str, *, is_admin: bool) -> list[str]:
     profiles = list_installed_profiles(tenant)
-    if is_admin and "app-store" not in profiles:
-        profiles.append("app-store")
-    if "open-webui" not in profiles:
-        profiles.append("open-webui")
+    platform_profiles = list_platform_app_profiles()
+    for p in platform_profiles:
+        if p not in profiles:
+            profiles.append(p)
     return profiles
 
 
@@ -173,9 +171,6 @@ async def tenant_shell_apps(
         profile = get_app_profile(profile_name)
         if profile is None:
             continue
-        if is_platform_app(profile) and not is_admin:
-            if profile_name != "open-webui":
-                continue
         spec = profile.get("spec") or {}
         portal_tiles = spec.get("portalTiles") or []
         if not portal_tiles:

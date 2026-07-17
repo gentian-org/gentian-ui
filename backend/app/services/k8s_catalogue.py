@@ -70,6 +70,20 @@ def is_platform_app(profile: dict[str, Any]) -> bool:
     return annotations.get(PLATFORM_APP_ANNOTATION) == "true"
 
 
+def list_platform_app_profiles() -> list[str]:
+    try:
+        profiles = _custom_objects_api().list_cluster_custom_object(GROUP, VERSION, "appprofiles")
+        return [
+            str(p["metadata"]["name"])
+            for p in profiles.get("items", [])
+            if is_platform_app(p) and "metadata" in p and "name" in p["metadata"]
+        ]
+    except ApiException as exc:
+        if exc.status == 404:
+            return []
+        raise
+
+
 def request_tenant_app_privilege_reconcile(tenant_name: str) -> None:
     """Ask the tenant operator to re-sync app-admins into installed apps immediately."""
     timestamp = (
