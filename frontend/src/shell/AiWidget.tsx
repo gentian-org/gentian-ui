@@ -31,15 +31,61 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
     setExpanded(true);
     setLoading(true);
 
-    // Simulate LLM response delay bridging to Open WebUI / LiteLLM proxy
-    setTimeout(() => {
-      const assistantMsg: Message = {
-        role: "assistant",
-        content: "This is a simulated response. In production, this integrates via the Gentian OIDC session with the tenant's Open WebUI instance at ai-chat.[tenantDomain].",
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+    try {
+      const response = await fetch("/api/v1/llm/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "gpt-3.5-turbo", // Fallback model, typically LiteLLM handles routing
+          messages: [...messages, userMsg],
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      let assistantContent = "";
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
       setLoading(false);
-    }, 1500);
+
+      if (reader) {
+        let done = false;
+        while (!done) {
+          const { value, done: readerDone } = await reader.read();
+          done = readerDone;
+          if (value) {
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split("\n");
+            for (const line of lines) {
+              if (line.startsWith("data: ") && line.trim() !== "data: [DONE]") {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                    assistantContent += data.choices[0].delta.content;
+                    setMessages((prev) => {
+                      const newMessages = [...prev];
+                      newMessages[newMessages.length - 1].content = assistantContent;
+                      return newMessages;
+                    });
+                  }
+                } catch (e) {
+                  console.error("Error parsing SSE data:", e);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      setMessages((prev) => [...prev, { role: "assistant", content: "Sorry, an error occurred." }]);
+      setLoading(false);
+    }
   }
 
   // Width of 6 standard tiles (44px each) + gaps
@@ -142,7 +188,17 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
               </button>
               <button
                 type="button"
-                onClick={onExpand}
+                onClick={() => {
+                  if (onExpand) {
+                    onExpand();
+                    // Give the WinBox a tiny delay to initialize, then set its url
+                    setTimeout(() => {
+                      const initialPrompt = messages.length > 0 ? messages[0].content : "";
+                      const url = `https://ai-chat.${window.location.host.split('.').slice(1).join('.')}?q=${encodeURIComponent(initialPrompt)}`;
+                      window.open(url, "open-webui-open-webui"); // WinBox uses the window name to target
+                    }, 100);
+                  }
+                }}
                 style={{
                   background: "transparent",
                   border: "none",
