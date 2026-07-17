@@ -34,6 +34,6 @@ legacy/           Archived reference only — never imported at runtime
 
 ## Related
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — target shell behaviour
-- [docs/FRONTEND-STACK.md](docs/FRONTEND-STACK.md) — why React
-- [docs/AGENTS.md](docs/AGENTS.md) — conventions for coding agents
+- [docs/architecture.md](docs/architecture.md) — target shell behaviour
+- [docs/frontend-stack.md](docs/frontend-stack.md) — why React
+- [AGENTS.md](AGENTS.md) — conventions for coding agents

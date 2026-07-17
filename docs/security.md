@@ -42,5 +42,5 @@ Copy `backend/.env.example` → `backend/.env` and `frontend/.env.example` →
 
 ## Related
 
-- [docs/ARCHITECTURE.md](./ARCHITECTURE.md) — shell UX and API surface
+- [docs/architecture.md](./architecture.md) — shell UX and API surface
 - [gentian-os/docs/design/new-security-architecture.md](https://github.com/gentian-org/gentian-os/blob/main/docs/design/new-security-architecture.md)

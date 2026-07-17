@@ -1,9 +1,29 @@
 # AGENTS.md — Gentian shell development
 
-Dogfoods [gentian-app-template](https://github.com/gentian-org/gentian-app-template) —
-same backend/frontend/chart layout and security modules. This repo is the **kernel
-shell** instance; see template `docs/AGENTS.md` for catalogue-app specifics
-(`profile/`, AppProfile publish flow).
+## Project overview
+
+`gentian-ui` is the kernel shell for Gentian OS — login hub, desktop/mobile bases, app
+launcher, and iframe window host. It dogfoods
+[gentian-app-template](https://github.com/gentian-org/gentian-app-template) — same
+backend/frontend/chart layout and security modules. This repo is the **kernel shell**
+instance; see template `docs/AGENTS.md` for catalogue-app specifics (`profile/`, AppProfile
+publish flow). See [README.md](README.md) for scope and layout.
+
+## Build & deployment — CI/GitOps only
+
+* CI builds the `gentian-portal-api`/`gentian-portal-web` images via
+  `.github/workflows/gentian-portal.yaml` on pushes to `develop`. Cluster rollout is automatic
+  via Argo CD Image Updater on the `gentian-portal` Application in `gentian-deployments`.
+* **Do not build/push images or deploy/patch the cluster yourself** — let CI and Argo CD
+  reconcile. Deleting a stuck resource to speed up reconciliation is fine; hand-patching a
+  replacement is not.
+
+## Security & licensing
+
+* **Never commit secrets** (OIDC client secrets, API keys) — see [docs/security.md](docs/security.md).
+* **Respect third-party license terms** when adding dependencies or vendoring code (e.g.
+  `legacy/` is archived reference only — never imported at runtime, and not a place to add
+  new code).
 
 ## Directory map
 
@@ -47,7 +67,7 @@ shell** instance; see template `docs/AGENTS.md` for catalogue-app specifics
 
 Production uses **Gateway API** (`chart/templates/httproute.yaml`) on
 `kernel-public-gateway`. Routes `/api`, `/healthz`, `/readyz` → API; `/` → web.
-See [docs/SECURITY.md](./SECURITY.md).
+See [docs/security.md](docs/security.md).
 
 ## Local dev
 
@@ -60,4 +80,4 @@ docker compose -f docker-compose.dev.yaml up --build
 
 `AUTH_DISABLED=true` and `VITE_AUTH_DISABLED=true` skip OIDC locally.
 
-See [docs/SECURITY.md](./SECURITY.md) and [docs/ARCHITECTURE.md](./ARCHITECTURE.md).
+See [docs/security.md](docs/security.md) and [docs/architecture.md](docs/architecture.md).
