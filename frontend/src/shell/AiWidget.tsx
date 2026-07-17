@@ -144,8 +144,6 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
               e.preventDefault();
               if (onExpand) {
                 onExpand();
-                const url = `https://ai-chat.${window.location.host.split('.').slice(1).join('.')}?q=${encodeURIComponent(prompt)}`;
-                window.open(url, "open-webui-open-webui");
               }
             }}
             style={{
@@ -225,9 +223,6 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
                 onClick={() => {
                   if (onExpand) {
                     onExpand();
-                    const initialPrompt = messages.length > 0 ? messages[0].content : "";
-                    const url = `https://ai-chat.${window.location.host.split('.').slice(1).join('.')}?q=${encodeURIComponent(initialPrompt)}`;
-                    window.open(url, "open-webui-open-webui"); // WinBox uses the window name to target
                   }
                 }}
                 style={{
