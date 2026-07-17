@@ -130,6 +130,8 @@ def user_can_see_portal_tile(
     normalized = (allowed_group or "Domain Users").strip()
 
     if is_admin:
+        if profile == "open-webui":
+            return True
         return is_admin_portal_tile(normalized)
 
     if is_admin_portal_tile(normalized):
@@ -148,6 +150,8 @@ def _profiles_for_shell_tiles(tenant: str, *, is_admin: bool) -> list[str]:
     profiles = list_installed_profiles(tenant)
     if is_admin and "app-store" not in profiles:
         profiles.append("app-store")
+    if "open-webui" not in profiles:
+        profiles.append("open-webui")
     return profiles
 
 
@@ -170,7 +174,8 @@ async def tenant_shell_apps(
         if profile is None:
             continue
         if is_platform_app(profile) and not is_admin:
-            continue
+            if profile_name != "open-webui":
+                continue
         spec = profile.get("spec") or {}
         portal_tiles = spec.get("portalTiles") or []
         if not portal_tiles:
