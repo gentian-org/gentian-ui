@@ -189,9 +189,16 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
               <div onClick={(e) => e.stopPropagation()}>
                 <AiWidget
                   isDesktop={true}
-                  onExpand={() => {
+                  onExpand={(prompt) => {
                     const app = apps.find((a) => a.id === "open-webui-open-webui");
-                    if (app) onSelectApp(app);
+                    if (app) {
+                      const dynamicApp = { ...app };
+                      if (prompt) {
+                        const separator = dynamicApp.launchUrl.includes("?") ? "&" : "?";
+                        dynamicApp.launchUrl += `${separator}q=${encodeURIComponent(prompt)}`;
+                      }
+                      onSelectApp(dynamicApp);
+                    }
                   }}
                 />
               </div>

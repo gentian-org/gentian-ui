@@ -260,8 +260,15 @@ export function AppMenu({
                 >
                   <AiWidget
                     isDesktop={false}
-                    onExpand={() => {
-                      if (item.app) onSelect(item.app);
+                    onExpand={(prompt) => {
+                      if (item.app) {
+                        const app = { ...item.app };
+                        if (prompt) {
+                          const separator = app.launchUrl.includes("?") ? "&" : "?";
+                          app.launchUrl += `${separator}q=${encodeURIComponent(prompt)}`;
+                        }
+                        onSelect(app);
+                      }
                     }}
                   />
                 </div>
