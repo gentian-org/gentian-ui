@@ -62,7 +62,11 @@ def app_launch_url(
     sub_domain = ingress.get("subDomain")
     if not sub_domain:
         return None
-    host = tenant_host(tenant, kernel_domain)
+    tenant_binding = profile_spec.get("tenantBinding", "isolated")
+    if tenant_binding == "none":
+        host = kernel_domain.strip().lower()
+    else:
+        host = tenant_host(tenant, kernel_domain)
     suffix = link_suffix or ""
     if suffix and not suffix.startswith(("#", "/")):
         suffix = f"/{suffix.lstrip('/')}"
