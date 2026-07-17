@@ -72,7 +72,6 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
         }}
       >
         <form onSubmit={handleSubmit} style={{ width: "100%", display: "flex", alignItems: "center" }}>
-          <span style={{ marginRight: "8px", color: "var(--gtn-text-secondary, #aaa)" }}>✨</span>
           <input
             type="text"
             placeholder="Ask anything..."
@@ -82,7 +81,7 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
               flex: 1,
               background: "transparent",
               border: "none",
-              color: "var(--gtn-text-primary, #fff)",
+              color: "var(--gtn-text-primary, #334155)",
               outline: "none",
               fontSize: "14px",
             }}

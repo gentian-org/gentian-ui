@@ -340,9 +340,9 @@ export function DesktopPage() {
       />
       
       {/* Preload Open WebUI after OIDC is ready to ensure instant response */}
-      {oidcReady && apps.some((a) => a.id === "open-webui") && (
+      {oidcReady && apps.some((a) => a.id === "open-webui-open-webui") && (
         <iframe
-          src={apps.find((a) => a.id === "open-webui")?.launchUrl || ""}
+          src={apps.find((a) => a.id === "open-webui-open-webui")?.launchUrl || ""}
           style={{ display: "none" }}
           title="open-webui-preload"
         />
