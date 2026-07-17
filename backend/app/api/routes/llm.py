@@ -23,47 +23,30 @@ def _core_v1_api() -> client.CoreV1Api:
         config.load_kube_config()
     return client.CoreV1Api()
 
-def get_webui_secret(tenant_id: str) -> str | None:
+def get_litellm_secret() -> str | None:
     try:
-        namespace = f"tenant-{tenant_id}"
-        secret = _core_v1_api().read_namespaced_secret("llm-credentials-open-webui", namespace)
-        return base64.b64decode(secret.data["WEBUI_SECRET_KEY"]).decode('utf-8')
+        secret = _core_v1_api().read_namespaced_secret("llm-sensitive-values", "platform-kernel")
+        return base64.b64decode(secret.data["litellm_master_key"]).decode('utf-8')
     except Exception as e:
-        print(f"Failed to read WEBUI_SECRET_KEY for {tenant_id}: {e}")
+        print(f"Failed to read litellm_master_key: {e}")
         return None
-
-def create_openwebui_jwt(user_id: str, secret: str) -> str:
-    payload = {
-        "id": user_id,
-        "exp": int(time.time()) + 300
-    }
-    return jwt.encode(payload, secret, algorithm="HS256")
 
 @router.post("/chat")
 async def proxy_chat_completion(
     request: Request,
     user: dict[str, Any] = Depends(get_current_user),
 ):
-    tenant_id = user.get("tenant")
-    if not tenant_id:
-        raise HTTPException(status_code=401, detail="Missing tenant context")
+    # Retrieve LiteLLM master key to proxy directly (scratchpad widget mode)
+    master_key = get_litellm_secret()
+    if not master_key:
+        raise HTTPException(status_code=500, detail="LITELLM_MASTER_KEY not configured")
 
-    secret = get_webui_secret(tenant_id)
-    if not secret:
-        raise HTTPException(status_code=500, detail="WEBUI_SECRET_KEY not configured")
-
-    user_id = user.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Missing user identity")
-
-    jwt_token = create_openwebui_jwt(user_id, secret)
-    
     try:
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
-    target_url = f"http://open-webui.tenant-{tenant_id}.svc.cluster.local:80/api/chat/completions"
+    target_url = "http://litellm.platform-system.svc.cluster.local:4000/chat/completions"
     
     async def stream_proxy():
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -71,7 +54,7 @@ async def proxy_chat_completion(
                 "POST", 
                 target_url, 
                 json=body,
-                headers={"Authorization": f"Bearer {jwt_token}", "Content-Type": "application/json"}
+                headers={"Authorization": f"Bearer {master_key}", "Content-Type": "application/json"}
             ) as response:
                 if response.status_code != 200:
                     err = await response.aread()
@@ -82,32 +65,4 @@ async def proxy_chat_completion(
 
     return StreamingResponse(stream_proxy(), media_type="text/event-stream")
 
-@router.post("/chats/new")
-async def proxy_chats_new(
-    request: Request,
-    user: dict[str, Any] = Depends(get_current_user),
-):
-    secret = os.environ.get("WEBUI_SECRET_KEY")
-    if not secret:
-        raise HTTPException(status_code=500, detail="WEBUI_SECRET_KEY not configured")
 
-    user_id = user.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Missing user identity")
-
-    jwt_token = create_openwebui_jwt(user_id, secret)
-    
-    try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-
-    target_url = "http://open-webui:80/api/v1/chats/new"
-    
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.post(
-            target_url, 
-            json=body,
-            headers={"Authorization": f"Bearer {jwt_token}", "Content-Type": "application/json"}
-        )
-        return response.json()

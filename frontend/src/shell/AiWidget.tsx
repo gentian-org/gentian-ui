@@ -122,7 +122,7 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
           boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
         }}
       >
-        <form onSubmit={handleSubmit} style={{ width: "100%", display: "flex", alignItems: "center" }}>
+        <form onSubmit={handleSubmit} style={{ width: "100%", display: "flex", alignItems: "center", position: "relative" }}>
           <input
             type="text"
             placeholder="Ask anything..."
@@ -135,8 +135,39 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
               color: "var(--gtn-text-primary, #334155)",
               outline: "none",
               fontSize: "14px",
+              paddingRight: "28px",
             }}
           />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              if (onExpand) {
+                onExpand();
+                setTimeout(() => {
+                  const url = `https://ai-chat.${window.location.host.split('.').slice(1).join('.')}?q=${encodeURIComponent(prompt)}`;
+                  window.open(url, "open-webui-open-webui");
+                }, 100);
+              }
+            }}
+            style={{
+              position: "absolute",
+              right: "4px",
+              background: "transparent",
+              border: "none",
+              color: "var(--gtn-text-secondary, #aaa)",
+              cursor: "pointer",
+              opacity: 0.5,
+              fontSize: "16px",
+              padding: "4px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            title="Expand to Full App"
+          >
+            ⤢
+          </button>
         </form>
       </div>
 
