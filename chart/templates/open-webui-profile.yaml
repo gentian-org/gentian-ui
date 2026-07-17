@@ -45,7 +45,7 @@ spec:
       displayName:
         de_DE: "AI Config"
         en_US: "AI Config"
-      linkTarget: newwindow
+      linkTarget: embedded
       allowedGroup: "Tenant Admins"
 
   chart:
