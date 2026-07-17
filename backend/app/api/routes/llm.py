@@ -46,7 +46,7 @@ async def proxy_chat_completion(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
-    target_url = "http://litellm.platform-system.svc.cluster.local:4000/chat/completions"
+    target_url = "http://litellm-proxy.platform-kernel.svc.cluster.local:4000/chat/completions"
     
     async def stream_proxy():
         async with httpx.AsyncClient(timeout=60.0) as client:
