@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { getAccessToken } from "@/auth/oidc";
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -32,9 +33,13 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
     setLoading(true);
 
     try {
+      const token = getAccessToken();
       const response = await fetch("/api/v1/llm/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           model: "gpt-3.5-turbo", // Fallback model, typically LiteLLM handles routing
           messages: [...messages, userMsg],
