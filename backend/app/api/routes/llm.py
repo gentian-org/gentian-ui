@@ -47,9 +47,18 @@ async def proxy_chat_completion(
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
     target_url = "http://litellm-proxy.platform-kernel.svc.cluster.local:4000/chat/completions"
+    models_url = "http://litellm-proxy.platform-kernel.svc.cluster.local:4000/v1/models"
     
     async def stream_proxy():
         async with httpx.AsyncClient(timeout=60.0) as client:
+            # Fetch models to ensure we pass a valid one
+            models_resp = await client.get(models_url, headers={"Authorization": f"Bearer {master_key}"})
+            if models_resp.status_code == 200:
+                models_data = models_resp.json().get("data", [])
+                available_models = [m["id"] for m in models_data]
+                if available_models and body.get("model") not in available_models:
+                    body["model"] = available_models[0]
+
             async with client.stream(
                 "POST", 
                 target_url, 

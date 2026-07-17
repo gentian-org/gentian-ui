@@ -144,10 +144,8 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
               e.preventDefault();
               if (onExpand) {
                 onExpand();
-                setTimeout(() => {
-                  const url = `https://ai-chat.${window.location.host.split('.').slice(1).join('.')}?q=${encodeURIComponent(prompt)}`;
-                  window.open(url, "open-webui-open-webui");
-                }, 100);
+                const url = `https://ai-chat.${window.location.host.split('.').slice(1).join('.')}?q=${encodeURIComponent(prompt)}`;
+                window.open(url, "open-webui-open-webui");
               }
             }}
             style={{
@@ -227,12 +225,9 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
                 onClick={() => {
                   if (onExpand) {
                     onExpand();
-                    // Give the WinBox a tiny delay to initialize, then set its url
-                    setTimeout(() => {
-                      const initialPrompt = messages.length > 0 ? messages[0].content : "";
-                      const url = `https://ai-chat.${window.location.host.split('.').slice(1).join('.')}?q=${encodeURIComponent(initialPrompt)}`;
-                      window.open(url, "open-webui-open-webui"); // WinBox uses the window name to target
-                    }, 100);
+                    const initialPrompt = messages.length > 0 ? messages[0].content : "";
+                    const url = `https://ai-chat.${window.location.host.split('.').slice(1).join('.')}?q=${encodeURIComponent(initialPrompt)}`;
+                    window.open(url, "open-webui-open-webui"); // WinBox uses the window name to target
                   }
                 }}
                 style={{
