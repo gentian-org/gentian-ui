@@ -107,6 +107,12 @@ export function DesktopPage() {
     if (!options?.forceNewWindow) {
       const existingWindow = windows.find((w) => w.appId === app.id);
       if (existingWindow) {
+        if (app.launchUrl) {
+          const hasQuery = app.launchUrl.includes("?q=") || app.launchUrl.includes("&q=");
+          if (hasQuery) {
+            setWindowUrl(existingWindow.id, app.launchUrl);
+          }
+        }
         focusWindow(existingWindow.id);
         setActiveAppId(app.id);
         return;
