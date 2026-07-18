@@ -263,7 +263,7 @@ export function AppMenu({
                     onExpand={(prompt) => {
                       if (item.app) {
                         const app = { ...item.app };
-                        if (prompt) {
+                        if (prompt && app.launchUrl) {
                           const separator = app.launchUrl.includes("?") ? "&" : "?";
                           app.launchUrl += `${separator}q=${encodeURIComponent(prompt)}`;
                         }

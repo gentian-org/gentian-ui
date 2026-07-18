@@ -193,7 +193,7 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
                     const app = apps.find((a) => a.id === "open-webui-open-webui");
                     if (app) {
                       const dynamicApp = { ...app };
-                      if (prompt) {
+                      if (prompt && dynamicApp.launchUrl) {
                         const separator = dynamicApp.launchUrl.includes("?") ? "&" : "?";
                         dynamicApp.launchUrl += `${separator}q=${encodeURIComponent(prompt)}`;
                       }
