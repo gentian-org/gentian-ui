@@ -77,7 +77,7 @@ export function WindowBody({ win, onIframeLoad }: WindowBodyProps) {
 
   return (
     <iframe
-      key={win.url}
+      key={win.id}
       title={win.title}
       src={win.url}
       className="shell-window__body"
