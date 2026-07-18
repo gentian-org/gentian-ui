@@ -247,7 +247,7 @@ export function AppMenu({
               {item.id === "open-webui-open-webui" ? (
                 <div
                   key={item.id}
-                  className="app-menu-slot"
+                  className="app-menu-slot app-menu-slot-ai"
                   data-id={item.id}
                   draggable
                   onDragStart={(e) => {
@@ -257,6 +257,7 @@ export function AppMenu({
                     e.dataTransfer.effectAllowed = "copyMove";
                   }}
                   style={{ display: "inline-block", verticalAlign: "top" }}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <AiWidget
                     isDesktop={false}

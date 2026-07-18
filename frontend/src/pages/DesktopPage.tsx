@@ -66,6 +66,25 @@ export function DesktopPage() {
     void prepareEmbeddedOidcSession(null).finally(() => setOidcReady(true));
   }, []);
 
+  useEffect(() => {
+    if (oidcReady) {
+      const openWebUi = apps.find((a) => a.id === "open-webui-open-webui");
+      if (openWebUi && openWebUi.launchUrl) {
+        const hasWindow = windows.some((w) => w.appId === openWebUi.id);
+        if (!hasWindow) {
+          openWindow({
+            id: openWebUi.id,
+            appId: openWebUi.id,
+            title: openWebUi.title,
+            url: openWebUi.launchUrl,
+            isHidden: true,
+            state: "minimized",
+          });
+        }
+      }
+    }
+  }, [oidcReady, apps, windows, openWindow]);
+
   function openBuiltinPanel(
     id: "account" | "settings",
     title: string,
@@ -338,15 +357,7 @@ export function DesktopPage() {
         onSelectApp={handleSelect}
         onOpenLinkWindow={handleOpenLinkWindow}
       />
-      
-      {/* Preload Open WebUI after OIDC is ready to ensure instant response */}
-      {oidcReady && apps.some((a) => a.id === "open-webui-open-webui") && (
-        <iframe
-          src={apps.find((a) => a.id === "open-webui-open-webui")?.launchUrl || ""}
-          style={{ display: "none" }}
-          title="open-webui-preload"
-        />
-      )}
+
 
       <WindowManager />
       <AppMenu

@@ -21,6 +21,7 @@ export type ShellWindow = {
   state: WindowVisualState;
   zIndex: number;
   focused: boolean;
+  isHidden?: boolean;
 };
 
 type OpenWindowInput = {
@@ -31,6 +32,8 @@ type OpenWindowInput = {
   builtinComponent?: ShellWindowBuiltin;
   pendingUrl?: string;
   geometry?: WindowGeometry;
+  isHidden?: boolean;
+  state?: WindowVisualState;
 };
 
 type WindowsState = {
@@ -57,8 +60,10 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
   openWindow: (win) =>
     set((state) => {
       const nextZ = state.nextZIndex + 1;
-      const visibleCount = state.windows.filter((w) => w.state !== "minimized").length;
+      const visibleCount = state.windows.filter((w) => w.state !== "minimized" && !w.isHidden).length;
       const geometry = win.geometry ?? createWindowGeometry(visibleCount);
+      const isHidden = win.isHidden ?? false;
+      const winState = win.state ?? ("normal" as const);
       return {
         nextZIndex: nextZ,
         windows: [
@@ -73,16 +78,28 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
             geometry,
             restoreGeometry: geometry,
             zIndex: nextZ,
-            focused: true,
-            state: "normal" as const,
+            focused: winState !== "minimized",
+            state: winState,
+            isHidden,
           },
         ],
       };
     }),
   closeWindow: (id) =>
-    set((state) => ({
-      windows: state.windows.filter((w) => w.id !== id),
-    })),
+    set((state) => {
+      const win = state.windows.find((w) => w.id === id);
+      if (win && win.appId === "open-webui-open-webui") {
+        // Instead of removing, we hide it!
+        return {
+          windows: state.windows.map((w) =>
+            w.id === id ? { ...w, isHidden: true, state: "minimized" as const, focused: false } : w
+          ),
+        };
+      }
+      return {
+        windows: state.windows.filter((w) => w.id !== id),
+      };
+    }),
   focusWindow: (id) =>
     set((state) => {
       const target = state.windows.find((w) => w.id === id);
@@ -92,16 +109,22 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
         nextZIndex: nextZ,
         windows: state.windows.map((w) => {
           if (w.id !== id) return { ...w, focused: false };
-          if (w.state === "minimized") {
-            return { ...w, state: "normal" as const, zIndex: nextZ, focused: true };
-          }
-          return { ...w, zIndex: nextZ, focused: true };
+          return {
+            ...w,
+            state: "normal" as const,
+            zIndex: nextZ,
+            focused: true,
+            isHidden: false,
+          };
         }),
       };
     }),
   openOrFocusWindow: (win) => {
     const existing = get().windows.find((w) => w.appId === win.appId);
     if (existing) {
+      if (win.url) {
+        get().setWindowUrl(existing.id, win.url);
+      }
       get().focusWindow(existing.id);
       return;
     }

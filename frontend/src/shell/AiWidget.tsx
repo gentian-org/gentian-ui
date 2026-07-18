@@ -64,6 +64,7 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
             type="button"
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               if (onExpand) {
                 onExpand(prompt.trim() || undefined);
                 setPrompt("");

@@ -313,6 +313,15 @@
   background: var(--gtn-100);
 }
 
+.app-menu-slot-ai:hover {
+  background: transparent;
+}
+
+.app-menu-slot-ai:active {
+  transform: none !important;
+  background: transparent !important;
+}
+
 .app-menu-slot:focus-visible {
   outline: none;
   box-shadow: var(--gtn-focus-ring);

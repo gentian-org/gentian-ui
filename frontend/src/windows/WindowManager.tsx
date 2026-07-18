@@ -55,28 +55,30 @@ export function WindowManager() {
     onHandlePointerCancel,
   } = useWindowResize();
 
-  const minimized = windows.filter((w) => w.state === "minimized");
-  const visible = windows.filter((w) => w.state !== "minimized");
+  const minimized = windows.filter((w) => w.state === "minimized" && !w.isHidden);
 
   return (
     <>
-      {visible.map((win) => (
-        <div
-          key={win.id}
-          role="dialog"
-          aria-label={win.title}
-          className={`shell-window${win.focused ? " shell-window--focused" : ""}${
-            win.state === "maximized" ? " shell-window--maximized" : ""
-          }`}
-          style={{
-            left: win.geometry.x,
-            top: win.geometry.y,
-            width: win.geometry.w,
-            height: win.geometry.h,
-            zIndex: win.zIndex,
-          }}
-          onMouseDown={() => focusWindow(win.id)}
-        >
+      {windows.map((win) => {
+        const isHidden = win.isHidden || win.state === "minimized";
+        return (
+          <div
+            key={win.id}
+            role="dialog"
+            aria-label={win.title}
+            className={`shell-window${win.focused ? " shell-window--focused" : ""}${
+              win.state === "maximized" ? " shell-window--maximized" : ""
+            }`}
+            style={{
+              left: win.geometry.x,
+              top: win.geometry.y,
+              width: win.geometry.w,
+              height: win.geometry.h,
+              zIndex: win.zIndex,
+              display: isHidden ? "none" : undefined,
+            }}
+            onMouseDown={() => focusWindow(win.id)}
+          >
           <header
             className="shell-window__header"
             onPointerDown={(event) => onHeaderPointerDown(event, win)}
@@ -124,7 +126,8 @@ export function WindowManager() {
             onPointerCancel={onHandlePointerCancel}
           />
         </div>
-      ))}
+      );
+    })}
 
       {minimized.length > 0 && (
         <div
