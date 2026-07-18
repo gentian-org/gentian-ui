@@ -118,6 +118,23 @@ export function AppMenu({
     return slots.length;
   }
 
+  /**
+   * Insert `id` into `ids` so that, among the currently *visible* slots, it ends up
+   * at `insertAt`. Anchoring on the neighboring item's id (rather than splicing at
+   * `insertAt` directly) keeps this correct even when `ids` holds entries that
+   * aren't currently visible (uninstalled apps, revoked access, deleted link tiles) —
+   * otherwise those hidden entries shift the raw array index space away from the
+   * visible-slot index space `insertAt` was measured in, e.g. making a drop aimed at
+   * the very end land one slot short of it.
+   */
+  function insertIdAtVisibleIndex(ids: string[], id: string, insertAt: number): string[] {
+    const next = ids.filter((existingId) => existingId !== id);
+    const anchorItem = visibleItems[insertAt];
+    const anchorIdx = anchorItem ? next.indexOf(anchorItem.id) : -1;
+    next.splice(anchorIdx === -1 ? next.length : anchorIdx, 0, id);
+    return next;
+  }
+
   function handleTrackDragOver(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -153,14 +170,7 @@ export function AppMenu({
 
         void updateCustomPrefs((prev) => {
           const currentIds = [...(prev.menuAppIds || apps.map((a) => a.id))];
-          const existingIdx = currentIds.indexOf(itemId);
-          let adjustedInsert = insertAt;
-          if (existingIdx !== -1) {
-            currentIds.splice(existingIdx, 1);
-            if (existingIdx < adjustedInsert) adjustedInsert--;
-          }
-          currentIds.splice(Math.min(adjustedInsert, currentIds.length), 0, itemId);
-          return { ...prev, menuAppIds: currentIds };
+          return { ...prev, menuAppIds: insertIdAtVisibleIndex(currentIds, itemId, insertAt) };
         });
       } else if (data.type === "existing") {
         // Drag from desktop → quick bar: MOVE (remove desktop tile, pin to bar)
@@ -170,16 +180,10 @@ export function AppMenu({
 
         void updateCustomPrefs((prev) => {
           const currentIds = [...(prev.menuAppIds || apps.map((a) => a.id))];
-          const existingIdx = currentIds.indexOf(itemId);
-          let adjustedInsert = insertAt;
-          if (existingIdx !== -1) {
-            currentIds.splice(existingIdx, 1);
-            if (existingIdx < adjustedInsert) adjustedInsert--;
-          }
-          currentIds.splice(Math.min(adjustedInsert, currentIds.length), 0, itemId);
+          const nextIds = insertIdAtVisibleIndex(currentIds, itemId, insertAt);
           // Remove from desktop (MOVE semantics)
           const nextDesktopTiles = (prev.desktopTiles || []).filter((t) => t.id !== data.id);
-          return { ...prev, menuAppIds: currentIds, desktopTiles: nextDesktopTiles };
+          return { ...prev, menuAppIds: nextIds, desktopTiles: nextDesktopTiles };
         });
       } else if (data.type === "menu-app") {
         // Reordering existing slot inside the menu bar
@@ -187,18 +191,8 @@ export function AppMenu({
 
         void updateCustomPrefs((prev) => {
           const currentIds = [...(prev.menuAppIds || apps.map((a) => a.id))];
-          const dragIdx = currentIds.indexOf(dragId);
-          if (dragIdx === -1) return prev;
-
-          let adjustedInsert = insertAt;
-          currentIds.splice(dragIdx, 1);
-          if (dragIdx < adjustedInsert) adjustedInsert--;
-          currentIds.splice(Math.min(adjustedInsert, currentIds.length), 0, dragId);
-
-          return {
-            ...prev,
-            menuAppIds: currentIds,
-          };
+          if (currentIds.indexOf(dragId) === -1) return prev;
+          return { ...prev, menuAppIds: insertIdAtVisibleIndex(currentIds, dragId, insertAt) };
         });
       }
     } catch (err) {

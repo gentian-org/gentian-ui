@@ -807,6 +807,11 @@
   user-select: none;
 }
 
+.desktop-tile-wrapper--ai {
+  width: 284px;
+  height: auto;
+}
+
 .desktop-tile {
   display: flex;
   flex-direction: column;

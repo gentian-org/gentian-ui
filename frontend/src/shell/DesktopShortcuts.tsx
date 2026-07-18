@@ -163,6 +163,7 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
       {tiles.map((tile) => {
         let displayTitle = tile.title;
         let displayIcon = tile.icon;
+        const isAiWidget = tile.type === "app" && tile.appId === "open-webui-open-webui";
 
         if (tile.type === "app" && tile.appId) {
           const app = apps.find((a) => a.id === tile.appId);
@@ -176,7 +177,7 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
           <div
             key={tile.id}
             data-id={tile.id}
-            className="desktop-tile-wrapper"
+            className={isAiWidget ? "desktop-tile-wrapper desktop-tile-wrapper--ai" : "desktop-tile-wrapper"}
             style={{
               left: tile.position.x,
               top: tile.position.y,
@@ -185,7 +186,7 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
             onDragStart={(e) => handleTileDragStart(e, tile)}
             onClick={(e) => handleTileClick(e, tile)}
           >
-            {tile.type === "app" && tile.appId === "open-webui-open-webui" ? (
+            {isAiWidget ? (
               <div onClick={(e) => e.stopPropagation()}>
                 <AiWidget
                   isDesktop={true}
