@@ -313,6 +313,10 @@
   background: var(--gtn-100);
 }
 
+.app-menu-slot-ai {
+  width: auto;
+}
+
 .app-menu-slot-ai:hover {
   background: transparent;
 }
