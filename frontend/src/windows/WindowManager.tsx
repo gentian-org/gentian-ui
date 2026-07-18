@@ -70,12 +70,12 @@ export function WindowManager() {
               win.state === "maximized" ? " shell-window--maximized" : ""
             }`}
             style={{
-              left: win.geometry.x,
-              top: win.geometry.y,
+              left: isHidden ? "-9999px" : win.geometry.x,
+              top: isHidden ? "-9999px" : win.geometry.y,
               width: win.geometry.w,
               height: win.geometry.h,
               zIndex: win.zIndex,
-              display: isHidden ? "none" : undefined,
+              pointerEvents: isHidden ? "none" : undefined,
             }}
             onMouseDown={() => focusWindow(win.id)}
           >
