@@ -47,6 +47,7 @@ from app.services.k8s_authorization import (
     get_platform_security_policy,
     list_app_grants,
     list_app_profiles_with_mac_requests,
+    list_customizations,
     list_integration_bindings,
     replace_app_grant,
     replace_platform_security_policy,
@@ -1346,6 +1347,105 @@ async def put_platform_security_policy_route(
         details={"allowedMacWaivers": len(body.allowedMacWaivers)},
     )
     return await get_platform_security_policy_route(user=user, settings=settings)
+
+
+class CustomizationRecord(BaseModel):
+    """Mirrors the Customization CRD (gentian-os api/v1alpha1) — see
+    docs/app-customization.md §5. Only the fields the debt report needs are typed
+    here; the CR carries more."""
+
+    name: str
+    namespace: str
+    summary: str = ""
+    targetProfile: str = ""
+    rung: str = ""
+    scope: str = ""
+    owner: str = ""
+    reviewBy: str = ""
+    phase: str = ""
+    reviewOverdue: bool = False
+    upstreamStale: bool = False
+    targetVersionDrift: bool = False
+    rungAboveRecommended: bool = False
+
+
+class CustomizationDebtByRung(BaseModel):
+    L0: int = 0
+    L1: int = 0
+    L2: int = 0
+    L3: int = 0
+    L4: int = 0
+    L5: int = 0
+    L6: int = 0
+
+
+class CustomizationDebtReport(BaseModel):
+    totalRecords: int = 0
+    carriedDeltas: int = 0
+    byRung: CustomizationDebtByRung = Field(default_factory=CustomizationDebtByRung)
+    reviewOverdue: list[CustomizationRecord] = Field(default_factory=list)
+    upstreamStale: list[CustomizationRecord] = Field(default_factory=list)
+    rungAboveRecommended: list[CustomizationRecord] = Field(default_factory=list)
+    records: list[CustomizationRecord] = Field(default_factory=list)
+
+
+def _customization_record(item: dict[str, Any]) -> CustomizationRecord:
+    meta = item.get("metadata") or {}
+    spec = item.get("spec") or {}
+    status = item.get("status") or {}
+    return CustomizationRecord(
+        name=meta.get("name", ""),
+        namespace=meta.get("namespace", ""),
+        summary=spec.get("summary", ""),
+        targetProfile=(spec.get("target") or {}).get("profile", ""),
+        rung=spec.get("rung", ""),
+        scope=spec.get("scope", ""),
+        owner=spec.get("owner", ""),
+        reviewBy=spec.get("reviewBy", ""),
+        phase=status.get("phase", ""),
+        reviewOverdue=bool(status.get("reviewOverdue")),
+        upstreamStale=bool(status.get("upstreamStale")),
+        targetVersionDrift=bool(status.get("targetVersionDrift")),
+        rungAboveRecommended=bool(status.get("rungAboveRecommended")),
+    )
+
+
+@router.get("/platform/customization-debt", response_model=CustomizationDebtReport)
+async def get_customization_debt_report(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> CustomizationDebtReport:
+    """The customization debt report (docs/app-customization.md §8.3).
+
+    Reads live Customization records — the operator's computed status is the
+    source of truth for review-overdue, upstream-stale and version-drift signals,
+    which is why this is a cluster read rather than a build of the git-based CI
+    report. The headline number, carriedDeltas (records at L4 or above), is the
+    one meant to trend down over time.
+    """
+    _require_admin(user, settings)
+    _require_platform_admin(user, settings)
+    try:
+        items = list_customizations()
+    except Exception as exc:  # noqa: BLE001 — surface K8s API errors to admins
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    records = [_customization_record(item) for item in items]
+    by_rung = CustomizationDebtByRung()
+    for record in records:
+        if hasattr(by_rung, record.rung):
+            setattr(by_rung, record.rung, getattr(by_rung, record.rung) + 1)
+    carried = by_rung.L4 + by_rung.L5 + by_rung.L6
+
+    return CustomizationDebtReport(
+        totalRecords=len(records),
+        carriedDeltas=carried,
+        byRung=by_rung,
+        reviewOverdue=[r for r in records if r.reviewOverdue],
+        upstreamStale=[r for r in records if r.upstreamStale],
+        rungAboveRecommended=[r for r in records if r.rungAboveRecommended],
+        records=records,
+    )
 
 
 @router.get("/integrations", response_model=IntegrationsOverviewResponse)

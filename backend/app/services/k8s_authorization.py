@@ -202,6 +202,25 @@ def effective_contract_capabilities(
     return list(binding_caps)
 
 
+def list_customizations() -> list[dict[str, Any]]:
+    """List every Customization CR cluster-wide, for the customization debt report.
+
+    The operator (see gentian-os internal/controller/customization_controller.go)
+    computes status.reviewOverdue, .upstreamStale, .targetVersionDrift and
+    .rungAboveRecommended on each record; this call surfaces that live state
+    rather than re-deriving it from git, which is the whole point of the debt
+    report being a cluster read instead of a CI artifact. See
+    gentian-os/docs/app-customization.md §8.3.
+    """
+    try:
+        result = _custom_objects_api().list_cluster_custom_object(GROUP, VERSION, "customizations")
+    except ApiException as exc:
+        if exc.status == 404:
+            return []
+        raise
+    return result.get("items") or []
+
+
 def decode_json_field(value: Any, default: Any) -> Any:
     if value is None:
         return default

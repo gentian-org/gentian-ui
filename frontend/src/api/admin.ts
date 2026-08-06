@@ -365,6 +365,49 @@ export function fetchPlatformSecurityPolicy() {
   return apiFetch<PlatformSecurityPolicy>("/admin/platform/security-policy");
 }
 
+// Customization ladder debt report — see docs/app-customization.md §8.3 in
+// gentian-os. Read live from Customization CRs; the operator computes
+// reviewOverdue/upstreamStale/targetVersionDrift/rungAboveRecommended on status.
+export type CustomizationRecord = {
+  name: string;
+  namespace: string;
+  summary: string;
+  targetProfile: string;
+  rung: string;
+  scope: string;
+  owner: string;
+  reviewBy: string;
+  phase: string;
+  reviewOverdue: boolean;
+  upstreamStale: boolean;
+  targetVersionDrift: boolean;
+  rungAboveRecommended: boolean;
+};
+
+export type CustomizationDebtByRung = {
+  L0: number;
+  L1: number;
+  L2: number;
+  L3: number;
+  L4: number;
+  L5: number;
+  L6: number;
+};
+
+export type CustomizationDebtReport = {
+  totalRecords: number;
+  carriedDeltas: number;
+  byRung: CustomizationDebtByRung;
+  reviewOverdue: CustomizationRecord[];
+  upstreamStale: CustomizationRecord[];
+  rungAboveRecommended: CustomizationRecord[];
+  records: CustomizationRecord[];
+};
+
+export function fetchCustomizationDebtReport() {
+  return apiFetch<CustomizationDebtReport>("/admin/platform/customization-debt");
+}
+
 export function updatePlatformSecurityPolicy(allowedMacWaivers: MacWaiverEntry[]) {
   return apiFetch<PlatformSecurityPolicy>("/admin/platform/security-policy", {
     method: "PUT",

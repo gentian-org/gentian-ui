@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { fetchAdminContext, fetchGroups } from "@/api/admin";
 import { AuditSection } from "@/admin/AuditSection";
+import { CustomizationDebtSection } from "@/admin/CustomizationDebtSection";
 import { GroupsSection } from "@/admin/GroupsSection";
 import { IntegrationsSection } from "@/admin/IntegrationsSection";
 import { InvitationsSection } from "@/admin/InvitationsSection";
@@ -21,6 +22,7 @@ type AdminTab =
   | "security"
   | "integrations"
   | "platform"
+  | "customization"
   | "sessions"
   | "audit"
   | "notifications";
@@ -144,6 +146,15 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
               Platform
             </button>
           ) : null}
+          {isPlatformAdmin ? (
+            <button
+              type="button"
+              className={`admin-console__tab${tab === "customization" ? " admin-console__tab--active" : ""}`}
+              onClick={() => setTab("customization")}
+            >
+              Customization
+            </button>
+          ) : null}
           <button
             type="button"
             className={`admin-console__tab${tab === "sessions" ? " admin-console__tab--active" : ""}`}
@@ -192,6 +203,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <IntegrationsSection tenant={tenant} />
           ) : tab === "platform" ? (
             <PlatformSecuritySection />
+          ) : tab === "customization" ? (
+            <CustomizationDebtSection />
           ) : tab === "sessions" ? (
             <SessionsSection tenant={tenant} />
           ) : tab === "notifications" ? (

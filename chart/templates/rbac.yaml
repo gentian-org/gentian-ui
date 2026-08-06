@@ -13,6 +13,11 @@ rules:
   - apiGroups: ["gentianos.io"]
     resources: ["integrationbindings", "appgrants"]
     verbs: ["get", "list", "watch", "update", "patch", "replace"]
+  # Read-only: the customization debt report (Admin Console -> Customization tab)
+  # displays live Customization records; it never authors them.
+  - apiGroups: ["gentianos.io"]
+    resources: ["customizations"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "list"]
