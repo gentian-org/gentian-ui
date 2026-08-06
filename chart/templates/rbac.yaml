@@ -5,7 +5,7 @@ metadata:
   name: {{ include "gentian-portal.fullname" . }}
 rules:
   - apiGroups: ["gentianos.io"]
-    resources: ["appprofiles", "appcatalogues", "tenants"]
+    resources: ["appprofiles", "appcatalogues", "apppackages", "tenants"]
     verbs: ["get", "list", "watch", "patch"]
   - apiGroups: ["gentianos.io"]
     resources: ["platformsecuritypolicies"]
