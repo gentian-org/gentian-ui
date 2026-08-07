@@ -59,6 +59,19 @@ spec:
   valueMapping:
     oidc:
       clientSecretKey: "dummyOidcSecret"
+    # This chart does not use the extraVolumes/extraVolumeMounts convention, so
+    # the platform is told where to put a volume it has to mount (the staging CA
+    # trust bundle). It used to special-case the app name in app-default.
+    volumes:
+      volumesPath: volumes
+      volumeMountsPath: volumeMounts.container
+
+  # Session-signing key, delivered in the credentials Secret this app consumes
+  # with envFrom. Declared here because the operator previously hardcoded
+  # `if appName == "open-webui"`; the value derivation is unchanged, so existing
+  # sessions stay valid.
+  derivedSecretKeys:
+    - key: WEBUI_SECRET_KEY
 
   ingress:
     subDomain: "ai-chat"
