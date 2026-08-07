@@ -14,9 +14,10 @@ spec:
   description: "User-friendly chat interface for LLMs, configured to route through the central LiteLLM proxy."
   family: open-webui
   catalogueVersion: "1.0.0"
-  edition: full
+  edition: me
   trustTier: certified
   license: MIT
+  author: Gentian
   tile:
     icon: chat
 
