@@ -222,9 +222,16 @@ async def tenant_shell_apps(
                 continue
             url_spec = spec
             if not spec.get("ingress") and not spec.get("apiIntegration"):
-                req_profile_name = profile.get("metadata", {}).get("annotations", {}).get("gentianos.io/requires-profile")
-                if req_profile_name:
-                    base_profile = get_app_profile(req_profile_name)
+                # An addon has no ingress of its own — it is reached inside its base
+                # app — so the tile URL comes from the base. spec.customization.addon.of
+                # is the current declaration; requires-profile is the legacy annotation
+                # kept for profiles not yet migrated.
+                addon_decl = (spec.get("customization") or {}).get("addon") or {}
+                base_name = addon_decl.get("of") or (
+                    profile.get("metadata", {}).get("annotations", {}).get("gentianos.io/requires-profile")
+                )
+                if base_name:
+                    base_profile = get_app_profile(str(base_name))
                     if base_profile and base_profile.get("spec"):
                         url_spec = base_profile["spec"]
             launch_url = app_launch_url(

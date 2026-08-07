@@ -46,11 +46,23 @@ export function AppMenu({
   const { logout } = useAuth();
 
   const menuAppIds = usePrefsStore((s) => s.customPrefs.menuAppIds);
+  const menuRemovedAppIds = usePrefsStore((s) => s.customPrefs.menuRemovedAppIds);
   const updateCustomPrefs = usePrefsStore((s) => s.updateCustomPrefs);
   const desktopTiles = usePrefsStore((s) => s.customPrefs.desktopTiles) || [];
 
-  const visibleItems: MenuItem[] = menuAppIds
-    ? menuAppIds
+  // Apps the user has never seen must still reach the quick bar. menuAppIds is a
+  // fixed list written the first time someone reorders or pins anything; without
+  // this, every app provisioned afterwards is silently absent from the bar, because
+  // it simply is not in the list. Appending keeps their ordering and adds the new
+  // ones at the end — the same place they would have been had they never customised.
+  const pinned = new Set(menuAppIds || []);
+  const removed = new Set(menuRemovedAppIds || []);
+  const effectiveMenuAppIds = menuAppIds
+    ? [...menuAppIds, ...apps.map((a) => a.id).filter((id) => !pinned.has(id) && !removed.has(id))]
+    : null;
+
+  const visibleItems: MenuItem[] = effectiveMenuAppIds
+    ? effectiveMenuAppIds
         .map((id): MenuItem | null => {
           if (id.startsWith("link:")) {
             const tileId = id.substring(5);
@@ -170,7 +182,11 @@ export function AppMenu({
 
         void updateCustomPrefs((prev) => {
           const currentIds = [...(prev.menuAppIds || apps.map((a) => a.id))];
-          return { ...prev, menuAppIds: insertIdAtVisibleIndex(currentIds, itemId, insertAt) };
+          return {
+            ...prev,
+            menuAppIds: insertIdAtVisibleIndex(currentIds, itemId, insertAt),
+            menuRemovedAppIds: (prev.menuRemovedAppIds || []).filter((id) => id !== itemId),
+          };
         });
       } else if (data.type === "existing") {
         // Drag from desktop → quick bar: MOVE (remove desktop tile, pin to bar)
@@ -208,6 +224,8 @@ export function AppMenu({
       return {
         ...prev,
         menuAppIds: currentIds.filter((id) => id !== itemId),
+        // Remember it was taken off deliberately, so it is not re-added as "new".
+        menuRemovedAppIds: [...(prev.menuRemovedAppIds || []), itemId],
       };
     });
   }

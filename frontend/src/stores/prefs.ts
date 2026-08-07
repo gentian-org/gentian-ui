@@ -22,6 +22,10 @@ type PrefsState = {
     desktopTiles?: DesktopTile[];
     tileCustomizations?: Record<string, TileCustomization>;
     menuAppIds?: string[];
+    // Apps the user deliberately took off the quick bar. Without this we cannot
+    // tell "removed on purpose" from "provisioned after menuAppIds was written",
+    // and newly installed apps would either never appear or resurrect removed ones.
+    menuRemovedAppIds?: string[];
   };
   isLoading: boolean;
   loadPrefs: () => Promise<void>;

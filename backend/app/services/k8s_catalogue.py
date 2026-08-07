@@ -53,6 +53,13 @@ def get_app_profile(name: str) -> dict[str, Any] | None:
 
 
 def list_installed_profiles(tenant_name: str) -> list[str]:
+    """Profiles the tenant has, including the addons enabled inside them.
+
+    An addon is not a separate installed app — it lives in spec.apps[].addons —
+    but it is a feature the user can open, so it contributes portal tiles just
+    like an app does. Leaving addons out is why enabling Nextcloud Mail produced
+    no tile in the app menu.
+    """
     tenant = get_tenant(tenant_name)
     if tenant is None:
         return []
@@ -62,6 +69,9 @@ def list_installed_profiles(tenant_name: str) -> list[str]:
         profile = entry.get("profile")
         if profile:
             profiles.append(str(profile))
+        for addon in entry.get("addons") or []:
+            if addon:
+                profiles.append(str(addon))
     return profiles
 
 

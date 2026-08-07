@@ -307,6 +307,7 @@ export function DesktopPage() {
               t.id === tileId ? { ...t, position: snapped } : t
             ),
             menuAppIds: (prev.menuAppIds || []).filter((id) => id !== data.id),
+              menuRemovedAppIds: [...(prev.menuRemovedAppIds || []), data.id],
           }));
         } else {
           const app = apps.find((a) => a.id === data.id);
@@ -319,6 +320,7 @@ export function DesktopPage() {
                 t.id === existing.id ? { ...t, position: snapped } : t
               ),
               menuAppIds: (prev.menuAppIds || []).filter((id) => id !== app.id),
+              menuRemovedAppIds: [...(prev.menuRemovedAppIds || []), app.id],
             }));
           } else {
             const newTile: DesktopTile = {
@@ -333,6 +335,7 @@ export function DesktopPage() {
               ...prev,
               desktopTiles: [...(prev.desktopTiles || []), newTile],
               menuAppIds: (prev.menuAppIds || []).filter((id) => id !== app.id),
+              menuRemovedAppIds: [...(prev.menuRemovedAppIds || []), app.id],
             }));
           }
         }
