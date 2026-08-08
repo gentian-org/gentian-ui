@@ -221,6 +221,7 @@ async def tenant_shell_apps(
             if app_id in seen:
                 continue
             url_spec = spec
+            auth_profile, auth_profile_name = profile, profile_name
             if not spec.get("ingress") and not spec.get("apiIntegration"):
                 # An addon has no ingress of its own — it is reached inside its base
                 # app — so the tile URL comes from the base. spec.customization.addon.of
@@ -234,6 +235,13 @@ async def tenant_shell_apps(
                     base_profile = get_app_profile(str(base_name))
                     if base_profile and base_profile.get("spec"):
                         url_spec = base_profile["spec"]
+                        auth_profile_name = str(base_name)
+                        # The addon is reached inside the base, over the base's own
+                        # session, so it must launch the same way. Without this the
+                        # tile falls back to plain navigation: the portal bridge never
+                        # runs, ?open=/?app= are never interpreted, and every addon
+                        # tile lands on Nextcloud's dashboard instead of its target.
+                        auth_profile = base_profile
             launch_url = app_launch_url(
                 url_spec,
                 tenant=tenant,
@@ -250,7 +258,7 @@ async def tenant_shell_apps(
                     "icon": tile_icon(spec, portal_tile),
                     "launchUrl": launch_url,
                     "linkTarget": str(portal_tile.get("linkTarget") or "newwindow"),
-                    "authMode": profile_auth_mode(profile, profile_name),
+                    "authMode": profile_auth_mode(auth_profile, auth_profile_name),
                     "builtin": False,
                 }
             )
