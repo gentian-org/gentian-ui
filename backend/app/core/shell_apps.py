@@ -180,10 +180,19 @@ async def tenant_shell_apps(
         if not portal_tiles:
             continue
         for portal_tile in portal_tiles:
-            requires_profile = profile.get("metadata", {}).get("annotations", {}).get("gentianos.io/requires-profile")
-            is_odoo_module = (requires_profile == "odoo-cb-base")
-            if is_odoo_module and not is_admin:
-                module_name = profile_name.removeprefix("odoo-cb-")
+            # Odoo addons are gated per user: a member sees the tile only if one of
+            # their Keycloak groups grants that module via gentianOdooModules.
+            #
+            # This used to key on requires-profile == "odoo-cb-base" and strip an
+            # "odoo-cb-" prefix. Both were stale from the profile rename, so the whole
+            # gate had been silently inert — every member saw every Odoo tile. It now
+            # keys on the addon declaration, which is also where the module's real
+            # Odoo name lives (crm, account, hr), rather than being guessed from the
+            # profile name.
+            addon_of = ((spec.get("customization") or {}).get("addon") or {})
+            is_odoo_addon = bool(addon_of.get("of")) and spec.get("family") == "odoo"
+            if is_odoo_addon and not is_admin:
+                module_name = addon_of.get("id") or profile_name
                 from app.services.keycloak_user_groups import realm_from_issuer
                 realm = realm_from_issuer(user.get("iss") or "") or f"tenant-{tenant}"
                 all_kc_groups = []
@@ -228,9 +237,7 @@ async def tenant_shell_apps(
                 # is the current declaration; requires-profile is the legacy annotation
                 # kept for profiles not yet migrated.
                 addon_decl = (spec.get("customization") or {}).get("addon") or {}
-                base_name = addon_decl.get("of") or (
-                    profile.get("metadata", {}).get("annotations", {}).get("gentianos.io/requires-profile")
-                )
+                base_name = addon_decl.get("of")
                 if base_name:
                     base_profile = get_app_profile(str(base_name))
                     if base_profile and base_profile.get("spec"):

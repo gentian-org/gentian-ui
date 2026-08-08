@@ -371,26 +371,31 @@ async def test_shell_apps_for_odoo_module_visibility():
     
     crm_profile = {
         "metadata": {
-            "name": "odoo-cb-crm",
-            "annotations": {"gentianos.io/requires-profile": "odoo-cb-base"},
+            "name": "odoo-crm-ce",
+            "annotations": {"gentianos.io/deployment-role": "addon"},
         },
         "spec": {
             "displayName": "Odoo CRM",
+            "family": "odoo",
+            # The gate reads the module's real Odoo name from here, not from the
+            # profile name.
+            "customization": {"addon": {"id": "crm", "of": "odoo-base-ce"}},
             "portalTiles": [{"name": "crm", "allowedGroup": "App Users"}],
         }
     }
     
     base_profile = {
-        "metadata": {"name": "odoo-cb-base"},
+        "metadata": {"name": "odoo-base-ce"},
         "spec": {
+            "family": "odoo",
             "ingress": {"subDomain": "erp"},
         }
     }
     
     def fake_profile(name: str):
-        if name == "odoo-cb-crm":
+        if name == "odoo-crm-ce":
             return crm_profile
-        if name == "odoo-cb-base":
+        if name == "odoo-base-ce":
             return base_profile
         return None
     
@@ -409,12 +414,12 @@ async def test_shell_apps_for_odoo_module_visibility():
     ]
     
     with (
-        patch("app.core.shell_apps.list_installed_profiles", return_value=["odoo-cb-crm"]),
+        patch("app.core.shell_apps.list_installed_profiles", return_value=["odoo-crm-ce"]),
         patch("app.core.shell_apps.get_app_profile", side_effect=fake_profile),
         patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings, store=mock_store)
         
     assert len(apps) == 1
-    assert apps[0]["id"] == "odoo-cb-crm-crm"
+    assert apps[0]["id"] == "odoo-crm-ce-crm"
     assert apps[0]["launchUrl"] == "https://erp.demo.desk.gentian.org"
