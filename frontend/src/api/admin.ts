@@ -492,3 +492,10 @@ export function updateAppGrant(
     body: JSON.stringify(body),
   });
 }
+
+export type GrantableAddon = { id: string; label: string; profile: string };
+
+/** Addons this tenant has installed and can therefore grant to a group. */
+export function fetchGrantableAddons(tenant?: string) {
+  return apiFetch<GrantableAddon[]>(`/admin/grantable-addons${tenantQuery(tenant)}`);
+}

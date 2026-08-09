@@ -17,6 +17,7 @@ from app.core.audit_log import record_admin_audit
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
 from app.core.openfga_client import OpenFGAClient
+from app.services.k8s_catalogue import get_app_profile, list_installed_profiles
 from app.core.gentian_groups import (
     is_admin_managed_group,
     is_bootstrap_tenant_admin,
@@ -851,6 +852,50 @@ async def list_groups(
     resolved = resolve_admin_tenant(user, settings, tenant)
     groups = await _managed_groups(store, resolved, settings)
     return [_group_response(group) for group in groups]
+
+
+@router.get("/grantable-addons")
+async def list_grantable_addons(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> list[dict[str, str]]:
+    """Addons a group can be granted, derived from what the tenant has installed.
+
+    The Groups screen used to offer a hardcoded trio of crm/contacts/calendar.
+    That list was wrong in both directions: it offered modules the tenant had not
+    installed, and it could not offer the ones it had — a tenant running
+    accounting, hr, mrp, pos_restaurant and purchase could grant none of them, so
+    those tiles were invisible to every member with no way to fix it.
+
+    The id returned is the app-side addon id from spec.customization.addon, which
+    is what gentianOdooModules is matched against when deciding tile visibility.
+    """
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for profile_name in list_installed_profiles(resolved):
+        profile = get_app_profile(profile_name)
+        if profile is None:
+            continue
+        spec = profile.get("spec") or {}
+        addon = (spec.get("customization") or {}).get("addon") or {}
+        addon_id = addon.get("id")
+        # Only Odoo addons are gated this way today; other families are visible
+        # to anyone entitled to the app itself.
+        if not addon_id or spec.get("family") != "odoo" or addon_id in seen:
+            continue
+        seen.add(addon_id)
+        out.append({
+            "id": addon_id,
+            "label": spec.get("displayName") or profile_name,
+            "profile": profile_name,
+        })
+    out.sort(key=lambda a: a["label"].lower())
+    return out
 
 
 @router.post("/groups", response_model=GroupResponse, status_code=status.HTTP_201_CREATED)

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   createGroup,
   deleteGroup,
@@ -7,8 +7,10 @@ import {
   updateGroup,
   fetchMembers,
   updateMemberGroups,
+  fetchGrantableAddons,
   type AdminGroup,
   type AdminMember,
+  type GrantableAddon,
 } from "@/api/admin";
 import "./admin.css";
 
@@ -33,6 +35,19 @@ function GroupEditPanel({ group, tenant, members, onClose }: GroupEditProps) {
   const initialMembers = members.filter((m) => m.groups.includes(group.name)).map((m) => m.id);
   const [draftMemberIds, setDraftMemberIds] = useState<string[]>(initialMembers);
   const [draftModules, setDraftModules] = useState<string[]>(group.gentianOdooModules ?? []);
+  // Offer exactly what the tenant has installed. The list used to be a hardcoded
+  // crm/contacts/calendar, which both offered modules that were not installed and
+  // hid the ones that were — so their tiles could never be granted to anyone.
+  const [grantableAddons, setGrantableAddons] = useState<GrantableAddon[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetchGrantableAddons(tenant)
+      .then((a) => !cancelled && setGrantableAddons(a))
+      .catch(() => !cancelled && setGrantableAddons([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [tenant]);
   const [draftRoles, setDraftRoles] = useState<string[]>(group.gentianOdooGroupRoles ?? []);
   const [newRoleInput, setNewRoleInput] = useState("");
 
@@ -209,12 +224,14 @@ function GroupEditPanel({ group, tenant, members, onClose }: GroupEditProps) {
             <div style={{ fontSize: "0.875rem", marginBottom: "1rem", color: "var(--gtn-ink-3)" }}>
               Select which Odoo apps are visible to members of this group in the portal:
             </div>
+            {grantableAddons.length === 0 && (
+              <div style={{ fontSize: "0.8125rem", marginBottom: "1rem", color: "var(--gtn-ink-3)" }}>
+                No Odoo apps are installed for this tenant yet. Install them from the App
+                Store first — only installed apps can be granted.
+              </div>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "1rem" }}>
-              {[
-                { id: "crm", label: "CRM" },
-                { id: "contacts", label: "Contacts" },
-                { id: "calendar", label: "Calendar" },
-              ].map((mod) => {
+              {grantableAddons.map((mod) => {
                 const isChecked = draftModules.includes(mod.id);
                 return (
                   <label
