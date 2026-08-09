@@ -2,6 +2,15 @@ export type AppLaunchUrlOptions = {
   username?: string;
   linkTarget?: string | null;
   authMode?: string | null;
+  /**
+   * Force the IdP to re-authenticate instead of reusing its SSO session.
+   *
+   * Only for the deliberate gesture (Ctrl/Cmd+click, "open as another user"). This
+   * used to be inferred from linkTarget === "newwindow", but the backend defaults
+   * linkTarget to "newwindow" for every tile that does not say otherwise, so the
+   * inference turned an ordinary click on most tiles into a forced login prompt.
+   */
+  forceLogin?: boolean;
 };
 
 /**
@@ -19,7 +28,7 @@ export function buildAppLaunchUrl(
     return rawLink;
   }
 
-  const { username, linkTarget, authMode } = options;
+  const { username, linkTarget, authMode, forceLogin } = options;
   if (!username || authMode !== "oidc") {
     return rawLink;
   }
@@ -32,9 +41,9 @@ export function buildAppLaunchUrl(
     if (username) {
       url.searchParams.set("login_hint", username);
     }
-    // Embedded tiles: allow silent SSO in the iframe (broker / tenant-realm cookie).
-    // Ctrl/Cmd+click opens a new tab with linkTarget newwindow and forces re-auth.
-    if (linkTarget === "newwindow") {
+    // Only the explicit gesture forces re-authentication. Every other launch lets
+    // the IdP reuse its SSO session, which is the whole point of having one.
+    if (forceLogin) {
       url.searchParams.set("prompt", "login");
     }
 

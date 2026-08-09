@@ -173,6 +173,7 @@ export function DesktopPage() {
         username: me?.username,
         linkTarget,
         authMode: app.authMode,
+        forceLogin: options?.forceLogin,
       });
 
       let launchUrl = appUrl;
