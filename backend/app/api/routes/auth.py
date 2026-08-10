@@ -48,10 +48,18 @@ def login_route(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    # Which realm the browser is sent to depends on the email, which is why the
+    # portal asks for it before redirecting. Tenant members authenticate in their
+    # own realm — that is where their account and every per-app OIDC client live,
+    # so that is where the SSO session has to be created for app launches to reuse
+    # it. Platform operators authenticate in the kernel realm.
+    realm = settings.kernel_realm if route.idp_hint is None else route.idp_hint
     return {
         "loginHint": route.login_hint,
         "idpHint": route.idp_hint,
         "kind": route.kind,
+        "realm": realm,
+        "issuer": settings.public_issuer_for_realm(realm),
     }
 
 

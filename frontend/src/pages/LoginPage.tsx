@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { requestForgotPassword } from "@/api/account";
 import { useAuth } from "@/auth/AuthProvider";
-import { setAccessToken, setIdToken } from "@/auth/oidc";
-import { resolvePostLoginPath } from "@/lib/postLogin";
+import { loginRedirect } from "@/auth/oidc";
 import { safeReturnTo } from "@/lib/returnTo";
 
 export function LoginPage() {
@@ -12,7 +11,6 @@ export function LoginPage() {
   const postLoginPath = safeReturnTo(returnTo);
   const { authDisabled, isAuthenticated, isLoading } = useAuth();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
@@ -30,8 +28,8 @@ export function LoginPage() {
     setErrorMessage("");
 
     const trimmedEmail = email.trim();
-    if (!trimmedEmail || !password) {
-      setErrorMessage("Enter your email and password.");
+    if (!trimmedEmail) {
+      setErrorMessage("Enter your email.");
       return;
     }
 
@@ -41,27 +39,29 @@ export function LoginPage() {
       return;
     }
 
+    // Ask which realm this email belongs to, then hand the browser to Keycloak.
+    //
+    // The password is deliberately not collected here. Posting it to the portal
+    // backend, which is what this page used to do, authenticates the user without
+    // the browser ever contacting Keycloak — so no SSO session cookie exists and
+    // every OIDC app has to prompt again. The redirect is what creates the session
+    // that app launches reuse. See gentian-os/docs/login-cleanup.md.
     setIsSubmitting(true);
     try {
-      const response = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmedEmail, password }),
-      });
+      const response = await fetch(
+        `/api/v1/auth/login-route?email=${encodeURIComponent(trimmedEmail)}`,
+      );
       const payload = (await response.json().catch(() => null)) as
-        | { accessToken?: string; idToken?: string; detail?: string }
+        | { issuer?: string; loginHint?: string; detail?: string }
         | null;
-      if (!response.ok || !payload?.accessToken) {
-        throw new Error(payload?.detail ?? "Invalid username or password.");
+      if (!response.ok || !payload?.issuer) {
+        throw new Error(payload?.detail ?? "We do not recognise that email domain.");
       }
-      setAccessToken(payload.accessToken);
-      if (payload.idToken) {
-        setIdToken(payload.idToken);
-      }
-      const target = returnTo
-        ? postLoginPath
-        : await resolvePostLoginPath(payload.accessToken);
-      window.location.assign(target);
+      await loginRedirect({
+        returnTo: postLoginPath,
+        issuer: payload.issuer,
+        loginHint: payload.loginHint ?? trimmedEmail,
+      });
     } catch (error) {
       setIsSubmitting(false);
       setErrorMessage(error instanceof Error ? error.message : "Could not sign in.");
@@ -126,24 +126,9 @@ export function LoginPage() {
                 required
               />
 
-              <label className="gentian-login__label" htmlFor="login-password">
-                Password
-              </label>
-              <input
-                id="login-password"
-                className="gentian-login__input"
-                type="password"
-                name="password"
-                autoComplete="current-password"
-                value={password}
-                disabled={isSubmitting}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-
               <button type="submit" className="gentian-login__btn" disabled={isSubmitting}>
                 {isSubmitting && <span className="gentian-login__spinner" aria-hidden="true" />}
-                {isSubmitting ? "Signing in…" : "Sign in"}
+                {isSubmitting ? "Continuing…" : "Continue"}
               </button>
 
               {!authDisabled && (

@@ -61,6 +61,22 @@ class Settings(BaseSettings):
     def idp_public_host(self) -> str:
         return f"id.{self.kernel_domain}"
 
+    def public_issuer_for_realm(self, realm: str) -> str:
+        """Browser-facing issuer for a realm.
+
+        Distinct from realm_issuer() in keycloak_password_login, which prefers the
+        in-cluster admin URL — correct for server-to-server calls and useless for a
+        redirect the browser has to follow. Derived from oidc_issuer by swapping
+        the realm segment, so the scheme, host and /auth prefix stay whatever this
+        deployment actually serves rather than being reassembled from parts.
+        """
+        issuer = (self.oidc_issuer or "").rstrip("/")
+        if not realm:
+            return issuer
+        if "/realms/" in issuer:
+            return issuer[: issuer.index("/realms/")] + f"/realms/{realm}"
+        return f"{self.idp_public_base_url.rstrip('/')}/realms/{realm}"
+
     @property
     def oidc_realm_base_url(self) -> str | None:
         """Realm OIDC base URL for JWKS/userinfo (prefer in-cluster Keycloak)."""

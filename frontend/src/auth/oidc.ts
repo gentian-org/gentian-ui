@@ -15,6 +15,11 @@ export type OidcConfig = {
 const TOKEN_STORAGE_KEY = "gentian.access_token";
 const ID_TOKEN_STORAGE_KEY = "gentian.id_token";
 const PKCE_VERIFIER_KEY = "gentian.pkce_verifier";
+// The realm a user authenticates in depends on their email, so the issuer is not
+// known until /auth/login-route has answered. The callback must exchange the code
+// against that same realm's token endpoint, and by then the redirect has wiped
+// everything but storage — so it is recorded here alongside the verifier.
+const ISSUER_KEY = "gentian.oidc_issuer";
 
 type JwtClaims = {
   iss?: string;
@@ -175,17 +180,31 @@ export function clearAccessToken(): void {
   sessionStorage.removeItem(TOKEN_STORAGE_KEY);
   sessionStorage.removeItem(ID_TOKEN_STORAGE_KEY);
   sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+  sessionStorage.removeItem(ISSUER_KEY);
 }
 
 export type LoginRedirectOptions = {
   returnTo?: string;
   loginHint?: string;
   idpHint?: string;
+  /**
+   * Realm issuer to authenticate against, overriding the build-time default.
+   *
+   * The portal resolves this from the email via /auth/login-route: a tenant
+   * member signs in to their own realm, which is where their account and every
+   * per-app OIDC client live, and therefore where the SSO session must exist for
+   * app launches to reuse it.
+   */
+  issuer?: string;
 };
 
 /**
- * Browser OIDC authorization redirect (legacy / broker flows only).
- * End users must sign in on the Gentian portal `/login` page instead.
+ * Browser OIDC authorization redirect — how every portal sign-in happens.
+ *
+ * This is what gives the browser a real Keycloak session cookie. The portal used
+ * to post credentials to its own backend and exchange them server-side, which
+ * left no session for any other application to reuse, so every OIDC app had to
+ * authenticate from scratch. See gentian-os/docs/login-cleanup.md.
  */
 export async function loginRedirect(options: LoginRedirectOptions | string = "/desktop"): Promise<void> {
   const normalized =
@@ -196,8 +215,10 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
     return;
   }
 
+  const issuer = (normalized.issuer || config.issuer).replace(/\/$/, "");
   const verifier = randomUrlSafeString(32);
   sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
+  sessionStorage.setItem(ISSUER_KEY, issuer);
   const challenge = await pkceChallengeFromVerifier(verifier);
 
   const params = new URLSearchParams({
@@ -216,7 +237,7 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
     params.set("kc_idp_hint", normalized.idpHint);
   }
 
-  window.location.href = `${config.issuer.replace(/\/$/, "")}/protocol/openid-connect/auth?${params}`;
+  window.location.href = `${issuer}/protocol/openid-connect/auth?${params}`;
 }
 
 export async function logoutRedirect(): Promise<void> {
@@ -259,7 +280,10 @@ export async function handleOAuthCallback(): Promise<boolean> {
     return false;
   }
 
-  const tokenUrl = `${config.issuer.replace(/\/$/, "")}/protocol/openid-connect/token`;
+  // The realm that issued the code is the one that must redeem it; falling back
+  // to the build-time issuer would send a tenant user's code to the kernel realm.
+  const issuer = (sessionStorage.getItem(ISSUER_KEY) || config.issuer).replace(/\/$/, "");
+  const tokenUrl = `${issuer}/protocol/openid-connect/token`;
   const body = new URLSearchParams({
     grant_type: "authorization_code",
     client_id: config.clientId,
@@ -276,12 +300,14 @@ export async function handleOAuthCallback(): Promise<boolean> {
 
   if (!response.ok) {
     sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+    sessionStorage.removeItem(ISSUER_KEY);
     return false;
   }
 
   const payload = (await response.json()) as { access_token?: string; id_token?: string };
   if (!payload.access_token) {
     sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+    sessionStorage.removeItem(ISSUER_KEY);
     return false;
   }
 
@@ -290,6 +316,7 @@ export async function handleOAuthCallback(): Promise<boolean> {
     setIdToken(payload.id_token);
   }
   sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+  sessionStorage.removeItem(ISSUER_KEY);
 
   const state = params.get("state") ?? "/desktop";
   window.history.replaceState({}, "", state.startsWith("/") ? state : `/${state}`);
