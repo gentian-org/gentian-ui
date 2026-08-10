@@ -3,7 +3,7 @@
 import re
 
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
@@ -65,6 +65,34 @@ def login_route(
         "kind": route.kind,
         "realm": realm,
         "issuer": settings.public_issuer_for_realm(realm),
+    }
+
+
+@router.get("/entry")
+def entry(request: Request, settings: Settings = Depends(get_settings)) -> dict[str, str | None]:
+    """Which realm this hostname signs people in to.
+
+    The portal answers on the shared portal host and on every tenant's own host.
+    On a tenant host the realm is already decided and there is nothing to ask, so
+    the login page skips straight to it.
+
+    Derived from the Host header rather than parsed in the browser, which would
+    have to know how many labels the kernel domain has and which first labels are
+    not tenants.
+    """
+    host = (request.headers.get("host") or "").split(":")[0].lower()
+    suffix = f".{settings.kernel_domain}".lower()
+    tenant: str | None = None
+    if host.endswith(suffix):
+        label = host[: -len(suffix)]
+        # A single label that is not the portal's own host. Anything deeper is an
+        # app hostname (erp.demo.…), not a portal entry.
+        if label and "." not in label and label != "portal" and _TENANT_RE.fullmatch(label):
+            tenant = label
+    return {
+        "tenant": tenant,
+        "realm": tenant or settings.kernel_realm,
+        "issuer": settings.public_issuer_for_realm(tenant or settings.kernel_realm),
     }
 
 

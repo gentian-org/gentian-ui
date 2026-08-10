@@ -20,7 +20,7 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   beforeLoad: () => {
-    throw redirect({ to: "/login", search: { returnTo: undefined, tenant: undefined, email: undefined } });
+    throw redirect({ to: "/login", search: { returnTo: undefined, email: undefined } });
   },
 });
 
@@ -29,10 +29,6 @@ const loginRoute = createRoute({
   path: "/login",
   validateSearch: (search: Record<string, unknown>) => ({
     returnTo: typeof search.returnTo === "string" ? search.returnTo : undefined,
-    // Set by the gateway when the user arrived on <tenant>.<kernel-domain>: the
-    // hostname already identifies the tenant, so the realm is known and the email
-    // step can be skipped entirely.
-    tenant: typeof search.tenant === "string" ? search.tenant : undefined,
     // Carried from the apex portal once the email has been entered there, so the
     // Keycloak form arrives pre-filled and only asks for a password.
     email: typeof search.email === "string" ? search.email : undefined,
@@ -76,7 +72,7 @@ const legacyUniventionOidcRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/univention/oidc",
   beforeLoad: () => {
-    throw redirect({ to: "/login", search: { returnTo: undefined, tenant: undefined, email: undefined } });
+    throw redirect({ to: "/login", search: { returnTo: undefined, email: undefined } });
   },
 });
 
@@ -94,7 +90,7 @@ const shellRoute = createRoute({
     if (!getAccessToken()) {
       throw redirect({
         to: "/login",
-        search: { returnTo: location.pathname, tenant: undefined, email: undefined },
+        search: { returnTo: location.pathname, email: undefined },
       });
     }
   },

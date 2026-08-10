@@ -7,7 +7,7 @@ import { safeReturnTo } from "@/lib/returnTo";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { returnTo, tenant, email: emailFromUrl } = useSearch({ from: "/login" });
+  const { returnTo, email: emailFromUrl } = useSearch({ from: "/login" });
   const postLoginPath = safeReturnTo(returnTo);
   const { authDisabled, isAuthenticated, isLoading } = useAuth();
   const [email, setEmail] = useState(emailFromUrl ?? "");
@@ -24,41 +24,42 @@ export function LoginPage() {
     }
   }, [isAuthenticated, isLoading, navigate, postLoginPath]);
 
-  // Arriving with a tenant means the hostname already identified the realm — the
-  // gateway puts it on the URL when the user comes in on <tenant>.<kernel-domain>.
-  // There is nothing to ask, so go straight to that realm's login, which asks for
-  // email and password on one page. This is what makes the tenant subdomain a
-  // bookmarkable single-stage sign-in.
+  // Ask which realm this hostname signs people in to.
+  //
+  // The portal answers on the shared host and on every tenant's own host. On a
+  // tenant host the realm is already decided, so there is nothing to ask the user
+  // and we go straight to it — that is what makes <tenant>.<kernel-domain> a
+  // single-stage login. The server decides from the Host header rather than the
+  // browser parsing it, which would have to know how deep the kernel domain is
+  // and which first labels are not tenants.
   useEffect(() => {
-    if (isLoading || isAuthenticated || authDisabled || !tenant || redirecting) {
+    if (isLoading || isAuthenticated || authDisabled || redirecting) {
       return;
     }
     setRedirecting(true);
     void (async () => {
       try {
-        const response = await fetch(
-          `/api/v1/auth/tenant-issuer?tenant=${encodeURIComponent(tenant)}`,
-        );
+        const response = await fetch("/api/v1/auth/entry");
         const payload = (await response.json().catch(() => null)) as
-          | { issuer?: string; detail?: string }
+          | { tenant?: string | null; issuer?: string }
           | null;
-        if (!response.ok || !payload?.issuer) {
-          throw new Error(payload?.detail ?? "We do not recognise that workspace.");
+        // No tenant means the shared portal: ask for an email as before.
+        if (!response.ok || !payload?.tenant || !payload.issuer) {
+          setRedirecting(false);
+          return;
         }
         await loginRedirect({
           returnTo: postLoginPath,
           issuer: payload.issuer,
-          // Present only when the apex portal already collected it, in which case
-          // Keycloak pre-fills the field and only the password is left.
+          // Present when the apex already collected it, so Keycloak pre-fills.
           loginHint: emailFromUrl || undefined,
         });
-      } catch (error) {
+      } catch {
         // Fall back to the email form rather than stranding the user.
         setRedirecting(false);
-        setErrorMessage(error instanceof Error ? error.message : "Could not sign in.");
       }
     })();
-  }, [isLoading, isAuthenticated, authDisabled, tenant, redirecting, postLoginPath, emailFromUrl]);
+  }, [isLoading, isAuthenticated, authDisabled, redirecting, postLoginPath, emailFromUrl]);
 
   async function signIn(event: React.FormEvent) {
     event.preventDefault();

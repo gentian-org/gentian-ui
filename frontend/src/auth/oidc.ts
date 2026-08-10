@@ -84,8 +84,9 @@ function logoutLandingForRealm(realm: string | null): string {
   }
   const kernelDomain = kernelDomainFromIssuer();
   if (!kernelDomain) {
-    // Fall back to the portal's own login rather than building a bad hostname.
-    return `${window.location.origin}/login?tenant=${encodeURIComponent(realm)}`;
+    // Fall back to this origin's login rather than building a bad hostname; the
+    // server resolves the realm from whichever host that turns out to be.
+    return `${window.location.origin}/login`;
   }
   return `https://${realm}.${kernelDomain}/`;
 }

@@ -100,3 +100,48 @@ def test_tenant_subdomain_maps_to_the_same_realm_as_the_email() -> None:
     # different places.
     assert route.idp_hint == "demo"
     assert _SETTINGS.public_issuer_for_realm(route.idp_hint).endswith("/realms/demo")
+
+
+# The portal answers on the shared host and on every tenant's own host. Which
+# realm a visitor signs in to is decided by the Host header, so the login page
+# can skip the email question when the answer is already known.
+
+from app.api.routes.auth import entry  # noqa: E402
+
+
+class _Req:
+    def __init__(self, host: str) -> None:
+        self.headers = {"host": host}
+
+
+def _entry(host: str):
+    return entry(_Req(host), _SETTINGS)
+
+
+def test_tenant_host_resolves_to_the_tenant_realm() -> None:
+    assert _entry("demo.desk.gentian.org")["tenant"] == "demo"
+    assert _entry("demo.desk.gentian.org")["issuer"].endswith("/realms/demo")
+
+
+def test_port_is_ignored() -> None:
+    assert _entry("demo.desk.gentian.org:443")["tenant"] == "demo"
+
+
+def test_shared_portal_host_is_not_a_tenant() -> None:
+    # Otherwise "portal" would be treated as a realm and nobody could sign in.
+    assert _entry("portal.desk.gentian.org")["tenant"] is None
+    assert _entry("portal.desk.gentian.org")["realm"] == "kernel"
+
+
+def test_apex_is_not_a_tenant() -> None:
+    assert _entry("desk.gentian.org")["tenant"] is None
+
+
+def test_app_hostnames_are_not_portal_entries() -> None:
+    # erp.demo.… is an app, two labels deep; treating it as tenant "erp.demo"
+    # would send people to a realm that does not exist.
+    assert _entry("erp.demo.desk.gentian.org")["tenant"] is None
+
+
+def test_foreign_domains_are_not_tenants() -> None:
+    assert _entry("demo.evil.example.com")["tenant"] is None
