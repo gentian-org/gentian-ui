@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { prepareEmbeddedOidcSession, openIdpBootstrapPopup } from "@/auth/idpSession";
+import { useEffect } from "react";
 import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
 import {
   fetchPortalBridgeTicket,
@@ -59,31 +58,31 @@ export function DesktopPage() {
     }
   }, [activeAppId, setActiveAppId, windows]);
 
-  const [oidcReady, setOidcReady] = useState(false);
-
+  // Embedded OIDC apps (Odoo) used to need a manual first-party-cookie bootstrap —
+  // a hidden iframe on load, a 1×1 off-screen popup per tile click — because portal
+  // sign-in used a password grant that never took the browser to Keycloak as a
+  // top-level page, so no first-party session cookie existed to reuse. Portal
+  // sign-in is a real Keycloak redirect now (see gentian-os/docs/login-cleanup.md),
+  // which already visits id.<kernel-domain> as a top-level navigation before the
+  // user ever reaches the desktop — the cookie the bootstrap used to manufacture
+  // exists by construction, so this mount effect no longer needs to wait for
+  // anything before pre-opening open-webui.
   useEffect(() => {
-    // Warm up Keycloak OIDC sessions silently in the background on load
-    void prepareEmbeddedOidcSession(null).finally(() => setOidcReady(true));
-  }, []);
-
-  useEffect(() => {
-    if (oidcReady) {
-      const openWebUi = apps.find((a) => a.id === "open-webui-open-webui");
-      if (openWebUi && openWebUi.launchUrl) {
-        const hasWindow = windows.some((w) => w.appId === openWebUi.id);
-        if (!hasWindow) {
-          openWindow({
-            id: openWebUi.id,
-            appId: openWebUi.id,
-            title: openWebUi.title,
-            url: openWebUi.launchUrl,
-            isHidden: true,
-            state: "minimized",
-          });
-        }
+    const openWebUi = apps.find((a) => a.id === "open-webui-open-webui");
+    if (openWebUi && openWebUi.launchUrl) {
+      const hasWindow = windows.some((w) => w.appId === openWebUi.id);
+      if (!hasWindow) {
+        openWindow({
+          id: openWebUi.id,
+          appId: openWebUi.id,
+          title: openWebUi.title,
+          url: openWebUi.launchUrl,
+          isHidden: true,
+          state: "minimized",
+        });
       }
     }
-  }, [oidcReady, apps, windows, openWindow]);
+  }, [apps, windows, openWindow]);
 
   function openBuiltinPanel(
     id: "account" | "settings",
@@ -119,16 +118,8 @@ export function DesktopPage() {
       }
     }
 
-    const useIdpBootstrap =
-      app.authMode === "oidc" && app.linkTarget === "embedded" && !options?.forceLogin;
-    
-    // Open a blank off-screen popup synchronously during the user gesture to bypass popup blockers.
-    // This allows Keycloak to drop first-party cookies for embedded OIDC apps on privacy-strict browsers (e.g. mobile).
-    const idpPopup = useIdpBootstrap ? openIdpBootstrapPopup() : null;
-
     setActiveAppId(app.id);
     if (app.builtin && app.id === "admin") {
-      idpPopup?.close();
       if (options?.forceNewWindow) {
         // Builtins can't run in separate browser tab directly without routing wrapper, so we focus or open normal
         openOrFocusWindow({
@@ -148,7 +139,6 @@ export function DesktopPage() {
       return;
     }
     if (!app.launchUrl) {
-      idpPopup?.close();
       return;
     }
     const appLaunchBase = app.launchUrl;
@@ -181,7 +171,6 @@ export function DesktopPage() {
       // If opening in a new window/tab, redirect top-level or open window immediately
       const openInNewTab = options?.forceNewWindow || linkTarget === "newwindow";
       if (openInNewTab) {
-        idpPopup?.close();
         window.open(appUrl, "_blank");
         return;
       }
@@ -222,9 +211,11 @@ export function DesktopPage() {
             window.alert(`Could not open ${app.title}. Try signing in again.`);
             return;
           }
-        } else if (useIdpBootstrap) {
-          await prepareEmbeddedOidcSession(idpPopup);
         }
+        // Embedded OIDC apps (Odoo) need no bootstrap here — the first-party
+        // Keycloak cookie already exists from the real redirect login that put
+        // the user on the desktop in the first place. See the comment above the
+        // open-webui pre-open effect.
 
         if (needsBridgeTicket && !options?.forceLogin) {
           setWindowUrl(winId, launchUrl);

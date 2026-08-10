@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { prepareEmbeddedOidcSession, openIdpBootstrapPopup } from "@/auth/idpSession";
 import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
 import {
   fetchPortalBridgeTicket,
@@ -98,12 +97,12 @@ export function MobilePage() {
       setOverlay("admin");
       return;
     }
-    if (app.authMode === "oidc" && app.linkTarget === "embedded") {
-      // Open the 1x1 off-screen popup during the user gesture to avoid popup blockers,
-      // and use it to bootstrap the first-party Keycloak session on mobile.
-      const popup = openIdpBootstrapPopup();
-      void prepareEmbeddedOidcSession(popup);
-    }
+    // Embedded OIDC apps (Odoo) used to need a popup here to bootstrap a
+    // first-party Keycloak cookie, because portal sign-in was a password grant
+    // that never took the browser to Keycloak as a top-level page. Portal sign-in
+    // is a real Keycloak redirect now (see gentian-os/docs/login-cleanup.md),
+    // which already visits id.<kernel-domain> before the user reaches this
+    // screen, so the cookie exists by construction and there is nothing to warm.
   }
 
   function openOverlay(panel: MobileOverlay) {
