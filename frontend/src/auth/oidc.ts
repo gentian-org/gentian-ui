@@ -47,20 +47,47 @@ function realmFromIssuer(issuer: string): string | null {
 }
 
 /**
+ * The kernel domain, derived from the configured issuer.
+ *
+ * Not a guess: the backend builds the browser-facing issuer as
+ * `https://id.<kernel-domain>/auth/realms/<realm>` (Settings.idp_public_base_url),
+ * so dropping the leading `id.` label is exact. Deriving it here rather than
+ * counting labels avoids assuming how deep the domain is.
+ */
+function kernelDomainFromIssuer(): string | null {
+  const issuer = getOidcConfig().issuer;
+  if (!issuer) {
+    return null;
+  }
+  try {
+    const host = new URL(issuer).hostname;
+    return host.startsWith("id.") ? host.slice(3) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Where sign-out should land, for a session in this realm.
  *
- * A tenant member must come back to their own single-stage entry, not the apex.
- * The apex asks for an email, so returning there turns every sign-out into a
- * two-stage sign-in — and the realm is already in the token, so there is nothing
- * to ask. Platform operators authenticate in the kernel realm and belong on the
- * plain login page.
+ * A tenant member goes back to their own entry — the absolute
+ * `https://<tenant>.<kernel-domain>/`, not a path on whichever host happened to
+ * be showing. Returning to the apex asks them for an email again, turning every
+ * sign-out into a two-stage sign-in, and the realm is already in the token so
+ * there is nothing to ask. Platform operators authenticate in the kernel realm
+ * and belong on the plain login page.
  */
-function loginPathForRealm(realm: string | null): string {
+function logoutLandingForRealm(realm: string | null): string {
   const kernelRealm = realmFromIssuer(getOidcConfig().issuer);
   if (!realm || realm === kernelRealm) {
-    return "/login";
+    return `${window.location.origin}/login`;
   }
-  return `/login?tenant=${encodeURIComponent(realm)}`;
+  const kernelDomain = kernelDomainFromIssuer();
+  if (!kernelDomain) {
+    // Fall back to the portal's own login rather than building a bad hostname.
+    return `${window.location.origin}/login?tenant=${encodeURIComponent(realm)}`;
+  }
+  return `https://${realm}.${kernelDomain}/`;
 }
 
 /** Map in-cluster Keycloak issuers to the browser-facing id.* URL. */
@@ -103,7 +130,7 @@ export function resolveLogoutUrl(
 
   const params = new URLSearchParams({
     client_id: clientId,
-    post_logout_redirect_uri: `${window.location.origin}${loginPathForRealm(realmFromIssuer(issuer))}`,
+    post_logout_redirect_uri: logoutLandingForRealm(realmFromIssuer(issuer)),
   });
   if (idToken) {
     params.set("id_token_hint", idToken);
@@ -277,7 +304,7 @@ export async function logoutRedirect(): Promise<void> {
   const claims = decodeJwtPayload(idToken ?? accessToken ?? "");
   const realm = typeof claims?.iss === "string" ? realmFromIssuer(claims.iss) : null;
   clearAccessToken();
-  window.location.replace(loginPathForRealm(realm));
+  window.location.replace(logoutLandingForRealm(realm));
 }
 
 
