@@ -189,6 +189,10 @@ async def tenant_shell_apps(
             # keys on the addon declaration, which is also where the module's real
             # Odoo name lives (crm, account, hr), rather than being guessed from the
             # profile name.
+            #
+            # Known debt: this is app-specific gating living in the portal. It belongs
+            # with the entitlement model, so that visibility is decided the same way
+            # for every app rather than once per family here.
             addon_of = ((spec.get("customization") or {}).get("addon") or {})
             is_odoo_addon = bool(addon_of.get("of")) and spec.get("family") == "odoo"
             if is_odoo_addon and not is_admin:
