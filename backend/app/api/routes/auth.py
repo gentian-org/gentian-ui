@@ -65,6 +65,17 @@ def login_route(
         "kind": route.kind,
         "realm": realm,
         "issuer": settings.public_issuer_for_realm(realm),
+        # Where a tenant member's sign-in must actually happen, not merely start.
+        #
+        # The portal is served on this tenant's own host now (see gentian-os
+        # kernelHTTPRouteSpecs), and that host is what is registered on the
+        # Keycloak client as a redirect_uri. Completing the flow on the apex and
+        # only linking to the tenant host afterwards does not canonicalise
+        # anything: redirect_uri is derived from window.location.origin at the
+        # moment loginRedirect() runs, so the flow has to start there too.
+        "tenantHost": (
+            f"{route.idp_hint}.{settings.kernel_domain}" if route.idp_hint else None
+        ),
     }
 
 
@@ -94,26 +105,6 @@ def entry(request: Request, settings: Settings = Depends(get_settings)) -> dict[
         "realm": tenant or settings.kernel_realm,
         "issuer": settings.public_issuer_for_realm(tenant or settings.kernel_realm),
     }
-
-
-@router.get("/tenant-issuer")
-def tenant_issuer(
-    tenant: str = Query(..., min_length=1, max_length=63),
-    settings: Settings = Depends(get_settings),
-) -> dict[str, str]:
-    """Realm issuer for a tenant known from the hostname.
-
-    The gateway puts the tenant on the login URL when the user arrives at
-    <tenant>.<kernel-domain>, so the realm is already known and there is nothing
-    to ask them. Validated rather than trusted: the value only selects which realm
-    to redirect to, and an unknown one would simply 404 at Keycloak, but a
-    well-formed check keeps arbitrary strings out of a URL the browser follows.
-    """
-    if not _TENANT_RE.fullmatch(tenant):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid tenant"
-        )
-    return {"realm": tenant, "issuer": settings.public_issuer_for_realm(tenant)}
 
 
 @router.post("/login", response_model=LoginResponse)

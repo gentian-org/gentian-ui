@@ -4,15 +4,16 @@ WORKDIR /app
 
 ARG VITE_OIDC_ISSUER=""
 ARG VITE_OIDC_CLIENT_ID=""
-ARG VITE_OIDC_REDIRECT_URI=""
 ARG VITE_OIDC_SCOPES="openid profile email"
 ARG VITE_AUTH_DISABLED="false"
 
 ENV VITE_OIDC_ISSUER=$VITE_OIDC_ISSUER
 ENV VITE_OIDC_CLIENT_ID=$VITE_OIDC_CLIENT_ID
-ENV VITE_OIDC_REDIRECT_URI=$VITE_OIDC_REDIRECT_URI
 ENV VITE_OIDC_SCOPES=$VITE_OIDC_SCOPES
 ENV VITE_AUTH_DISABLED=$VITE_AUTH_DISABLED
+# No VITE_OIDC_REDIRECT_URI: the portal is served on several hostnames now (the
+# shared one and every tenant's own), so a value baked in at build time can only
+# ever be correct for one of them. oidc.ts always uses this origin's own /login.
 
 COPY package.json ./
 RUN npm install

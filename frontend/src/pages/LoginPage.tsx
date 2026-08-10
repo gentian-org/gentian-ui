@@ -90,21 +90,32 @@ export function LoginPage() {
         `/api/v1/auth/login-route?email=${encodeURIComponent(trimmedEmail)}`,
       );
       const payload = (await response.json().catch(() => null)) as
-        | { issuer?: string; loginHint?: string; detail?: string }
+        | { issuer?: string; loginHint?: string; tenantHost?: string | null; detail?: string }
         | null;
       if (!response.ok || !payload?.issuer) {
         throw new Error(payload?.detail ?? "We do not recognise that email domain.");
       }
-      // Straight to the tenant's realm, carrying the address as login_hint so
-      // Keycloak pre-fills it and only the password is left.
-      //
-      // An earlier cut handed off to the tenant's own host first, on the idea
-      // that it is the canonical entry. It cannot carry the email: that host is a
-      // static gateway redirect using ReplaceFullPath, which replaces path *and*
-      // query, so ?email= was dropped before the portal ever saw it. The hop was
-      // invisible anyway — a 302 the user never reads — so it bought nothing and
-      // cost the pre-fill. The tenant host remains the bookmarkable single-stage
-      // entry in its own right; it simply is not a waypoint.
+
+      // A tenant member's sign-in has to happen on their own host, not merely
+      // link there afterwards. redirect_uri is this origin's own /login (see
+      // oidc.ts), so if loginRedirect() ran here the flow would finish on the
+      // shared portal host regardless of which realm issued the token — the
+      // earlier version of this page did exactly that, and demo.desk.gentian.org
+      // never actually became canonical because of it. A real navigation puts
+      // window.location.origin on the tenant host *before* loginRedirect() reads
+      // it, carrying the email so Keycloak still pre-fills it there.
+      if (payload.tenantHost) {
+        const target = new URL(`https://${payload.tenantHost}/login`);
+        target.searchParams.set("email", payload.loginHint ?? trimmedEmail);
+        // Already sanitised to "/desktop" or "/mobile" — no reason to carry the
+        // raw query value across origins when this is all it can resolve to.
+        target.searchParams.set("returnTo", postLoginPath);
+        window.location.assign(target.toString());
+        return;
+      }
+
+      // No tenant host: a platform operator, who belongs on the kernel realm
+      // from this apex/portal host.
       await loginRedirect({
         returnTo: postLoginPath,
         issuer: payload.issuer,

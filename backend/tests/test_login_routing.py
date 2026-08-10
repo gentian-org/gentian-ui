@@ -145,3 +145,24 @@ def test_app_hostnames_are_not_portal_entries() -> None:
 
 def test_foreign_domains_are_not_tenants() -> None:
     assert _entry("demo.evil.example.com")["tenant"] is None
+
+
+# tenantHost on /auth/login-route is what lets the apex hand a tenant member's
+# sign-in over to their own host *before* the OIDC flow starts. redirect_uri is
+# derived from window.location.origin at the moment the flow starts (oidc.ts), so
+# starting it here and only linking to the tenant host afterwards does not
+# canonicalise anything — the token exchange still finishes back on this host.
+
+from app.api.routes.auth import login_route  # noqa: E402
+
+
+def test_login_route_hands_a_tenant_member_to_their_own_host() -> None:
+    result = login_route(email="john-doe@demo.desk.gentian.org", settings=_SETTINGS)
+    assert result["tenantHost"] == "demo.desk.gentian.org"
+
+
+def test_login_route_gives_an_operator_no_tenant_host() -> None:
+    # Platform operators stay on the apex/portal host; there is no tenant realm
+    # to hand them off to.
+    result = login_route(email="ops@desk.gentian.org", settings=_SETTINGS)
+    assert result["tenantHost"] is None

@@ -13,6 +13,7 @@ import {
   handleOAuthCallback,
   isAuthenticated,
   logoutRedirect,
+  nonCanonicalRedirectTarget,
 } from "@/auth/oidc";
 import { useSessionWatchdog } from "@/auth/useSessionWatchdog";
 import { loginPathWithReturnTo } from "@/lib/returnTo";
@@ -37,6 +38,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const fromCallback = await handleOAuthCallback();
       const authed = fromCallback || isAuthenticated();
+      // A tenant session found on a host other than its own is walked over to
+      // the right one before anything else renders — see
+      // nonCanonicalRedirectTarget. Skipped right after handleOAuthCallback,
+      // since that path just finished putting the token on its own canonical
+      // host and the check would always be a no-op there.
+      if (authed && !fromCallback) {
+        const target = nonCanonicalRedirectTarget();
+        if (target) {
+          window.location.replace(target);
+          return;
+        }
+      }
       setAuthenticated(authed);
       setIsLoading(false);
       if (authed) {

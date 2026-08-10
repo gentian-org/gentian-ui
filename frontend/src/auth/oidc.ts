@@ -91,6 +91,50 @@ function logoutLandingForRealm(realm: string | null): string {
   return `https://${realm}.${kernelDomain}/`;
 }
 
+/**
+ * Where an already-authenticated session should actually be, if not here.
+ *
+ * demo.desk.gentian.org (and every tenant host) is canonical for its members —
+ * see docs/login-cleanup.md. A session can still exist on the shared portal host
+ * from before that was true, or from a bookmark, or from a link someone shares
+ * out of habit. Rather than leave it there, an authenticated tenant session found
+ * on the wrong host is walked over to the right one, carrying the current path so
+ * the visit is not lost — cheap to do, since the SSO cookie makes the resulting
+ * re-login on the new origin silent.
+ *
+ * Returns null when there is nothing to do: no session, a platform operator (no
+ * tenant host to prefer), or already on the right host.
+ */
+export function nonCanonicalRedirectTarget(): string | null {
+  const config = getOidcConfig();
+  if (config.authDisabled) {
+    return null;
+  }
+  const token = sessionStorage.getItem(ID_TOKEN_STORAGE_KEY) ?? sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  if (!token) {
+    return null;
+  }
+  const claims = decodeJwtPayload(token);
+  const issuer = typeof claims?.iss === "string" ? claims.iss : null;
+  if (!issuer) {
+    return null;
+  }
+  const realm = realmFromIssuer(issuer);
+  const kernelRealm = realmFromIssuer(config.issuer);
+  if (!realm || realm === kernelRealm) {
+    return null;
+  }
+  const kernelDomain = kernelDomainFromIssuer();
+  if (!kernelDomain) {
+    return null;
+  }
+  const canonicalHost = `${realm}.${kernelDomain}`;
+  if (window.location.hostname === canonicalHost) {
+    return null;
+  }
+  return `https://${canonicalHost}${window.location.pathname}${window.location.search}`;
+}
+
 /** Map in-cluster Keycloak issuers to the browser-facing id.* URL. */
 function externalLogoutIssuer(issuer: string): string {
   const normalized = issuer.replace(/\/$/, "");
@@ -144,7 +188,19 @@ export function getOidcConfig(): OidcConfig {
   return {
     issuer: import.meta.env.VITE_OIDC_ISSUER ?? "",
     clientId: import.meta.env.VITE_OIDC_CLIENT_ID ?? "",
-    redirectUri: import.meta.env.VITE_OIDC_REDIRECT_URI ?? `${window.location.origin}/login`,
+    // Always this origin's own /login, never a build-time constant.
+    //
+    // The portal is served on several hostnames — the shared one and every
+    // tenant's own — and a single baked-in value can only ever be correct for
+    // one of them. It used to be VITE_OIDC_REDIRECT_URI, fixed at build time to
+    // https://portal.<kernel-domain>/login, so a login that started on
+    // <tenant>.<kernel-domain> sent that redirect_uri to Keycloak anyway and
+    // finished back on the shared host — the tenant host was never actually
+    // canonical, it only looked that way until the token exchange landed
+    // somewhere else. The Keycloak client is registered with both the shared
+    // origin and every tenant origin (keycloak_portal_client.go), so whichever
+    // host initiates the flow is a valid place for it to finish.
+    redirectUri: `${window.location.origin}/login`,
     scopes: import.meta.env.VITE_OIDC_SCOPES ?? "openid profile email groups",
     authDisabled: import.meta.env.VITE_AUTH_DISABLED === "true",
   };
