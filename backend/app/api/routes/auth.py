@@ -1,5 +1,7 @@
 """Unauthenticated auth helpers for the portal login page."""
 
+import re
+
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
@@ -11,6 +13,9 @@ from app.services.admin_store import AdminStoreDep, admin_store_configured
 from app.services.keycloak_password_login import LoginFailedError, password_login
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# Keycloak realm names, which are also the DNS label the tenant is reached on.
+_TENANT_RE = re.compile(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?")
 
 
 class LoginRequest(BaseModel):
@@ -60,7 +65,33 @@ def login_route(
         "kind": route.kind,
         "realm": realm,
         "issuer": settings.public_issuer_for_realm(realm),
+        # Where a tenant member should actually be sent: their own host is the
+        # single-stage entry worth bookmarking. Composed here rather than in the
+        # browser, which would have to guess how many labels the kernel domain has.
+        "tenantHost": (
+            f"{route.idp_hint}.{settings.kernel_domain}" if route.idp_hint else None
+        ),
     }
+
+
+@router.get("/tenant-issuer")
+def tenant_issuer(
+    tenant: str = Query(..., min_length=1, max_length=63),
+    settings: Settings = Depends(get_settings),
+) -> dict[str, str]:
+    """Realm issuer for a tenant known from the hostname.
+
+    The gateway puts the tenant on the login URL when the user arrives at
+    <tenant>.<kernel-domain>, so the realm is already known and there is nothing
+    to ask them. Validated rather than trusted: the value only selects which realm
+    to redirect to, and an unknown one would simply 404 at Keycloak, but a
+    well-formed check keeps arbitrary strings out of a URL the browser follows.
+    """
+    if not _TENANT_RE.fullmatch(tenant):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid tenant"
+        )
+    return {"realm": tenant, "issuer": settings.public_issuer_for_realm(tenant)}
 
 
 @router.post("/login", response_model=LoginResponse)

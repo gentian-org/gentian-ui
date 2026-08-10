@@ -82,3 +82,23 @@ def test_public_issuer_keeps_scheme_host_and_auth_prefix() -> None:
 def test_public_issuer_falls_back_when_no_issuer_is_configured() -> None:
     s = Settings(OIDC_ISSUER="", KERNEL_DOMAIN="desk.gentian.org")
     assert s.public_issuer_for_realm("demo") == "https://id.desk.gentian.org/auth/realms/demo"
+
+
+# The tenant host is the single-stage entry: a user who signs in from the apex is
+# handed to it, and bookmarking it skips the email step entirely.
+
+
+def _host_for(email: str) -> str | None:
+    route = resolve_login_route(
+        email, kernel_domain=_SETTINGS.kernel_domain, tenancy_mode=_SETTINGS.tenancy_mode
+    )
+    return f"{route.idp_hint}.{_SETTINGS.kernel_domain}" if route.idp_hint else None
+
+
+def test_tenant_member_is_handed_to_their_own_host() -> None:
+    assert _host_for("john-doe@demo.desk.gentian.org") == "demo.desk.gentian.org"
+
+
+def test_platform_operator_has_no_tenant_host() -> None:
+    # Operators stay on the apex portal and authenticate in the kernel realm.
+    assert _host_for("ops@desk.gentian.org") is None

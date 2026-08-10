@@ -7,14 +7,15 @@ import { safeReturnTo } from "@/lib/returnTo";
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { returnTo } = useSearch({ from: "/login" });
+  const { returnTo, tenant, email: emailFromUrl } = useSearch({ from: "/login" });
   const postLoginPath = safeReturnTo(returnTo);
   const { authDisabled, isAuthenticated, isLoading } = useAuth();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(emailFromUrl ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
 
   useEffect(() => {
@@ -22,6 +23,42 @@ export function LoginPage() {
       void navigate({ to: postLoginPath });
     }
   }, [isAuthenticated, isLoading, navigate, postLoginPath]);
+
+  // Arriving with a tenant means the hostname already identified the realm — the
+  // gateway puts it on the URL when the user comes in on <tenant>.<kernel-domain>.
+  // There is nothing to ask, so go straight to that realm's login, which asks for
+  // email and password on one page. This is what makes the tenant subdomain a
+  // bookmarkable single-stage sign-in.
+  useEffect(() => {
+    if (isLoading || isAuthenticated || authDisabled || !tenant || redirecting) {
+      return;
+    }
+    setRedirecting(true);
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/v1/auth/tenant-issuer?tenant=${encodeURIComponent(tenant)}`,
+        );
+        const payload = (await response.json().catch(() => null)) as
+          | { issuer?: string; detail?: string }
+          | null;
+        if (!response.ok || !payload?.issuer) {
+          throw new Error(payload?.detail ?? "We do not recognise that workspace.");
+        }
+        await loginRedirect({
+          returnTo: postLoginPath,
+          issuer: payload.issuer,
+          // Present only when the apex portal already collected it, in which case
+          // Keycloak pre-fills the field and only the password is left.
+          loginHint: emailFromUrl || undefined,
+        });
+      } catch (error) {
+        // Fall back to the email form rather than stranding the user.
+        setRedirecting(false);
+        setErrorMessage(error instanceof Error ? error.message : "Could not sign in.");
+      }
+    })();
+  }, [isLoading, isAuthenticated, authDisabled, tenant, redirecting, postLoginPath, emailFromUrl]);
 
   async function signIn(event: React.FormEvent) {
     event.preventDefault();
@@ -52,10 +89,26 @@ export function LoginPage() {
         `/api/v1/auth/login-route?email=${encodeURIComponent(trimmedEmail)}`,
       );
       const payload = (await response.json().catch(() => null)) as
-        | { issuer?: string; loginHint?: string; detail?: string }
+        | {
+            issuer?: string;
+            loginHint?: string;
+            tenantHost?: string | null;
+            detail?: string;
+          }
         | null;
       if (!response.ok || !payload?.issuer) {
         throw new Error(payload?.detail ?? "We do not recognise that email domain.");
+      }
+      // Hand off to the tenant's own host rather than redirecting to Keycloak from
+      // here. That host is the canonical single-stage entry — the one worth
+      // bookmarking — so a user who signs in once from the apex learns the URL
+      // that skips this step next time. It carries the email, so Keycloak
+      // pre-fills it and only the password is left.
+      if (payload.tenantHost) {
+        const target = new URL(`https://${payload.tenantHost}/`);
+        target.searchParams.set("email", trimmedEmail);
+        window.location.assign(target.toString());
+        return;
       }
       await loginRedirect({
         returnTo: postLoginPath,
