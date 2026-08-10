@@ -65,12 +65,6 @@ def login_route(
         "kind": route.kind,
         "realm": realm,
         "issuer": settings.public_issuer_for_realm(realm),
-        # Where a tenant member should actually be sent: their own host is the
-        # single-stage entry worth bookmarking. Composed here rather than in the
-        # browser, which would have to guess how many labels the kernel domain has.
-        "tenantHost": (
-            f"{route.idp_hint}.{settings.kernel_domain}" if route.idp_hint else None
-        ),
     }
 
 

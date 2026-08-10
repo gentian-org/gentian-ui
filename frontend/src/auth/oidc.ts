@@ -46,6 +46,23 @@ function realmFromIssuer(issuer: string): string | null {
   return match?.[1] ?? null;
 }
 
+/**
+ * Where sign-out should land, for a session in this realm.
+ *
+ * A tenant member must come back to their own single-stage entry, not the apex.
+ * The apex asks for an email, so returning there turns every sign-out into a
+ * two-stage sign-in — and the realm is already in the token, so there is nothing
+ * to ask. Platform operators authenticate in the kernel realm and belong on the
+ * plain login page.
+ */
+function loginPathForRealm(realm: string | null): string {
+  const kernelRealm = realmFromIssuer(getOidcConfig().issuer);
+  if (!realm || realm === kernelRealm) {
+    return "/login";
+  }
+  return `/login?tenant=${encodeURIComponent(realm)}`;
+}
+
 /** Map in-cluster Keycloak issuers to the browser-facing id.* URL. */
 function externalLogoutIssuer(issuer: string): string {
   const normalized = issuer.replace(/\/$/, "");
@@ -86,7 +103,7 @@ export function resolveLogoutUrl(
 
   const params = new URLSearchParams({
     client_id: clientId,
-    post_logout_redirect_uri: `${window.location.origin}/login`,
+    post_logout_redirect_uri: `${window.location.origin}${loginPathForRealm(realmFromIssuer(issuer))}`,
   });
   if (idToken) {
     params.set("id_token_hint", idToken);
@@ -242,6 +259,7 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
 
 export async function logoutRedirect(): Promise<void> {
   const accessToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  const idToken = sessionStorage.getItem(ID_TOKEN_STORAGE_KEY);
   if (accessToken) {
     try {
       await fetch("/api/v1/auth/logout", {
@@ -254,8 +272,12 @@ export async function logoutRedirect(): Promise<void> {
       console.error("Backchannel logout failed", e);
     }
   }
+  // Read the realm before clearing, or the token that names it is already gone.
+  // Either token carries iss; the id token is not always present.
+  const claims = decodeJwtPayload(idToken ?? accessToken ?? "");
+  const realm = typeof claims?.iss === "string" ? realmFromIssuer(claims.iss) : null;
   clearAccessToken();
-  window.location.replace("/login");
+  window.location.replace(loginPathForRealm(realm));
 }
 
 

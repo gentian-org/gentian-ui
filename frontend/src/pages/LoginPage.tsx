@@ -89,27 +89,21 @@ export function LoginPage() {
         `/api/v1/auth/login-route?email=${encodeURIComponent(trimmedEmail)}`,
       );
       const payload = (await response.json().catch(() => null)) as
-        | {
-            issuer?: string;
-            loginHint?: string;
-            tenantHost?: string | null;
-            detail?: string;
-          }
+        | { issuer?: string; loginHint?: string; detail?: string }
         | null;
       if (!response.ok || !payload?.issuer) {
         throw new Error(payload?.detail ?? "We do not recognise that email domain.");
       }
-      // Hand off to the tenant's own host rather than redirecting to Keycloak from
-      // here. That host is the canonical single-stage entry — the one worth
-      // bookmarking — so a user who signs in once from the apex learns the URL
-      // that skips this step next time. It carries the email, so Keycloak
-      // pre-fills it and only the password is left.
-      if (payload.tenantHost) {
-        const target = new URL(`https://${payload.tenantHost}/`);
-        target.searchParams.set("email", trimmedEmail);
-        window.location.assign(target.toString());
-        return;
-      }
+      // Straight to the tenant's realm, carrying the address as login_hint so
+      // Keycloak pre-fills it and only the password is left.
+      //
+      // An earlier cut handed off to the tenant's own host first, on the idea
+      // that it is the canonical entry. It cannot carry the email: that host is a
+      // static gateway redirect using ReplaceFullPath, which replaces path *and*
+      // query, so ?email= was dropped before the portal ever saw it. The hop was
+      // invisible anyway — a 302 the user never reads — so it bought nothing and
+      // cost the pre-fill. The tenant host remains the bookmarkable single-stage
+      // entry in its own right; it simply is not a waypoint.
       await loginRedirect({
         returnTo: postLoginPath,
         issuer: payload.issuer,

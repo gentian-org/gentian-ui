@@ -84,21 +84,19 @@ def test_public_issuer_falls_back_when_no_issuer_is_configured() -> None:
     assert s.public_issuer_for_realm("demo") == "https://id.desk.gentian.org/auth/realms/demo"
 
 
-# The tenant host is the single-stage entry: a user who signs in from the apex is
-# handed to it, and bookmarking it skips the email step entirely.
+# The tenant subdomain is the single-stage entry, reached directly rather than as
+# a waypoint: a static gateway redirect cannot carry the email through, so the
+# apex sends the browser straight to the realm with login_hint instead.
 
 
-def _host_for(email: str) -> str | None:
+def test_tenant_subdomain_maps_to_the_same_realm_as_the_email() -> None:
     route = resolve_login_route(
-        email, kernel_domain=_SETTINGS.kernel_domain, tenancy_mode=_SETTINGS.tenancy_mode
+        "john-doe@demo.desk.gentian.org",
+        kernel_domain=_SETTINGS.kernel_domain,
+        tenancy_mode=_SETTINGS.tenancy_mode,
     )
-    return f"{route.idp_hint}.{_SETTINGS.kernel_domain}" if route.idp_hint else None
-
-
-def test_tenant_member_is_handed_to_their_own_host() -> None:
-    assert _host_for("john-doe@demo.desk.gentian.org") == "demo.desk.gentian.org"
-
-
-def test_platform_operator_has_no_tenant_host() -> None:
-    # Operators stay on the apex portal and authenticate in the kernel realm.
-    assert _host_for("ops@desk.gentian.org") is None
+    # demo.desk.gentian.org and john-doe@demo.desk.gentian.org must resolve to one
+    # realm, or the bookmarked entry and the apex would sign people in to
+    # different places.
+    assert route.idp_hint == "demo"
+    assert _SETTINGS.public_issuer_for_realm(route.idp_hint).endswith("/realms/demo")
