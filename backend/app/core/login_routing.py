@@ -12,7 +12,6 @@ _ADMIN_LOCAL_RE = re.compile(r"^admin-([a-z0-9-]+)$")
 @dataclass(frozen=True)
 class LoginRoute:
     login_hint: str
-    keycloak_username: str
     idp_hint: str | None
     kind: Literal["platform", "tenant"]
 
@@ -36,7 +35,6 @@ def resolve_login_route(email: str, *, kernel_domain: str, tenancy_mode: str = "
     if admin_match:
         return LoginRoute(
             login_hint=normalized,
-            keycloak_username=local,
             idp_hint=admin_match.group(1),
             kind="tenant",
         )
@@ -44,7 +42,6 @@ def resolve_login_route(email: str, *, kernel_domain: str, tenancy_mode: str = "
     if domain == kernel_domain:
         return LoginRoute(
             login_hint=normalized,
-            keycloak_username=normalized,
             idp_hint=None,
             kind="platform",
         )
@@ -54,7 +51,6 @@ def resolve_login_route(email: str, *, kernel_domain: str, tenancy_mode: str = "
         if tenant and "." not in tenant:
             return LoginRoute(
                 login_hint=normalized,
-                keycloak_username=normalized,
                 idp_hint=tenant,
                 kind="tenant",
             )

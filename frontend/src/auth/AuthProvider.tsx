@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { apiFetch } from "@/api/client";
 import {
   getOidcConfig,
   handleOAuthCallback,
@@ -54,6 +55,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
       if (authed) {
         await queryClient.invalidateQueries({ queryKey: ["me"] });
+      }
+      if (fromCallback) {
+        // Fire-and-forget: the code exchange just finished entirely
+        // browser-to-Keycloak (handleOAuthCallback), so this is the backend's
+        // one chance to notice "a login just happened" — see backend
+        // app/api/routes/auth.py, session_started().
+        void apiFetch("/auth/session-started", { method: "POST" }).catch(() => {});
       }
     })();
   }, [queryClient]);

@@ -62,8 +62,8 @@ export function DesktopPage() {
   // a hidden iframe on load, a 1×1 off-screen popup per tile click — because portal
   // sign-in used a password grant that never took the browser to Keycloak as a
   // top-level page, so no first-party session cookie existed to reuse. Portal
-  // sign-in is a real Keycloak redirect now (see gentian-os/docs/login-cleanup.md),
-  // which already visits id.<kernel-domain> as a top-level navigation before the
+  // sign-in is a real Keycloak redirect now, which already visits
+  // id.<kernel-domain> as a top-level navigation before the
   // user ever reaches the desktop — the cookie the bootstrap used to manufacture
   // exists by construction, so this mount effect no longer needs to wait for
   // anything before pre-opening open-webui.

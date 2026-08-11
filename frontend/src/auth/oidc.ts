@@ -94,10 +94,10 @@ function logoutLandingForRealm(realm: string | null): string {
 /**
  * Where an already-authenticated session should actually be, if not here.
  *
- * demo.desk.gentian.org (and every tenant host) is canonical for its members —
- * see docs/login-cleanup.md. A session can still exist on the shared portal host
- * from before that was true, or from a bookmark, or from a link someone shares
- * out of habit. Rather than leave it there, an authenticated tenant session found
+ * demo.desk.gentian.org (and every tenant host) is canonical for its members.
+ * A session can still exist on the shared portal host from before that was
+ * true, or from a bookmark, or from a link someone shares out of habit.
+ * Rather than leave it there, an authenticated tenant session found
  * on the wrong host is walked over to the right one, carrying the current path so
  * the visit is not lost — cheap to do, since the SSO cookie makes the resulting
  * re-login on the new origin silent.
@@ -305,7 +305,7 @@ export type LoginRedirectOptions = {
  * This is what gives the browser a real Keycloak session cookie. The portal used
  * to post credentials to its own backend and exchange them server-side, which
  * left no session for any other application to reuse, so every OIDC app had to
- * authenticate from scratch. See gentian-os/docs/login-cleanup.md.
+ * authenticate from scratch.
  */
 export async function loginRedirect(options: LoginRedirectOptions | string = "/desktop"): Promise<void> {
   const normalized =

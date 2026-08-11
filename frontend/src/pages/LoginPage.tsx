@@ -83,7 +83,7 @@ export function LoginPage() {
     // backend, which is what this page used to do, authenticates the user without
     // the browser ever contacting Keycloak — so no SSO session cookie exists and
     // every OIDC app has to prompt again. The redirect is what creates the session
-    // that app launches reuse. See gentian-os/docs/login-cleanup.md.
+    // that app launches reuse.
     setIsSubmitting(true);
     try {
       const response = await fetch(

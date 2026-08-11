@@ -100,9 +100,9 @@ export function MobilePage() {
     // Embedded OIDC apps (Odoo) used to need a popup here to bootstrap a
     // first-party Keycloak cookie, because portal sign-in was a password grant
     // that never took the browser to Keycloak as a top-level page. Portal sign-in
-    // is a real Keycloak redirect now (see gentian-os/docs/login-cleanup.md),
-    // which already visits id.<kernel-domain> before the user reaches this
-    // screen, so the cookie exists by construction and there is nothing to warm.
+    // is a real Keycloak redirect now, which already visits id.<kernel-domain>
+    // before the user reaches this screen, so the cookie exists by construction
+    // and there is nothing to warm.
   }
 
   function openOverlay(panel: MobileOverlay) {

@@ -9,12 +9,28 @@ import httpx
 from fastapi import HTTPException, status
 
 from app.core.config import Settings
-from app.services.keycloak_password_login import realm_issuer
 from app.services.keycloak_user_groups import realm_from_issuer
 
 
 class AccountServiceError(Exception):
     """Raised when Keycloak rejects an account operation."""
+
+
+def _keycloak_base(settings: Settings) -> str:
+    base = settings.keycloak_admin_url or settings.oidc_issuer or ""
+    base = base.rstrip("/")
+    if base.endswith("/auth"):
+        return base
+    if "/realms/" in base:
+        return base[: base.index("/realms/")]
+    return base
+
+
+def realm_issuer(settings: Settings, realm: str) -> str:
+    base = _keycloak_base(settings)
+    if base.endswith("/auth"):
+        return f"{base}/realms/{realm}"
+    return f"{base}/auth/realms/{realm}"
 
 
 def _account_base(settings: Settings, realm: str) -> str:

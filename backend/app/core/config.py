@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     def public_issuer_for_realm(self, realm: str) -> str:
         """Browser-facing issuer for a realm.
 
-        Distinct from realm_issuer() in keycloak_password_login, which prefers the
+        Distinct from realm_issuer() in keycloak_account, which prefers the
         in-cluster admin URL — correct for server-to-server calls and useless for a
         redirect the browser has to follow. Derived from oidc_issuer by swapping
         the realm segment, so the scheme, host and /auth prefix stay whatever this

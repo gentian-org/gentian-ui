@@ -3,6 +3,7 @@
 import jwt
 import pytest
 
+from app.api.routes.auth import session_started
 from app.core.auth import _issuer_allowed, _validate_client_id
 from app.core.config import Settings
 
@@ -77,5 +78,50 @@ async def test_logout_endpoint_auth_disabled():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post("/api/v1/auth/logout")
+        assert response.status_code == 204
+
+
+class _FakeStore:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    async def restore_workspace_email_for_login(self, realm: str, keycloak_username: str) -> None:
+        self.calls.append((realm, keycloak_username))
+
+
+@pytest.mark.asyncio
+async def test_session_started_restores_email_when_store_configured():
+    store = _FakeStore()
+    settings = Settings(
+        KEYCLOAK_ADMIN_URL="http://keycloak.platform-kernel.svc:8080/auth",
+        KEYCLOAK_ADMIN_PASSWORD="secret",
+    )
+    claims = {
+        "iss": "https://id.desk.gentian.org/auth/realms/demo",
+        "preferred_username": "jane@demo.desk.gentian.org",
+    }
+    await session_started(user=claims, settings=settings, store=store)
+    assert store.calls == [("demo", "jane@demo.desk.gentian.org")]
+
+
+@pytest.mark.asyncio
+async def test_session_started_noop_when_store_not_configured():
+    store = _FakeStore()
+    settings = Settings()
+    claims = {
+        "iss": "https://id.desk.gentian.org/auth/realms/demo",
+        "preferred_username": "jane@demo.desk.gentian.org",
+    }
+    await session_started(user=claims, settings=settings, store=store)
+    assert store.calls == []
+
+
+@pytest.mark.asyncio
+async def test_session_started_endpoint_auth_disabled():
+    from httpx import ASGITransport, AsyncClient
+    from app.main import app
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/api/v1/auth/session-started")
         assert response.status_code == 204
 

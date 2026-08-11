@@ -10,7 +10,6 @@ def test_platform_admin_uses_kernel_native_login():
     )
     assert route.kind == "platform"
     assert route.idp_hint is None
-    assert route.keycloak_username == "administrator@desk.gentian.org"
 
 
 def test_bootstrap_tenant_admin_brokers_to_tenant():
@@ -20,7 +19,6 @@ def test_bootstrap_tenant_admin_brokers_to_tenant():
     )
     assert route.kind == "tenant"
     assert route.idp_hint == "demo"
-    assert route.keycloak_username == "admin-demo"
 
 
 def test_tenant_member_email_domain():
@@ -38,8 +36,7 @@ def test_unknown_domain_raises():
 
 # Which realm the browser is redirected to decides where the SSO session is
 # created. Send a tenant member to the kernel realm and the session lands
-# somewhere none of their apps look, which is the failure docs/login-cleanup.md
-# was written about.
+# somewhere none of their apps look.
 
 from app.core.config import Settings  # noqa: E402
 

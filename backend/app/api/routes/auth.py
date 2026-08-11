@@ -3,36 +3,18 @@
 import re
 
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
 from app.core.login_routing import resolve_login_route
-from app.services.keycloak_idp_session import create_idp_session_redirect
 from app.services.admin_store import AdminStoreDep, admin_store_configured
-from app.services.keycloak_password_login import LoginFailedError, password_login
+from app.services.keycloak_user_groups import realm_from_issuer
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # Keycloak realm names, which are also the DNS label the tenant is reached on.
 _TENANT_RE = re.compile(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?")
-
-
-class LoginRequest(BaseModel):
-    email: str = Field(min_length=3, max_length=320)
-    password: str = Field(min_length=1, max_length=512)
-
-
-class LoginResponse(BaseModel):
-    accessToken: str
-    idToken: str | None = None
-    realm: str
-    kind: str
-
-
-class IdpSessionResponse(BaseModel):
-    redirectUrl: str | None = None
-    skipped: bool = False
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -107,41 +89,30 @@ def entry(request: Request, settings: Settings = Depends(get_settings)) -> dict[
     }
 
 
-@router.post("/login", response_model=LoginResponse)
-async def login(
-    body: LoginRequest,
+@router.post("/session-started", status_code=status.HTTP_204_NO_CONTENT)
+async def session_started(
+    user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
     *,
     store: AdminStoreDep,
-) -> LoginResponse:
-    """Authenticate with email/password on the Gentian login page (no Keycloak redirect)."""
+) -> None:
+    """Best-effort housekeeping fired once, right after a real Keycloak login.
+
+    The code exchange happens entirely browser-to-Keycloak now (see
+    frontend/src/auth/oidc.ts, handleOAuthCallback), so this is the only moment
+    the backend still sees "a login just happened" — the equivalent of what used
+    to run inline in the old password-grant /auth/login handler.
+    """
+    if not admin_store_configured(settings):
+        return
+    realm = realm_from_issuer(str(user.get("iss") or ""))
+    username = user.get("preferred_username")
+    if not realm or not username:
+        return
     try:
-        route = resolve_login_route(
-            body.email,
-            kernel_domain=settings.kernel_domain,
-            tenancy_mode=settings.tenancy_mode,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-    realm = settings.kernel_realm if route.idp_hint is None else route.idp_hint
-    if admin_store_configured(settings):
-        try:
-            await store.restore_workspace_email_for_login(realm, route.keycloak_username)
-        except Exception:
-            pass
-
-    try:
-        tokens = password_login(body.email, body.password, route, settings)
-    except LoginFailedError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
-
-    return LoginResponse(
-        accessToken=tokens["accessToken"],
-        idToken=tokens.get("idToken"),
-        realm=tokens["realm"],
-        kind=route.kind,
-    )
+        await store.restore_workspace_email_for_login(realm, username)
+    except Exception:
+        pass
 
 
 @router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
@@ -174,33 +145,6 @@ async def forgot_password(
         return
 
 
-@router.post("/idp-session", response_model=IdpSessionResponse)
-def idp_session(
-    response: Response,
-    user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> IdpSessionResponse:
-    """Bootstrap a Keycloak browser SSO session after portal password login."""
-    if settings.auth_disabled:
-        return IdpSessionResponse(skipped=True)
-
-    res = create_idp_session_redirect(user, settings)
-    if res is None:
-        return IdpSessionResponse(skipped=True)
-    redirect_url, cookies_to_set = res
-    for c in cookies_to_set:
-        response.set_cookie(
-            key=c["key"],
-            value=c["value"],
-            domain=settings.kernel_domain,
-            path="/auth",
-            httponly=c["httponly"],
-            samesite="none",
-            secure=True,
-        )
-    return IdpSessionResponse(redirectUrl=redirect_url)
-
-
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     user: dict = Depends(get_current_user),
@@ -215,7 +159,6 @@ async def logout(
     if not user_id or not issuer:
         return
 
-    from app.services.keycloak_idp_session import realm_from_issuer
     realm = realm_from_issuer(issuer)
     if not realm:
         return
