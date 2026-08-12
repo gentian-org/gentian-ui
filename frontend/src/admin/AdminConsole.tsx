@@ -189,6 +189,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
           ) : tab === "invitations" ? (
             <InvitationsSection
               tenant={tenant}
+              kernelDomain={contextQuery.data.kernelDomain}
               privilegeGroups={privilegeGroups}
               appEntitlementGroups={appEntitlementGroups}
               customGroups={customGroups}

@@ -88,6 +88,16 @@ class AdminContextResponse(BaseModel):
     isTenantAdmin: bool
     availableTenants: list[str] = Field(default_factory=list)
     storeConfigured: bool
+    # The cluster's kernel domain, so the client never has to infer it.
+    #
+    # InvitationsSection used to derive it from window.location.hostname by
+    # stripping a "portal." prefix. The portal is also served on each tenant's
+    # own host (see the tenant-<name>-portal route), and there the prefix is not
+    # "portal." — so the hostname was taken as the base domain and the tenant
+    # name prepended a second time, generating login addresses like
+    # corp@corp.corp.gtn.host. The API already has the real value; sending it
+    # removes the guess.
+    kernelDomain: str
 
 
 class MemberCreateRequest(BaseModel):
@@ -541,6 +551,7 @@ async def admin_context(
         or is_tenant_admin(groups)
         or is_bootstrap_tenant_admin(user),
         availableTenants=available,
+        kernelDomain=settings.kernel_domain,
         storeConfigured=settings.auth_disabled
         or bool(settings.keycloak_admin_url and settings.keycloak_admin_password),
     )

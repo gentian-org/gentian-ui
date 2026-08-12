@@ -8,6 +8,12 @@ export type AdminContext = {
   isTenantAdmin: boolean;
   availableTenants: string[];
   storeConfigured: boolean;
+  /**
+   * Cluster kernel domain, e.g. "gtn.host". Server-provided on purpose: the
+   * portal answers on portal.<kernel-domain> AND on every tenant's own host,
+   * so it cannot be inferred from window.location.hostname.
+   */
+  kernelDomain: string;
 };
 
 export type AdminMember = {

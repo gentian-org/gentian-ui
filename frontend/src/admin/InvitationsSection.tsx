@@ -9,6 +9,8 @@ import "./admin.css";
 
 type InvitationsSectionProps = {
   tenant: string;
+  /** Cluster kernel domain from GET /admin/context — never inferred locally. */
+  kernelDomain: string;
   privilegeGroups: AdminGroup[];
   appEntitlementGroups: AdminGroup[];
   customGroups: AdminGroup[];
@@ -65,27 +67,34 @@ function TogglePill({
   );
 }
 
-function getTenantDomain(tenant: string): string {
-  const hostname = window.location.hostname;
-  let baseDomain = "desk.gentian.org";
-  if (hostname.includes(".")) {
-    if (hostname.startsWith("portal.")) {
-      baseDomain = hostname.substring("portal.".length);
-    } else {
-      baseDomain = hostname;
-    }
-  }
-  return `${tenant}.${baseDomain}`;
+/**
+ * A tenant member's login domain: <tenant>.<kernel-domain>.
+ *
+ * kernelDomain comes from the server (GET /admin/context). It used to be
+ * inferred from window.location.hostname by stripping a "portal." prefix, which
+ * is only correct when the console is opened at portal.<kernel-domain>. The
+ * portal is deliberately served on each tenant's own host as well, and there
+ * nothing was stripped: the whole hostname became the base domain and the
+ * tenant name was prepended to it a second time, so inviting a user from
+ * corp.gtn.host generated an address at corp.corp.gtn.host — and identically at
+ * demo.desk.gentian.org on the test cluster.
+ *
+ * It also fell back to a hardcoded "desk.gentian.org" for any hostname without
+ * a dot, which would silently issue another cluster's addresses.
+ */
+function tenantLoginDomain(tenant: string, kernelDomain: string): string {
+  return `${tenant}.${kernelDomain}`;
 }
 
 export function InvitationsSection({
   tenant,
+  kernelDomain,
   privilegeGroups,
   appEntitlementGroups,
   customGroups,
 }: InvitationsSectionProps) {
   const queryClient = useQueryClient();
-  const tenantDomain = getTenantDomain(tenant);
+  const tenantDomain = tenantLoginDomain(tenant, kernelDomain);
 
   // ── Filter out admin-only app IDs from the visible entitlement groups ──────
   const visibleAppGroups = useMemo(() => {
