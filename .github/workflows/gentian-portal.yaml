@@ -65,10 +65,13 @@ jobs:
           tags: |
             ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}
             ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.short }}
-          build-args: |
-            VITE_OIDC_ISSUER=https://id.desk.gentian.org/auth/realms/kernel
-            VITE_OIDC_CLIENT_ID=gentian-portal
-            VITE_AUTH_DISABLED=false
+          # No build-args. Vite freezes import.meta.env.VITE_* into the bundle
+          # at build time, and this one image is deployed to every cluster — so
+          # anything passed here is wrong everywhere except the cluster it names.
+          # It named the test cluster (id.desk.gentian.org), which meant every
+          # other deployment ran a portal that believed it lived there and
+          # redirected tenant sessions to it. Deployment config now arrives from
+          # the environment at container start; see frontend/docker-entrypoint.sh.
 
       - name: Build and push api
         uses: docker/build-push-action@v6

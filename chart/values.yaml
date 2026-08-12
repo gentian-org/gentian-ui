@@ -33,7 +33,13 @@ web:
       memory: 128Mi
   securityContext: {}
   env:
-    VITE_AUTH_DISABLED: "false"
+    # (empty)
+    #
+    # VITE_* has no effect at runtime: Vite substitutes import.meta.env.VITE_*
+    # during `npm run build`, so setting it on the Deployment does nothing. The
+    # web container is configured by OIDC_ISSUER / OIDC_CLIENT_ID / OIDC_SCOPES /
+    # AUTH_DISABLED / KERNEL_DOMAIN, which the entrypoint renders into
+    # /config.js at start. Use this map only for genuinely extra env.
 
 gateway:
   enabled: true
@@ -46,6 +52,12 @@ existingSecret:
 
 auth:
   disabled: false
+  # OIDC public-client settings handed to the browser at RUNTIME (the web
+  # container renders them into /config.js at start). Never build args: Vite
+  # freezes import.meta.env.VITE_* into the bundle, and one image is deployed to
+  # every cluster, so a baked-in value is wrong everywhere but one.
+  clientId: gentian-portal
+  scopes: openid profile email groups
 
 openfga:
   apiUrl: ""

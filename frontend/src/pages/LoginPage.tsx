@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { requestForgotPassword } from "@/api/account";
 import { useAuth } from "@/auth/AuthProvider";
-import { loginRedirect } from "@/auth/oidc";
+import { getKernelDomain, loginRedirect } from "@/auth/oidc";
 import { safeReturnTo } from "@/lib/returnTo";
 
 export function LoginPage() {
@@ -10,6 +10,11 @@ export function LoginPage() {
   const { returnTo, email: emailFromUrl } = useSearch({ from: "/login" });
   const postLoginPath = safeReturnTo(returnTo);
   const { authDisabled, isAuthenticated, isLoading } = useAuth();
+  // Derived from the runtime kernel domain, never hardcoded: this bundle is
+  // the same image on every cluster, and the placeholder used to read
+  // "you@demo.desk.gentian.org" — another deployment's domain — for everyone.
+  const kernelDomain = getKernelDomain();
+  const emailPlaceholder = kernelDomain ? `you@${kernelDomain}` : "you@example.com";
   const [email, setEmail] = useState(emailFromUrl ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -178,7 +183,7 @@ export function LoginPage() {
                 name="email"
                 autoComplete="username"
                 inputMode="email"
-                placeholder="you@demo.desk.gentian.org"
+                placeholder={emailPlaceholder}
                 value={email}
                 disabled={isSubmitting}
                 onChange={(event) => setEmail(event.target.value)}

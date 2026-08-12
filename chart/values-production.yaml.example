@@ -29,10 +29,13 @@ web:
       memory: 128Mi
   env:
     # Build-time Vite args — set in CI image build, not at pod runtime
-    VITE_OIDC_ISSUER: https://id.example.gentian.cloud/auth/realms/kernel
-    VITE_OIDC_CLIENT_ID: gentian-portal
-    VITE_AUTH_DISABLED: "false"
-    # No VITE_OIDC_REDIRECT_URI: the portal derives it from window.location.origin,
+    # (empty — see below)
+    # No VITE_* at all: those are build-time constants Vite freezes into the
+    # bundle, and one image serves every cluster. Set kernelDomain (and
+    # auth.clientId / auth.scopes if they differ) at the top level instead — the
+    # web container renders them into /config.js at start.
+    #
+    # No VITE_OIDC_REDIRECT_URI either: the portal derives it from window.location.origin,
     # since it is served on the shared host and on every tenant's own.
 
 openfga:

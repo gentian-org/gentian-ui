@@ -82,7 +82,7 @@ function logoutLandingForRealm(realm: string | null): string {
   if (!realm || realm === kernelRealm) {
     return `${window.location.origin}/login`;
   }
-  const kernelDomain = kernelDomainFromIssuer();
+  const kernelDomain = getKernelDomain();
   if (!kernelDomain) {
     // Fall back to this origin's login rather than building a bad hostname; the
     // server resolves the realm from whichever host that turns out to be.
@@ -124,7 +124,7 @@ export function nonCanonicalRedirectTarget(): string | null {
   if (!realm || realm === kernelRealm) {
     return null;
   }
-  const kernelDomain = kernelDomainFromIssuer();
+  const kernelDomain = getKernelDomain();
   if (!kernelDomain) {
     return null;
   }
@@ -184,10 +184,55 @@ export function resolveLogoutUrl(
   return `${externalLogoutIssuer(issuer)}/protocol/openid-connect/logout?${params.toString()}`;
 }
 
+/**
+ * Deployment configuration, supplied at RUNTIME.
+ *
+ * window.__GENTIAN_CONFIG__ is written into /config.js by the container's
+ * entrypoint from environment variables, and index.html loads it before this
+ * bundle. Nothing cluster-, tenant- or app-specific may be read from
+ * import.meta.env in production: Vite freezes those at build time, and one image
+ * is deployed to every cluster.
+ *
+ * That is not hypothetical. VITE_OIDC_ISSUER was baked in as the test cluster's
+ * https://id.desk.gentian.org/auth/realms/kernel, so every other cluster ran a
+ * portal that derived "desk.gentian.org" as its kernel domain and sent tenant
+ * sessions from corp.gtn.host to corp.desk.gentian.org — a different deployment.
+ *
+ * import.meta.env remains only as a fallback for `vite dev`, where no container
+ * entrypoint runs and values come from .env.local.
+ */
+type RuntimeConfig = {
+  oidcIssuer?: string;
+  oidcClientId?: string;
+  oidcScopes?: string;
+  authDisabled?: string;
+  kernelDomain?: string;
+};
+
+function runtimeConfig(): RuntimeConfig {
+  return (window as unknown as { __GENTIAN_CONFIG__?: RuntimeConfig }).__GENTIAN_CONFIG__ ?? {};
+}
+
+/**
+ * The cluster's kernel domain, e.g. "gtn.host".
+ *
+ * Prefers the value the deployment supplies directly. Falls back to deriving it
+ * from the issuer host (id.<kernel-domain>) so a deployment that sets only
+ * OIDC_ISSUER still behaves correctly.
+ */
+export function getKernelDomain(): string | null {
+  const explicit = runtimeConfig().kernelDomain;
+  if (explicit) {
+    return explicit;
+  }
+  return kernelDomainFromIssuer();
+}
+
 export function getOidcConfig(): OidcConfig {
+  const runtime = runtimeConfig();
   return {
-    issuer: import.meta.env.VITE_OIDC_ISSUER ?? "",
-    clientId: import.meta.env.VITE_OIDC_CLIENT_ID ?? "",
+    issuer: runtime.oidcIssuer || import.meta.env.VITE_OIDC_ISSUER || "",
+    clientId: runtime.oidcClientId || import.meta.env.VITE_OIDC_CLIENT_ID || "",
     // Always this origin's own /login, never a build-time constant.
     //
     // The portal is served on several hostnames — the shared one and every
@@ -201,8 +246,9 @@ export function getOidcConfig(): OidcConfig {
     // origin and every tenant origin (keycloak_portal_client.go), so whichever
     // host initiates the flow is a valid place for it to finish.
     redirectUri: `${window.location.origin}/login`,
-    scopes: import.meta.env.VITE_OIDC_SCOPES ?? "openid profile email groups",
-    authDisabled: import.meta.env.VITE_AUTH_DISABLED === "true",
+    scopes: runtime.oidcScopes || import.meta.env.VITE_OIDC_SCOPES || "openid profile email groups",
+    authDisabled:
+      (runtime.authDisabled ?? import.meta.env.VITE_AUTH_DISABLED) === "true",
   };
 }
 

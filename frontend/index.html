@@ -10,6 +10,18 @@
     <link rel="apple-touch-icon" href="/favicon/apple-touch-icon.png" />
     <link rel="manifest" href="/favicon/site.webmanifest" />
     <title>Gentian</title>
+    <!--
+      Runtime configuration, written by docker-entrypoint.sh at container start
+      from the environment. A classic (non-module) script so it executes before
+      the module bundle below, guaranteeing window.__GENTIAN_CONFIG__ exists
+      before any application code reads it.
+
+      Deliberately not a build-time constant: one image is deployed to every
+      cluster, so a value frozen at build time can only be correct for one of
+      them. In dev, `vite dev` serves no config.js and the 404 is harmless —
+      oidc.ts falls back to import.meta.env from .env.local.
+    -->
+    <script src="/config.js"></script>
   </head>
   <body>
     <div id="root"></div>

@@ -23,6 +23,32 @@ spec:
         - name: web
           image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag }}"
           imagePullPolicy: {{ .Values.web.image.pullPolicy | default "IfNotPresent" }}
+          # Runtime configuration. docker-entrypoint.sh renders these into
+          # /config.js at container start, and index.html loads it before the
+          # app bundle.
+          #
+          # These must NOT be build args. Vite freezes import.meta.env.VITE_* at
+          # build time and one image serves every cluster, so a baked-in issuer
+          # is wrong everywhere but the cluster it was built for — it named the
+          # test cluster, and every other deployment redirected tenant sessions
+          # there. Same values the API already receives, from the same source.
+          env:
+            - name: KERNEL_DOMAIN
+              value: {{ .Values.kernelDomain | quote }}
+            # Built here rather than configured separately so it cannot drift
+            # from kernelDomain; matches how the API derives idp_public_base_url.
+            - name: OIDC_ISSUER
+              value: {{ printf "https://id.%s/auth/realms/%s" .Values.kernelDomain (.Values.kernelRealm | default "kernel") | quote }}
+            - name: OIDC_CLIENT_ID
+              value: {{ .Values.auth.clientId | default "gentian-portal" | quote }}
+            - name: OIDC_SCOPES
+              value: {{ .Values.auth.scopes | default "openid profile email groups" | quote }}
+            - name: AUTH_DISABLED
+              value: {{ ternary "true" "false" .Values.auth.disabled | quote }}
+            {{- range $key, $value := .Values.web.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
           ports:
             - containerPort: {{ .Values.web.port }}
               name: http
