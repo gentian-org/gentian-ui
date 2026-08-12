@@ -9,6 +9,14 @@ spec:
   parentRefs:
     - name: {{ .Values.gateway.parentGatewayName }}
       namespace: {{ .Values.gateway.parentGatewayNamespace }}
+      # Bind to the HTTPS listener only.
+      #
+      # Without a sectionName a route attaches to EVERY listener whose hostname
+      # matches, and the kernel Gateway's :80 listener is hostname-less so it
+      # matches everything. Gateway API then ranks this route's specific hostname
+      # above the redirect route's absent one, so http://portal.<domain> was
+      # served in the clear instead of being redirected to https.
+      sectionName: {{ .Values.gateway.listenerName | default "https-wildcard" }}
   hostnames:
     - {{ printf "%s.%s" .Values.gateway.host .Values.kernelDomain | quote }}
   rules:

@@ -46,6 +46,11 @@ gateway:
   parentGatewayName: kernel-public-gateway
   parentGatewayNamespace: platform-kernel
   host: portal
+  # Gateway listener this route binds to. The kernel Gateway serves all HTTPS
+  # names from one hostname-less listener; binding explicitly keeps the route
+  # off the :80 redirect listener, which would otherwise serve the portal in
+  # plaintext.
+  listenerName: https-wildcard
 
 existingSecret:
   name: gentian-portal-secrets
