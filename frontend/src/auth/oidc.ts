@@ -246,7 +246,7 @@ export function getOidcConfig(): OidcConfig {
     // origin and every tenant origin (keycloak_portal_client.go), so whichever
     // host initiates the flow is a valid place for it to finish.
     redirectUri: `${window.location.origin}/login`,
-    scopes: runtime.oidcScopes || import.meta.env.VITE_OIDC_SCOPES || "openid profile email groups",
+    scopes: runtime.oidcScopes || import.meta.env.VITE_OIDC_SCOPES || "openid profile email",
     authDisabled:
       (runtime.authDisabled ?? import.meta.env.VITE_AUTH_DISABLED) === "true",
   };

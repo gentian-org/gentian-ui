@@ -57,7 +57,13 @@ auth:
   # freezes import.meta.env.VITE_* into the bundle, and one image is deployed to
   # every cluster, so a baked-in value is wrong everywhere but one.
   clientId: gentian-portal
-  scopes: openid profile email groups
+  # Must name only scopes the kernel realm actually defines. "groups" is NOT
+  # one of them — the realm has no such client scope — and requesting it makes
+  # Keycloak reject the whole authorization request:
+  #   error=invalid_scope&error_description=Invalid scopes: openid profile email groups
+  # which bounces the user back to /login in a loop that never reaches a
+  # password prompt. Add the scope to the realm before adding it here.
+  scopes: openid profile email
 
 openfga:
   apiUrl: ""

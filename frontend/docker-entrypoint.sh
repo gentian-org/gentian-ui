@@ -85,7 +85,9 @@ emit() {
     echo 'window.__GENTIAN_CONFIG__ = {'
     emit 'oidcIssuer'   "${OIDC_ISSUER:-}"
     emit 'oidcClientId' "${OIDC_CLIENT_ID:-gentian-portal}"
-    emit 'oidcScopes'   "${OIDC_SCOPES:-openid profile email groups}"
+    # Only scopes the realm defines. "groups" is not one of them; requesting it
+    # returns invalid_scope and traps the user in a login loop.
+    emit 'oidcScopes'   "${OIDC_SCOPES:-openid profile email}"
     emit 'authDisabled' "${AUTH_DISABLED:-false}"
     emit 'kernelDomain' "${KERNEL_DOMAIN:-}"
     echo '};'
