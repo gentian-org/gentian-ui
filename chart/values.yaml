@@ -58,16 +58,15 @@ existingSecret:
 auth:
   disabled: false
   # OIDC public-client settings handed to the browser at RUNTIME (the web
-  # container renders them into /config.js at start). Never build args: Vite
-  # freezes import.meta.env.VITE_* into the bundle, and one image is deployed to
-  # every cluster, so a baked-in value is wrong everywhere but one.
+  # container renders them into /config.js at start). Keep them out of build
+  # args: Vite freezes import.meta.env.VITE_* into the bundle, and one image is
+  # deployed to every cluster, so a baked-in value can only suit one of them.
   clientId: gentian-portal
-  # Must name only scopes the kernel realm actually defines. "groups" is NOT
-  # one of them — the realm has no such client scope — and requesting it makes
-  # Keycloak reject the whole authorization request:
-  #   error=invalid_scope&error_description=Invalid scopes: openid profile email groups
-  # which bounces the user back to /login in a loop that never reaches a
-  # password prompt. Add the scope to the realm before adding it here.
+  # Name only scopes the kernel realm defines. The realm has no "groups" client
+  # scope; requesting one it does not define makes Keycloak reject the whole
+  # authorization request with error=invalid_scope, which bounces the user back
+  # to /login in a loop that never reaches a password prompt. Add the scope to
+  # the realm first, then list it here.
   scopes: openid profile email
 
 openfga:

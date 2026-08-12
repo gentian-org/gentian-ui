@@ -5,23 +5,17 @@
 # Assemble the served document root at container start, injecting runtime
 # configuration that must not be baked into the image.
 #
-# Why this exists
-# ---------------
+# Why config arrives at run time
+# ------------------------------
 # Vite substitutes import.meta.env.VITE_* at BUILD time, so anything passed as a
 # build arg is frozen into the JavaScript bundle. One portal image is published
 # and deployed to every cluster, so a baked-in value can only ever be right for
-# the cluster it was built for. It was built for the test cluster:
+# the cluster that built it — and the SPA derives the kernel domain from the
+# OIDC issuer and treats <tenant>.<kernel-domain> as the host to send sessions
+# to, so a wrong issuer sends users to an entirely different deployment.
 #
-#   VITE_OIDC_ISSUER=https://id.desk.gentian.org/auth/realms/kernel
-#
-# Every other cluster therefore ran a bundle that believed it lived on
-# desk.gentian.org. The visible symptom was a tenant on corp.gtn.host being
-# redirected to corp.desk.gentian.org — an entirely different deployment —
-# because the SPA derives the kernel domain from the issuer and treats
-# <tenant>.<kernel-domain> as the canonical host to send sessions to.
-#
-# Config now arrives from the environment at container start (12-factor III).
-# The image stays identical across clusters; only its environment differs.
+# Config therefore comes from the environment at container start (12-factor III).
+# The image is identical across clusters; only its environment differs.
 #
 # Why it copies the document root
 # -------------------------------
@@ -40,8 +34,8 @@ WWW_DIR="${GENTIAN_WWW_DIR:-/app/www}"
 CONFIG_PATH="${WWW_DIR}/config.js"
 
 # Fail loudly rather than serve a portal that cannot authenticate. An empty
-# issuer previously degraded into "auth is not configured" screens that looked
-# like a Keycloak problem; refusing to start points at the actual cause.
+# issuer degrades into "auth is not configured" screens that look like a Keycloak
+# fault; refusing to start points at the actual cause.
 if [ -z "${OIDC_ISSUER:-}" ] && [ "${AUTH_DISABLED:-false}" != "true" ]; then
     echo "FATAL: OIDC_ISSUER is unset and AUTH_DISABLED is not true." >&2
     echo "       Set OIDC_ISSUER to https://id.<kernel-domain>/auth/realms/<realm>" >&2
@@ -55,15 +49,15 @@ if [ ! -d "${WWW_DIR}" ]; then
     exit 1
 fi
 
-# cp, then verify. A failed redirect does NOT trip `set -e` on its own, which is
-# how the first version of this script printed "runtime config written" directly
-# after the kernel refused the write on a read-only filesystem — leaving the SPA
-# to request /config.js, receive index.html from the rewrite with a 200, and run
-# with no configuration at all.
+# cp, then verify. A failed redirect does NOT trip `set -e` on its own, so every
+# step here is checked explicitly: an unverified failure would print "runtime
+# config written" and leave the SPA to request /config.js, receive index.html
+# from the catch-all rewrite with a 200, and run with no configuration at all.
+#
 # -R, not -a: the destination is an emptyDir owned by the runtime user, and
 # preserving ownership from the image layer is both impossible unprivileged and
-# pointless. `cp -a` filled the log with "can't preserve ownership" for every
-# file and risks a non-zero exit on stricter filesystems.
+# pointless. `cp -a` logs "can't preserve ownership" for every file and risks a
+# non-zero exit on stricter filesystems.
 cp -R "${SRC_DIR}/." "${WWW_DIR}/" || {
     echo "FATAL: could not populate ${WWW_DIR} from ${SRC_DIR}" >&2
     exit 1
@@ -85,8 +79,9 @@ emit() {
     echo 'window.__GENTIAN_CONFIG__ = {'
     emit 'oidcIssuer'   "${OIDC_ISSUER:-}"
     emit 'oidcClientId' "${OIDC_CLIENT_ID:-gentian-portal}"
-    # Only scopes the realm defines. "groups" is not one of them; requesting it
-    # returns invalid_scope and traps the user in a login loop.
+    # Only scopes the realm defines. The kernel realm has no "groups" scope;
+    # requesting an undefined scope returns invalid_scope and traps the user in
+    # a login loop.
     emit 'oidcScopes'   "${OIDC_SCOPES:-openid profile email}"
     emit 'authDisabled' "${AUTH_DISABLED:-false}"
     emit 'kernelDomain' "${KERNEL_DOMAIN:-}"
@@ -96,8 +91,8 @@ emit() {
     exit 1
 }
 
-# Prove it landed. Without this the only symptom is the SPA silently receiving
-# index.html where it expects its configuration.
+# Prove it landed. Without this check the only symptom is the SPA silently
+# receiving index.html where it expects its configuration.
 if [ ! -s "${CONFIG_PATH}" ]; then
     echo "FATAL: ${CONFIG_PATH} is missing or empty after generation." >&2
     exit 1
