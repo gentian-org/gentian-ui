@@ -67,3 +67,14 @@ spec:
               port: http
           resources:
             {{- toYaml .Values.web.resources | nindent 12 }}
+          volumeMounts:
+            # The served document root. The entrypoint copies the built assets
+            # here from /app/dist and generates config.js alongside them, which
+            # it cannot do in the image layer because readOnlyRootFilesystem is
+            # set. Without this mount the container refuses to start rather than
+            # serving a portal with no runtime configuration.
+            - name: www
+              mountPath: /app/www
+      volumes:
+        - name: www
+          emptyDir: {}

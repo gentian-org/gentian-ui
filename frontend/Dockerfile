@@ -22,10 +22,13 @@ FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432
 RUN npm install -g serve@14.2.4
 COPY --from=build /app/dist /app/dist
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+# /app/www is the served document root, populated from /app/dist at start. It
+# must be a writable volume: the Pod runs readOnlyRootFilesystem: true, so the
+# entrypoint cannot generate config.js inside the image layer. Created here so a
+# plain `docker run` without a mount still works.
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
-    # The entrypoint writes /app/dist/config.js at start, and the container runs
-    # unprivileged, so that directory has to be writable by the runtime user.
-    && chown -R 65532:65532 /app/dist
+    && mkdir -p /app/www \
+    && chown -R 65532:65532 /app/www
 USER 65532
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
@@ -43,4 +46,4 @@ ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 #
 # Without this `serve` sends only an ETag and browsers fall back to heuristic
 # caching, which is exactly how the stale-bundle breakage happened.
-CMD ["serve", "-s", "/app/dist", "-l", "8080", "-c", "/app/dist/serve.json"]
+CMD ["serve", "-s", "/app/www", "-l", "8080", "-c", "/app/www/serve.json"]
