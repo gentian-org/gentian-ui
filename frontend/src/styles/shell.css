@@ -378,6 +378,37 @@
   box-shadow: 0 -4px 24px rgba(20, 21, 46, 0.1);
 }
 
+.app-launcher__status {
+  padding: 8px 4px 20px;
+  text-align: center;
+  color: var(--gtn-ink-1);
+}
+
+.app-launcher__status-title {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.app-launcher__status-detail {
+  margin: 0;
+  color: var(--gtn-ink-2);
+  font-size: 0.9rem;
+}
+
+.app-launcher__retry {
+  margin-top: 12px;
+  padding: 8px 16px;
+  border-radius: var(--gtn-r2);
+  border: 1px solid var(--gtn-border);
+  background: var(--gtn-paper-2);
+  color: var(--gtn-ink-1);
+  cursor: pointer;
+}
+
+.app-launcher__retry:hover {
+  background: var(--gtn-paper-1);
+}
+
 .app-launcher__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));

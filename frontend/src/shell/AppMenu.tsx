@@ -10,6 +10,9 @@ import { usePrefsStore, type DesktopTile } from "@/stores/prefs";
 
 type AppMenuProps = {
   apps: ShellApp[];
+  /** The session request failed; `apps` is empty for lack of an answer. */
+  loadFailed?: boolean;
+  onReload?: () => void;
   activeAppId: string | null;
   username?: string;
   onSelect: (app: ShellApp, options?: { forceNewWindow?: boolean }) => void;
@@ -30,6 +33,8 @@ export type MenuItem = {
 
 export function AppMenu({
   apps,
+  loadFailed,
+  onReload,
   activeAppId,
   username,
   onSelect,
@@ -372,7 +377,13 @@ export function AppMenu({
       </nav>
 
       {launcherOpen && (
-        <AppLauncher apps={apps} onSelect={onSelect} onClose={() => setLauncherOpen(false)} />
+        <AppLauncher
+          apps={apps}
+          loadFailed={loadFailed}
+          onReload={onReload}
+          onSelect={onSelect}
+          onClose={() => setLauncherOpen(false)}
+        />
       )}
     </>
   );

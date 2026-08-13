@@ -27,7 +27,7 @@ function snapToGrid(x: number, y: number) {
 }
 
 export function DesktopPage() {
-  const { me, apps } = useShellApps();
+  const { me, apps, loadFailed, reload } = useShellApps();
   const backgroundUrl = useShellBackgroundUrl();
 
   const activeAppId = useAppsStore((s) => s.activeAppId);

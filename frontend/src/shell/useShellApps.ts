@@ -32,6 +32,8 @@ export function useShellApps() {
     isLoading: meLoading,
     isFetching,
     isFetched,
+    isError,
+    refetch,
   } = useQuery({
     queryKey: ["me"],
     queryFn: () => apiFetch<MeResponse>("/session/me"),
@@ -75,6 +77,11 @@ export function useShellApps() {
     apps,
     isAdminUser,
     adminOnly,
+    // The session request failed. Distinct from "this user has no apps": both
+    // leave `apps` empty, and rendering them the same way turns any backend or
+    // edge fault into a silent, plausible-looking empty desktop.
+    loadFailed: isError,
+    reload: refetch,
     isLoading: !sessionReady || !hasToken || meLoading || (isFetching && !isFetched),
   };
 }

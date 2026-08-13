@@ -18,7 +18,7 @@ import { buildAppLaunchUrl } from "@/lib/appLaunchUrl";
 type MobileOverlay = "admin" | "account" | "settings" | null;
 
 export function MobilePage() {
-  const { me, apps } = useShellApps();
+  const { me, apps, loadFailed, reload } = useShellApps();
   const backgroundUrl = useShellBackgroundUrl();
 
   const activeAppId = useAppsStore((s) => s.activeAppId);
