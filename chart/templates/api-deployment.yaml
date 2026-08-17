@@ -49,6 +49,10 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            {{- if .Values.credentialManager.url }}
+            - name: CREDENTIAL_MANAGER_URL
+              value: {{ .Values.credentialManager.url | quote }}
+            {{- end }}
             {{- if .Values.openfga.apiUrl }}
             - name: OPENFGA_API_URL
               value: {{ .Values.openfga.apiUrl | quote }}

@@ -99,3 +99,12 @@ llm:
   # profile being available to install and a tile being worth showing are
   # different questions.
   enabled: false
+
+# The gentian-os Credential Manager. The console proxies to it rather than the
+# browser calling it directly: it serves no CORS headers, and proxying keeps it
+# on the cluster network with one origin for the console.
+#
+# Unset disables the Credentials section rather than breaking it — the API
+# answers 503 and the section says the manager is unavailable.
+credentialManager:
+  url: ""

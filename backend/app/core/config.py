@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     openfga_api_token: str | None = Field(default=None, alias="OPENFGA_API_TOKEN")
     openfga_authzen_enabled: bool = Field(default=False, alias="OPENFGA_AUTHZEN_ENABLED")
 
+    # The gentian-os Credential Manager, in-cluster. The console proxies to it
+    # rather than the browser calling it: it serves no CORS headers, and routing
+    # through the backend keeps the service off the public network.
+    credential_manager_url: str | None = Field(default=None, alias="CREDENTIAL_MANAGER_URL")
+
     keycloak_admin_url: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_URL")
     keycloak_admin_username: str = Field(default="admin", alias="KEYCLOAK_ADMIN_USERNAME")
     keycloak_admin_password: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_PASSWORD")
