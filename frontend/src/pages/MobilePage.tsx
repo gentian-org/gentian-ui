@@ -145,6 +145,8 @@ export function MobilePage() {
       )}
       <AppMenu
         apps={apps}
+        loadFailed={loadFailed}
+        onReload={reload}
         activeAppId={activeAppId}
         username={me?.username}
         onSelect={handleSelect}
