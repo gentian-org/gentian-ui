@@ -37,6 +37,12 @@ spec:
               value: {{ .Values.kernelDomain | quote }}
             - name: KERNEL_REALM
               value: {{ .Values.kernelRealm | default "kernel" | quote }}
+            # Capabilities this cluster actually serves. A platform app annotated
+            # gentianos.io/requires-capability gets a desktop tile only when its
+            # capability is listed here, so an undeployed component cannot offer
+            # a tile pointing at a host that resolves to nothing.
+            - name: GENTIAN_CAPABILITIES
+              value: {{ .Values.capabilities | default (ternary "llm" "" .Values.llm.enabled) | quote }}
             - name: AUTH_DISABLED
               value: {{ ternary "true" "false" .Values.auth.disabled | quote }}
             {{- range $key, $value := .Values.api.env }}

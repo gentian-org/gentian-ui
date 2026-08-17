@@ -6,6 +6,10 @@ metadata:
     gentianos.io/profile-name: open-webui
   annotations:
     gentianos.io/platform-app: "true"
+    # The tile waits for the cluster to actually serve LLM. platform-app alone
+    # means "show without installing per tenant", which offered a tile pointing
+    # at a host that resolves to nothing whenever spec.llm.enabled was off.
+    gentianos.io/requires-capability: "llm"
     # OpenWebUI needs network access to the platform-kernel namespace where LiteLLM resides
     gentianos.io/kernel-egress-namespaces: platform-kernel,envoy-gateway-system
     gentianos.io/standard-image-pull-secrets: "true"

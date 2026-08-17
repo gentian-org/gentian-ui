@@ -12,6 +12,19 @@ from kubernetes.client.rest import ApiException
 GROUP = "gentianos.io"
 VERSION = "v1alpha1"
 PLATFORM_APP_ANNOTATION = "gentianos.io/platform-app"
+
+# A cluster capability a profile needs before its tile is worth showing.
+#
+# platform-app means "show this to everyone without installing it per tenant" —
+# that is how the App Store gets a tile. It says nothing about whether the thing
+# behind the tile exists. litellm-me and open-webui both set platform-app while
+# spec.llm.enabled is off, so the desktop offered two tiles pointing at hosts
+# that resolve to nothing.
+#
+# Deliberately separate from installation: the profile stays in the catalogue,
+# discoverable, so an operator can see that LLM exists and turn it on. Only the
+# tile waits for the capability.
+REQUIRES_CAPABILITY_ANNOTATION = "gentianos.io/requires-capability"
 APP_PRIVILEGE_REQUESTED_ANNOTATION = "gentianos.io/app-privilege-requested-at"
 
 
@@ -80,13 +93,28 @@ def is_platform_app(profile: dict[str, Any]) -> bool:
     return annotations.get(PLATFORM_APP_ANNOTATION) == "true"
 
 
-def list_platform_app_profiles() -> list[str]:
+def required_capability(profile: dict[str, Any]) -> str:
+    """The cluster capability this profile needs, or "" when it needs none."""
+    annotations = profile.get("metadata", {}).get("annotations") or {}
+    return str(annotations.get(REQUIRES_CAPABILITY_ANNOTATION) or "").strip()
+
+
+def list_platform_app_profiles(capabilities: set[str] | None = None) -> list[str]:
+    """Platform apps whose required capability, if any, this cluster has.
+
+    A profile with no requires-capability annotation is always included, so
+    existing profiles keep behaving exactly as before.
+    """
+    available = capabilities if capabilities is not None else set()
     try:
         profiles = _custom_objects_api().list_cluster_custom_object(GROUP, VERSION, "appprofiles")
         return [
             str(p["metadata"]["name"])
             for p in profiles.get("items", [])
-            if is_platform_app(p) and "metadata" in p and "name" in p["metadata"]
+            if is_platform_app(p)
+            and "metadata" in p
+            and "name" in p["metadata"]
+            and (not required_capability(p) or required_capability(p) in available)
         ]
     except ApiException as exc:
         if exc.status == 404:

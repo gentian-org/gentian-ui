@@ -84,3 +84,18 @@ podSecurity:
   runAsNonRoot: true
   runAsUser: 65532
   fsGroup: 65532
+
+# Cluster capabilities, as a comma-separated list (e.g. "llm"). Left empty the
+# chart derives it from the toggles below, so a cluster that enables LLM gets the
+# tiles without a second setting to keep in step.
+capabilities: ""
+
+llm:
+  # Whether this cluster serves LLM. Mirrors the Cluster XR's spec.llm.enabled;
+  # supplied by the portal Application's Helm parameters.
+  #
+  # Off by default, and off is what withholds the LLM Admin Panel and AI Config
+  # tiles. Their AppProfiles stay installed and discoverable either way — a
+  # profile being available to install and a tile being worth showing are
+  # different questions.
+  enabled: false

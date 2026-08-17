@@ -423,3 +423,67 @@ async def test_shell_apps_for_odoo_module_visibility():
     assert len(apps) == 1
     assert apps[0]["id"] == "odoo-crm-ce-crm"
     assert apps[0]["launchUrl"] == "https://erp.demo.desk.gentian.org"
+
+
+# --- capability-gated platform apps -----------------------------------------
+#
+# platform-app means "show without installing per tenant" — that is how the App
+# Store gets a tile. It says nothing about whether the thing behind the tile
+# exists, so litellm-me and open-webui were offered on a cluster with LLM off,
+# pointing at hosts that resolve to nothing.
+#
+# The catalogue/installed distinction still holds: the profile stays installable
+# and discoverable either way. Only the tile waits for the capability.
+
+LLM_PROFILE = {
+    "metadata": {
+        "name": "litellm-me",
+        "annotations": {
+            "gentianos.io/platform-app": "true",
+            "gentianos.io/requires-capability": "llm",
+        },
+    },
+    "spec": {"displayName": "LLM Admin Panel"},
+}
+
+PLAIN_PLATFORM_PROFILE = {
+    "metadata": {"name": "app-store", "annotations": {"gentianos.io/platform-app": "true"}},
+    "spec": {"displayName": "App Store"},
+}
+
+
+def test_required_capability_reads_the_annotation():
+    from app.services.k8s_catalogue import required_capability
+
+    assert required_capability(LLM_PROFILE) == "llm"
+    assert required_capability(PLAIN_PLATFORM_PROFILE) == ""
+
+
+def test_platform_apps_are_filtered_by_capability():
+    from unittest.mock import patch
+
+    from app.services import k8s_catalogue
+
+    listed = {"items": [PLAIN_PLATFORM_PROFILE, LLM_PROFILE]}
+    with patch.object(
+        k8s_catalogue, "_custom_objects_api"
+    ) as api:
+        api.return_value.list_cluster_custom_object.return_value = listed
+
+        # LLM off: the gated tile is withheld, the ungated one is not.
+        assert k8s_catalogue.list_platform_app_profiles(set()) == ["app-store"]
+
+        # LLM on: both appear.
+        assert k8s_catalogue.list_platform_app_profiles({"llm"}) == ["app-store", "litellm-me"]
+
+        # No capability set supplied at all behaves as "none known", which is the
+        # safe default: a tile for something undeployed is worse than a missing one.
+        assert k8s_catalogue.list_platform_app_profiles() == ["app-store"]
+
+
+def test_capability_set_parses_the_setting():
+    from app.core.config import Settings
+
+    assert Settings(GENTIAN_CAPABILITIES="").capability_set == set()
+    assert Settings(GENTIAN_CAPABILITIES="llm").capability_set == {"llm"}
+    assert Settings(GENTIAN_CAPABILITIES="llm, mail ,").capability_set == {"llm", "mail"}

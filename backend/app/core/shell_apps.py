@@ -148,9 +148,14 @@ def user_can_see_portal_tile(
     return tenant_members_group(tenant) in groups
 
 
-def _profiles_for_shell_tiles(tenant: str, *, is_admin: bool) -> list[str]:
+def _profiles_for_shell_tiles(
+    tenant: str, *, is_admin: bool, capabilities: set[str] | None = None
+) -> list[str]:
+    # Installed profiles are shown because the tenant chose them. Platform apps
+    # are shown because they ship with the platform — but only those whose
+    # required capability this cluster actually has.
     profiles = list_installed_profiles(tenant)
-    platform_profiles = list_platform_app_profiles()
+    platform_profiles = list_platform_app_profiles(capabilities)
     for p in platform_profiles:
         if p not in profiles:
             profiles.append(p)
@@ -171,7 +176,9 @@ async def tenant_shell_apps(
 
     apps: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for profile_name in _profiles_for_shell_tiles(tenant, is_admin=is_admin):
+    for profile_name in _profiles_for_shell_tiles(
+        tenant, is_admin=is_admin, capabilities=settings.capability_set
+    ):
         profile = get_app_profile(profile_name)
         if profile is None:
             continue

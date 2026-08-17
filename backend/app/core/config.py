@@ -15,6 +15,18 @@ class Settings(BaseSettings):
     kernel_realm: str = Field(default="kernel", alias="KERNEL_REALM")
     tenancy_mode: str = Field(default="multi", alias="TENANCY_MODE")
 
+    # Cluster capabilities present on THIS cluster, comma-separated (e.g. "llm").
+    #
+    # A platform app annotated gentianos.io/requires-capability gets a desktop
+    # tile only when its capability appears here. Empty by default: a tile for a
+    # component that is not deployed points at a host that resolves to nothing,
+    # so the safe answer when nothing has told us is to show nothing.
+    capabilities: str = Field(default="", alias="GENTIAN_CAPABILITIES")
+
+    @property
+    def capability_set(self) -> set[str]:
+        return {c.strip() for c in self.capabilities.split(",") if c.strip()}
+
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
     portal_shell_secrets_namespace: str = Field(
         default="platform-kernel",
