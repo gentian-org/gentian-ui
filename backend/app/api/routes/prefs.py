@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 from fastapi.responses import Response
 
 from app.core.auth import get_current_user
@@ -99,6 +99,7 @@ def delete_prefs_background(
 
 from pydantic import BaseModel
 import uuid
+from urllib.parse import urlparse
 
 class CreateTemplateRequest(BaseModel):
     name: str
@@ -214,8 +215,56 @@ def apply_template(
 
 import httpx
 
+def _frame_ancestors_allows(csp: str, parent_origin: str) -> bool:
+    """Whether frame-ancestors in `csp` permits a page served from `parent_origin`.
+
+    The directive is an allow-LIST, so the question is whether our origin is on
+    it — not whether any particular token appears in it. Testing for the presence
+    of "self" answered False for
+        frame-ancestors 'self' https://portal.example https://tenant.example
+    which names the portal explicitly two tokens later: every app that permits
+    the portal alongside itself was reported unembeddable, and the shell fell
+    back to opening a browser tab.
+    """
+    directive = ""
+    for part in csp.split(";"):
+        part = part.strip()
+        if part.lower().startswith("frame-ancestors"):
+            directive = part
+            break
+    if not directive:
+        return True
+
+    sources = directive.split()[1:]
+    if not sources or any(s == "'none'" for s in sources):
+        return False
+    if any(s == "*" for s in sources):
+        return True
+    if not parent_origin:
+        # Without knowing where the shell is served from, only a wildcard can be
+        # judged. Assume embeddable and let the browser decide rather than
+        # opening a tab the user did not ask for.
+        return True
+
+    parsed = urlparse(parent_origin)
+    host, scheme = parsed.hostname or "", parsed.scheme or "https"
+    for src in sources:
+        src = src.strip("'")
+        if src in {"self"}:
+            continue  # same-origin only; the shell is a different origin
+        src_parsed = urlparse(src if "//" in src else f"//{src}")
+        src_host = src_parsed.hostname or src
+        if src_parsed.scheme and src_parsed.scheme != scheme:
+            continue
+        if src_host == host:
+            return True
+        if src_host.startswith("*.") and host.endswith(src_host[1:]):
+            return True
+    return False
+
+
 @router.get("/check-iframe")
-async def check_iframe_embeddable(url: str) -> dict:
+async def check_iframe_embeddable(url: str, request: Request) -> dict:
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -233,9 +282,17 @@ async def check_iframe_embeddable(url: str) -> dict:
             csp = resp_headers.get("content-security-policy", "").lower()
             if "deny" in x_frame or "sameorigin" in x_frame:
                 return {"embeddable": False}
-            if "frame-ancestors" in csp:
-                if "frame-ancestors *" not in csp and ("frame-ancestors 'none'" in csp or "self" in csp or "'self'" in csp):
-                    return {"embeddable": False}
+            # The origin the shell is served from, which is what
+            # frame-ancestors is asked about.
+            parent = request.headers.get("origin") or ""
+            if not parent:
+                referer = request.headers.get("referer") or ""
+                if referer:
+                    r = urlparse(referer)
+                    if r.scheme and r.hostname:
+                        parent = f"{r.scheme}://{r.netloc}"
+            if not _frame_ancestors_allows(csp, parent):
+                return {"embeddable": False}
             return {"embeddable": True}
     except Exception:
         return {"embeddable": True}

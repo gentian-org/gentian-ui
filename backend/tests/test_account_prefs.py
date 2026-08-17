@@ -154,6 +154,37 @@ async def test_templates_crud_and_apply():
         assert list_res3.json() == []
 
 
+def test_frame_ancestors_allows_listed_origin():
+    """frame-ancestors is an allow-list, so membership is the question.
+
+    The store publishes
+        frame-ancestors 'self' https://portal.gtn.host https://corp.gtn.host ...
+    and the portal is named in it. A check that answered on the presence of the
+    token "self" called that unembeddable, so the shell opened a browser tab for
+    every app that permits the portal alongside itself.
+    """
+    from app.api.routes.prefs import _frame_ancestors_allows as allows
+
+    store = (
+        "frame-ancestors 'self' https://portal.gtn.host "
+        "https://corp.gtn.host https://*.corp.gtn.host"
+    )
+    assert allows(store, "https://corp.gtn.host") is True
+    assert allows(store, "https://portal.gtn.host") is True
+    assert allows(store, "https://sub.corp.gtn.host") is True
+
+    assert allows(store, "https://evil.example") is False
+    assert allows("frame-ancestors 'none'", "https://corp.gtn.host") is False
+    assert allows("frame-ancestors 'self'", "https://corp.gtn.host") is False
+    assert allows("frame-ancestors http://corp.gtn.host", "https://corp.gtn.host") is False
+
+    assert allows("frame-ancestors *", "https://corp.gtn.host") is True
+    assert allows("default-src 'self'", "https://corp.gtn.host") is True
+    # Unknown parent origin: only a wildcard is judgeable, so defer to the
+    # browser rather than opening a tab nobody asked for.
+    assert allows(store, "") is True
+
+
 @pytest.mark.asyncio
 async def test_check_iframe_embeddable():
     transport = ASGITransport(app=app)
