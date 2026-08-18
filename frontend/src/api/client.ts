@@ -2,6 +2,24 @@ import { getAccessToken, redirectToLoginForExpiredSession } from "@/auth/oidc";
 
 const API_BASE = "/api/v1";
 
+/**
+ * Paths whose 401 means "the upstream refused this token", not "your portal
+ * session expired".
+ *
+ * The credential manager exchanges the caller's token with OpenBao and answers
+ * 401 when that exchange fails — a wrong audience, a group matching no role, an
+ * auth backend that does not exist yet. Treating that as an expired session
+ * logged the operator out mid-click and destroyed the one message that said
+ * what was actually wrong.
+ */
+const UPSTREAM_AUTH_PATHS = ["/credentials"];
+
+function isUpstreamAuth(path: string): boolean {
+  return UPSTREAM_AUTH_PATHS.some(
+    (p) => path === p || path.startsWith(`${p}/`) || path.startsWith(`${p}?`),
+  );
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getAccessToken();
   const headers: Record<string, string> = {
@@ -26,6 +44,13 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       }
     } catch {
       // Response body is not JSON.
+    }
+    if (response.status === 401 && isUpstreamAuth(path)) {
+      throw new Error(
+        `Not authorised by the credential manager${detail}. Your portal session is fine — ` +
+          `OpenBao refused the token. Check that you are in the cluster-admin group, and that ` +
+          `this cluster's OIDC auth backend exists.`,
+      );
     }
     if (response.status === 401 && token) {
       redirectToLoginForExpiredSession();
