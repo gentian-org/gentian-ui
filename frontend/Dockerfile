@@ -44,6 +44,21 @@ ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 #                           fails to boot until a hard reload
 #   assets/**   immutable — content-addressed filenames, safe to keep forever
 #
+# cleanUrls: false is load-bearing, not a preference. serve-handler turns
+# cleanUrls ON when the key is absent, which 301s any path matching
+# /(\.html|\/index)$/ to its extensionless form. Combined with `serve -s`, the
+# extensionless path is then answered by the single-page rewrite instead of
+# resolving back to the file — so every real .html file except index.html
+# becomes unreachable over HTTP while sitting perfectly well on disk.
+#
+# portal-sso.html is exactly such a file. The Nextcloud post-installation hook
+# fetches it with `curl -sfLo` and copies it into the app's docroot to hand a
+# portal session over to the app. With cleanUrls on it followed the 301 and
+# received index.html — the SPA shell — which references /assets/* and
+# /config.js as absolute paths that do not exist on the app's origin. The tile
+# opened a page whose JavaScript 404ed, so no session was ever exchanged and no
+# user was provisioned in the app.
+#
 # Without this `serve` sends only an ETag and browsers fall back to heuristic
 # caching, which is exactly how the stale-bundle breakage happened.
 CMD ["serve", "-s", "/app/www", "-l", "8080", "-c", "/app/www/serve.json"]
