@@ -18,12 +18,24 @@ rules:
   - apiGroups: ["gentianos.io"]
     resources: ["customizations"]
     verbs: ["get", "list", "watch"]
+  # The Backup tab creates TenantExports and reads their progress. Delete is
+  # included so an admin can clear a finished export; update is not, because
+  # an export's spec is a record of what was captured and editing it after the
+  # fact would make its own status a lie.
+  - apiGroups: ["gentianos.io"]
+    resources: ["tenantexports"]
+    verbs: ["get", "list", "watch", "create", "delete"]
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "list"]
+  # create/delete on Secrets exists for one purpose: a backup passphrase is
+  # written as a Secret in the tenant's namespace so it never appears in a
+  # TenantExport spec, in etcd as plain spec data, or in `kubectl get -o yaml`.
+  # The operator copies it beside the capture Jobs and deletes both copies when
+  # the export finishes.
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get"]
+    verbs: ["get", "create", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

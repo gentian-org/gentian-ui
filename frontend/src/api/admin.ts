@@ -505,3 +505,60 @@ export type GrantableAddon = { id: string; label: string; profile: string };
 export function fetchGrantableAddons(tenant?: string) {
   return apiFetch<GrantableAddon[]>(`/admin/grantable-addons${tenantQuery(tenant)}`);
 }
+
+// --- Backups -----------------------------------------------------------------
+
+export type BackupAppStatus = {
+  name: string;
+  phase: string;
+  stores: string[];
+  chartVersion: string;
+  quiesceStart: string | null;
+  quiesceEnd: string | null;
+  message: string;
+};
+
+export type Backup = {
+  name: string;
+  phase: string;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  bundleBucket: string;
+  bundlePrefix: string;
+  encryptionMode: string;
+  platformReadable: boolean;
+  quiesced: string[];
+  apps: BackupAppStatus[];
+  message: string;
+};
+
+export type BackupCreateBody = {
+  name: string;
+  apps: string[];
+  encryption: {
+    mode: "recipient" | "passphrase";
+    passphrase?: string;
+    recipients?: string[];
+  };
+};
+
+export function fetchBackups(tenant?: string) {
+  return apiFetch<Backup[]>(`/admin/backups${tenantQuery(tenant)}`);
+}
+
+export function fetchBackup(name: string, tenant?: string) {
+  return apiFetch<Backup>(`/admin/backups/${encodeURIComponent(name)}${tenantQuery(tenant)}`);
+}
+
+export function createBackup(body: BackupCreateBody, tenant?: string) {
+  return apiFetch<Backup>(`/admin/backups${tenantQuery(tenant)}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** An export is finished when it can no longer change on its own. */
+export function backupIsTerminal(backup: Backup): boolean {
+  return backup.phase === "Ready" || backup.phase === "Failed";
+}

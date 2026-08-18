@@ -54,6 +54,14 @@ from app.services.k8s_authorization import (
     replace_platform_security_policy,
     tenant_namespace,
 )
+from app.services.k8s_backup import (
+    create_export,
+    create_passphrase_secret,
+    delete_passphrase_secret,
+    get_export,
+    list_exports,
+    valid_export_name,
+)
 from app.services.security_policy_store import SecurityPolicyStoreDep
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -1634,3 +1642,196 @@ async def update_app_grant(
         phase=(updated.get("status") or {}).get("phase", ""),
     )
 
+
+
+# --- Backups (tenant export) -------------------------------------------------
+
+
+class BackupEncryptionRequest(BaseModel):
+    """How the requester wants the bundle protected.
+
+    The choice is deliberately in front of the admin rather than a platform
+    default they never see: it decides whether anyone but them can ever read
+    the bundle, and that is not a decision to make on their behalf silently.
+    """
+
+    mode: Literal["recipient", "passphrase"] = "recipient"
+    # Supplied only for mode: passphrase. It never lands in the TenantExport
+    # spec — the BFF puts it in a Secret and the export references that.
+    passphrase: str | None = Field(default=None, min_length=12, max_length=512)
+    # Supplied only for mode: recipient, to encrypt to a key the platform has
+    # no identity for.
+    recipients: list[str] = Field(default_factory=list)
+
+
+class BackupCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+    apps: list[str] = Field(default_factory=list)
+    encryption: BackupEncryptionRequest = Field(default_factory=BackupEncryptionRequest)
+
+
+class BackupAppStatus(BaseModel):
+    name: str
+    phase: str = ""
+    stores: list[str] = Field(default_factory=list)
+    chartVersion: str = ""
+    quiesceStart: str | None = None
+    quiesceEnd: str | None = None
+    message: str = ""
+
+
+class BackupResponse(BaseModel):
+    name: str
+    phase: str = ""
+    createdAt: str = ""
+    startedAt: str | None = None
+    completedAt: str | None = None
+    bundleBucket: str = ""
+    bundlePrefix: str = ""
+    encryptionMode: str = ""
+    # Stated rather than implied: whether platform-held keys can still open
+    # this bundle is the difference between "we can restore you" and "only you
+    # can", and support needs to see it without inferring it from the mode.
+    platformReadable: bool = False
+    # Apps currently paused for writes. A non-empty list on a running export is
+    # normal; on a stalled one it is the thing to look at first.
+    quiesced: list[str] = Field(default_factory=list)
+    apps: list[BackupAppStatus] = Field(default_factory=list)
+    message: str = ""
+
+
+def _backup_response(item: dict[str, Any]) -> BackupResponse:
+    meta = item.get("metadata") or {}
+    spec_status = item.get("status") or {}
+    bundle = spec_status.get("bundle") or {}
+    encryption = spec_status.get("encryption") or {}
+
+    message = ""
+    for condition in spec_status.get("conditions") or []:
+        # Complete carries the terminal reason; Accepted explains a queued
+        # export. Either is more useful than an empty cell.
+        if condition.get("type") in ("Complete", "Accepted") and condition.get("message"):
+            message = condition["message"]
+            if condition.get("type") == "Complete":
+                break
+
+    return BackupResponse(
+        name=meta.get("name", ""),
+        phase=spec_status.get("phase", ""),
+        createdAt=meta.get("creationTimestamp", "") or "",
+        startedAt=spec_status.get("startedAt"),
+        completedAt=spec_status.get("completedAt"),
+        bundleBucket=bundle.get("bucket", ""),
+        bundlePrefix=bundle.get("prefix", ""),
+        encryptionMode=encryption.get("mode", ""),
+        platformReadable=bool(encryption.get("platformReadable")),
+        quiesced=list(spec_status.get("quiesced") or []),
+        apps=[
+            BackupAppStatus(
+                name=app.get("name", ""),
+                phase=app.get("phase", ""),
+                stores=list(app.get("stores") or []),
+                chartVersion=app.get("chartVersion", ""),
+                quiesceStart=app.get("quiesceStart"),
+                quiesceEnd=app.get("quiesceEnd"),
+                message=app.get("message", ""),
+            )
+            for app in spec_status.get("apps") or []
+        ],
+        message=message,
+    )
+
+
+@router.get("/backups", response_model=list[BackupResponse])
+async def list_backups(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> list[BackupResponse]:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    try:
+        items = list_exports(resolved)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    return [_backup_response(item) for item in items]
+
+
+@router.get("/backups/{name}", response_model=BackupResponse)
+async def get_backup(
+    name: str,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> BackupResponse:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    try:
+        item = get_export(resolved, name)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"backup {name!r} not found")
+    return _backup_response(item)
+
+
+@router.post("/backups", response_model=BackupResponse, status_code=status.HTTP_201_CREATED)
+async def create_backup(
+    body: BackupCreateRequest,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> BackupResponse:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+
+    if not valid_export_name(body.name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="name must be lowercase alphanumeric with hyphens, at most 40 characters",
+        )
+
+    encryption: dict[str, Any] = {"mode": body.encryption.mode}
+    passphrase_created = False
+
+    if body.encryption.mode == "passphrase":
+        if not body.encryption.passphrase:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="a passphrase is required for mode: passphrase",
+            )
+        try:
+            secret_name = create_passphrase_secret(resolved, body.name, body.encryption.passphrase)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        passphrase_created = True
+        encryption["passphraseSecretRef"] = {"name": secret_name, "key": "passphrase"}
+    elif body.encryption.recipients:
+        encryption["recipients"] = body.encryption.recipients
+
+    try:
+        created = create_export(resolved, body.name, apps=body.apps, encryption=encryption)
+    except Exception as exc:  # noqa: BLE001
+        # Leaving the passphrase behind for an export that was never created
+        # would put it in the namespace with nothing to consume or clean it up.
+        if passphrase_created:
+            try:
+                delete_passphrase_secret(resolved, body.name)
+            except Exception:  # noqa: BLE001
+                pass
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="backup.created",
+        target=body.name,
+        details={
+            "encryption": body.encryption.mode,
+            "apps": ",".join(body.apps) if body.apps else "all",
+        },
+    )
+    return _backup_response(created)
