@@ -43,11 +43,22 @@ export function CredentialsSection() {
     return <p>Loading credentials…</p>;
   }
   if (credentialsQuery.isError) {
+    // The message, not a summary of it. apiFetch already distinguishes "the
+    // upstream refused this token" from "the service is not reachable", and
+    // replacing both with "unavailable" threw away the only text that said
+    // which — leaving an operator to guess between a 503, a 502 and a 401.
+    const detail = (credentialsQuery.error as Error)?.message ?? "";
     return (
-      <p className="admin-console__error">
-        The credential manager is unavailable. Credentials cannot be read or supplied until it
-        responds.
-      </p>
+      <section className="admin-section">
+        <h2 className="admin-section__title">Credentials</h2>
+        <p className="admin-console__error">
+          Credentials cannot be read right now.
+        </p>
+        {detail ? <p className="admin-console__error"><code>{detail}</code></p> : null}
+        <button type="button" onClick={() => void credentialsQuery.refetch()}>
+          Try again
+        </button>
+      </section>
     );
   }
 
