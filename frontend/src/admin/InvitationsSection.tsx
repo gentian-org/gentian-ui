@@ -30,6 +30,25 @@ function groupLabel(name: string): string {
   return name;
 }
 
+/**
+ * The editable part of a login address. The character set is deliberately
+ * narrow — the domain is fixed and shown beside the field, so anything outside
+ * [a-z0-9-_] does not belong in what the operator types here.
+ */
+function sanitizeLocalPart(raw: string): string {
+  return raw.toLowerCase().replace(/[^a-z0-9-_]/g, "");
+}
+
+/** The address suggested from a name, until the operator edits it themselves. */
+function suggestLocalPart(first: string, last: string): string {
+  const cleanFirst = first.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const cleanLast = last.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (cleanFirst && cleanLast) {
+    return `${cleanFirst}-${cleanLast}`;
+  }
+  return cleanFirst || cleanLast || "";
+}
+
 /** A single labelled section block inside the invite form. */
 function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -142,27 +161,23 @@ export function InvitationsSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleAppGroups, isInitialized]);
 
-  // Handle name updates and auto-population of Login email
+  // Handle name updates and auto-population of Login email.
+  //
+  // Both updates are made from the handler, not from inside the setForm
+  // updater. A state updater has to be a pure function of the previous state —
+  // React may call it more than once, and setLocalPart was riding along each
+  // time it did.
   const handleNameChange = (field: "firstName" | "lastName", val: string) => {
-    setForm((prev) => {
-      const next = { ...prev, [field]: val };
-      if (!hasManuallyEditedLocalPart) {
-        const first = field === "firstName" ? val : prev.firstName;
-        const last = field === "lastName" ? val : prev.lastName;
-        
-        // Clean and format local part
-        const cleanFirst = first.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-        const cleanLast = last.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-        const generated = cleanFirst && cleanLast ? `${cleanFirst}-${cleanLast}` : cleanFirst || cleanLast || "";
-        setLocalPart(generated);
-      }
-      return next;
-    });
+    const first = field === "firstName" ? val : form.firstName;
+    const last = field === "lastName" ? val : form.lastName;
+    setForm((prev) => ({ ...prev, [field]: val }));
+    if (!hasManuallyEditedLocalPart) {
+      setLocalPart(suggestLocalPart(first, last));
+    }
   };
 
   const handleLocalPartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, "");
-    setLocalPart(val);
+    setLocalPart(sanitizeLocalPart(e.target.value));
     setHasManuallyEditedLocalPart(true);
   };
 
@@ -213,8 +228,20 @@ export function InvitationsSection({
         </h2>
       </div>
 
+      {/*
+        autoComplete="off" throughout, and field names that do not read as a
+        person's own details.
+
+        This form is first name + last name + email — the exact shape a browser
+        classifies as an address form, so it offers the operator's own saved
+        profile and inline-completes it as they type, selecting the completion
+        on every keystroke. But the operator is not the person being invited:
+        every value here belongs to somebody else, so there is nothing on file
+        that is ever the right suggestion.
+      */}
       <form
         className="admin-console__form admin-console__form--invite"
+        autoComplete="off"
         onSubmit={(e) => {
           e.preventDefault();
           setSuccess(null);
@@ -229,6 +256,10 @@ export function InvitationsSection({
               <label htmlFor="inv-first">First name</label>
               <input
                 id="inv-first"
+                name="invitee-given"
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
                 value={form.firstName}
                 onChange={(e) => handleNameChange("firstName", e.target.value)}
                 placeholder="John"
@@ -238,6 +269,10 @@ export function InvitationsSection({
               <label htmlFor="inv-last">Last name</label>
               <input
                 id="inv-last"
+                name="invitee-family"
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
                 value={form.lastName}
                 onChange={(e) => handleNameChange("lastName", e.target.value)}
                 placeholder="Doe"
@@ -251,6 +286,10 @@ export function InvitationsSection({
             <div className="admin-console__email-input-wrapper">
               <input
                 id="inv-email-local"
+                name="invitee-login-local"
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
                 type="text"
                 required
                 value={localPart}
@@ -266,9 +305,12 @@ export function InvitationsSection({
             <label htmlFor="inv-invite-email">Invite email</label>
             <input
               id="inv-invite-email"
+              name="invitee-delivery"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
               type="email"
               required
-              autoComplete="off"
               value={form.inviteEmail}
               onChange={(e) => setForm((p) => ({ ...p, inviteEmail: e.target.value }))}
               placeholder="personal@example.com"
