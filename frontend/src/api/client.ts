@@ -46,10 +46,13 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       // Response body is not JSON.
     }
     if (response.status === 401 && isUpstreamAuth(path)) {
+      // The detail carries which check failed — audience, claims, role or mount
+      // — because the API classifies the refusal now. This message used to guess,
+      // and told operators to check a group membership that was correct through
+      // three separate causes, none of which was the group.
       throw new Error(
         `Not authorised by the credential manager${detail}. Your portal session is fine — ` +
-          `OpenBao refused the token. Check that you are in the cluster-admin group, and that ` +
-          `this cluster's OIDC auth backend exists.`,
+          `OpenBao refused the token; the credential manager's log has OpenBao's own words.`,
       );
     }
     if (response.status === 401 && token) {
