@@ -5,13 +5,18 @@ import re
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
 from app.core.login_routing import resolve_login_route
 from app.services.admin_store import AdminStoreDep, admin_store_configured
+from app.services.credential_manager import prove_write_path
 from app.services.keycloak_user_groups import realm_from_issuer
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+_bearer = HTTPBearer(auto_error=False)
 
 # Keycloak realm names, which are also the DNS label the tenant is reached on.
 _TENANT_RE = re.compile(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?")
@@ -93,6 +98,7 @@ def entry(request: Request, settings: Settings = Depends(get_settings)) -> dict[
 async def session_started(
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     *,
     store: AdminStoreDep,
 ) -> None:
@@ -103,6 +109,24 @@ async def session_started(
     the backend still sees "a login just happened" — the equivalent of what used
     to run inline in the old password-grant /auth/login handler.
     """
+    # Prove the cluster's human write path, before anything else here can
+    # return early.
+    #
+    # Signing in demonstrates Keycloak works, which was never in doubt. What
+    # nothing else demonstrates is the EXCHANGE: trading this token for a
+    # short-lived OpenBao one, which is what every credential write uses and
+    # what the installer's bootstrap credential is traded away for. Until this
+    # call was added the only thing that performed it was the Credentials tab,
+    # so a cluster's proof depended on an administrator happening to navigate
+    # there — and the install's last step refused, correctly, until they did.
+    #
+    # Best effort, and deliberately not fatal: a cluster whose OpenBao is
+    # unreachable should still let its administrator in. The proof is recorded
+    # by the credential manager when the exchange succeeds, so a failure here
+    # simply means it is recorded on the next attempt.
+    if credentials is not None and credentials.credentials:
+        await prove_write_path(credentials.credentials, settings)
+
     if not admin_store_configured(settings):
         return
     realm = realm_from_issuer(str(user.get("iss") or ""))
