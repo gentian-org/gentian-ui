@@ -6,6 +6,7 @@ import {
   updatePlatformSecurityPolicy,
   type MacWaiverEntry,
 } from "@/api/admin";
+import "./admin.css";
 
 export function PlatformSecuritySection() {
   const queryClient = useQueryClient();
@@ -28,14 +29,15 @@ export function PlatformSecuritySection() {
   });
 
   if (policyQuery.isLoading) {
-    return <p>Loading platform security policy…</p>;
+    return <p className="admin-console__loading">Loading platform security policy…</p>;
   }
   if (policyQuery.isError || !policyQuery.data) {
-    return <p className="admin-console__error">Platform security policy is unavailable.</p>
+    return <p className="admin-console__error">Platform security policy is unavailable.</p>;
   }
 
   const allowed = draft ?? policyQuery.data.allowedMacWaivers;
   const requests = policyQuery.data.catalogueRequests;
+  const summary = summaryQuery.data;
 
   const toggleApproval = (profile: string, policy: string, scope: string) => {
     const key = `${profile}/${policy}/${scope}`;
@@ -50,81 +52,132 @@ export function PlatformSecuritySection() {
   };
 
   return (
-    <section className="admin-section">
-      <h2 className="admin-section__title">Platform security</h2>
-      <p className="admin-section__lead">
-        Approve MAC waivers requested by catalogue AppProfiles. Workloads receive waiver pod
-        labels only when both the profile declares a request and the cluster allows it.
-      </p>
+    <section>
+      <header className="admin-console__section-head">
+        <div>
+          <h2 className="admin-console__section-title">Platform security</h2>
+          <p className="admin-console__lead">
+            Approve MAC waivers requested by catalogue AppProfiles. Workloads receive waiver pod
+            labels only when both the profile declares a request and the cluster allows it.
+          </p>
+        </div>
+        {draft !== null ? (
+          <span className="admin-console__badge admin-console__badge--warn">unsaved changes</span>
+        ) : null}
+      </header>
 
-      {summaryQuery.data ? (
-        <p className="admin-section__meta">
-          {summaryQuery.data.tenantCount} tenant{summaryQuery.data.tenantCount === 1 ? "" : "s"} ·{" "}
-          {summaryQuery.data.bindingCount} integration binding
-          {summaryQuery.data.bindingCount === 1 ? "" : "s"} ·{" "}
-          {summaryQuery.data.grantCount} AppGrant
-          {summaryQuery.data.grantCount === 1 ? "" : "s"} (
-          {summaryQuery.data.grantReadyCount} OpenFGA-synced) ·{" "}
-          {summaryQuery.data.allowedMacWaivers} approved MAC waiver
-          {summaryQuery.data.allowedMacWaivers === 1 ? "" : "s"} ·{" "}
-          {summaryQuery.data.catalogueMacWaiverProfiles} catalogue profile
-          {summaryQuery.data.catalogueMacWaiverProfiles === 1 ? "" : "s"} requesting waivers
+      {summary ? (
+        <div className="admin-console__stats">
+          <div className="admin-console__stat">
+            <div className="admin-console__stat-value">{summary.tenantCount}</div>
+            <div className="admin-console__stat-label">
+              Tenant{summary.tenantCount === 1 ? "" : "s"}
+            </div>
+          </div>
+          <div className="admin-console__stat">
+            <div className="admin-console__stat-value">{summary.bindingCount}</div>
+            <div className="admin-console__stat-label">
+              Integration binding{summary.bindingCount === 1 ? "" : "s"}
+            </div>
+          </div>
+          <div className="admin-console__stat">
+            <div className="admin-console__stat-value">
+              {summary.grantReadyCount}/{summary.grantCount}
+            </div>
+            <div className="admin-console__stat-label">AppGrants OpenFGA-synced</div>
+          </div>
+          <div
+            className={`admin-console__stat${
+              summary.allowedMacWaivers > 0 ? " admin-console__stat--alert" : ""
+            }`}
+          >
+            <div className="admin-console__stat-value">{summary.allowedMacWaivers}</div>
+            <div className="admin-console__stat-label">Approved MAC waivers</div>
+          </div>
+          <div className="admin-console__stat">
+            <div className="admin-console__stat-value">{summary.catalogueMacWaiverProfiles}</div>
+            <div className="admin-console__stat-label">Profiles requesting waivers</div>
+          </div>
+        </div>
+      ) : null}
+
+      <h3 className="admin-console__subsection-title">Catalogue waiver requests</h3>
+
+      {requests.length === 0 ? (
+        <p className="admin-console__empty">
+          No catalogue profiles currently request MAC waivers.
+        </p>
+      ) : (
+        <div className="admin-console__table-wrap">
+          <table className="admin-console__table">
+            <thead>
+              <tr>
+                <th>Profile</th>
+                <th>Policy</th>
+                <th>Scope</th>
+                <th>Approved</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requests.flatMap((entry) =>
+                entry.macWaivers.map((w) => {
+                  const approved = allowed.some(
+                    (a) =>
+                      a.profile === entry.name &&
+                      a.policy === w.policy &&
+                      a.scope === w.scope,
+                  );
+                  return (
+                    <tr key={`${entry.name}-${w.policy}-${w.scope}`}>
+                      <td>{entry.displayName || entry.name}</td>
+                      <td><code>{w.policy}</code></td>
+                      <td><code>{w.scope}</code></td>
+                      <td>
+                        <button
+                          type="button"
+                          className={`admin-console__toggle${
+                            approved ? " admin-console__toggle--on" : ""
+                          }`}
+                          aria-pressed={approved}
+                          onClick={() => toggleApproval(entry.name, w.policy, w.scope)}
+                        >
+                          <span className="admin-console__toggle-icon">
+                            {approved ? "☑" : "☐"}
+                          </span>
+                          {approved ? "Approved" : "Not approved"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                }),
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {saveMutation.isError ? (
+        <p className="admin-console__error" role="status">
+          {(saveMutation.error as Error).message}
         </p>
       ) : null}
 
-      {requests.length === 0 ? (
-        <p>No catalogue profiles currently request MAC waivers.</p>
-      ) : (
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Profile</th>
-              <th>Policy</th>
-              <th>Scope</th>
-              <th>Approved</th>
-            </tr>
-          </thead>
-          <tbody>
-            {requests.flatMap((entry) =>
-              entry.macWaivers.map((w) => {
-                const approved = allowed.some(
-                  (a) =>
-                    a.profile === entry.name &&
-                    a.policy === w.policy &&
-                    a.scope === w.scope,
-                );
-                return (
-                  <tr key={`${entry.name}-${w.policy}-${w.scope}`}>
-                    <td>{entry.displayName || entry.name}</td>
-                    <td><code>{w.policy}</code></td>
-                    <td><code>{w.scope}</code></td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={approved}
-                        onChange={() => toggleApproval(entry.name, w.policy, w.scope)}
-                      />
-                    </td>
-                  </tr>
-                );
-              }),
-            )}
-          </tbody>
-        </table>
-      )}
-
-      <div className="admin-section__actions">
+      <div className="admin-console__actions">
         <button
           type="button"
-          className="admin-button admin-button--primary"
+          className="admin-console__btn admin-console__btn--primary"
           disabled={draft === null || saveMutation.isPending}
           onClick={() => saveMutation.mutate(allowed)}
         >
           {saveMutation.isPending ? "Saving…" : "Save allowlist"}
         </button>
         {draft !== null ? (
-          <button type="button" className="admin-button" onClick={() => setDraft(null)}>
-            Reset
+          <button
+            type="button"
+            className="admin-console__btn admin-console__btn--quiet"
+            onClick={() => setDraft(null)}
+          >
+            Discard changes
           </button>
         ) : null}
       </div>

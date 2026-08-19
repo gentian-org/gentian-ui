@@ -59,7 +59,7 @@ export function AuditSection({ tenant }: AuditSectionProps) {
   return (
     <section>
       <div className="admin-console__toolbar">
-        <h2 className="admin-console__title" style={{ fontSize: "1.125rem" }}>
+        <h2 className="admin-console__section-title">
           Audit log
         </h2>
         <div style={{ display: "flex", gap: "0.5rem" }}>

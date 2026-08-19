@@ -1,9 +1,21 @@
+/* =========================================================================
+   Admin Console — the component layer over the Gentian design tokens.
+
+   Every colour, radius, font and easing here resolves to a token from
+   frontend/design-system/gentian-theme.css. If something is needed that no
+   token carries, add the token there rather than a literal here — a literal
+   is how the console drifts away from the rest of the shell.
+   ========================================================================= */
+
+/* ── Shell ───────────────────────────────────────────────────────────────── */
+
 .admin-console {
   position: relative;
   z-index: 20;
   min-height: calc(100vh - var(--app-menu-height));
   padding: 1.5rem;
   overflow: auto;
+  color: var(--gtn-ink-1);
 }
 
 .admin-console--embedded {
@@ -22,6 +34,7 @@
   margin: 0;
   border: none;
   border-radius: 0;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
 }
@@ -35,59 +48,142 @@
 .admin-console__frame {
   max-width: 1120px;
   margin: 0 auto;
-  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
-  border-radius: var(--gtn-r2, 4px);
-  background: var(--gtn-paper-3, #fff);
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r3);
+  background: var(--gtn-paper-3);
+  box-shadow: var(--gtn-shadow-2);
+  overflow: hidden;
 }
 
 .admin-console__header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   gap: 1rem;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  padding: 0.85rem 1.5rem;
+  border-bottom: 1px solid var(--gtn-border);
+  background: var(--gtn-paper-0);
 }
 
-.admin-console__eyebrow {
-  font-size: 0.625rem;
-  letter-spacing: 0.14em;
+.admin-console__identity {
+  font-family: var(--gtn-font-mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
   text-transform: uppercase;
-  color: var(--gtn-ink-4, #74779a);
-  margin-bottom: 0.5rem;
+  letter-spacing: 0.04em;
+  color: var(--gtn-ink-1);
 }
 
-.admin-console__title {
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 500;
-  color: var(--gtn-ink-1, #14152e);
+.admin-console__identity--muted {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--gtn-ink-4);
 }
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
 
 .admin-console__tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
-  border-bottom: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  padding: 0 0.75rem;
+  border-bottom: 1px solid var(--gtn-border);
+  background: var(--gtn-paper-0);
 }
 
 .admin-console__tab {
-  padding: 0.75rem 1.25rem;
+  padding: 0.6rem 0.85rem;
   border: none;
   border-bottom: 2px solid transparent;
   background: transparent;
-  color: var(--gtn-ink-3, #45486b);
-  font-size: 0.875rem;
+  color: var(--gtn-ink-3);
+  font: inherit;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
+  transition: color var(--gtn-dur-1) var(--gtn-ease-out),
+              border-color var(--gtn-dur-1) var(--gtn-ease-out);
 }
 
-.admin-console__tab--active {
-  color: var(--gtn-gentian-600, #1b1a82);
-  border-bottom-color: var(--gtn-gentian-500, #262696);
+.admin-console__tab:hover {
+  color: var(--gtn-ink-1);
+  border-bottom-color: var(--gtn-border-strong);
+}
+
+.admin-console__tab:focus-visible {
+  outline: none;
+  box-shadow: var(--gtn-focus-ring);
+  border-radius: var(--gtn-r1) var(--gtn-r1) 0 0;
+}
+
+.admin-console__tab--active,
+.admin-console__tab--active:hover {
+  color: var(--gtn-600);
+  border-bottom-color: var(--gtn-500);
 }
 
 .admin-console__body {
-  padding: 1.25rem 1.5rem 1.5rem;
+  padding: 1.5rem;
+}
+
+/* ── Section scaffolding ─────────────────────────────────────────────────── */
+
+.admin-console__section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+/* The title/lead block takes the room; the action keeps its intrinsic width,
+   so a lead reaches its full measure instead of wrapping at half of it. */
+.admin-console__section-head > :first-child {
+  flex: 1 1 28rem;
+  min-width: 0;
+}
+
+.admin-console__section-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--gtn-ink-1);
+}
+
+.admin-console__lead {
+  margin: 0.35rem 0 0;
+  max-width: 68ch;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--gtn-ink-3);
+}
+
+.admin-console__meta {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--gtn-ink-4);
+}
+
+.admin-console__subsection {
+  margin-top: 2rem;
+}
+
+.admin-console__subsection > .admin-console__lead {
+  margin-bottom: 1rem;
+}
+
+.admin-console__subsection-title,
+.admin-console__subtitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.625rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--gtn-ink-2);
 }
 
 .admin-console__toolbar {
@@ -97,6 +193,30 @@
   gap: 1rem;
   margin-bottom: 1rem;
 }
+
+.admin-console__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+/* ── Inline code & monospace ─────────────────────────────────────────────── */
+
+.admin-console__mono,
+.admin-console__body code {
+  font-family: var(--gtn-font-mono);
+  font-size: 0.8125rem;
+}
+
+.admin-console__body code {
+  padding: 0.05rem 0.3rem;
+  border-radius: var(--gtn-r1);
+  background: var(--gtn-paper-1);
+  color: var(--gtn-ink-2);
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
 
 .admin-console__table {
   width: 100%;
@@ -108,43 +228,328 @@
 .admin-console__table td {
   text-align: left;
   padding: 0.65rem 0.75rem;
-  border-bottom: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-bottom: 1px solid var(--gtn-border);
+  vertical-align: top;
 }
 
 .admin-console__table th {
   font-size: 0.6875rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--gtn-ink-4, #74779a);
+  color: var(--gtn-ink-4);
   font-weight: 600;
+  white-space: nowrap;
 }
 
-.admin-console__mono {
-  font-family: "Commit Mono", ui-monospace, monospace;
-  font-size: 0.8125rem;
+.admin-console__table tbody tr:hover > td {
+  background: var(--gtn-paper-0);
 }
+
+.admin-console__table--numeric td {
+  font-family: var(--gtn-font-mono);
+  font-size: 0.9375rem;
+  color: var(--gtn-ink-1);
+}
+
+.admin-console__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+}
+
+.admin-console__table-wrap .admin-console__table tr:last-child > td {
+  border-bottom: none;
+}
+
+.admin-console__table-wrap .admin-console__table th {
+  background: var(--gtn-paper-0);
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+
+.admin-console__cards {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-console__card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem 1rem;
+  align-items: start;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-3);
+  transition: border-color var(--gtn-dur-1) var(--gtn-ease-out),
+              box-shadow var(--gtn-dur-1) var(--gtn-ease-out);
+}
+
+.admin-console__card:hover {
+  border-color: var(--gtn-border-strong);
+  box-shadow: var(--gtn-shadow-1);
+}
+
+.admin-console__card--attention {
+  border-left: 3px solid var(--gtn-ember);
+}
+
+.admin-console__card-main {
+  min-width: 0;
+}
+
+.admin-console__card-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--gtn-ink-1);
+}
+
+.admin-console__card-desc {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--gtn-ink-3);
+}
+
+.admin-console__card-meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--gtn-ink-4);
+  overflow-wrap: anywhere;
+}
+
+.admin-console__card-aside {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-console__card-footer {
+  grid-column: 1 / -1;
+  margin-top: 0.25rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--gtn-border-faint);
+}
+
+.admin-console__card-footer .admin-console__error {
+  margin: 0.75rem 0 0;
+}
+
+.admin-console__card-footer > .admin-console__hint {
+  display: block;
+  margin: 0.75rem 0 0;
+}
+
+/* The timestamp column of a history card aligns with its title, not centred. */
+.admin-console__card-aside--top {
+  align-items: flex-start;
+  white-space: nowrap;
+}
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+
+.admin-console__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--gtn-r-pill);
+  background: var(--gtn-paper-2);
+  color: var(--gtn-ink-3);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.admin-console__badge--ok {
+  background: var(--gtn-moss-bg);
+  color: var(--gtn-moss);
+}
+
+.admin-console__badge--warn {
+  background: var(--gtn-ember-bg);
+  color: var(--gtn-ember);
+}
+
+.admin-console__badge--danger {
+  background: var(--gtn-madder-bg);
+  color: var(--gtn-madder);
+}
+
+.admin-console__badge--info {
+  background: var(--gtn-iris-bg);
+  color: var(--gtn-iris);
+}
+
+.admin-console__chip {
+  display: inline-block;
+  margin: 0.125rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--gtn-r1);
+  border: 1px solid var(--gtn-border);
+  background: var(--gtn-paper-1);
+  font-family: var(--gtn-font-mono);
+  font-size: 0.6875rem;
+}
+
+/* ── Stat tiles ──────────────────────────────────────────────────────────── */
+
+/* Tiles share the row but stay tile-sized: a headline pair should not stretch
+   to half the console each just because there are only two of them. */
+.admin-console__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-console__stat {
+  flex: 1 1 8rem;
+  max-width: 15rem;
+}
+
+/* A distribution strip: many small buckets that should stay on one row. */
+.admin-console__stats--strip .admin-console__stat {
+  flex: 1 1 4.5rem;
+  max-width: 9rem;
+  padding: 0.5rem 0.625rem;
+}
+
+.admin-console__stats--strip .admin-console__stat-value {
+  font-size: 1.125rem;
+}
+
+.admin-console__stat {
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-0);
+}
+
+.admin-console__stat-label {
+  overflow-wrap: anywhere;
+}
+
+.admin-console__stat-value {
+  font-family: var(--gtn-font-mono);
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--gtn-ink-1);
+}
+
+.admin-console__stat-label {
+  margin-top: 0.2rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gtn-ink-4);
+}
+
+.admin-console__stat--accent {
+  border-color: var(--gtn-200);
+  background: var(--gtn-50);
+}
+
+.admin-console__stat--accent .admin-console__stat-value {
+  color: var(--gtn-600);
+}
+
+.admin-console__stat--alert {
+  border-color: var(--gtn-ember);
+  background: var(--gtn-ember-bg);
+}
+
+.admin-console__stat--alert .admin-console__stat-value,
+.admin-console__stat--alert .admin-console__stat-label {
+  color: var(--gtn-ember);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
 
 .admin-console__btn {
-  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
-  border-radius: 2px;
-  background: var(--gtn-paper-0, #f4f1ea);
-  color: var(--gtn-ink-1, #14152e);
+  border: 1px solid var(--gtn-border-strong);
+  border-radius: var(--gtn-r1);
+  background: var(--gtn-paper-3);
+  color: var(--gtn-ink-1);
+  font: inherit;
   font-size: 0.8125rem;
   font-weight: 600;
-  padding: 0.45rem 0.75rem;
+  padding: 0.45rem 0.85rem;
   cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--gtn-dur-1) var(--gtn-ease-out),
+              border-color var(--gtn-dur-1) var(--gtn-ease-out),
+              color var(--gtn-dur-1) var(--gtn-ease-out);
+}
+
+.admin-console__btn:hover:not(:disabled) {
+  background: var(--gtn-paper-1);
+}
+
+.admin-console__btn:focus-visible {
+  outline: none;
+  box-shadow: var(--gtn-focus-ring);
+}
+
+.admin-console__btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .admin-console__btn--primary {
-  background: var(--gtn-gentian-600, #1b1a82);
+  background: var(--gtn-600);
   border-color: transparent;
-  color: #fff;
+  color: var(--gtn-paper-3);
+}
+
+.admin-console__btn--primary:hover:not(:disabled) {
+  background: var(--gtn-700);
 }
 
 .admin-console__btn--danger {
-  color: #9b2d2d;
-  border-color: rgba(155, 45, 45, 0.35);
+  color: var(--gtn-madder);
+  border-color: var(--gtn-madder);
+  background: var(--gtn-paper-3);
 }
+
+.admin-console__btn--danger:hover:not(:disabled) {
+  background: var(--gtn-madder-bg);
+}
+
+.admin-console__btn--danger-solid {
+  background: var(--gtn-madder);
+  border-color: transparent;
+  color: var(--gtn-paper-3);
+}
+
+.admin-console__btn--danger-solid:hover:not(:disabled) {
+  background: var(--gtn-madder);
+  filter: brightness(0.9);
+}
+
+.admin-console__btn--quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--gtn-ink-3);
+}
+
+.admin-console__btn--quiet:hover:not(:disabled) {
+  background: var(--gtn-paper-1);
+  color: var(--gtn-ink-1);
+}
+
+/* ── Forms ───────────────────────────────────────────────────────────────── */
 
 .admin-console__form {
   display: grid;
@@ -152,20 +557,32 @@
   max-width: 36rem;
   margin-bottom: 1rem;
   padding: 1rem;
-  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
-  border-radius: 4px;
-  background: var(--gtn-paper-0, #f4f1ea);
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-0);
 }
 
 .admin-console__form--wide {
   max-width: 36rem;
 }
 
+.admin-console__form--plain {
+  max-width: 32rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
 .admin-console__fieldset {
-  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
-  border-radius: 4px;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
   padding: 0.75rem 1rem;
   margin: 0;
+}
+
+.admin-console__fieldset--plain {
+  border: none;
+  padding: 0;
 }
 
 .admin-console__fieldset legend {
@@ -173,8 +590,13 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--gtn-ink-3, #45486b);
+  color: var(--gtn-ink-3);
   padding: 0 0.25rem;
+}
+
+.admin-console__fieldset--plain legend {
+  padding: 0;
+  margin-bottom: 0.5rem;
 }
 
 .admin-console__checkbox {
@@ -185,29 +607,13 @@
   margin-bottom: 0.35rem;
 }
 
-.admin-console__field select {
-  width: 100%;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
-  border-radius: 2px;
-  font: inherit;
-  background: #fff;
-}
-
-.admin-console__field label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-  color: var(--gtn-ink-3, #45486b);
-}
-
+.admin-console__field label,
 .admin-console__field > span {
   display: block;
   font-size: 0.75rem;
   font-weight: 600;
   margin-bottom: 0.25rem;
-  color: var(--gtn-ink-3, #45486b);
+  color: var(--gtn-ink-3);
 }
 
 .admin-console__field-row {
@@ -216,13 +622,28 @@
   gap: 0.75rem;
 }
 
+.admin-console__field input,
+.admin-console__field select,
 .admin-console__field textarea {
   width: 100%;
   padding: 0.5rem 0.6rem;
-  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
-  border-radius: 2px;
+  border: 1px solid var(--gtn-border-strong);
+  border-radius: var(--gtn-r1);
   font: inherit;
+  color: var(--gtn-ink-1);
+  background: var(--gtn-paper-3);
+}
+
+.admin-console__field textarea {
   resize: vertical;
+}
+
+.admin-console__field input:focus-visible,
+.admin-console__field select:focus-visible,
+.admin-console__field textarea:focus-visible {
+  outline: none;
+  border-color: var(--gtn-400);
+  box-shadow: var(--gtn-focus-ring);
 }
 
 .admin-console__checkbox-grid {
@@ -232,48 +653,199 @@
   overflow: auto;
 }
 
+/* A labelled stack: caption above, control below. */
+.admin-console__stack {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 26rem;
+}
+
+.admin-console__stack--indent {
+  margin-left: 1.5rem;
+}
+
+/* Radio cards read as one group, wider than a plain field stack. */
+.admin-console__choices {
+  display: grid;
+  gap: 0.625rem;
+  max-width: 34rem;
+}
+
+/* A submit button with a consequence note underneath it. */
+.admin-console__submit {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+
+.admin-console__label {
+  display: block;
+  font-size: 0.875rem;
+}
+
+.admin-console__label-text {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gtn-ink-3);
+}
+
+.admin-console__label input:not([type="radio"]):not([type="checkbox"]) {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--gtn-border-strong);
+  border-radius: var(--gtn-r1);
+  font: inherit;
+  color: var(--gtn-ink-1);
+  background: var(--gtn-paper-3);
+}
+
+.admin-console__label input:focus-visible {
+  outline: none;
+  border-color: var(--gtn-400);
+  box-shadow: var(--gtn-focus-ring);
+}
+
+/* Radio cards — a choice with consequences deserves room to explain itself. */
+.admin-console__choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.625rem;
+  align-items: start;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-3);
+  cursor: pointer;
+  transition: border-color var(--gtn-dur-1) var(--gtn-ease-out),
+              background var(--gtn-dur-1) var(--gtn-ease-out);
+}
+
+.admin-console__choice:hover {
+  border-color: var(--gtn-border-strong);
+}
+
+.admin-console__choice--selected {
+  border-color: var(--gtn-400);
+  background: var(--gtn-50);
+}
+
+.admin-console__choice input {
+  margin-top: 0.15rem;
+  accent-color: var(--gtn-500);
+}
+
+.admin-console__choice-title {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gtn-ink-1);
+}
+
+.admin-console__choice-desc {
+  display: block;
+  margin: 0.2rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--gtn-ink-3);
+}
+
+.admin-console__choice-extra {
+  display: block;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--gtn-border-faint);
+}
+
+/* ── Feedback ────────────────────────────────────────────────────────────── */
+
 .admin-console__hint {
-  color: var(--gtn-ink-3, #45486b);
+  color: var(--gtn-ink-4);
   font-size: 0.8125rem;
 }
 
-.admin-console__subtitle {
+.admin-console__error,
+.admin-console__success,
+.admin-console__warning {
   margin: 0 0 0.75rem;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--gtn-ink-2, #2a2d4a);
-}
-
-.admin-console__field input {
-  width: 100%;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
-  border-radius: 2px;
-  font: inherit;
-  background: #fff;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--gtn-r1);
+  border-left: 3px solid;
+  font-size: 0.8125rem;
+  line-height: 1.5;
 }
 
 .admin-console__error {
-  color: #9b2d2d;
-  font-size: 0.8125rem;
-  margin-bottom: 0.75rem;
+  border-left-color: var(--gtn-madder);
+  background: var(--gtn-madder-bg);
+  color: var(--gtn-madder);
 }
 
 .admin-console__success {
-  color: #1f6b3a;
-  font-size: 0.8125rem;
-  margin-bottom: 0.75rem;
+  border-left-color: var(--gtn-moss);
+  background: var(--gtn-moss-bg);
+  color: var(--gtn-moss);
 }
 
-.admin-console__chip {
-  display: inline-block;
-  margin: 0.125rem;
-  padding: 0.2rem 0.45rem;
-  border-radius: 2px;
-  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
-  background: var(--gtn-paper-1, #ece8df);
-  font-family: "Commit Mono", ui-monospace, monospace;
-  font-size: 0.6875rem;
+.admin-console__warning {
+  border-left-color: var(--gtn-ember);
+  background: var(--gtn-ember-bg);
+  color: var(--gtn-ember);
+}
+
+.admin-console__error code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.admin-console__empty {
+  padding: 1.25rem;
+  border: 1px dashed var(--gtn-border-strong);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-0);
+  color: var(--gtn-ink-4);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.admin-console__loading {
+  padding: 1rem 0;
+  color: var(--gtn-ink-4);
+  font-size: 0.875rem;
+}
+
+/* ── Danger zone ─────────────────────────────────────────────────────────── */
+
+.admin-console__danger {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--gtn-madder);
+  border-left-width: 3px;
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-madder-bg);
+  max-width: 34rem;
+}
+
+.admin-console__danger-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--gtn-madder);
+}
+
+.admin-console__danger p {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--gtn-ink-2);
+}
+
+.admin-console__danger code {
+  background: var(--gtn-paper-3);
 }
 
 /* ── Toggle buttons ──────────────────────────────────────────────────────── */
@@ -289,21 +861,29 @@
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
-  border-radius: 2px;
-  background: var(--gtn-paper-1, #ece8df);
-  color: var(--gtn-ink-3, #45486b);
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r1);
+  background: var(--gtn-paper-1);
+  color: var(--gtn-ink-3);
+  font: inherit;
   font-size: 0.8125rem;
   font-weight: 500;
   padding: 0.3rem 0.65rem;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  transition: background var(--gtn-dur-1) var(--gtn-ease-out),
+              color var(--gtn-dur-1) var(--gtn-ease-out),
+              border-color var(--gtn-dur-1) var(--gtn-ease-out);
   line-height: 1.4;
   user-select: none;
 }
 
 .admin-console__toggle:hover {
-  background: var(--gtn-paper-0, #f4f1ea);
+  background: var(--gtn-paper-0);
+}
+
+.admin-console__toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--gtn-focus-ring);
 }
 
 .admin-console__toggle-icon {
@@ -314,17 +894,17 @@
 }
 
 .admin-console__toggle--on {
-  background: #e3e8f4;
-  border-color: #abbce5;
-  color: #1a2a58;
+  background: var(--gtn-iris-bg);
+  border-color: var(--gtn-200);
+  color: var(--gtn-700);
 }
 
 .admin-console__toggle--on:hover {
-  background: #d8e0ee;
+  background: var(--gtn-100);
 }
 
 .admin-console__toggle--on .admin-console__toggle-icon {
-  color: var(--gtn-gentian-600, #1b1a82);
+  color: var(--gtn-600);
   opacity: 1;
 }
 
@@ -347,15 +927,21 @@
 .admin-console__email-input-wrapper {
   display: flex;
   align-items: center;
-  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
-  border-radius: 2px;
-  background: #fff;
+  border: 1px solid var(--gtn-border-strong);
+  border-radius: var(--gtn-r1);
+  background: var(--gtn-paper-3);
   overflow: hidden;
+}
+
+.admin-console__email-input-wrapper:focus-within {
+  border-color: var(--gtn-400);
+  box-shadow: var(--gtn-focus-ring);
 }
 
 .admin-console__email-input-wrapper input {
   border: none !important;
   outline: none !important;
+  box-shadow: none !important;
   flex: 1;
   padding: 0.5rem 0.6rem;
   font: inherit;
@@ -364,11 +950,11 @@
 
 .admin-console__email-domain {
   padding: 0.5rem 0.65rem;
-  background: var(--gtn-paper-1, #ece8df);
-  color: var(--gtn-ink-3, #45486b);
-  font-family: "Commit Mono", ui-monospace, monospace;
+  background: var(--gtn-paper-1);
+  color: var(--gtn-ink-3);
+  font-family: var(--gtn-font-mono);
   font-size: 0.8125rem;
-  border-left: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-left: 1px solid var(--gtn-border);
   user-select: none;
   white-space: nowrap;
 }
@@ -379,7 +965,6 @@
   margin-top: 1rem;
 }
 
-
 /* ── Invite section blocks (Rights / Apps / Requirements) ────────────────── */
 
 .admin-console__invite-section {
@@ -388,7 +973,7 @@
   gap: 0.75rem;
   align-items: start;
   padding: 0.625rem 0;
-  border-top: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-top: 1px solid var(--gtn-border);
 }
 
 .admin-console__invite-section-label {
@@ -396,7 +981,7 @@
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--gtn-ink-4, #74779a);
+  color: var(--gtn-ink-4);
   padding-top: 0.3rem;
 }
 
@@ -410,9 +995,9 @@
 
 .admin-console__edit-panel {
   margin-bottom: 1.25rem;
-  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
-  border-radius: 4px;
-  background: var(--gtn-paper-0, #f4f1ea);
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-0);
   overflow: hidden;
 }
 
@@ -422,8 +1007,8 @@
   align-items: center;
   gap: 1rem;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
-  background: var(--gtn-paper-1, #ece8df);
+  border-bottom: 1px solid var(--gtn-border);
+  background: var(--gtn-paper-1);
 }
 
 .admin-console__edit-panel-body {
@@ -435,7 +1020,7 @@
   grid-template-columns: 10rem 1fr;
   gap: 1rem;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
+  border-bottom: 1px solid var(--gtn-border);
   align-items: start;
 }
 
@@ -446,7 +1031,7 @@
 .admin-console__edit-row-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--gtn-ink-3, #45486b);
+  color: var(--gtn-ink-3);
   padding-top: 0.4rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -458,10 +1043,10 @@
 
 .admin-console__edit-row-value input {
   padding: 0.45rem 0.6rem;
-  border: 1px solid var(--gtn-border, rgba(14, 18, 38, 0.12));
-  border-radius: 2px;
+  border: 1px solid var(--gtn-border-strong);
+  border-radius: var(--gtn-r1);
   font: inherit;
-  background: #fff;
+  background: var(--gtn-paper-3);
 }
 
 .admin-console__edit-actions {
@@ -473,5 +1058,5 @@
 /* ── Editing row highlight ───────────────────────────────────────────────── */
 
 .admin-console__row--editing > td {
-  background: var(--gtn-paper-1, #ece8df);
+  background: var(--gtn-paper-1);
 }

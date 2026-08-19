@@ -208,7 +208,7 @@ export function InvitationsSection({
   return (
     <section>
       <div className="admin-console__toolbar">
-        <h2 className="admin-console__title" style={{ fontSize: "1.125rem" }}>
+        <h2 className="admin-console__section-title">
           Invite member
         </h2>
       </div>

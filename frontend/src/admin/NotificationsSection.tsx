@@ -110,7 +110,7 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
   return (
     <section>
       <div className="admin-console__toolbar">
-        <h2 className="admin-console__title" style={{ fontSize: "1.125rem" }}>
+        <h2 className="admin-console__section-title">
           Notifications
         </h2>
         <button

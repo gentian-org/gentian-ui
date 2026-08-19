@@ -31,6 +31,27 @@ type AdminTab =
   | "notifications"
   | "backup";
 
+/**
+ * The tab strip, in display order. Kept as data so a new section is one entry
+ * rather than another copy of the same button — the copies are how Backup and
+ * Credentials ended up looking unlike the rest of the console.
+ */
+const TABS: { id: AdminTab; label: string; platformOnly?: boolean }[] = [
+  { id: "invitations", label: "Invitations" },
+  { id: "members", label: "Members" },
+  { id: "groups", label: "Groups" },
+  { id: "templates", label: "Templates" },
+  { id: "security", label: "Security" },
+  { id: "integrations", label: "Integrations" },
+  { id: "platform", label: "Platform", platformOnly: true },
+  { id: "customization", label: "Customization", platformOnly: true },
+  { id: "credentials", label: "Credentials" },
+  { id: "sessions", label: "Sessions" },
+  { id: "audit", label: "Audit" },
+  { id: "notifications", label: "Notifications" },
+  { id: "backup", label: "Backup" },
+];
+
 type AdminConsoleProps = {
   /** Render inside a desktop shell window instead of full-viewport overlay. */
   embedded?: boolean;
@@ -54,7 +75,9 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
     return (
       <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
         <div className="admin-console__frame">
-          <div className="admin-console__body">Loading admin console…</div>
+          <div className="admin-console__body">
+            <p className="admin-console__loading">Loading admin console…</p>
+          </div>
         </div>
       </div>
     );
@@ -88,112 +111,30 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
   return (
     <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
       <div className="admin-console__frame">
-        <header className="admin-console__header" style={{ padding: "0.85rem 1.5rem", alignItems: "center" }}>
-          <div className="admin-console__mono" style={{ fontWeight: 600, textTransform: "uppercase", fontSize: "0.8125rem", color: "var(--gtn-ink-1)" }}>
+        <header className="admin-console__header">
+          <div className="admin-console__identity">
             tenant {tenant}
             {isPlatformAdmin ? " · platform scope" : ""}
           </div>
-          <div className="admin-console__mono" style={{ color: "var(--gtn-ink-4)", fontSize: "0.8125rem" }}>
+          <div className="admin-console__identity admin-console__identity--muted">
             realm/{realm}
           </div>
         </header>
 
-        <nav className="admin-console__tabs">
-          <button
-            type="button"
-            className={`admin-console__tab${tab === "invitations" ? " admin-console__tab--active" : ""}`}
-            onClick={() => setTab("invitations")}
-          >
-            Invitations
-          </button>
-          <button
-            type="button"
-            className={`admin-console__tab${tab === "members" ? " admin-console__tab--active" : ""}`}
-            onClick={() => setTab("members")}
-          >
-            Member
-          </button>
-          <button
-            type="button"
-            className={`admin-console__tab${tab === "groups" ? " admin-console__tab--active" : ""}`}
-            onClick={() => setTab("groups")}
-          >
-            Groups
-          </button>
-          <button
-            type="button"
-            className={`admin-console__tab${tab === "templates" ? " admin-console__tab--active" : ""}`}
-            onClick={() => setTab("templates")}
-          >
-            Templates
-          </button>
-          <button
-            type="button"
-            className={`admin-console__tab${tab === "security" ? " admin-console__tab--active" : ""}`}
-            onClick={() => setTab("security")}
-          >
-            Security
-          </button>
-          <button
-            type="button"
-            className={`admin-console__tab${tab === "integrations" ? " admin-console__tab--active" : ""}`}
-            onClick={() => setTab("integrations")}
-          >
-            Integrations
-          </button>
-          {isPlatformAdmin ? (
+        <nav className="admin-console__tabs" aria-label="Admin sections">
+          {TABS.filter((entry) => !entry.platformOnly || isPlatformAdmin).map((entry) => (
             <button
+              key={entry.id}
               type="button"
-              className={`admin-console__tab${tab === "platform" ? " admin-console__tab--active" : ""}`}
-              onClick={() => setTab("platform")}
+              aria-current={tab === entry.id ? "page" : undefined}
+              className={`admin-console__tab${
+                tab === entry.id ? " admin-console__tab--active" : ""
+              }`}
+              onClick={() => setTab(entry.id)}
             >
-              Platform
+              {entry.label}
             </button>
-          ) : null}
-          {isPlatformAdmin ? (
-            <button
-              type="button"
-              className={`admin-console__tab${tab === "customization" ? " admin-console__tab--active" : ""}`}
-              onClick={() => setTab("customization")}
-            >
-              Customization
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className={`admin-console__tab${tab === "credentials" ? " admin-console__tab--active" : ""}`}
-            onClick={() => setTab("credentials")}
-          >
-            Credentials
-          </button>
-          <button
-            type="button"
-            className={`admin-console__tab${tab === "sessions" ? " admin-console__tab--active" : ""}`}
-            onClick={() => setTab("sessions")}
-          >
-            Sessions
-          </button>
-          <button
-            type="button"
-            className={`admin-console__tab${tab === "audit" ? " admin-console__tab--active" : ""}`}
-            onClick={() => setTab("audit")}
-          >
-            Audit
-          </button>
-          <button
-            type="button"
-            className={`admin-console__tab${tab === "notifications" ? " admin-console__tab--active" : ""}`}
-            onClick={() => setTab("notifications")}
-          >
-            Notifications
-          </button>
-          <button
-            type="button"
-            className={`admin-console__tab${tab === "backup" ? " admin-console__tab--active" : ""}`}
-            onClick={() => setTab("backup")}
-          >
-            Backup
-          </button>
+          ))}
         </nav>
 
         <div className="admin-console__body">

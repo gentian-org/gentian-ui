@@ -150,6 +150,8 @@
   --gtn-500:      var(--gentian-500);
   --gtn-600:      var(--gentian-600);
   --gtn-700:      var(--gentian-700);
+  --gtn-iris:     var(--iris);
+  --gtn-iris-bg:  var(--iris-bg);
   --gtn-moss:     var(--moss);
   --gtn-moss-bg:  var(--moss-bg);
   --gtn-ember:    var(--ember);
@@ -158,12 +160,14 @@
   --gtn-madder-bg:var(--madder-bg);
   --gtn-border:        var(--border);
   --gtn-border-strong: var(--border-strong);
+  --gtn-border-faint:  var(--border-faint);
   --gtn-shadow-1: var(--shadow-1);
   --gtn-shadow-2: var(--shadow-2);
   --gtn-shadow-3: var(--shadow-3);
   --gtn-r1:       var(--radius-1);
   --gtn-r2:       var(--radius-2);
   --gtn-r3:       var(--radius-3);
+  --gtn-r-pill:   var(--radius-pill);
   --gtn-ease-out: var(--ease-out);
   --gtn-ease-io:  var(--ease-inout);
   --gtn-dur-1:    var(--dur-1);

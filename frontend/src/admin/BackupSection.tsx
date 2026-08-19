@@ -43,6 +43,17 @@ function formatTime(value: string | null): string {
   return new Date(value).toLocaleString();
 }
 
+/** The phase colour: an export is fine, working, or broken — nothing in between. */
+function phaseBadgeClass(phase: string): string {
+  if (phase === "Ready") {
+    return "admin-console__badge admin-console__badge--ok";
+  }
+  if (phase === "Failed") {
+    return "admin-console__badge admin-console__badge--danger";
+  }
+  return "admin-console__badge admin-console__badge--info";
+}
+
 export function BackupSection({ tenant }: BackupSectionProps) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(defaultName);
@@ -114,202 +125,231 @@ export function BackupSection({ tenant }: BackupSectionProps) {
 
   return (
     <section>
-      <div className="admin-console__toolbar">
-        <h2 className="admin-console__title" style={{ fontSize: "1.125rem" }}>
-          Backup
-        </h2>
+      <header className="admin-console__section-head">
+        <div>
+          <h2 className="admin-console__section-title">Backup</h2>
+          <p className="admin-console__lead">
+            An export captures this workspace — app databases, files and member accounts — into
+            one encrypted bundle. Apps are paused one at a time while each is captured, so every
+            app&apos;s data is internally consistent; the rest keep running.
+          </p>
+        </div>
         <button
           type="button"
           className="admin-console__btn"
-          onClick={() => backupsQuery.refetch()}
+          onClick={() => void backupsQuery.refetch()}
         >
           Refresh
         </button>
-      </div>
-
-      <p style={{ fontSize: "0.875rem", color: "var(--gtn-ink-4)", marginBottom: "1rem" }}>
-        An export captures this workspace — app databases, files and member accounts — into one
-        encrypted bundle. Apps are paused one at a time while each is captured, so every app's data
-        is internally consistent; the rest keep running.
-      </p>
+      </header>
 
       {error && <p className="admin-console__error">{error}</p>}
       {success && <p className="admin-console__success">{success}</p>}
 
-      <form onSubmit={submit} style={{ marginBottom: "1.5rem" }}>
-        <label style={{ display: "block", fontSize: "0.875rem", marginBottom: "0.75rem" }}>
-          <span style={{ display: "block", marginBottom: "0.25rem" }}>Name</span>
-          <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="export-2026-08-18"
-            required
-          />
-        </label>
-
-        <fieldset style={{ border: "none", padding: 0, margin: "0 0 0.75rem" }}>
-          <legend style={{ fontSize: "0.875rem", marginBottom: "0.5rem" }}>Encryption</legend>
-
-          <label
-            style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", marginBottom: "0.5rem" }}
-          >
+      <form className="admin-console__form admin-console__form--plain" onSubmit={submit}>
+        <div className="admin-console__stack">
+          <label className="admin-console__label">
+            <span className="admin-console__label-text">Name</span>
             <input
-              type="radio"
-              name="encryption-mode"
-              checked={mode === "recipient"}
-              onChange={() => setMode("recipient")}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="export-2026-08-18"
+              required
             />
-            <span style={{ fontSize: "0.875rem" }}>
-              <strong>Platform key</strong>
-              <br />
-              <span style={{ color: "var(--gtn-ink-4)" }}>
-                Encrypted to the platform's backup key, so support can help you restore it. Use this
-                for routine and scheduled backups.
-              </span>
-            </span>
           </label>
+        </div>
 
-          <label style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start" }}>
-            <input
-              type="radio"
-              name="encryption-mode"
-              checked={mode === "passphrase"}
-              onChange={() => setMode("passphrase")}
-            />
-            <span style={{ fontSize: "0.875rem" }}>
-              <strong>My passphrase</strong>
-              <br />
-              <span style={{ color: "var(--gtn-ink-4)" }}>
-                Encrypted so only you can open it — not the platform, not support. If the passphrase
-                is lost, the bundle cannot be recovered by anyone.
+        <fieldset className="admin-console__fieldset admin-console__fieldset--plain">
+          <legend>Encryption</legend>
+
+          <div className="admin-console__choices">
+            <label
+              className={`admin-console__choice${
+                mode === "recipient" ? " admin-console__choice--selected" : ""
+              }`}
+            >
+              <input
+                type="radio"
+                name="encryption-mode"
+                checked={mode === "recipient"}
+                onChange={() => setMode("recipient")}
+              />
+              <span>
+                <span className="admin-console__choice-title">Platform key</span>
+                <span className="admin-console__choice-desc">
+                  Encrypted to the platform&apos;s backup key, so support can help you restore it.
+                  Use this for routine and scheduled backups.
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
 
-          {mode === "passphrase" && (
-            <div style={{ marginTop: "0.75rem", display: "grid", gap: "0.5rem", maxWidth: "24rem" }}>
-              <label style={{ fontSize: "0.875rem" }}>
-                <span style={{ display: "block", marginBottom: "0.25rem" }}>Passphrase</span>
-                <input
-                  type="password"
-                  value={passphrase}
-                  onChange={(event) => setPassphrase(event.target.value)}
-                  minLength={12}
-                  autoComplete="new-password"
-                  required
-                />
-              </label>
-              <label style={{ fontSize: "0.875rem" }}>
-                <span style={{ display: "block", marginBottom: "0.25rem" }}>Confirm passphrase</span>
-                <input
-                  type="password"
-                  value={confirmPassphrase}
-                  onChange={(event) => setConfirmPassphrase(event.target.value)}
-                  minLength={12}
-                  autoComplete="new-password"
-                  required
-                />
-              </label>
-            </div>
-          )}
+            <label
+              className={`admin-console__choice${
+                mode === "passphrase" ? " admin-console__choice--selected" : ""
+              }`}
+            >
+              <input
+                type="radio"
+                name="encryption-mode"
+                checked={mode === "passphrase"}
+                onChange={() => setMode("passphrase")}
+              />
+              <span>
+                <span className="admin-console__choice-title">My passphrase</span>
+                <span className="admin-console__choice-desc">
+                  Encrypted so only you can open it — not the platform, not support. If the
+                  passphrase is lost, the bundle cannot be recovered by anyone.
+                </span>
+              </span>
+            </label>
+
+            {/* Outside the radio label on purpose: a label nested in a label is
+                invalid, and clicking the input would re-trigger the radio. */}
+            {mode === "passphrase" && (
+              <div className="admin-console__stack admin-console__stack--indent">
+                <label className="admin-console__label">
+                  <span className="admin-console__label-text">Passphrase</span>
+                  <input
+                    type="password"
+                    value={passphrase}
+                    onChange={(event) => setPassphrase(event.target.value)}
+                    minLength={12}
+                    autoComplete="new-password"
+                    required
+                  />
+                </label>
+                <label className="admin-console__label">
+                  <span className="admin-console__label-text">Confirm passphrase</span>
+                  <input
+                    type="password"
+                    value={confirmPassphrase}
+                    onChange={(event) => setConfirmPassphrase(event.target.value)}
+                    minLength={12}
+                    autoComplete="new-password"
+                    required
+                  />
+                </label>
+              </div>
+            )}
+          </div>
         </fieldset>
 
-        <button
-          type="submit"
-          className="admin-console__btn"
-          disabled={createMutation.isPending || running.length > 0}
-        >
-          {createMutation.isPending ? "Starting…" : "Start export"}
-        </button>
-        {running.length > 0 && (
-          <p style={{ fontSize: "0.8125rem", color: "var(--gtn-ink-4)", marginTop: "0.5rem" }}>
-            An export is already running. Only one runs at a time, so no app is paused by two at
-            once.
-          </p>
-        )}
-      </form>
-
-      <h3 className="admin-console__title" style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>
-        History
-      </h3>
-
-      {backupsQuery.isLoading && <p style={{ fontSize: "0.875rem" }}>Loading…</p>}
-      {!backupsQuery.isLoading && backups.length === 0 && (
-        <p style={{ fontSize: "0.875rem" }}>No exports yet.</p>
-      )}
-
-      {backups.map((backup) => (
-        <div key={backup.name} style={{ marginBottom: "1.5rem" }}>
-          <div className="admin-console__toolbar">
-            <h4 className="admin-console__title" style={{ fontSize: "0.9375rem" }}>
-              {backup.name} — {backup.phase || "Pending"}
-            </h4>
-            <span style={{ fontSize: "0.8125rem", color: "var(--gtn-ink-4)" }}>
-              {formatTime(backup.completedAt ?? backup.startedAt ?? backup.createdAt)}
-            </span>
-          </div>
-
-          {backup.message && (
-            <p style={{ fontSize: "0.8125rem", color: "var(--gtn-ink-4)" }}>{backup.message}</p>
-          )}
-
-          {backup.quiesced.length > 0 && (
-            <p className="admin-console__error">
-              Paused right now: {backup.quiesced.join(", ")}. These apps stay offline until this
-              export finishes.
-            </p>
-          )}
-
-          <p style={{ fontSize: "0.8125rem", marginBottom: "0.5rem" }}>
-            {backup.encryptionMode === "passphrase" ? "Your passphrase" : "Platform key"}
-            {backup.phase === "Ready" && !backup.platformReadable && " — only you can open this bundle"}
-            {backup.bundlePrefix && (
-              <>
-                {" · "}
-                <span className="admin-console__mono">
-                  {backup.bundleBucket}/{backup.bundlePrefix}
-                </span>
-              </>
-            )}
-          </p>
-
-          {backup.apps.length > 0 && (
-            <table className="admin-console__table">
-              <thead>
-                <tr>
-                  <th>App</th>
-                  <th>State</th>
-                  <th>Captured</th>
-                  <th>Paused for</th>
-                </tr>
-              </thead>
-              <tbody>
-                {backup.apps.map((app) => (
-                  <tr key={app.name}>
-                    <td>{app.name}</td>
-                    <td>
-                      {app.phase || "Pending"}
-                      {app.message && (
-                        <span style={{ color: "var(--gtn-ink-4)" }}> — {app.message}</span>
-                      )}
-                    </td>
-                    <td>{app.stores.length > 0 ? app.stores.join(", ") : "—"}</td>
-                    <td>{pauseWindow(app)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {backup.phase === "Ready" && (
-            <p style={{ fontSize: "0.8125rem", color: "var(--gtn-ink-4)", marginTop: "0.5rem" }}>
-              The bundle stays in the platform's object storage at the location above.{" "}
-              <span className="admin-console__mono">bundle-info.json</span> inside it is readable
-              and names the exact command that decrypts the rest.
+        <div className="admin-console__submit">
+          <button
+            type="submit"
+            className="admin-console__btn admin-console__btn--primary"
+            disabled={createMutation.isPending || running.length > 0}
+          >
+            {createMutation.isPending ? "Starting…" : "Start export"}
+          </button>
+          {running.length > 0 && (
+            <p className="admin-console__hint">
+              An export is already running. Only one runs at a time, so no app is paused by two at
+              once.
             </p>
           )}
         </div>
-      ))}
+      </form>
+
+      <div className="admin-console__subsection">
+        <h3 className="admin-console__subsection-title">History</h3>
+
+        {backupsQuery.isLoading && <p className="admin-console__loading">Loading…</p>}
+
+        {!backupsQuery.isLoading && backups.length === 0 && (
+          <p className="admin-console__empty">No exports yet.</p>
+        )}
+
+        <div className="admin-console__cards">
+          {backups.map((backup) => (
+            <article key={backup.name} className="admin-console__card">
+              <div className="admin-console__card-main">
+                <div className="admin-console__card-title">
+                  <span className="admin-console__mono">{backup.name}</span>
+                  <span className={phaseBadgeClass(backup.phase)}>
+                    {backup.phase || "Pending"}
+                  </span>
+                  <span className="admin-console__badge">
+                    {backup.encryptionMode === "passphrase" ? "your passphrase" : "platform key"}
+                  </span>
+                </div>
+
+                {backup.message && (
+                  <p className="admin-console__card-desc">{backup.message}</p>
+                )}
+
+                {backup.phase === "Ready" && !backup.platformReadable && (
+                  <p className="admin-console__card-desc">
+                    Only you can open this bundle.
+                  </p>
+                )}
+
+                {backup.bundlePrefix && (
+                  <p className="admin-console__card-meta">
+                    <code>
+                      {backup.bundleBucket}/{backup.bundlePrefix}
+                    </code>
+                  </p>
+                )}
+              </div>
+
+              <div className="admin-console__card-aside admin-console__card-aside--top admin-console__hint">
+                {formatTime(backup.completedAt ?? backup.startedAt ?? backup.createdAt)}
+              </div>
+
+              {(backup.quiesced.length > 0 || backup.apps.length > 0 ||
+                backup.phase === "Ready") && (
+                <div className="admin-console__card-footer">
+                  {backup.quiesced.length > 0 && (
+                    <p className="admin-console__warning">
+                      Paused right now: {backup.quiesced.join(", ")}. These apps stay offline
+                      until this export finishes.
+                    </p>
+                  )}
+
+                  {backup.apps.length > 0 && (
+                    <div className="admin-console__table-wrap">
+                      <table className="admin-console__table">
+                        <thead>
+                          <tr>
+                            <th>App</th>
+                            <th>State</th>
+                            <th>Captured</th>
+                            <th>Paused for</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {backup.apps.map((app) => (
+                            <tr key={app.name}>
+                              <td>{app.name}</td>
+                              <td>
+                                {app.phase || "Pending"}
+                                {app.message && (
+                                  <span className="admin-console__hint"> — {app.message}</span>
+                                )}
+                              </td>
+                              <td>{app.stores.length > 0 ? app.stores.join(", ") : "—"}</td>
+                              <td>{pauseWindow(app)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {backup.phase === "Ready" && (
+                    <p className="admin-console__hint">
+                      The bundle stays in the platform&apos;s object storage at the location
+                      above. <code>bundle-info.json</code> inside it is readable and names the
+                      exact command that decrypts the rest.
+                    </p>
+                  )}
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
