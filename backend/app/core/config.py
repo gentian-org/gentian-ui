@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     # through the backend keeps the service off the public network.
     credential_manager_url: str | None = Field(default=None, alias="CREDENTIAL_MANAGER_URL")
 
+    # The gentian-os app lifecycle API, in-cluster. The Resources tab proxies to
+    # it rather than reasoning about quotas here: the plan catalogue, the
+    # downgrade guard and the write to the deployments repository all live in
+    # the operator, and `kubectl gentian resources` calls the same endpoints.
+    # Unset means the Resources tab reports itself unavailable rather than
+    # showing an empty catalogue that looks like a cluster with no plans.
+    app_lifecycle_url: str | None = Field(default=None, alias="APP_LIFECYCLE_URL")
+
     keycloak_admin_url: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_URL")
     keycloak_admin_username: str = Field(default="admin", alias="KEYCLOAK_ADMIN_USERNAME")
     keycloak_admin_password: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_PASSWORD")

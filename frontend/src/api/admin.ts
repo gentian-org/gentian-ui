@@ -570,3 +570,127 @@ export function deleteBackup(name: string, tenant?: string, opts?: { force?: boo
 export function backupIsTerminal(backup: Backup): boolean {
   return backup.phase === "Ready" || backup.phase === "Failed";
 }
+
+// --- Resources ---------------------------------------------------------------
+
+export type ResourceHeadroom = {
+  resource: string;
+  used: string;
+  hard: string;
+  /** Absent when the resource has no ceiling — not zero, which would draw an
+   *  empty bar for something that is in fact unlimited. */
+  usedRatio?: number | null;
+};
+
+export type ResourceState = {
+  tenant: string;
+  plan: string;
+  annotatedPlan: string;
+  /** The enforced ceiling is not the one the recorded plan describes. */
+  drifted: boolean;
+  /** The ceiling matches no plan in the catalogue — set by hand. */
+  custom: boolean;
+  quota: ResourceHeadroom[];
+  hasQuota: boolean;
+  actual: Record<string, string>;
+  /** Where `actual` came from, or why it is missing. */
+  actualSource: string;
+  installedApps: number;
+};
+
+export type ResourcePlan = {
+  name: string;
+  displayName: string;
+  description: string;
+  tier: number;
+  productSku: string;
+  quotas: Record<string, string>;
+  current: boolean;
+  selectable: boolean;
+  /** Why `selectable` is false, in the reader's terms. */
+  blocked: string;
+};
+
+export type ResourcePlanChange = {
+  status: string;
+  tenant: string;
+  plan: string;
+  previousPlan: string;
+  message: string;
+};
+
+export type ResourceSample = {
+  observedAt: string;
+  plan: string;
+  productSku: string;
+  hard: Record<string, string>;
+  used: Record<string, string>;
+  actual?: Record<string, string> | null;
+};
+
+export type ResourceUsage = {
+  tenant: string;
+  samples: ResourceSample[];
+};
+
+export type ResourcePlanInterval = {
+  plan: string;
+  productSku: string;
+  from: string;
+  to: string;
+  seconds: number;
+  partial: boolean;
+};
+
+export type ResourceReport = {
+  tenant: string;
+  from: string;
+  to: string;
+  intervals: ResourcePlanInterval[];
+  incomplete: boolean;
+};
+
+export function fetchResourceState(tenant?: string) {
+  return apiFetch<ResourceState>(`/admin/resources${tenantQuery(tenant)}`);
+}
+
+export function fetchResourcePlans(tenant?: string) {
+  return apiFetch<ResourcePlan[]>(`/admin/resources/plans${tenantQuery(tenant)}`);
+}
+
+export function changeResourcePlan(plan: string, tenant?: string, force = false) {
+  return apiFetch<ResourcePlanChange>(`/admin/resources${tenantQuery(tenant)}`, {
+    method: "PUT",
+    body: JSON.stringify({ plan, force }),
+  });
+}
+
+export function fetchResourceUsage(
+  params: { from?: string; to?: string; stepSeconds?: number } = {},
+  tenant?: string,
+) {
+  const search = new URLSearchParams();
+  if (tenant) search.set("tenant", tenant);
+  if (params.from) search.set("from", params.from);
+  if (params.to) search.set("to", params.to);
+  if (params.stepSeconds) search.set("stepSeconds", String(params.stepSeconds));
+  const query = search.toString();
+  return apiFetch<ResourceUsage>(`/admin/resources/usage${query ? `?${query}` : ""}`);
+}
+
+export function fetchResourceReport(
+  params: { from?: string; to?: string } = {},
+  tenant?: string,
+) {
+  const search = new URLSearchParams();
+  if (tenant) search.set("tenant", tenant);
+  if (params.from) search.set("from", params.from);
+  if (params.to) search.set("to", params.to);
+  const query = search.toString();
+  return apiFetch<ResourceReport>(`/admin/resources/report${query ? `?${query}` : ""}`);
+}
+
+/** Every tenant's ceiling and consumption — platform administrators only. */
+export function fetchTenantResourceStates() {
+  return apiFetch<ResourceState[]>("/admin/resources/tenants");
+}

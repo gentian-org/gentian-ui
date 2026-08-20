@@ -108,3 +108,16 @@ llm:
 # answers 503 and the section says the manager is unavailable.
 credentialManager:
   url: ""
+
+# The gentian-os app lifecycle API. The Resources tab reads a tenant's plan,
+# ceiling and usage history from it, and posts plan changes to it — which the
+# operator turns into a commit in the deployments repository, the same path an
+# App Store install takes.
+#
+# Unset disables the Resources tab rather than breaking it: the tab says the
+# resources API is not configured, instead of showing a cluster that appears to
+# have no plans.
+#
+#   http://gentian-os-lifecycle.gentian-system.svc.cluster.local:8082
+appLifecycle:
+  url: ""

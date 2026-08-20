@@ -53,6 +53,10 @@ spec:
             - name: CREDENTIAL_MANAGER_URL
               value: {{ .Values.credentialManager.url | quote }}
             {{- end }}
+            {{- if .Values.appLifecycle.url }}
+            - name: APP_LIFECYCLE_URL
+              value: {{ .Values.appLifecycle.url | quote }}
+            {{- end }}
             {{- if .Values.openfga.apiUrl }}
             - name: OPENFGA_API_URL
               value: {{ .Values.openfga.apiUrl | quote }}

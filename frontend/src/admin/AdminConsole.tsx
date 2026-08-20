@@ -10,6 +10,7 @@ import { IntegrationsSection } from "@/admin/IntegrationsSection";
 import { InvitationsSection } from "@/admin/InvitationsSection";
 import { MembersSection } from "@/admin/MembersSection";
 import { NotificationsSection } from "@/admin/NotificationsSection";
+import { ResourcesSection } from "@/admin/ResourcesSection";
 import { PlatformSecuritySection } from "@/admin/PlatformSecuritySection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
 import { SessionsSection } from "@/admin/SessionsSection";
@@ -23,6 +24,7 @@ type AdminTab =
   | "templates"
   | "security"
   | "integrations"
+  | "resources"
   | "platform"
   | "customization"
   | "credentials"
@@ -43,6 +45,7 @@ const TABS: { id: AdminTab; label: string; platformOnly?: boolean }[] = [
   { id: "templates", label: "Templates" },
   { id: "security", label: "Security" },
   { id: "integrations", label: "Integrations" },
+  { id: "resources", label: "Resources" },
   { id: "platform", label: "Platform", platformOnly: true },
   { id: "customization", label: "Customization", platformOnly: true },
   { id: "credentials", label: "Credentials" },
@@ -161,6 +164,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <SecurityPoliciesSection tenant={tenant} />
           ) : tab === "integrations" ? (
             <IntegrationsSection tenant={tenant} />
+          ) : tab === "resources" ? (
+            <ResourcesSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
           ) : tab === "platform" ? (
             <PlatformSecuritySection />
           ) : tab === "customization" ? (

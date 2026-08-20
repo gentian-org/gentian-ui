@@ -1060,3 +1060,185 @@
 .admin-console__row--editing > td {
   background: var(--gtn-paper-1);
 }
+
+/* ---------------------------------------------------------------------------
+   Resources — headroom meters and usage charts
+   --------------------------------------------------------------------------- */
+
+/* A meter, not a progress bar: it shows how much of a ceiling is committed,
+   and the interesting state is "nearly full", not "nearly done". */
+.resource-meter {
+  display: inline-block;
+  width: 120px;
+  height: 8px;
+  margin-right: 8px;
+  vertical-align: middle;
+  border-radius: var(--gtn-r1);
+  background: var(--gtn-paper-2);
+  overflow: hidden;
+}
+
+.resource-meter--compact {
+  width: 64px;
+  height: 6px;
+  margin-right: 4px;
+}
+
+.resource-meter__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--gtn-r1);
+  background: var(--iris);
+}
+
+/* Amber, then red. These are the design system's status colors and are never
+   used for a series — a chart that borrowed them would say "warning" in a
+   place that means nothing of the kind. */
+.resource-meter__fill--tight {
+  background: var(--ember);
+}
+
+.resource-meter__fill--full {
+  background: var(--madder);
+}
+
+.resource-headroom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.resource-headroom__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--gtn-ink-3);
+}
+
+.resource-headroom__label {
+  min-width: 52px;
+}
+
+.resource-headroom__pct {
+  font-family: var(--gtn-font-mono);
+  color: var(--gtn-ink-4);
+}
+
+.usage-chart {
+  margin: 0 0 20px;
+}
+
+.usage-chart__caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.usage-chart__title {
+  font-weight: 600;
+  color: var(--gtn-ink-2);
+}
+
+.usage-chart__legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--gtn-ink-4);
+}
+
+.usage-chart__legend--muted {
+  color: var(--gtn-ink-5);
+}
+
+/* A swatch beside the label, never the label in the series color: text wears
+   text tokens so it stays legible and identity never rests on color alone. */
+.usage-chart__key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.usage-chart__plot {
+  position: relative;
+}
+
+.usage-chart__plot svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.usage-chart__line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* The ceiling frames the series; it must not read as a third one. */
+.usage-chart__ceiling {
+  stroke: var(--gtn-ink-5);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.usage-chart__ceiling-label,
+.usage-chart__end-label {
+  font-family: var(--gtn-font-mono);
+  font-size: 11px;
+  fill: var(--gtn-ink-4);
+}
+
+.usage-chart__end-label {
+  fill: var(--gtn-ink-2);
+}
+
+.usage-chart__crosshair {
+  stroke: var(--gtn-ink-5);
+  stroke-width: 1;
+}
+
+/* A ring in the surface color keeps a dot readable where the two series
+   overlap, which is exactly where a reader is trying to tell them apart. */
+.usage-chart__dot {
+  stroke: var(--gtn-paper-3);
+  stroke-width: 2;
+}
+
+.usage-chart__tooltip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+  padding: 6px 10px;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r1);
+  background: var(--gtn-paper-3);
+  box-shadow: var(--gtn-shadow-2);
+  font-size: 0.78rem;
+  color: var(--gtn-ink-2);
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.usage-chart__tooltip-time {
+  font-family: var(--gtn-font-mono);
+  color: var(--gtn-ink-4);
+  margin-bottom: 2px;
+}
+
+.usage-chart__tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.usage-chart__tooltip-row--muted {
+  color: var(--gtn-ink-4);
+}

@@ -51,6 +51,21 @@ def get_tenant(name: str) -> dict[str, Any] | None:
         raise
 
 
+def list_tenant_names() -> list[str]:
+    """Every tenant on the cluster, by name, alphabetically.
+
+    Platform-scope only by convention — this reads a cluster-scoped list and
+    applies no filter, so every caller must have checked for platform
+    administrator privileges before reaching it.
+    """
+    result = _custom_objects_api().list_cluster_custom_object(GROUP, VERSION, "tenants")
+    names = [
+        (item.get("metadata") or {}).get("name", "")
+        for item in result.get("items") or []
+    ]
+    return sorted(name for name in names if name)
+
+
 def get_app_profile(name: str) -> dict[str, Any] | None:
     try:
         return _custom_objects_api().get_cluster_custom_object(

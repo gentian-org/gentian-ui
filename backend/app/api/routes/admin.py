@@ -17,7 +17,20 @@ from app.core.audit_log import record_admin_audit
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
 from app.core.openfga_client import OpenFGAClient
-from app.services.k8s_catalogue import get_app_profile, list_installed_profiles
+from app.services.k8s_catalogue import (
+    get_app_profile,
+    list_installed_profiles,
+    list_tenant_names,
+)
+from app.services.resource_plans import (
+    ResourcesRefused,
+    ResourcesUnavailable,
+    fetch_plans as fetch_resource_plans,
+    fetch_report as fetch_resource_report,
+    fetch_state as fetch_resource_state,
+    fetch_usage as fetch_resource_usage,
+    set_plan as set_resource_plan,
+)
 from app.core.gentian_groups import (
     is_admin_managed_group,
     is_bootstrap_tenant_admin,
@@ -1886,3 +1899,305 @@ async def delete_backup(
         target=name,
         details={"phase": phase or "unknown", "forced": str(force).lower()},
     )
+
+
+# --- Resources (plans, ceilings, usage history) ------------------------------
+#
+# Thin on purpose. The plan catalogue, the downgrade guard, the entitlement
+# ceiling and the write to the deployments repository all live in gentian-os,
+# behind the same endpoints `kubectl gentian resources` calls. What these routes
+# add is the thing only the BFF knows: which tenant this caller may act on, and
+# whether they are a tenant administrator or a platform operator.
+
+
+class ResourceHeadroom(BaseModel):
+    resource: str
+    used: str = ""
+    hard: str = ""
+    usedRatio: float | None = None
+
+
+class ResourceStateResponse(BaseModel):
+    tenant: str
+    plan: str = ""
+    annotatedPlan: str = ""
+    # The enforced ceiling and the recorded plan disagree — a hand edit, or a
+    # plan whose quantities changed under tenants already on it. Surfaced rather
+    # than resolved: what is enforced and what is billed have come apart, and
+    # that is a decision for a person.
+    drifted: bool = False
+    custom: bool = False
+    quota: list[ResourceHeadroom] = Field(default_factory=list)
+    hasQuota: bool = False
+    actual: dict[str, str] = Field(default_factory=dict)
+    actualSource: str = ""
+    installedApps: int = 0
+
+
+class ResourcePlanResponse(BaseModel):
+    name: str
+    displayName: str = ""
+    description: str = ""
+    tier: int = 0
+    productSku: str = ""
+    quotas: dict[str, str] = Field(default_factory=dict)
+    current: bool = False
+    selectable: bool = True
+    blocked: str = ""
+
+
+class ResourcePlanChangeRequest(BaseModel):
+    plan: str = Field(min_length=1, max_length=253)
+    # Shrinking a tenant below what it is using does not fail loudly — the
+    # cluster refuses the *next* pod create, so everything runs until something
+    # restarts. Only a platform operator may ask for it, and only deliberately.
+    force: bool = False
+
+
+class ResourcePlanChangeResponse(BaseModel):
+    status: str
+    tenant: str
+    plan: str
+    previousPlan: str = ""
+    message: str = ""
+
+
+class ResourceSampleResponse(BaseModel):
+    observedAt: str
+    plan: str = ""
+    productSku: str = ""
+    hard: dict[str, str] = Field(default_factory=dict)
+    used: dict[str, str] = Field(default_factory=dict)
+    actual: dict[str, str] | None = None
+
+
+class ResourceUsageResponse(BaseModel):
+    tenant: str
+    samples: list[ResourceSampleResponse] = Field(default_factory=list)
+
+
+class ResourcePlanIntervalResponse(BaseModel):
+    plan: str
+    productSku: str = ""
+    field_from: str = Field(alias="from")
+    to: str
+    seconds: int
+    partial: bool = False
+
+    model_config = {"populate_by_name": True}
+
+
+class ResourceReportResponse(BaseModel):
+    tenant: str
+    field_from: str = Field(alias="from")
+    to: str
+    intervals: list[ResourcePlanIntervalResponse] = Field(default_factory=list)
+    incomplete: bool = False
+
+    model_config = {"populate_by_name": True}
+
+
+def _resources_actor(user: dict[str, Any]) -> str:
+    """Who the plan change is attributed to, in git and in the billing record."""
+    return str(user.get("email") or user.get("preferred_username") or user.get("sub") or "unknown")
+
+
+def _resources_error(exc: Exception) -> HTTPException:
+    """Translate an operator refusal into the status the console can act on.
+
+    The operator's own message is passed through verbatim: "limits.cpu: using
+    34, plan allows 32" is the whole answer, and a generic failure would send
+    the admin to a log for something the response already said.
+    """
+    if isinstance(exc, ResourcesRefused):
+        return HTTPException(status_code=exc.status_code, detail=exc.detail)
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+    )
+
+
+@router.get("/resources", response_model=ResourceStateResponse)
+async def get_resource_state(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> ResourceStateResponse:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    try:
+        payload = await fetch_resource_state(settings, resolved, actor=_resources_actor(user))
+    except (ResourcesRefused, ResourcesUnavailable) as exc:
+        raise _resources_error(exc) from exc
+    return ResourceStateResponse(**payload)
+
+
+@router.get("/resources/plans", response_model=list[ResourcePlanResponse])
+async def list_resource_plans(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> list[ResourcePlanResponse]:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    # A platform operator sees the whole catalogue, including plans arranged
+    # off-catalogue; a tenant administrator sees what they may choose for
+    # themselves. The entitlement ceiling is applied by the operator from the
+    # Tenant, not sent from here.
+    self_service = not user_is_platform_admin(user)
+    try:
+        plans = await fetch_resource_plans(
+            settings, resolved, actor=_resources_actor(user), self_service=self_service
+        )
+    except (ResourcesRefused, ResourcesUnavailable) as exc:
+        raise _resources_error(exc) from exc
+    return [ResourcePlanResponse(**plan) for plan in plans]
+
+
+@router.put("/resources", response_model=ResourcePlanChangeResponse)
+async def change_resource_plan(
+    body: ResourcePlanChangeRequest,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> ResourcePlanChangeResponse:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    is_platform = user_is_platform_admin(user)
+
+    if body.force and not is_platform:
+        # Not merely withheld in the UI: force skips the check that keeps a
+        # tenant's own pods creatable, and a tenant administrator asking for it
+        # is asking to break their workspace without being told.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only a platform administrator may shrink a tenant below what it is using",
+        )
+
+    try:
+        result = await set_resource_plan(
+            settings,
+            resolved,
+            body.plan,
+            actor=_resources_actor(user),
+            self_service=not is_platform,
+            force=body.force,
+        )
+    except (ResourcesRefused, ResourcesUnavailable) as exc:
+        # Audited on failure too: a refused downgrade is a decision someone
+        # made about a tenant's ceiling, and the attempt is the interesting
+        # half when the tenant later asks why nothing changed.
+        await record_admin_audit(
+            user,
+            tenant=resolved,
+            action="resources.plan_change_refused",
+            target=body.plan,
+            success=False,
+            details={"reason": str(exc)[:480]},
+        )
+        raise _resources_error(exc) from exc
+
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="resources.plan_changed",
+        target=body.plan,
+        details={
+            "previousPlan": str(result.get("previousPlan") or ""),
+            "status": str(result.get("status") or ""),
+            "forced": str(body.force).lower(),
+        },
+    )
+    return ResourcePlanChangeResponse(
+        status=str(result.get("status") or ""),
+        tenant=str(result.get("tenant") or resolved),
+        plan=str(result.get("plan") or body.plan),
+        previousPlan=str(result.get("previousPlan") or ""),
+        message=str(result.get("message") or ""),
+    )
+
+
+@router.get("/resources/usage", response_model=ResourceUsageResponse)
+async def get_resource_usage(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+    from_: str | None = Query(default=None, alias="from"),
+    to: str | None = Query(default=None),
+    stepSeconds: int | None = Query(default=None, ge=60),
+) -> ResourceUsageResponse:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    try:
+        payload = await fetch_resource_usage(
+            settings,
+            resolved,
+            actor=_resources_actor(user),
+            frm=from_,
+            to=to,
+            step_seconds=stepSeconds,
+        )
+    except (ResourcesRefused, ResourcesUnavailable) as exc:
+        raise _resources_error(exc) from exc
+    return ResourceUsageResponse(
+        tenant=resolved,
+        samples=[ResourceSampleResponse(**s) for s in payload.get("samples") or []],
+    )
+
+
+@router.get("/resources/report", response_model=ResourceReportResponse)
+async def get_resource_report(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+    from_: str | None = Query(default=None, alias="from"),
+    to: str | None = Query(default=None),
+) -> ResourceReportResponse:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    try:
+        payload = await fetch_resource_report(
+            settings, resolved, actor=_resources_actor(user), frm=from_, to=to
+        )
+    except (ResourcesRefused, ResourcesUnavailable) as exc:
+        raise _resources_error(exc) from exc
+    return ResourceReportResponse(**payload)
+
+
+@router.get("/resources/tenants", response_model=list[ResourceStateResponse])
+async def list_tenant_resource_states(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> list[ResourceStateResponse]:
+    """Every tenant's ceiling and consumption, for the cluster admin's overview.
+
+    Platform-only, and one call per tenant rather than a bulk endpoint: a
+    tenant's usage lives in that tenant's own database, so there is no query
+    that spans them. That is the cost of keeping consumption where the rest of
+    the tenant's data lives, and it is paid by a screen nobody loads in a loop.
+    """
+    _require_platform_admin(user, settings)
+    actor = _resources_actor(user)
+
+    try:
+        tenants = list_tenant_names()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+
+    states: list[ResourceStateResponse] = []
+    for name in tenants:
+        try:
+            payload = await fetch_resource_state(settings, name, actor=actor)
+        except (ResourcesRefused, ResourcesUnavailable):
+            # One unreachable tenant must not blank the whole overview — the
+            # row is reported with what is known, which is its name.
+            states.append(ResourceStateResponse(tenant=name))
+            continue
+        states.append(ResourceStateResponse(**payload))
+    return states
