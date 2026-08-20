@@ -109,10 +109,17 @@ function trim(value: number): string {
 /** A short label for a ResourceQuota key, for axes and table headers. */
 export function resourceLabel(resource: string): string {
   switch (resource) {
+    // Requests first in the reader's mind as well as the table: reserved
+    // capacity is what a plan sells, and the limits rows beside it are a burst
+    // ceiling that will always look far from full.
+    case "requests.cpu":
+      return "CPU reserved";
+    case "requests.memory":
+      return "Memory reserved";
     case "limits.cpu":
-      return "CPU";
+      return "CPU burst ceiling";
     case "limits.memory":
-      return "Memory";
+      return "Memory burst ceiling";
     case "requests.storage":
       return "Storage";
     case "pods":
