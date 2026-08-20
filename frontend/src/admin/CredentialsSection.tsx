@@ -266,6 +266,18 @@ function RepositoriesPanel({
   } | null>(null);
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState<{ name: string } & RepositoryInput>({
+    name: "",
+    // apps, not deployments: an additive catalogue alongside the cluster's is
+    // what a tenant adds. deployments repoints what everything reconciles from,
+    // which the API guards with a retype — offering it as an equal choice here
+    // would invite the dangerous one by accident.
+    role: "apps",
+    type: "git",
+    url: "",
+    branch: "",
+  });
 
   const run = async (name: string, input?: RepositoryInput, confirm?: string) => {
     setError(null);
@@ -277,6 +289,8 @@ function RepositoriesPanel({
       }
       setPending(null);
       setTyped("");
+      setAdding(false);
+      setDraft({ name: "", role: "apps", type: "git", url: "", branch: "" });
       onChanged();
     } catch (err) {
       if (err instanceof NeedsConfirmation) {
@@ -297,6 +311,91 @@ function RepositoriesPanel({
       </p>
 
       {error ? <p className="admin-console__error">{error}</p> : null}
+
+      {/* Adding a repository. The API already accepted this — saveRepository has
+          existed since the panel did — but nothing ever called it with an input,
+          so the capability was reachable only by hand. A tenant admin could see
+          their repositories and not add one. */}
+      {adding ? (
+        <form
+          className="admin-console__form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const { name, ...input } = draft;
+            void run(name.trim(), {
+              ...input,
+              url: input.url.trim(),
+              branch: input.branch?.trim() || undefined,
+            });
+          }}
+        >
+          <label className="admin-console__field">
+            Name
+            <input
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              placeholder="my-catalogue"
+              required
+            />
+          </label>
+          <label className="admin-console__field">
+            Repository URL
+            <input
+              value={draft.url}
+              onChange={(e) => setDraft({ ...draft, url: e.target.value })}
+              placeholder="https://github.com/acme/gentian-apps"
+              required
+            />
+          </label>
+          <label className="admin-console__field">
+            Kind
+            <select
+              value={draft.type}
+              onChange={(e) => setDraft({ ...draft, type: e.target.value as "git" | "oci" })}
+            >
+              <option value="git">git</option>
+              <option value="oci">oci</option>
+            </select>
+          </label>
+          {draft.type === "git" ? (
+            <label className="admin-console__field">
+              Branch
+              <input
+                value={draft.branch ?? ""}
+                onChange={(e) => setDraft({ ...draft, branch: e.target.value })}
+                placeholder="main"
+              />
+            </label>
+          ) : null}
+          <p className="admin-console__hint">
+            An additive app catalogue for this tenant. Its apps appear alongside the
+            cluster&apos;s; removing it removes those apps.
+          </p>
+          <div className="admin-console__form-actions">
+            <button type="submit" className="admin-console__btn admin-console__btn--primary">
+              Add repository
+            </button>
+            <button
+              type="button"
+              className="admin-console__btn"
+              onClick={() => {
+                setAdding(false);
+                setError(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button
+          type="button"
+          className="admin-console__btn admin-console__btn--primary"
+          onClick={() => setAdding(true)}
+        >
+          Add a repository
+        </button>
+      )}
 
       {loading ? (
         <p className="admin-console__loading">Loading repositories…</p>
