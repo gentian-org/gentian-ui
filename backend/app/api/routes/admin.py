@@ -57,6 +57,7 @@ from app.services.k8s_authorization import (
 from app.services.k8s_backup import (
     create_export,
     create_passphrase_secret,
+    delete_export,
     delete_passphrase_secret,
     get_export,
     list_exports,
@@ -1835,3 +1836,53 @@ async def create_backup(
         },
     )
     return _backup_response(created)
+
+
+@router.delete("/backups/{name}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_backup(
+    name: str,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+    force: bool = False,
+) -> None:
+    """Delete a backup and its stored bundle.
+
+    The operator holds the resource with a finalizer until the bundle's
+    objects are removed from storage, so a deleted backup is actually gone —
+    not merely absent from this list. Deleting a Running backup aborts it
+    (apps are resumed first); that is deliberate enough to sit behind
+    ?force=true rather than a repeated click.
+    """
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+
+    try:
+        item = get_export(resolved, name)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"backup {name!r} not found")
+
+    phase = str((item.get("status") or {}).get("phase") or "")
+    if phase not in ("Ready", "Failed") and not force:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"backup {name!r} is {phase or 'starting'}; deleting now aborts it — retry with force=true",
+        )
+
+    try:
+        deleted = delete_export(resolved, name)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"backup {name!r} not found")
+
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="backup.deleted",
+        target=name,
+        details={"phase": phase or "unknown", "forced": str(force).lower()},
+    )

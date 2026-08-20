@@ -558,6 +558,14 @@ export function createBackup(body: BackupCreateBody, tenant?: string) {
   });
 }
 
+export function deleteBackup(name: string, tenant?: string, opts?: { force?: boolean }) {
+  const force = opts?.force ? (tenant ? "&" : "?") + "force=true" : "";
+  return apiFetch<void>(
+    `/admin/backups/${encodeURIComponent(name)}${tenantQuery(tenant)}${force}`,
+    { method: "DELETE" },
+  );
+}
+
 /** An export is finished when it can no longer change on its own. */
 export function backupIsTerminal(backup: Backup): boolean {
   return backup.phase === "Ready" || backup.phase === "Failed";

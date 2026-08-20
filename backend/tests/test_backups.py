@@ -63,6 +63,13 @@ class FakeCluster:
     def delete_passphrase_secret(self, tenant: str, export_name: str) -> None:
         self.secrets.pop(k8s_backup.passphrase_secret_name(export_name), None)
 
+    def delete_export(self, tenant: str, name: str) -> bool:
+        for i, item in enumerate(self.exports):
+            if item["metadata"]["name"] == name:
+                del self.exports[i]
+                return True
+        return False
+
 
 @pytest.fixture
 def cluster(monkeypatch) -> FakeCluster:
@@ -72,6 +79,7 @@ def cluster(monkeypatch) -> FakeCluster:
     monkeypatch.setattr(admin_routes, "create_export", fake.create_export)
     monkeypatch.setattr(admin_routes, "create_passphrase_secret", fake.create_passphrase_secret)
     monkeypatch.setattr(admin_routes, "delete_passphrase_secret", fake.delete_passphrase_secret)
+    monkeypatch.setattr(admin_routes, "delete_export", fake.delete_export)
     return fake
 
 
@@ -229,3 +237,45 @@ def test_export_names_must_be_dns_safe():
     assert not k8s_backup.valid_export_name("-leading")
     assert not k8s_backup.valid_export_name("trailing-")
     assert not k8s_backup.valid_export_name("x" * 41)
+
+
+def _seed_export(cluster: FakeCluster, name: str, phase: str) -> None:
+    cluster.exports.append(
+        {
+            "metadata": {"name": name, "namespace": "tenant-demo"},
+            "spec": {},
+            "status": {"phase": phase},
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_terminal_backups_delete_without_force(cluster: FakeCluster):
+    _seed_export(cluster, "old-failed", "Failed")
+    async with await _client() as client:
+        resp = await client.delete("/api/v1/admin/backups/old-failed")
+    assert resp.status_code == 204
+    assert cluster.get_export("demo", "old-failed") is None
+
+
+@pytest.mark.asyncio
+async def test_deleting_a_running_backup_needs_force(cluster: FakeCluster):
+    """A running export being deleted is an abort: paused apps get resumed and
+    the partial bundle is removed. Deliberate enough to require force=true,
+    not just a second click on the same button."""
+    _seed_export(cluster, "in-flight", "Running")
+    async with await _client() as client:
+        refused = await client.delete("/api/v1/admin/backups/in-flight")
+        assert refused.status_code == 409
+        assert cluster.get_export("demo", "in-flight") is not None
+
+        forced = await client.delete("/api/v1/admin/backups/in-flight", params={"force": "true"})
+        assert forced.status_code == 204
+    assert cluster.get_export("demo", "in-flight") is None
+
+
+@pytest.mark.asyncio
+async def test_deleting_a_missing_backup_is_a_404(cluster: FakeCluster):
+    async with await _client() as client:
+        resp = await client.delete("/api/v1/admin/backups/never-existed")
+    assert resp.status_code == 404

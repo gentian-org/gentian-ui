@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   backupIsTerminal,
   createBackup,
+  deleteBackup,
   fetchBackups,
   type Backup,
   type BackupCreateBody,
@@ -62,15 +63,23 @@ export function BackupSection({ tenant }: BackupSectionProps) {
   const [confirmPassphrase, setConfirmPassphrase] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // Names whose deletion was accepted but whose card is still in the list:
+  // the operator holds a deleted export until its bundle is gone from
+  // storage, so the entry lingers for a few seconds after the DELETE call.
+  const [deleting, setDeleting] = useState<string[]>([]);
 
   const backupsQuery = useQuery({
     queryKey: ["admin", "backups", tenant],
     queryFn: () => fetchBackups(tenant),
-    // Poll only while something can still change on its own. A finished list
-    // that keeps refetching is load with no new information.
+    // Poll only while something can still change on its own — a running
+    // export, or one whose deletion is still being carried out. A finished
+    // list that keeps refetching is load with no new information.
     refetchInterval: (query) => {
       const data = query.state.data as Backup[] | undefined;
       if (!data) {
+        return POLL_MS;
+      }
+      if (deleting.length > 0) {
         return POLL_MS;
       }
       return data.some((backup) => !backupIsTerminal(backup)) ? POLL_MS : false;
@@ -97,8 +106,40 @@ export function BackupSection({ tenant }: BackupSectionProps) {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (vars: { name: string; force: boolean }) =>
+      deleteBackup(vars.name, tenant, { force: vars.force }),
+    onSuccess: async (_result, vars) => {
+      setError(null);
+      setSuccess(`Deleting ${vars.name} — the stored bundle is being removed.`);
+      setDeleting((prev) => (prev.includes(vars.name) ? prev : [...prev, vars.name]));
+      await queryClient.invalidateQueries({ queryKey: ["admin", "backups", tenant] });
+    },
+    onError: (err: Error) => {
+      setSuccess(null);
+      setError(err.message);
+    },
+  });
+
   const backups = backupsQuery.data ?? [];
   const running = backups.filter((backup) => !backupIsTerminal(backup));
+
+  useEffect(() => {
+    setDeleting((prev) => {
+      const kept = prev.filter((name) => backups.some((backup) => backup.name === name));
+      return kept.length === prev.length ? prev : kept;
+    });
+  }, [backups]);
+
+  function confirmDelete(backup: Backup) {
+    const terminal = backupIsTerminal(backup);
+    const question = terminal
+      ? `Delete backup "${backup.name}"? Its stored bundle is removed from object storage. This cannot be undone.`
+      : `Abort the running backup "${backup.name}"? Paused apps are resumed, and anything captured so far is removed.`;
+    if (window.confirm(question)) {
+      deleteMutation.mutate({ name: backup.name, force: !terminal });
+    }
+  }
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -295,6 +336,18 @@ export function BackupSection({ tenant }: BackupSectionProps) {
 
               <div className="admin-console__card-aside admin-console__card-aside--top admin-console__hint">
                 {formatTime(backup.completedAt ?? backup.startedAt ?? backup.createdAt)}
+                <button
+                  type="button"
+                  className="admin-console__btn admin-console__btn--danger"
+                  disabled={deleting.includes(backup.name) || deleteMutation.isPending}
+                  onClick={() => confirmDelete(backup)}
+                >
+                  {deleting.includes(backup.name)
+                    ? "Deleting…"
+                    : backupIsTerminal(backup)
+                      ? "Delete"
+                      : "Abort"}
+                </button>
               </div>
 
               {(backup.quiesced.length > 0 || backup.apps.length > 0 ||
