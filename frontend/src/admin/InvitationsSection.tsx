@@ -49,6 +49,38 @@ function suggestLocalPart(first: string, last: string): string {
   return cleanFirst || cleanLast || "";
 }
 
+/**
+ * Focusing a text field with Tab makes the browser select its whole value, so
+ * the next keystroke replaces it. That convention exists for fields holding a
+ * default worth overwriting; here it fights the form, because the login
+ * address is generated from the name and is usually adjusted rather than
+ * retyped — and tabbing between fields is how this form gets filled in.
+ *
+ * So the caret goes to the end instead. A pointer places its own caret on
+ * mouseup, after focus, so clicking is unaffected and needs no special case.
+ */
+function caretToEndOnFocus(event: React.FocusEvent<HTMLInputElement>) {
+  const field = event.currentTarget;
+  const { value } = field;
+  if (!value) {
+    return;
+  }
+  try {
+    field.setSelectionRange(value.length, value.length);
+  } catch {
+    // An email input exposes no selection API at all, so it has to be a text
+    // input for as long as it takes to move the cursor. Re-assigning the value
+    // is not enough: the browser skips the write when the string is unchanged,
+    // and the selection survives.
+    field.type = "text";
+    try {
+      field.setSelectionRange(value.length, value.length);
+    } finally {
+      field.type = "email";
+    }
+  }
+}
+
 /** A single labelled section block inside the invite form. */
 function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -256,6 +288,7 @@ export function InvitationsSection({
               <label htmlFor="inv-first">First name</label>
               <input
                 id="inv-first"
+                onFocus={caretToEndOnFocus}
                 name="invitee-given"
                 autoComplete="off"
                 data-1p-ignore
@@ -269,6 +302,7 @@ export function InvitationsSection({
               <label htmlFor="inv-last">Last name</label>
               <input
                 id="inv-last"
+                onFocus={caretToEndOnFocus}
                 name="invitee-family"
                 autoComplete="off"
                 data-1p-ignore
@@ -286,6 +320,7 @@ export function InvitationsSection({
             <div className="admin-console__email-input-wrapper">
               <input
                 id="inv-email-local"
+                onFocus={caretToEndOnFocus}
                 name="invitee-login-local"
                 autoComplete="off"
                 data-1p-ignore
@@ -305,6 +340,7 @@ export function InvitationsSection({
             <label htmlFor="inv-invite-email">Invite email</label>
             <input
               id="inv-invite-email"
+              onFocus={caretToEndOnFocus}
               name="invitee-delivery"
               autoComplete="off"
               data-1p-ignore
