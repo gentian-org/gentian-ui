@@ -244,14 +244,12 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
           <>
             <div className="admin-console__stats admin-console__stats--strip">
               <div className="admin-console__stat">
+                <span className="admin-console__stat-value">{state.plan || "custom"}</span>
                 <span className="admin-console__stat-label">Plan</span>
-                <span className="admin-console__stat-value">
-                  {state.plan || "custom"}
-                </span>
               </div>
               <div className="admin-console__stat">
-                <span className="admin-console__stat-label">Installed apps</span>
                 <span className="admin-console__stat-value">{state.installedApps}</span>
+                <span className="admin-console__stat-label">Installed apps</span>
               </div>
             </div>
 

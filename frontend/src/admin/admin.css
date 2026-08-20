@@ -439,7 +439,11 @@
   overflow-wrap: anywhere;
 }
 
+/* Both parts claim their own line whether the caller reaches for a div or a
+   span. Leaving that to the element meant an inline pair ran together —
+   "Plan" and "base" rendered as "Planbase". */
 .admin-console__stat-value {
+  display: block;
   font-family: var(--gtn-font-mono);
   font-size: 1.375rem;
   font-weight: 700;
@@ -448,6 +452,7 @@
 }
 
 .admin-console__stat-label {
+  display: block;
   margin-top: 0.2rem;
   font-size: 0.6875rem;
   font-weight: 600;
