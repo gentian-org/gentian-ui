@@ -23,7 +23,7 @@ _PROJECTS_ORIGIN_RE = re.compile(r"^https://projects\.[a-z0-9-]+\.[a-z0-9.-]+$")
 
 
 def openproject_login_from_claims(claims: dict[str, Any]) -> str:
-    for key in ("gentian_username", "opendesk_username", "preferred_username", "email"):
+    for key in ("gentian_username", "preferred_username", "email"):
         raw = str(claims.get(key) or "").strip()
         if not raw:
             continue

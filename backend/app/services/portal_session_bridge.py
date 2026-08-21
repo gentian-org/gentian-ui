@@ -15,7 +15,7 @@ _TICKET_TTL_SECONDS = 60
 
 
 def portal_username_from_claims(claims: dict[str, Any]) -> str:
-    for key in ("preferred_username", "opendesk_username", "email"):
+    for key in ("preferred_username", "email"):
         raw = str(claims.get(key) or "").strip()
         if not raw:
             continue
