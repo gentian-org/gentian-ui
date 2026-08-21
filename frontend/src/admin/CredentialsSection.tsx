@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { ApiError } from "@/api/client";
 import {
   deleteRepository,
   fetchCredentials,
@@ -144,6 +145,14 @@ function CredentialCard({
     },
   });
 
+  // Keyed by field name for O(1) lookup while rendering each input. Empty
+  // when the error is not an ApiError, or carries no fields — an unreachable
+  // endpoint, for instance, is not a claim about any one input.
+  const fieldErrors: Record<string, string> =
+    mutation.error instanceof ApiError && mutation.error.fields
+      ? Object.fromEntries(mutation.error.fields.map((fe) => [fe.field, fe.message]))
+      : {};
+
   const needsAttention = !credential.satisfied && !credential.optional;
 
   return (
@@ -205,26 +214,37 @@ function CredentialCard({
           }}
         >
           <div className="admin-console__stack">
-            {credential.fields.map((field) => (
-              <label key={field.key} className="admin-console__label">
-                <span className="admin-console__label-text">{field.key}</span>
-                <input
-                  type={field.secret ? "password" : "text"}
-                  autoComplete={field.secret ? "new-password" : "off"}
-                  value={values[field.key] ?? ""}
-                  placeholder={field.example}
-                  onChange={(event) =>
-                    setValues((prev) => ({ ...prev, [field.key]: event.target.value }))
-                  }
-                />
-              </label>
-            ))}
+            {credential.fields.map((field) => {
+              const fieldError = fieldErrors[field.key];
+              return (
+                <label key={field.key} className="admin-console__label">
+                  <span className="admin-console__label-text">{field.key}</span>
+                  <input
+                    type={field.secret ? "password" : "text"}
+                    autoComplete={field.secret ? "new-password" : "off"}
+                    value={values[field.key] ?? ""}
+                    placeholder={field.example}
+                    aria-invalid={fieldError ? true : undefined}
+                    onChange={(event) =>
+                      setValues((prev) => ({ ...prev, [field.key]: event.target.value }))
+                    }
+                  />
+                  {/* Attributed to this field by the API — audience, claims and
+                      the rest stay a form-level message below, because the
+                      target rejecting basic auth cannot say which half was
+                      wrong, and guessing one would point at the wrong box. */}
+                  {fieldError ? <span className="admin-console__field-error">{fieldError}</span> : null}
+                </label>
+              );
+            })}
           </div>
 
           {/* Validation runs against the real endpoint before anything is
               stored, so a rejection here is the target refusing the value —
-              not a format check this form invented. */}
-          {mutation.isError ? (
+              not a format check this form invented. Shown only when the
+              failure is not already attributed to a field above, so the same
+              reason is not repeated once per box and once as a banner. */}
+          {mutation.isError && Object.keys(fieldErrors).length === 0 ? (
             <p className="admin-console__error">{(mutation.error as Error).message}</p>
           ) : null}
 

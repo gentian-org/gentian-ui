@@ -735,6 +735,15 @@
   box-shadow: var(--gtn-focus-ring);
 }
 
+/* The API's per-field validation message, attributed to the one input it
+   named rather than repeated as a form-level banner. */
+.admin-console__field-error {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--gtn-madder);
+}
+
 /* Radio cards — a choice with consequences deserves room to explain itself. */
 .admin-console__choice {
   display: grid;

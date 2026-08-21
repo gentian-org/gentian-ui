@@ -3,6 +3,30 @@ import { getAccessToken, redirectToLoginForExpiredSession } from "@/auth/oidc";
 const API_BASE = "/api/v1";
 
 /**
+ * One entry of a failed request's per-field validation detail, when the
+ * upstream attributes the failure to a specific field rather than the
+ * request as a whole. Mirrors the credential manager's FieldError.
+ */
+export type FieldError = {
+  field: string;
+  message: string;
+};
+
+/**
+ * Thrown by apiFetch on any non-2xx response. fields is populated only when
+ * the body carries one — most endpoints never do, and existing catch sites
+ * that read only .message are unaffected.
+ */
+export class ApiError extends Error {
+  readonly fields?: FieldError[];
+  constructor(message: string, fields?: FieldError[]) {
+    super(message);
+    this.name = "ApiError";
+    this.fields = fields;
+  }
+}
+
+/**
  * Paths whose 401 means "the upstream refused this token", not "your portal
  * session expired".
  *
@@ -37,10 +61,21 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   });
   if (!response.ok) {
     let detail = "";
+    let fields: FieldError[] | undefined;
     try {
-      const body = (await response.json()) as { detail?: unknown };
+      const body = (await response.json()) as { detail?: unknown; error?: unknown; fields?: unknown };
       if (typeof body.detail === "string" && body.detail) {
         detail = `: ${body.detail}`;
+      } else if (typeof body.error === "string" && body.error) {
+        // The credential manager's shape, forwarded verbatim by the BFF proxy
+        // rather than translated into FastAPI's own {"detail": ...}. Reading
+        // only .detail missed this every time: a validation failure showed as
+        // a bare status code with the actual reason sitting beside it under
+        // the other key.
+        detail = `: ${body.error}`;
+      }
+      if (Array.isArray(body.fields)) {
+        fields = body.fields as FieldError[];
       }
     } catch {
       // Response body is not JSON.
@@ -50,7 +85,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       // — because the API classifies the refusal now. This message used to guess,
       // and told operators to check a group membership that was correct through
       // three separate causes, none of which was the group.
-      throw new Error(
+      throw new ApiError(
         `Not authorised by the credential manager${detail}. Your portal session is fine — ` +
           `OpenBao refused the token; the credential manager's log has OpenBao's own words.`,
       );
@@ -58,7 +93,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     if (response.status === 401 && token) {
       redirectToLoginForExpiredSession();
     }
-    throw new Error(`API ${path} failed: ${response.status}${detail}`);
+    throw new ApiError(`API ${path} failed: ${response.status}${detail}`, fields);
   }
   if (response.status === 204) {
     return undefined as T;
