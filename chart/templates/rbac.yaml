@@ -27,8 +27,13 @@ rules:
     verbs: ["get", "list", "watch", "create", "delete"]
   # Backup settings. Update and delete are both needed: a policy is edited in
   # place, and deleting a tenant's returns it to inheriting the cluster's.
-  # Cluster-scoped for both scopes, so the console — not RBAC — is what keeps a
-  # tenant admin off the cluster policy and off other tenants'.
+  #
+  # These verbs are the console's, not any admin's. Every call reaches the API
+  # server as this service account — nothing here impersonates the signed-in
+  # user — so RBAC authorises the console and cannot tell a tenant admin from a
+  # platform one. That is true of every resource this role grants, and it is
+  # why the tenant boundary is enforced in the API layer: routes gate on
+  # isPlatformAdmin and reads filter on spec.tenant.
   - apiGroups: ["gentianos.io"]
     resources: ["backuppolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
