@@ -24,7 +24,7 @@ Kernel UI for Gentian OS: login hub, desktop/mobile bases, app launcher, iframe 
 frontend/src/
   pages/          LoginPage, DesktopPage, MobilePage
   shell/          AppMenu, Background, MobileAppLayer, UserMenu
-  windows/        WindowManager (+ GentianWindow / WinBox in M2)
+  windows/        WindowManager, iframe body, chrome icons, drag/resize hooks
   settings/       SettingsPanel
   stores/         Zustand — windows, apps
   api/            fetch client
@@ -37,4 +37,3 @@ frontend/src/
 - **M2** — Keycloak OIDC, K8s app list, WinBox.js wrapper
 - **M3** — Postgres prefs, wallpaper upload, theme tokens
 
-Behavioural reference: `legacy/gentian-ui-architecture.md`, `legacy/frontend/`.

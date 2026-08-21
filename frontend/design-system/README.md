@@ -1,7 +1,7 @@
 # Gentian design system (shell)
 
-Vendored tokens and theme for the greenfield React portal. **Do not symlink or
-import from `legacy/`** — update files here when the brand evolves.
+Vendored tokens and theme for the React shell. Update the files here when the
+brand evolves.
 
 | Asset | Location |
 |-------|----------|
@@ -9,5 +9,3 @@ import from `legacy/`** — update files here when the brand evolves.
 | Fonts | `../public/fonts/` |
 | App tiles | `../public/tiles/*.svg` |
 | Logo | `../public/branding/logo.png` |
-
-Reference only (read-only): `legacy/design-system/` in the archived tree.

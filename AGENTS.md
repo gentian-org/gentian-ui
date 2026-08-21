@@ -21,9 +21,7 @@ publish flow). See [README.md](README.md) for scope and layout.
 ## Security & licensing
 
 * **Never commit secrets** (OIDC client secrets, API keys) — see [docs/security.md](docs/security.md).
-* **Respect third-party license terms** when adding dependencies or vendoring code (e.g.
-  `legacy/` is archived reference only — never imported at runtime, and not a place to add
-  new code).
+* **Respect third-party license terms** when adding dependencies or vendoring code.
 
 ## Directory map
 
@@ -39,7 +37,7 @@ publish flow). See [README.md](README.md) for scope and layout.
 | `backend/app/api/routes/` | HTTP routers (`session`, `apps`, `prefs`) |
 | `frontend/src/auth/` | OIDC provider, RequireAuth, token helpers |
 | `frontend/src/pages/` | Login, Desktop, Mobile |
-| `frontend/design-system/` | Brand tokens (`gentian-theme.css`) — vendored, not legacy |
+| `frontend/design-system/` | Brand tokens (`gentian-theme.css`) — vendored |
 | `frontend/public/fonts/` | Self-hosted Hanken Grotesk + Commit Mono |
 | `frontend/public/tiles/` | App launcher tile SVGs |
 | `frontend/src/shell/` | App menu, background, launcher |
@@ -47,7 +45,6 @@ publish flow). See [README.md](README.md) for scope and layout.
 | `frontend/src/api/client.ts` | Typed fetch + Bearer token |
 | `frontend/src/router.tsx` | TanStack Router |
 | `chart/` | Kernel Helm (Gateway API HTTPRoute) |
-| `legacy/` | Archived Vue/Nubus code — reference only |
 
 ## Add an API endpoint
 

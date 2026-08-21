@@ -29,7 +29,6 @@ frontend/
   src/auth/       OIDC stubs
   src/shell/      App menu, background, launcher
 chart/            Kernel Helm chart (portal.<domain>)
-legacy/           Archived reference only — never imported at runtime
 ```
 
 ## Related
