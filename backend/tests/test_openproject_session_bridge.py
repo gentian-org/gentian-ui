@@ -28,10 +28,9 @@ def test_openproject_login_from_claims_prefers_gentian_username():
 def test_openproject_login_from_claims_falls_back_to_preferred_username():
     """No gentian_username: the login is the local part of preferred_username.
 
-    The openDesk profiles issue opendesk_username from the LDAP uid and no
-    neutral claim. That fallback used to sit ahead of preferred_username here;
-    Keycloak's username is the same uid for LDAP-federated users, so
-    preferred_username carries it.
+    Profiles that publish no neutral username claim fall through to here.
+    Keycloak's username is the LDAP uid for federated users, and the profile
+    scope carries it as preferred_username.
     """
     assert (
         openproject_login_from_claims(

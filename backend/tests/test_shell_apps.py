@@ -38,7 +38,7 @@ ELEMENT_PROFILE = {
         "displayName": "Element (Matrix)",
         "ingress": {"subDomain": "chat"},
         "tile": {"icon": "chat"},
-        "kernelRequirements": {"identity": {"oidc": {"clientId": "opendesk-synapse"}}},
+        "kernelRequirements": {"identity": {"oidc": {"clientId": "gentian-synapse"}}},
         "portalTiles": [
             {
                 "name": "element",
