@@ -67,6 +67,15 @@ from app.services.k8s_authorization import (
     replace_platform_security_policy,
     tenant_namespace,
 )
+from app.services.k8s_backup_schedules import (
+    delete_schedule,
+    get_schedule,
+    is_managed,
+    list_all_schedules,
+    list_schedules,
+    patch_schedule,
+    tenant_from_namespace,
+)
 from app.services.k8s_backup_policy import (
     delete_policy,
     get_policy,
@@ -2175,6 +2184,181 @@ async def delete_tenant_backup_policy(
         action="backup.policy.reset",
         target=resolved,
         details={},
+    )
+
+
+# --- Backup schedules (what is actually configured, per tenant) --------------
+
+
+class BackupScheduleResponse(BaseModel):
+    name: str
+    tenant: str
+    schedule: str = ""
+    suspended: bool = False
+    retention: BackupRetentionModel = Field(default_factory=BackupRetentionModel)
+    lastScheduleTime: str | None = None
+    lastSuccessfulTime: str | None = None
+    nextScheduleTime: str | None = None
+    # Derived from the backup settings rather than written by hand. Editing one
+    # is reverted on the operator's next pass, so the console sends people to
+    # the settings instead of offering a form that loses its input.
+    managed: bool = False
+    message: str = ""
+
+
+class BackupScheduleRequest(BaseModel):
+    schedule: str = ""
+    suspended: bool = False
+    retention: BackupRetentionModel = Field(default_factory=BackupRetentionModel)
+
+
+def _schedule_response(item: dict[str, Any]) -> BackupScheduleResponse:
+    meta = item.get("metadata") or {}
+    spec = item.get("spec") or {}
+    st = item.get("status") or {}
+    ret = spec.get("retention") or {}
+    # keepLast predates the tiers and remains the whole answer for schedules
+    # that only ever said "keep seven".
+    keep_last = int(ret.get("keepLast", spec.get("keepLast", 0)))
+    conditions = st.get("conditions") or []
+    message = next((c.get("message", "") for c in conditions if c.get("status") == "False"), "")
+    return BackupScheduleResponse(
+        name=meta.get("name", ""),
+        tenant=tenant_from_namespace(meta.get("namespace", "")),
+        schedule=spec.get("schedule", ""),
+        suspended=bool(spec.get("suspend", False)),
+        retention=BackupRetentionModel(
+            keepLast=keep_last,
+            keepDaily=int(ret.get("keepDaily", 0)),
+            keepWeekly=int(ret.get("keepWeekly", 0)),
+            keepMonthly=int(ret.get("keepMonthly", 0)),
+            keepYearly=int(ret.get("keepYearly", 0)),
+        ),
+        lastScheduleTime=st.get("lastScheduleTime"),
+        lastSuccessfulTime=st.get("lastSuccessfulTime"),
+        nextScheduleTime=st.get("nextScheduleTime"),
+        managed=is_managed(item),
+        message=message,
+    )
+
+
+@router.get("/backup-schedules", response_model=list[BackupScheduleResponse])
+async def list_backup_schedules(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+    allTenants: bool = False,
+) -> list[BackupScheduleResponse]:
+    """Schedules for one tenant, or for every tenant when a platform admin asks.
+
+    "Which tenants are actually backed up" is only answerable cluster-wide, and
+    is the question an operator most needs answered.
+    """
+    _require_admin(user, settings)
+    if allTenants:
+        _require_platform_admin(user, settings)
+        try:
+            items = list_all_schedules()
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    else:
+        resolved = resolve_admin_tenant(user, settings, tenant)
+        try:
+            items = list_schedules(resolved)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    out = [_schedule_response(item) for item in items]
+    out.sort(key=lambda s: (s.tenant, s.name))
+    return out
+
+
+@router.put("/backup-schedules/{name}", response_model=BackupScheduleResponse)
+async def update_backup_schedule(
+    name: str,
+    body: BackupScheduleRequest,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> BackupScheduleResponse:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+
+    existing = get_schedule(resolved, name)
+    if existing is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"schedule {name!r} not found")
+    if is_managed(existing):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="this schedule comes from the backup settings; change it there instead",
+        )
+    if problem := validate_schedule(body.schedule.strip()):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=problem)
+    if not body.schedule.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="a schedule needs a cron expression; suspend it instead of clearing it",
+        )
+
+    spec: dict[str, Any] = {
+        "schedule": body.schedule.strip(),
+        "suspend": body.suspended,
+        "retention": {
+            "keepLast": body.retention.keepLast,
+            "keepDaily": body.retention.keepDaily,
+            "keepWeekly": body.retention.keepWeekly,
+            "keepMonthly": body.retention.keepMonthly,
+            "keepYearly": body.retention.keepYearly,
+        },
+    }
+    try:
+        saved = patch_schedule(resolved, name, spec)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="backup.schedule.updated",
+        target=name,
+        details={"schedule": body.schedule, "suspended": str(body.suspended).lower()},
+    )
+    return _schedule_response(saved)
+
+
+@router.delete("/backup-schedules/{name}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_backup_schedule(
+    name: str,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> None:
+    """Delete a schedule. Exports it already produced are left alone."""
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+
+    existing = get_schedule(resolved, name)
+    if existing is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"schedule {name!r} not found")
+    if is_managed(existing):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "this schedule comes from the backup settings and would be recreated; "
+                "set the schedule to Never there instead"
+            ),
+        )
+
+    try:
+        delete_schedule(resolved, name)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    await record_admin_audit(
+        user, tenant=resolved, action="backup.schedule.deleted", target=name, details={}
     )
 
 

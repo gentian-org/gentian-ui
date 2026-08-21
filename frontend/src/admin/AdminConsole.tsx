@@ -3,6 +3,7 @@ import { useState } from "react";
 import { fetchAdminContext, fetchGroups } from "@/api/admin";
 import { AuditSection } from "@/admin/AuditSection";
 import { BackupPolicySection } from "@/admin/BackupPolicySection";
+import { BackupSchedulesSection } from "@/admin/BackupSchedulesSection";
 import { BackupSection } from "@/admin/BackupSection";
 import { CredentialsSection } from "@/admin/CredentialsSection";
 import { CustomizationDebtSection } from "@/admin/CustomizationDebtSection";
@@ -179,6 +180,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <NotificationsSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
           ) : tab === "backup" ? (
             <>
+              <BackupSchedulesSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
               <BackupPolicySection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
               <BackupSection tenant={tenant} />
             </>

@@ -37,6 +37,12 @@ rules:
   - apiGroups: ["gentianos.io"]
     resources: ["backuppolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # The schedule overview lists across namespaces so a platform admin can see
+  # which tenants are actually backed up. No create: a schedule comes from the
+  # backup settings, and the operator owns the one it derives.
+  - apiGroups: ["gentianos.io"]
+    resources: ["tenantexportschedules"]
+    verbs: ["get", "list", "watch", "patch", "delete"]
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "list"]

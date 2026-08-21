@@ -643,6 +643,46 @@ export function resetBackupPolicy(tenant?: string) {
   });
 }
 
+export type BackupSchedule = {
+  name: string;
+  tenant: string;
+  schedule: string;
+  suspended: boolean;
+  retention: BackupRetention;
+  lastScheduleTime: string | null;
+  lastSuccessfulTime: string | null;
+  nextScheduleTime: string | null;
+  /** Derived from the backup settings; editing it is reverted by the operator. */
+  managed: boolean;
+  message: string;
+};
+
+export type BackupScheduleBody = {
+  schedule: string;
+  suspended: boolean;
+  retention: BackupRetention;
+};
+
+export function fetchBackupSchedules(tenant?: string, allTenants = false) {
+  const q = tenantQuery(tenant);
+  const all = allTenants ? (q ? "&" : "?") + "allTenants=true" : "";
+  return apiFetch<BackupSchedule[]>(`/admin/backup-schedules${q}${all}`);
+}
+
+export function saveBackupSchedule(name: string, body: BackupScheduleBody, tenant?: string) {
+  return apiFetch<BackupSchedule>(
+    `/admin/backup-schedules/${encodeURIComponent(name)}${tenantQuery(tenant)}`,
+    { method: "PUT", body: JSON.stringify(body) },
+  );
+}
+
+export function deleteBackupSchedule(name: string, tenant?: string) {
+  return apiFetch<void>(
+    `/admin/backup-schedules/${encodeURIComponent(name)}${tenantQuery(tenant)}`,
+    { method: "DELETE" },
+  );
+}
+
 export const emptyRetention: BackupRetention = {
   keepLast: 0,
   keepDaily: 0,
