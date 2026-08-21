@@ -611,7 +611,7 @@ export type BackupPolicyBody = {
   suspendSchedule: boolean;
   retention: BackupRetention;
   allowTenantOverride?: boolean;
-  /** The workspace name, required when sending bundles to your own storage. */
+  /** The tenant name, required when sending bundles to your own storage. */
   confirm?: string;
 };
 

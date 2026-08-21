@@ -170,7 +170,7 @@ export function BackupSection({ tenant }: BackupSectionProps) {
         <div>
           <h2 className="admin-console__section-title">Backup</h2>
           <p className="admin-console__lead">
-            An export captures this workspace — app databases, files and member accounts — into
+            An export captures this tenant — app databases, files and member accounts — into
             one encrypted bundle. Apps are paused one at a time while each is captured, so every
             app&apos;s data is internally consistent; the rest keep running.
           </p>

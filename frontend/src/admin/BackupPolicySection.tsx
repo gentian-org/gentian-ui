@@ -355,7 +355,7 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
   const overrideBlocked = clusterPolicy ? !clusterPolicy.allowTenantOverride : false;
 
   return (
-    <section className="admin-console__section">
+    <section>
       <header className="admin-console__section-head">
         <div>
           <h2 className="admin-console__section-title">Backup settings</h2>
@@ -372,7 +372,7 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
         <div className="admin-console__subsection">
           <h3 className="admin-console__subsection-title">Cluster settings</h3>
           <p className="admin-console__hint">
-            The default for every workspace that has not chosen its own.
+            The default for every tenant that has not chosen its own.
           </p>
 
           <StorageFields
@@ -381,7 +381,7 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
             platformLabel="This cluster's own storage"
           />
 
-          <h4 className="admin-console__label-text">When backups run</h4>
+          <h4 className="admin-console__group-title">When backups run</h4>
           <ScheduleFields
             value={clusterDraft.schedule}
             onChange={(schedule) => setClusterDraft({ ...clusterDraft, schedule })}
@@ -389,7 +389,7 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
             inherited=""
           />
 
-          <h4 className="admin-console__label-text">How many to keep</h4>
+          <h4 className="admin-console__group-title">How many to keep</h4>
           <RetentionFields
             value={clusterDraft.retention}
             onChange={(retention) => setClusterDraft({ ...clusterDraft, retention })}
@@ -404,10 +404,10 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
               }
             />
             <span>
-              Workspace admins may choose their own storage provider.
+              Tenant admins may choose their own storage provider.
               {clusterDraft.allowTenantOverride
                 ? " Their backups then sit outside this cluster, and you need their keys to help them restore."
-                : " Every workspace's backups stay where you control them, and you can restore any of them."}
+                : " Every tenant's backups stay where you control them, and you can restore any of them."}
             </span>
           </label>
 
@@ -440,7 +440,7 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
             </p>
             {overrideBlocked ? (
               <p className="admin-console__hint">
-                Your provider has fixed these settings for every workspace on this cluster.
+                Your provider has fixed these settings for every tenant on this cluster.
               </p>
             ) : (
               <button
@@ -456,7 +456,7 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
 
         {overriding && (
           <>
-            <h4 className="admin-console__label-text">When backups run</h4>
+            <h4 className="admin-console__group-title">When backups run</h4>
             <ScheduleFields
               value={tenantDraft.schedule}
               onChange={(schedule) => setTenantDraft({ ...tenantDraft, schedule })}
@@ -464,7 +464,7 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
               inherited={clusterPolicy?.effectiveSchedule ?? ""}
             />
 
-            <h4 className="admin-console__label-text">How many to keep</h4>
+            <h4 className="admin-console__group-title">How many to keep</h4>
             <RetentionFields
               value={tenantDraft.retention}
               onChange={(retention) => setTenantDraft({ ...tenantDraft, retention })}
@@ -472,7 +472,7 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
 
             {!overrideBlocked && (
               <>
-                <h4 className="admin-console__label-text">Where backups are stored</h4>
+                <h4 className="admin-console__group-title">Where backups are stored</h4>
                 <StorageFields
                   draft={tenantDraft}
                   setDraft={setTenantDraft}

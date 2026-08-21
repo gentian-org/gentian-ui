@@ -167,15 +167,31 @@
   color: var(--gtn-ink-4);
 }
 
-/* Two sections in one tab need a clear break, or they read as one. */
-.admin-console__section + .admin-console__section {
-  margin-top: 3rem;
-  padding-top: 2rem;
+/* Two sections in one tab read as one long form without a break. Sections are
+   bare <section> elements, so this matches on the element rather than a class
+   only one of them carries. */
+.admin-console__body > section + section {
+  margin-top: 2.5rem;
+  padding-top: 1.75rem;
   border-top: 1px solid var(--gtn-border);
 }
 
 .admin-console__subsection {
-  margin-top: 2rem;
+  margin-top: 1.5rem;
+}
+
+/* Groups a few fields under a heading inside a subsection. The title carries
+   its own top margin because, unlike a subsection, there is no wrapper to
+   supply it. */
+.admin-console__group-title {
+  margin: 1.5rem 0 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gtn-ink-2);
+}
+
+.admin-console__group-title:first-child {
+  margin-top: 0;
 }
 
 .admin-console__subsection > .admin-console__lead {

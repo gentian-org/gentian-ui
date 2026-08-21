@@ -2119,7 +2119,7 @@ async def put_tenant_backup_policy(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 f"sending backups to your own storage changes where recovery reads from; "
-                f"type the workspace name {resolved!r} to confirm"
+                f"type the tenant name {resolved!r} to confirm"
             ),
         )
 
