@@ -67,6 +67,13 @@ from app.services.k8s_authorization import (
     replace_platform_security_policy,
     tenant_namespace,
 )
+from app.services.k8s_backup_policy import (
+    delete_policy,
+    get_policy,
+    put_policy,
+    validate_destination,
+    validate_schedule,
+)
 from app.services.k8s_backup import (
     create_export,
     create_passphrase_secret,
@@ -1898,6 +1905,274 @@ async def delete_backup(
         action="backup.deleted",
         target=name,
         details={"phase": phase or "unknown", "forced": str(force).lower()},
+    )
+
+
+# --- Backup policy (where bundles go, how often, how long they are kept) -----
+
+
+class BackupDestinationModel(BaseModel):
+    endpoint: str = ""
+    bucket: str = ""
+    region: str = ""
+
+
+class BackupRetentionModel(BaseModel):
+    keepLast: int = 0
+    keepDaily: int = 0
+    keepWeekly: int = 0
+    keepMonthly: int = 0
+    keepYearly: int = 0
+
+
+class BackupPolicyResponse(BaseModel):
+    scope: str
+    tenant: str = ""
+    # Whether a policy of this scope exists at all. Absent is not the same as
+    # empty: it means "inherits", which is what the UI has to show.
+    configured: bool = False
+    destination: BackupDestinationModel = Field(default_factory=BackupDestinationModel)
+    schedule: str = ""
+    suspendSchedule: bool = False
+    retention: BackupRetentionModel = Field(default_factory=BackupRetentionModel)
+    allowTenantOverride: bool = True
+    # What is actually in force after inheritance, straight from the operator.
+    effectiveEndpoint: str = ""
+    effectiveBucket: str = ""
+    effectiveSchedule: str = ""
+    # A destination whose keys have not been supplied yet. The console shows a
+    # link to the credential manager rather than an error.
+    credentialRequirement: str = ""
+    credentialSatisfied: bool = True
+    message: str = ""
+
+
+class BackupPolicyRequest(BaseModel):
+    destination: BackupDestinationModel = Field(default_factory=BackupDestinationModel)
+    schedule: str = ""
+    suspendSchedule: bool = False
+    retention: BackupRetentionModel = Field(default_factory=BackupRetentionModel)
+    allowTenantOverride: bool | None = None
+    # Typed confirmation for a tenant overriding its destination: bundles then
+    # leave the platform's storage, and that is worth naming deliberately.
+    confirm: str = ""
+
+
+def _policy_response(scope: str, tenant: str, item: dict[str, Any] | None) -> BackupPolicyResponse:
+    if item is None:
+        return BackupPolicyResponse(scope=scope, tenant=tenant, configured=False)
+    spec = item.get("spec") or {}
+    st = item.get("status") or {}
+    dest = spec.get("destination") or {}
+    ret = spec.get("retention") or {}
+    conditions = st.get("conditions") or []
+    message = next(
+        (c.get("message", "") for c in conditions if c.get("type") == "Accepted"),
+        "",
+    )
+    return BackupPolicyResponse(
+        scope=scope,
+        tenant=tenant,
+        configured=True,
+        destination=BackupDestinationModel(
+            endpoint=dest.get("endpoint", ""),
+            bucket=dest.get("bucket", ""),
+            region=dest.get("region", ""),
+        ),
+        schedule=spec.get("schedule", ""),
+        suspendSchedule=bool(spec.get("suspendSchedule", False)),
+        retention=BackupRetentionModel(
+            keepLast=int(ret.get("keepLast", 0)),
+            keepDaily=int(ret.get("keepDaily", 0)),
+            keepWeekly=int(ret.get("keepWeekly", 0)),
+            keepMonthly=int(ret.get("keepMonthly", 0)),
+            keepYearly=int(ret.get("keepYearly", 0)),
+        ),
+        allowTenantOverride=bool(spec.get("allowTenantOverride", True)),
+        effectiveEndpoint=st.get("effectiveEndpoint", ""),
+        effectiveBucket=st.get("effectiveBucket", ""),
+        effectiveSchedule=st.get("effectiveSchedule", ""),
+        credentialRequirement=st.get("credentialRequirement", ""),
+        credentialSatisfied=bool(st.get("credentialSatisfied", True)),
+        message=message,
+    )
+
+
+def _policy_spec_from(body: BackupPolicyRequest) -> tuple[dict[str, str] | None, dict[str, int] | None]:
+    dest = {
+        k: v
+        for k, v in (
+            ("endpoint", body.destination.endpoint.strip()),
+            ("bucket", body.destination.bucket.strip()),
+            ("region", body.destination.region.strip()),
+        )
+        if v
+    }
+    retention = {
+        k: v
+        for k, v in (
+            ("keepLast", body.retention.keepLast),
+            ("keepDaily", body.retention.keepDaily),
+            ("keepWeekly", body.retention.keepWeekly),
+            ("keepMonthly", body.retention.keepMonthly),
+            ("keepYearly", body.retention.keepYearly),
+        )
+        if v > 0
+    }
+    return (dest or None), (retention or None)
+
+
+def _reject_bad_policy(body: BackupPolicyRequest) -> None:
+    for problem in (
+        validate_destination(body.destination.endpoint.strip(), body.destination.bucket.strip()),
+        validate_schedule(body.schedule.strip()),
+    ):
+        if problem:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=problem)
+
+
+@router.get("/backup-policy/cluster", response_model=BackupPolicyResponse)
+async def get_cluster_backup_policy(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> BackupPolicyResponse:
+    _require_platform_admin(user, settings)
+    try:
+        return _policy_response("cluster", "", get_policy("cluster", None))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+
+@router.put("/backup-policy/cluster", response_model=BackupPolicyResponse)
+async def put_cluster_backup_policy(
+    body: BackupPolicyRequest,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> BackupPolicyResponse:
+    """Set the cluster default. Platform admins only: this decides where every
+    tenant's bundles go unless they say otherwise."""
+    _require_platform_admin(user, settings)
+    _reject_bad_policy(body)
+    destination, retention = _policy_spec_from(body)
+
+    try:
+        saved = put_policy(
+            "cluster",
+            None,
+            destination=destination,
+            schedule=body.schedule.strip(),
+            suspend_schedule=body.suspendSchedule,
+            retention=retention,
+            allow_tenant_override=body.allowTenantOverride,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    await record_admin_audit(
+        user,
+        tenant="",
+        action="backup.policy.cluster.updated",
+        target="default",
+        details={
+            "endpoint": body.destination.endpoint or "platform storage",
+            "schedule": body.schedule or "none",
+        },
+    )
+    return _policy_response("cluster", "", saved)
+
+
+@router.get("/backup-policy", response_model=BackupPolicyResponse)
+async def get_tenant_backup_policy(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> BackupPolicyResponse:
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    try:
+        return _policy_response("tenant", resolved, get_policy("tenant", resolved))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+
+@router.put("/backup-policy", response_model=BackupPolicyResponse)
+async def put_tenant_backup_policy(
+    body: BackupPolicyRequest,
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> BackupPolicyResponse:
+    """Override the cluster default for one tenant.
+
+    Sending an endpoint requires ``confirm`` to equal the tenant name: bundles
+    then leave the platform's storage, and a typed name has to be looked up
+    where a checkbox is clicked through.
+    """
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    _reject_bad_policy(body)
+
+    if body.destination.endpoint.strip() and body.confirm.strip() != resolved:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"sending backups to your own storage changes where recovery reads from; "
+                f"type the workspace name {resolved!r} to confirm"
+            ),
+        )
+
+    destination, retention = _policy_spec_from(body)
+    try:
+        saved = put_policy(
+            "tenant",
+            resolved,
+            destination=destination,
+            schedule=body.schedule.strip(),
+            suspend_schedule=body.suspendSchedule,
+            retention=retention,
+            allow_tenant_override=None,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="backup.policy.updated",
+        target=resolved,
+        details={
+            "endpoint": body.destination.endpoint or "inherited",
+            "schedule": body.schedule or ("suspended" if body.suspendSchedule else "inherited"),
+        },
+    )
+    return _policy_response("tenant", resolved, saved)
+
+
+@router.delete("/backup-policy", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_tenant_backup_policy(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> None:
+    """Drop the override and go back to inheriting the cluster default."""
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+    try:
+        removed = delete_policy("tenant", resolved)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    if not removed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="no override to remove")
+
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="backup.policy.reset",
+        target=resolved,
+        details={},
     )
 
 

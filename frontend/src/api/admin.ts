@@ -571,6 +571,86 @@ export function backupIsTerminal(backup: Backup): boolean {
   return backup.phase === "Ready" || backup.phase === "Failed";
 }
 
+export type BackupDestination = {
+  endpoint: string;
+  bucket: string;
+  region: string;
+};
+
+export type BackupRetention = {
+  keepLast: number;
+  keepDaily: number;
+  keepWeekly: number;
+  keepMonthly: number;
+  keepYearly: number;
+};
+
+export type BackupPolicy = {
+  scope: "cluster" | "tenant";
+  tenant: string;
+  /** False means this scope sets nothing and inherits. */
+  configured: boolean;
+  destination: BackupDestination;
+  schedule: string;
+  suspendSchedule: boolean;
+  retention: BackupRetention;
+  allowTenantOverride: boolean;
+  /** What applies after inheritance, resolved by the operator. */
+  effectiveEndpoint: string;
+  effectiveBucket: string;
+  effectiveSchedule: string;
+  /** A destination whose keys have not been supplied yet. */
+  credentialRequirement: string;
+  credentialSatisfied: boolean;
+  message: string;
+};
+
+export type BackupPolicyBody = {
+  destination: BackupDestination;
+  schedule: string;
+  suspendSchedule: boolean;
+  retention: BackupRetention;
+  allowTenantOverride?: boolean;
+  /** The workspace name, required when sending bundles to your own storage. */
+  confirm?: string;
+};
+
+export function fetchClusterBackupPolicy() {
+  return apiFetch<BackupPolicy>("/admin/backup-policy/cluster");
+}
+
+export function saveClusterBackupPolicy(body: BackupPolicyBody) {
+  return apiFetch<BackupPolicy>("/admin/backup-policy/cluster", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchBackupPolicy(tenant?: string) {
+  return apiFetch<BackupPolicy>(`/admin/backup-policy${tenantQuery(tenant)}`);
+}
+
+export function saveBackupPolicy(body: BackupPolicyBody, tenant?: string) {
+  return apiFetch<BackupPolicy>(`/admin/backup-policy${tenantQuery(tenant)}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export function resetBackupPolicy(tenant?: string) {
+  return apiFetch<void>(`/admin/backup-policy${tenantQuery(tenant)}`, {
+    method: "DELETE",
+  });
+}
+
+export const emptyRetention: BackupRetention = {
+  keepLast: 0,
+  keepDaily: 0,
+  keepWeekly: 0,
+  keepMonthly: 0,
+  keepYearly: 0,
+};
+
 // --- Resources ---------------------------------------------------------------
 
 export type ResourceHeadroom = {
