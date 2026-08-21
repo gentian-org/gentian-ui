@@ -167,6 +167,13 @@
   color: var(--gtn-ink-4);
 }
 
+/* Two sections in one tab need a clear break, or they read as one. */
+.admin-console__section + .admin-console__section {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--gtn-border);
+}
+
 .admin-console__subsection {
   margin-top: 2rem;
 }

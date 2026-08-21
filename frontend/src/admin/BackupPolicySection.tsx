@@ -11,6 +11,15 @@ import {
   type BackupPolicyBody,
   type BackupRetention,
 } from "@/api/admin";
+import {
+  cronFrom,
+  defaultSchedule,
+  describeSchedule,
+  formFromCron,
+  WEEKDAYS,
+  type Frequency,
+  type ScheduleForm,
+} from "@/admin/backupSchedule";
 import "./admin.css";
 
 type BackupPolicySectionProps = {
@@ -18,44 +27,54 @@ type BackupPolicySectionProps = {
   isPlatformAdmin: boolean;
 };
 
+type StorageMode = "platform" | "external";
+
+const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 type Draft = {
+  storage: StorageMode;
   endpoint: string;
   bucket: string;
   region: string;
-  schedule: string;
-  suspendSchedule: boolean;
+  schedule: ScheduleForm;
   retention: BackupRetention;
   allowTenantOverride: boolean;
 };
 
 function draftFrom(policy: BackupPolicy | undefined): Draft {
+  const endpoint = policy?.destination.endpoint ?? "";
   return {
-    endpoint: policy?.destination.endpoint ?? "",
+    storage: endpoint ? "external" : "platform",
+    endpoint,
     bucket: policy?.destination.bucket ?? "",
     region: policy?.destination.region ?? "",
-    schedule: policy?.schedule ?? "",
-    suspendSchedule: policy?.suspendSchedule ?? false,
+    schedule: formFromCron(policy?.schedule ?? "", policy?.suspendSchedule ?? false),
     retention: policy?.retention ?? emptyRetention,
     allowTenantOverride: policy?.allowTenantOverride ?? true,
   };
 }
 
 function bodyFrom(draft: Draft, confirm?: string): BackupPolicyBody {
+  const external = draft.storage === "external";
   return {
-    destination: { endpoint: draft.endpoint.trim(), bucket: draft.bucket.trim(), region: draft.region.trim() },
-    schedule: draft.schedule.trim(),
-    suspendSchedule: draft.suspendSchedule,
+    destination: {
+      endpoint: external ? draft.endpoint.trim() : "",
+      bucket: draft.bucket.trim(),
+      region: external ? draft.region.trim() : "",
+    },
+    schedule: cronFrom(draft.schedule),
+    suspendSchedule: draft.schedule.frequency === "off",
     retention: draft.retention,
     confirm,
   };
 }
 
 const RETENTION_TIERS: { key: keyof BackupRetention; label: string; hint: string }[] = [
-  { key: "keepLast", label: "Most recent", hint: "always kept, whatever their age" },
-  { key: "keepDaily", label: "Daily", hint: "one per day" },
-  { key: "keepWeekly", label: "Weekly", hint: "one per week" },
-  { key: "keepMonthly", label: "Monthly", hint: "one per month" },
-  { key: "keepYearly", label: "Yearly", hint: "one per year" },
+  { key: "keepLast", label: "Most recent", hint: "kept whatever their age" },
+  { key: "keepDaily", label: "Days", hint: "one per day" },
+  { key: "keepWeekly", label: "Weeks", hint: "one per week" },
+  { key: "keepMonthly", label: "Months", hint: "one per month" },
+  { key: "keepYearly", label: "Years", hint: "one per year" },
 ];
 
 function RetentionFields({
@@ -65,49 +84,176 @@ function RetentionFields({
   value: BackupRetention;
   onChange: (next: BackupRetention) => void;
 }) {
+  const nothingKept = RETENTION_TIERS.every((t) => value[t.key] === 0);
   return (
-    <div className="admin-console__field-row">
-      {RETENTION_TIERS.map((tier) => (
-        <label key={tier.key} className="admin-console__label">
-          <span className="admin-console__label-text">{tier.label}</span>
-          <input
-            type="number"
-            min={0}
-            value={value[tier.key]}
-            onChange={(e) => onChange({ ...value, [tier.key]: Number(e.target.value) || 0 })}
-          />
-          <span className="admin-console__hint">{tier.hint}</span>
+    <>
+      <div className="admin-console__field-row">
+        {RETENTION_TIERS.map((tier) => (
+          <label key={tier.key} className="admin-console__label">
+            <span className="admin-console__label-text">{tier.label}</span>
+            <input
+              type="number"
+              min={0}
+              value={value[tier.key]}
+              onChange={(e) => onChange({ ...value, [tier.key]: Number(e.target.value) || 0 })}
+            />
+            <span className="admin-console__hint">{tier.hint}</span>
+          </label>
+        ))}
+      </div>
+      <p className="admin-console__hint">
+        {nothingKept
+          ? "Nothing is deleted automatically. Backups accumulate until you remove them."
+          : "A backup kept by any row is kept. Older ones are deleted."}
+      </p>
+    </>
+  );
+}
+
+function ScheduleFields({
+  value,
+  onChange,
+  allowInherit,
+  inherited,
+}: {
+  value: ScheduleForm;
+  onChange: (next: ScheduleForm) => void;
+  allowInherit: boolean;
+  inherited: string;
+}) {
+  const showTime = ["daily", "weekly", "monthly"].includes(value.frequency);
+  return (
+    <div className="admin-console__stack">
+      <div className="admin-console__field-row">
+        <label className="admin-console__label">
+          <span className="admin-console__label-text">How often</span>
+          <select
+            value={value.frequency}
+            onChange={(e) => onChange({ ...value, frequency: e.target.value as Frequency })}
+          >
+            {allowInherit && <option value="inherit">Same as the cluster</option>}
+            <option value="off">Never — only when I start one</option>
+            <option value="daily">Every day</option>
+            <option value="weekly">Every week</option>
+            <option value="monthly">Every month</option>
+            <option value="custom">Custom (cron)</option>
+          </select>
         </label>
-      ))}
+
+        {value.frequency === "weekly" && (
+          <label className="admin-console__label">
+            <span className="admin-console__label-text">Day</span>
+            <select
+              value={value.weekday}
+              onChange={(e) => onChange({ ...value, weekday: Number(e.target.value) })}
+            >
+              {WEEKDAYS.map((day, i) => (
+                <option key={day} value={i}>
+                  {day}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {value.frequency === "monthly" && (
+          <label className="admin-console__label">
+            <span className="admin-console__label-text">Day of month</span>
+            <select
+              value={value.monthday}
+              onChange={(e) => onChange({ ...value, monthday: Number(e.target.value) })}
+            >
+              {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {showTime && (
+          <label className="admin-console__label">
+            <span className="admin-console__label-text">Start at (UTC)</span>
+            <input
+              type="time"
+              value={value.time}
+              onChange={(e) => onChange({ ...value, time: e.target.value })}
+            />
+            <span className="admin-console__hint">one run, not a window</span>
+          </label>
+        )}
+      </div>
+
+      {value.frequency === "custom" && (
+        <label className="admin-console__label">
+          <span className="admin-console__label-text">Cron expression (UTC)</span>
+          <input
+            placeholder="0 3 * * *"
+            value={value.custom}
+            onChange={(e) => onChange({ ...value, custom: e.target.value })}
+          />
+        </label>
+      )}
+
+      <p className="admin-console__hint">{describeSchedule(value, inherited)}</p>
     </div>
   );
 }
 
-function DestinationFields({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => void }) {
+function StorageFields({
+  draft,
+  setDraft,
+  platformLabel,
+}: {
+  draft: Draft;
+  setDraft: (d: Draft) => void;
+  platformLabel: string;
+}) {
   return (
     <div className="admin-console__stack">
       <label className="admin-console__label">
-        <span className="admin-console__label-text">Endpoint</span>
-        <input
-          placeholder="https://sos-ch-gva-2.exo.io — leave empty for the platform's own storage"
-          value={draft.endpoint}
-          onChange={(e) => setDraft({ ...draft, endpoint: e.target.value })}
-        />
+        <span className="admin-console__label-text">Where backups are stored</span>
+        <select
+          value={draft.storage}
+          onChange={(e) => setDraft({ ...draft, storage: e.target.value as StorageMode })}
+        >
+          <option value="platform">{platformLabel}</option>
+          <option value="external">External storage (S3-compatible)</option>
+        </select>
       </label>
+
+      {draft.storage === "external" && (
+        <>
+          <label className="admin-console__label">
+            <span className="admin-console__label-text">Endpoint</span>
+            <input
+              placeholder="https://sos-ch-gva-2.exo.io"
+              value={draft.endpoint}
+              onChange={(e) => setDraft({ ...draft, endpoint: e.target.value })}
+            />
+            <span className="admin-console__hint">
+              The provider&apos;s S3 address, including https://
+            </span>
+          </label>
+          <label className="admin-console__label">
+            <span className="admin-console__label-text">Region</span>
+            <input
+              placeholder="ch-gva-2"
+              value={draft.region}
+              onChange={(e) => setDraft({ ...draft, region: e.target.value })}
+            />
+            <span className="admin-console__hint">Required by some providers; leave empty if unsure</span>
+          </label>
+        </>
+      )}
+
       <label className="admin-console__label">
         <span className="admin-console__label-text">Bucket</span>
         <input
-          placeholder="leave empty to keep the default name"
+          placeholder={draft.storage === "external" ? "my-backups" : "leave empty for the default"}
           value={draft.bucket}
           onChange={(e) => setDraft({ ...draft, bucket: e.target.value })}
-        />
-      </label>
-      <label className="admin-console__label">
-        <span className="admin-console__label-text">Region</span>
-        <input
-          placeholder="required by some providers; MinIO needs none"
-          value={draft.region}
-          onChange={(e) => setDraft({ ...draft, region: e.target.value })}
         />
       </label>
     </div>
@@ -127,11 +273,10 @@ function EffectiveSummary({ policy }: { policy: BackupPolicy }) {
       </p>
       {policy.credentialRequirement && !policy.credentialSatisfied && (
         <p className="admin-console__warning">
-          Waiting for storage keys. Supply <code>{policy.credentialRequirement}</code> in the
+          Waiting for the storage keys. Supply <code>{policy.credentialRequirement}</code> in the
           Credentials tab — until then, backups to this destination cannot run.
         </p>
       )}
-      {policy.message && <p className="admin-console__hint">{policy.message}</p>}
     </div>
   );
 }
@@ -157,7 +302,14 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
   const [confirmName, setConfirmName] = useState("");
 
   useEffect(() => {
-    if (clusterQuery.data) setClusterDraft(draftFrom(clusterQuery.data));
+    if (clusterQuery.data) {
+      const d = draftFrom(clusterQuery.data);
+      // The cluster has nothing to inherit from.
+      setClusterDraft({
+        ...d,
+        schedule: d.schedule.frequency === "inherit" ? { ...defaultSchedule, frequency: "off" } : d.schedule,
+      });
+    }
   }, [clusterQuery.data]);
 
   useEffect(() => {
@@ -188,27 +340,27 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
   });
   const saveTenant = useMutation({
     mutationFn: () => saveBackupPolicy(bodyFrom(tenantDraft, confirmName.trim()), tenant),
-    onSuccess: settled("Workspace backup settings saved."),
+    onSuccess: settled("Backup settings saved."),
     onError: failed,
   });
   const reset = useMutation({
     mutationFn: () => resetBackupPolicy(tenant),
-    onSuccess: settled("Back to the cluster default."),
+    onSuccess: settled("Back to the cluster settings."),
     onError: failed,
   });
 
   const clusterPolicy = clusterQuery.data;
   const tenantPolicy = tenantQuery.data;
-  const movingStorage = tenantDraft.endpoint.trim() !== "";
+  const movingStorage = tenantDraft.storage === "external" && tenantDraft.endpoint.trim() !== "";
   const overrideBlocked = clusterPolicy ? !clusterPolicy.allowTenantOverride : false;
 
   return (
     <section className="admin-console__section">
       <header className="admin-console__section-head">
         <div>
-          <h2 className="admin-console__section-title">Backup policy</h2>
+          <h2 className="admin-console__section-title">Backup settings</h2>
           <p className="admin-console__lead">
-            Where backups are stored, how often they run, and how long they are kept.
+            Where backups are stored, when they run, and how long they are kept.
           </p>
         </div>
       </header>
@@ -218,23 +370,26 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
 
       {isPlatformAdmin && (
         <div className="admin-console__subsection">
-          <h3 className="admin-console__subsection-title">Cluster default</h3>
+          <h3 className="admin-console__subsection-title">Cluster settings</h3>
           <p className="admin-console__hint">
-            Applies to every workspace that does not set its own.
+            The default for every workspace that has not chosen its own.
           </p>
 
-          <DestinationFields draft={clusterDraft} setDraft={setClusterDraft} />
+          <StorageFields
+            draft={clusterDraft}
+            setDraft={setClusterDraft}
+            platformLabel="This cluster's own storage"
+          />
 
-          <label className="admin-console__label">
-            <span className="admin-console__label-text">Schedule (UTC)</span>
-            <input
-                placeholder="0 3 * * * — leave empty for no scheduled backups"
-              value={clusterDraft.schedule}
-              onChange={(e) => setClusterDraft({ ...clusterDraft, schedule: e.target.value })}
-            />
-          </label>
+          <h4 className="admin-console__label-text">When backups run</h4>
+          <ScheduleFields
+            value={clusterDraft.schedule}
+            onChange={(schedule) => setClusterDraft({ ...clusterDraft, schedule })}
+            allowInherit={false}
+            inherited=""
+          />
 
-          <h4 className="admin-console__label-text">Keep</h4>
+          <h4 className="admin-console__label-text">How many to keep</h4>
           <RetentionFields
             value={clusterDraft.retention}
             onChange={(retention) => setClusterDraft({ ...clusterDraft, retention })}
@@ -249,8 +404,10 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
               }
             />
             <span>
-              Let workspaces use their own storage. Turning this off keeps every bundle where
-              you can reach it.
+              Workspace admins may choose their own storage provider.
+              {clusterDraft.allowTenantOverride
+                ? " Their backups then sit outside this cluster, and you need their keys to help them restore."
+                : " Every workspace's backups stay where you control them, and you can restore any of them."}
             </span>
           </label>
 
@@ -261,7 +418,7 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
               disabled={saveCluster.isPending}
               onClick={() => saveCluster.mutate()}
             >
-              {saveCluster.isPending ? "Saving…" : "Save cluster default"}
+              {saveCluster.isPending ? "Saving…" : "Save default"}
             </button>
           </div>
 
@@ -270,124 +427,108 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
       )}
 
       <div className="admin-console__subsection">
-        <h3 className="admin-console__subsection-title">This workspace</h3>
+        <h3 className="admin-console__subsection-title">{titleCase(tenant)} settings</h3>
 
-        {tenantPolicy && !tenantPolicy.configured && !overriding && (
-          <p className="admin-console__hint">
-            Using the cluster default. <EffectiveInline policy={tenantPolicy} />
-          </p>
-        )}
-
-        {overrideBlocked && !overriding ? (
-          <p className="admin-console__hint">
-            Your provider has fixed the backup destination for all workspaces on this cluster.
-          </p>
-        ) : (
+        {!overriding && (
           <>
-            {!overriding && (
+            <p className="admin-console__hint">
+              {tenantPolicy?.effectiveSchedule
+                ? `Backups run ${tenantPolicy.effectiveSchedule} UTC, stored in ${
+                    tenantPolicy.effectiveEndpoint || "the platform's storage"
+                  }.`
+                : "No scheduled backups. You can start one at any time from the list below."}
+            </p>
+            {overrideBlocked ? (
+              <p className="admin-console__hint">
+                Your provider has fixed these settings for every workspace on this cluster.
+              </p>
+            ) : (
               <button
                 type="button"
                 className="admin-console__btn"
                 onClick={() => setOverriding(true)}
               >
-                Change for this workspace
+                Change for {tenant}
               </button>
             )}
+          </>
+        )}
 
-            {overriding && (
+        {overriding && (
+          <>
+            <h4 className="admin-console__label-text">When backups run</h4>
+            <ScheduleFields
+              value={tenantDraft.schedule}
+              onChange={(schedule) => setTenantDraft({ ...tenantDraft, schedule })}
+              allowInherit
+              inherited={clusterPolicy?.effectiveSchedule ?? ""}
+            />
+
+            <h4 className="admin-console__label-text">How many to keep</h4>
+            <RetentionFields
+              value={tenantDraft.retention}
+              onChange={(retention) => setTenantDraft({ ...tenantDraft, retention })}
+            />
+
+            {!overrideBlocked && (
               <>
-                <label className="admin-console__label">
-                  <span className="admin-console__label-text">Schedule (UTC)</span>
-                  <input
-                            placeholder="leave empty to inherit"
-                    value={tenantDraft.schedule}
-                    onChange={(e) => setTenantDraft({ ...tenantDraft, schedule: e.target.value })}
-                  />
-                </label>
-                <label className="admin-console__checkbox">
-                  <input
-                    type="checkbox"
-                    checked={tenantDraft.suspendSchedule}
-                    onChange={(e) =>
-                      setTenantDraft({ ...tenantDraft, suspendSchedule: e.target.checked })
-                    }
-                  />
-                  <span>No scheduled backups for this workspace</span>
-                </label>
-
-                <h4 className="admin-console__label-text">Keep</h4>
-                <RetentionFields
-                  value={tenantDraft.retention}
-                  onChange={(retention) => setTenantDraft({ ...tenantDraft, retention })}
+                <h4 className="admin-console__label-text">Where backups are stored</h4>
+                <StorageFields
+                  draft={tenantDraft}
+                  setDraft={setTenantDraft}
+                  platformLabel="The platform's storage (recommended)"
                 />
-
-                <h4 className="admin-console__label-text">Your own storage</h4>
-                <DestinationFields draft={tenantDraft} setDraft={setTenantDraft} />
-
-                {movingStorage && (
-                  <div className="admin-console__warning">
-                    <p>
-                      Backups will be written to your storage instead of the platform&apos;s.
-                      Recovering then starts by fetching a bundle from there, so it depends on
-                      that endpoint being reachable and on the keys staying valid — if either
-                      lapses, the backups are unusable until it is fixed.
-                    </p>
-                    <p>
-                      Bundles already written stay where they are and remain restorable.
-                    </p>
-                    <label className="admin-console__label">
-                      <span className="admin-console__label-text">
-                        Type <code>{tenant}</code> to confirm
-                      </span>
-                      <input
-                                    value={confirmName}
-                        onChange={(e) => setConfirmName(e.target.value)}
-                        autoComplete="off"
-                      />
-                    </label>
-                  </div>
-                )}
-
-                <div className="admin-console__submit">
-                  <button
-                    type="button"
-                    className="admin-console__btn admin-console__btn--primary"
-                    disabled={
-                      saveTenant.isPending || (movingStorage && confirmName.trim() !== tenant)
-                    }
-                    onClick={() => saveTenant.mutate()}
-                  >
-                    {saveTenant.isPending ? "Saving…" : "Save"}
-                  </button>
-                  {tenantPolicy?.configured && (
-                    <button
-                      type="button"
-                      className="admin-console__btn admin-console__btn--danger"
-                      disabled={reset.isPending}
-                      onClick={() => {
-                        if (window.confirm("Go back to the cluster default?")) reset.mutate();
-                      }}
-                    >
-                      Use the cluster default
-                    </button>
-                  )}
-                </div>
               </>
             )}
+
+            {movingStorage && (
+              <div className="admin-console__warning">
+                <p>
+                  Backups will be written to your storage instead of the platform&apos;s.
+                  Recovering then starts by fetching a backup from there, so it depends on that
+                  storage being reachable and the keys staying valid.
+                </p>
+                <p>Backups already taken stay where they are and can still be restored.</p>
+                <label className="admin-console__label">
+                  <span className="admin-console__label-text">
+                    Type <code>{tenant}</code> to confirm
+                  </span>
+                  <input
+                    value={confirmName}
+                    onChange={(e) => setConfirmName(e.target.value)}
+                    autoComplete="off"
+                  />
+                </label>
+              </div>
+            )}
+
+            <div className="admin-console__submit">
+              <button
+                type="button"
+                className="admin-console__btn admin-console__btn--primary"
+                disabled={saveTenant.isPending || (movingStorage && confirmName.trim() !== tenant)}
+                onClick={() => saveTenant.mutate()}
+              >
+                {saveTenant.isPending ? "Saving…" : "Save"}
+              </button>
+              {tenantPolicy?.configured && (
+                <button
+                  type="button"
+                  className="admin-console__btn admin-console__btn--danger"
+                  disabled={reset.isPending}
+                  onClick={() => {
+                    if (window.confirm("Go back to the cluster settings?")) reset.mutate();
+                  }}
+                >
+                  Use the cluster settings
+                </button>
+              )}
+            </div>
           </>
         )}
 
         {tenantPolicy && <EffectiveSummary policy={tenantPolicy} />}
       </div>
     </section>
-  );
-}
-
-function EffectiveInline({ policy }: { policy: BackupPolicy }) {
-  return (
-    <>
-      Backups go to <code>{policy.effectiveBucket || "the platform's storage"}</code>
-      {policy.effectiveSchedule ? `, ${policy.effectiveSchedule} UTC.` : ", on request only."}
-    </>
   );
 }
