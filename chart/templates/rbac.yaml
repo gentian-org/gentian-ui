@@ -25,6 +25,13 @@ rules:
   - apiGroups: ["gentianos.io"]
     resources: ["tenantexports"]
     verbs: ["get", "list", "watch", "create", "delete"]
+  # Backup settings. Update and delete are both needed: a policy is edited in
+  # place, and deleting a tenant's returns it to inheriting the cluster's.
+  # Cluster-scoped for both scopes, so the console — not RBAC — is what keeps a
+  # tenant admin off the cluster policy and off other tenants'.
+  - apiGroups: ["gentianos.io"]
+    resources: ["backuppolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "list"]

@@ -2070,7 +2070,9 @@ async def put_cluster_backup_policy(
 
     await record_admin_audit(
         user,
-        tenant="",
+        # The kernel realm, not "": the audit log lives in a per-tenant
+        # database, and an empty name resolves to no database at all.
+        tenant=settings.kernel_realm,
         action="backup.policy.cluster.updated",
         target="default",
         details={

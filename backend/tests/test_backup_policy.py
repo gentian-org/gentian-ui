@@ -206,3 +206,23 @@ def test_only_platform_admins_may_set_cluster_defaults():
 
     platform_admin = {"groups": ["gentian:platform:superadmin"]}
     admin_routes._require_platform_admin(platform_admin, settings)  # no raise
+
+
+@pytest.mark.asyncio
+async def test_cluster_save_audits_against_a_real_tenant(policies: FakePolicies, monkeypatch):
+    """The audit log lives in a per-tenant database, so an empty tenant name
+    resolves to no database and the write fails — turning a saved policy into
+    a 500. The cluster policy audits against the kernel realm instead."""
+    seen: dict[str, object] = {}
+
+    async def capture(user, *, tenant, action, target, details):
+        seen["tenant"] = tenant
+
+    monkeypatch.setattr(admin_routes, "record_admin_audit", capture)
+    async with await _client() as client:
+        resp = await client.put(
+            "/api/v1/admin/backup-policy/cluster",
+            json={"destination": {}, "schedule": "0 3 * * *"},
+        )
+    assert resp.status_code == 200
+    assert seen["tenant"], "cluster policy audited against an empty tenant"
