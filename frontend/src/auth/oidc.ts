@@ -384,7 +384,36 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
     params.set("kc_idp_hint", normalized.idpHint);
   }
 
-  window.location.href = `${issuer}/protocol/openid-connect/auth?${params}`;
+  // Authenticate in the top-level window, never in a frame.
+  //
+  // The shell opens apps framed, and Keycloak is reachable framed on purpose —
+  // the tenant realm clears xFrameOptions so the portal can embed it. But a
+  // framed Keycloak is a third-party context, and its cookies are SameSite=None,
+  // which browsers accept first-party only. Chrome blocks them in private
+  // windows outright and is removing them elsewhere; Safari and Firefox already
+  // partition them.
+  //
+  // The cookie that goes missing first is AUTH_SESSION_ID, which Keycloak sets
+  // before the password is even entered and uses to correlate the form POST with
+  // the authentication session it started. Without it the flow restarts, so the
+  // password is accepted and asked for again — two or three times before a retry
+  // happens to land. Whatever finally succeeds leaves no KEYCLOAK_IDENTITY
+  // behind, so the session exists on the server and nowhere in the browser, and
+  // every app that authenticates through Keycloak prompts as if nobody had
+  // signed in. Apps reached through the portal's own ticket bridge are unaffected,
+  // which is what makes the failure look app-specific rather than systemic.
+  //
+  // window.top is same-origin when the shell frames its own pages, and cross-
+  // origin framing still permits top navigation for a non-sandboxed frame. The
+  // fallback covers the case where the assignment is refused; it is no worse
+  // than the previous behaviour.
+  const authorizeUrl = `${issuer}/protocol/openid-connect/auth?${params}`;
+  const topWindow = window.top ?? window;
+  try {
+    topWindow.location.href = authorizeUrl;
+  } catch {
+    window.location.href = authorizeUrl;
+  }
 }
 
 export async function logoutRedirect(): Promise<void> {
