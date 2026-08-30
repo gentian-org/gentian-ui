@@ -124,6 +124,8 @@ export type ShellApp = {
   launchUrl: string | null;
   linkTarget?: string | null;
   authMode?: string | null;
+  /** The app asks to be opened hidden at desktop mount; see gentianos.io/portal-preopen. */
+  preopen?: boolean;
   builtin?: boolean;
 };
 

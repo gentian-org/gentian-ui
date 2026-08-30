@@ -104,6 +104,18 @@ def profile_auth_mode(profile: dict[str, Any], profile_name: str) -> str | None:
     return None
 
 
+def profile_preopen(profile: dict[str, Any]) -> bool:
+    """Whether the shell should open this app hidden at desktop mount.
+
+    Some apps need a live session before the user ever clicks their tile -- the
+    AI widget queries its backing app in the background, and a cold app answers
+    with a login redirect. The app declares that need itself; the shell must not
+    know which app it is.
+    """
+    annotations = profile.get("metadata", {}).get("annotations") or {}
+    return str(annotations.get("gentianos.io/portal-preopen", "")).lower() in {"true", "1", "yes"}
+
+
 def tile_icon(profile_spec: dict[str, Any], portal_tile: dict[str, Any]) -> str:
     tile_spec = portal_tile.get("tile") or {}
     if tile_spec.get("logo"):
@@ -277,6 +289,7 @@ async def tenant_shell_apps(
                     "launchUrl": launch_url,
                     "linkTarget": str(portal_tile.get("linkTarget") or "newwindow"),
                     "authMode": profile_auth_mode(auth_profile, auth_profile_name),
+                    "preopen": profile_preopen(auth_profile),
                     "builtin": False,
                 }
             )

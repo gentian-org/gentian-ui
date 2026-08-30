@@ -68,7 +68,13 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
     queryKey: ["admin", "context"],
     queryFn: () => fetchAdminContext(),
   });
-  const tenant = contextQuery.data?.tenant ?? "demo";
+  // No tenant literal as a fallback. Hooks must be declared before the early
+  // returns below, so this runs before the loading and error guards -- but the
+  // groups query is gated on the context having loaded, and every consumer of
+  // `tenant` sits after those guards, so the empty string is never used. It used
+  // to read `?? "demo"`, which would have queried a real, unrelated tenant the
+  // moment someone reordered any of that.
+  const tenant = contextQuery.data?.tenant ?? "";
 
   const groupsQuery = useQuery({
     queryKey: ["admin", "groups", tenant],

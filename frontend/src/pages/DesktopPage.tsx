@@ -59,29 +59,28 @@ export function DesktopPage() {
     }
   }, [activeAppId, setActiveAppId, windows]);
 
-  // Embedded OIDC apps (Odoo) used to need a manual first-party-cookie bootstrap —
-  // a hidden iframe on load, a 1×1 off-screen popup per tile click — because portal
-  // sign-in used a password grant that never took the browser to Keycloak as a
-  // top-level page, so no first-party session cookie existed to reuse. Portal
-  // sign-in is a real Keycloak redirect now, which already visits
-  // id.<kernel-domain> as a top-level navigation before the
-  // user ever reaches the desktop — the cookie the bootstrap used to manufacture
-  // exists by construction, so this mount effect no longer needs to wait for
-  // anything before pre-opening open-webui.
+  // Some apps need a live session before their tile is ever clicked -- the AI
+  // widget queries its backing app in the background, and a cold app answers with
+  // a login redirect. Those apps say so themselves, via the profile annotation
+  // gentianos.io/portal-preopen; the shell must not know which app it is.
+  //
+  // This used to need a first-party-cookie bootstrap first (a hidden iframe on
+  // load, a 1x1 off-screen popup per tile click) because portal sign-in used a
+  // password grant that never took the browser to Keycloak as a top-level page.
+  // Sign-in is a real Keycloak redirect now and visits id.<kernel-domain> before
+  // the user reaches the desktop, so the cookie exists by construction.
   useEffect(() => {
-    const openWebUi = apps.find((a) => a.id === "open-webui-open-webui");
-    if (openWebUi && openWebUi.launchUrl) {
-      const hasWindow = windows.some((w) => w.appId === openWebUi.id);
-      if (!hasWindow) {
-        openWindow({
-          id: openWebUi.id,
-          appId: openWebUi.id,
-          title: openWebUi.title,
-          url: openWebUi.launchUrl,
-          isHidden: true,
-          state: "minimized",
-        });
-      }
+    for (const app of apps) {
+      if (!app.preopen || !app.launchUrl) continue;
+      if (windows.some((w) => w.appId === app.id)) continue;
+      openWindow({
+        id: app.id,
+        appId: app.id,
+        title: app.title,
+        url: app.launchUrl,
+        isHidden: true,
+        state: "minimized",
+      });
     }
   }, [apps, windows, openWindow]);
 
