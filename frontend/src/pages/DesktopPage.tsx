@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { getAccessToken } from "@/auth/oidc";
 import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
 import {
   fetchPortalBridgeTicket,
@@ -208,7 +209,13 @@ export function DesktopPage() {
             );
           } else {
             if (needsBridgeTicket) closeWindow(winId);
-            window.alert(`Could not open ${app.title}. Try signing in again.`);
+            // An expired session already sent the user to login; alerting on top
+            // of that blocks the navigation behind a dialog telling them to do
+            // by hand what is happening anyway. Only report a ticket failure
+            // the user can still be in the desktop for.
+            if (getAccessToken()) {
+              window.alert(`Could not open ${app.title}. Try signing in again.`);
+            }
             return;
           }
         }
