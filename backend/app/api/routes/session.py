@@ -11,7 +11,6 @@ from app.core.gentian_groups import (
     user_is_platform_admin,
 )
 from app.core.shell_apps import shell_apps_for_user
-from app.services.admin_store import AdminStoreDep
 from app.core.tenant import resolve_user_context
 from app.services.matrix_session_bridge import (
     create_matrix_bridge_ticket,
@@ -61,7 +60,6 @@ def _apply_openproject_bridge_cors(request: Request, response: Response, setting
 
 @router.get("/me")
 async def get_me(
-    store: AdminStoreDep,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> dict[str, Any]:
@@ -79,7 +77,7 @@ async def get_me(
         "isTenantAdmin": settings.auth_disabled
         or is_tenant_admin(groups)
         or is_bootstrap_tenant_admin(user),
-        "shellApps": await shell_apps_for_user(user, settings, store=store),
+        "shellApps": await shell_apps_for_user(user, settings),
     }
 
 

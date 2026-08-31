@@ -106,6 +106,37 @@ def test_app_launch_url_api_profile_without_tenant_binding():
     )
 
 
+ODOO_BASE_PROFILE = {
+    "metadata": {"name": "odoo-base-ce"},
+    "spec": {
+        "family": "odoo",
+        "ingress": {"subDomain": "erp"},
+        "portalTiles": [
+            {"name": "odoo-admin", "allowedGroup": "App Admins", "linkTarget": "embedded"}
+        ],
+    },
+}
+
+ODOO_CRM_PROFILE = {
+    "metadata": {
+        "name": "odoo-crm-ce",
+        "annotations": {"gentianos.io/deployment-role": "addon"},
+    },
+    "spec": {
+        "displayName": "Odoo CRM",
+        "family": "odoo",
+        "customization": {"addon": {"id": "crm", "of": "odoo-base-ce"}},
+        "portalTiles": [{"name": "crm", "allowedGroup": "App Users"}],
+    },
+}
+
+
+def _fake_odoo_profile(name: str):
+    return {
+        "odoo-base-ce": ODOO_BASE_PROFILE,
+        "odoo-crm-ce": ODOO_CRM_PROFILE,
+    }.get(name)
+
 def test_is_admin_portal_tile():
     assert is_admin_portal_tile("Tenant Admins")
     assert not is_admin_portal_tile("App Users")
@@ -204,6 +235,7 @@ async def test_shell_apps_for_member_includes_entitled_app():
             "launchUrl": "https://chat.demo.desk.gentian.org",
             "linkTarget": "embedded",
             "authMode": "matrix-bridge",
+            "preopen": False,
             "builtin": False,
         }
     ]
@@ -234,6 +266,7 @@ async def test_shell_apps_for_openproject_uses_bridge_auth_mode():
             "launchUrl": "https://projects.demo.desk.gentian.org",
             "linkTarget": "embedded",
             "authMode": "openproject-bridge",
+            "preopen": False,
             "builtin": False,
         }
     ]
@@ -284,6 +317,7 @@ async def test_shell_apps_for_nextcloud_uses_bridge_auth_mode():
             "launchUrl": "https://cloud.demo.desk.gentian.org",
             "linkTarget": "embedded",
             "authMode": "portal-bridge",
+            "preopen": False,
             "builtin": False,
         }
     ]
@@ -360,69 +394,126 @@ async def test_shell_apps_for_member_without_entitlement_empty():
     assert apps == []
 
 
-async def test_shell_apps_for_odoo_module_visibility():
+async def test_addon_tile_needs_that_addons_own_group():
+    """Entitlement is the addon's own group -- tenant membership is not enough."""
+    settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    settings.auth_disabled = False
+
+    def user_with(*groups):
+        return {
+            "preferred_username": "john-doe@demo.desk.gentian.org",
+            "tenant": "demo",
+            "groups": list(groups),
+        }
+
+    with (
+        patch(
+            "app.core.shell_apps.list_installed_profiles",
+            return_value=["odoo-base-ce", "odoo-crm-ce"],
+        ),
+        patch("app.core.shell_apps.get_app_profile", side_effect=_fake_odoo_profile),
+        patch("app.core.shell_apps.is_platform_app", return_value=False),
+    ):
+        entitled = await shell_apps_for_user(
+            user_with(
+                "gentian:tenant:demo:members",
+                "gentian:tenant:demo:app:odoo-base-ce",
+                "gentian:tenant:demo:app:odoo-crm-ce",
+            ),
+            settings,
+        )
+        member_only = await shell_apps_for_user(
+            user_with(
+                "gentian:tenant:demo:members",
+                "gentian:tenant:demo:app:odoo-base-ce",
+            ),
+            settings,
+        )
+
+    ids = [app["id"] for app in entitled]
+    assert "odoo-crm-ce-crm" in ids
+    crm = next(app for app in entitled if app["id"] == "odoo-crm-ce-crm")
+    assert crm["launchUrl"] == "https://erp.demo.desk.gentian.org"
+
+    # Holding the base and being a tenant member used to be enough for every
+    # addon tile in the family.
+    assert [app["id"] for app in member_only] == []
+
+
+async def test_base_tile_hidden_when_no_addon_is_entitled():
+    """A base with no entitled addon has nothing to offer, so it stays hidden."""
     settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
     settings.auth_disabled = False
     user = {
-        "preferred_username": "crm-user@demo.desk.gentian.org",
+        "preferred_username": "john-doe@demo.desk.gentian.org",
         "tenant": "demo",
-        "groups": ["/sales-team"],
+        "groups": [
+            "gentian:tenant:demo:members",
+            # entitled to the base itself, but to none of the addons in it
+            "gentian:tenant:demo:app:odoo-base-ce",
+        ],
     }
-    
-    crm_profile = {
-        "metadata": {
-            "name": "odoo-crm-ce",
-            "annotations": {"gentianos.io/deployment-role": "addon"},
-        },
-        "spec": {
-            "displayName": "Odoo CRM",
-            "family": "odoo",
-            # The gate reads the module's real Odoo name from here, not from the
-            # profile name.
-            "customization": {"addon": {"id": "crm", "of": "odoo-base-ce"}},
-            "portalTiles": [{"name": "crm", "allowedGroup": "App Users"}],
-        }
-    }
-    
-    base_profile = {
-        "metadata": {"name": "odoo-base-ce"},
-        "spec": {
-            "family": "odoo",
-            "ingress": {"subDomain": "erp"},
-        }
-    }
-    
-    def fake_profile(name: str):
-        if name == "odoo-crm-ce":
-            return crm_profile
-        if name == "odoo-base-ce":
-            return base_profile
-        return None
-    
-    # Mock AdminStore list_groups
-    from unittest.mock import AsyncMock
-    from app.services.admin_store import Group
-    
-    mock_store = AsyncMock()
-    mock_store.list_groups.return_value = [
-        Group(
-            id="g1",
-            name="sales-team",
-            path="/sales-team",
-            gentian_odoo_modules=["crm"],
-        )
-    ]
-    
     with (
-        patch("app.core.shell_apps.list_installed_profiles", return_value=["odoo-crm-ce"]),
-        patch("app.core.shell_apps.get_app_profile", side_effect=fake_profile),
+        patch(
+            "app.core.shell_apps.list_installed_profiles",
+            return_value=["odoo-base-ce", "odoo-crm-ce"],
+        ),
+        patch("app.core.shell_apps.get_app_profile", side_effect=_fake_odoo_profile),
         patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
-        apps = await shell_apps_for_user(user, settings, store=mock_store)
-        
-    assert len(apps) == 1
-    assert apps[0]["id"] == "odoo-crm-ce-crm"
-    assert apps[0]["launchUrl"] == "https://erp.demo.desk.gentian.org"
+        apps = await shell_apps_for_user(user, settings)
+
+    assert [app["id"] for app in apps] == []
+
+
+async def test_base_tile_shown_once_one_addon_is_entitled():
+    settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    settings.auth_disabled = False
+    user = {
+        "preferred_username": "john-doe@demo.desk.gentian.org",
+        "tenant": "demo",
+        "groups": [
+            "gentian:tenant:demo:members",
+            "gentian:tenant:demo:app:odoo-base-ce",
+            "gentian:tenant:demo:app:odoo-crm-ce",
+        ],
+    }
+    with (
+        patch(
+            "app.core.shell_apps.list_installed_profiles",
+            return_value=["odoo-base-ce", "odoo-crm-ce"],
+        ),
+        patch("app.core.shell_apps.get_app_profile", side_effect=_fake_odoo_profile),
+        patch("app.core.shell_apps.is_platform_app", return_value=False),
+    ):
+        apps = await shell_apps_for_user(user, settings)
+
+    assert "odoo-base-ce-odoo-admin" in [app["id"] for app in apps]
+
+
+async def test_base_without_activated_addons_is_not_hollow():
+    """A base the tenant activated nothing in is a plain app, not a hollow base."""
+    settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    settings.auth_disabled = False
+    user = {
+        "preferred_username": "john-doe@demo.desk.gentian.org",
+        "tenant": "demo",
+        "groups": [
+            "gentian:tenant:demo:members",
+            "gentian:tenant:demo:app:odoo-base-ce",
+        ],
+    }
+    with (
+        patch(
+            "app.core.shell_apps.list_installed_profiles",
+            return_value=["odoo-base-ce"],
+        ),
+        patch("app.core.shell_apps.get_app_profile", side_effect=_fake_odoo_profile),
+        patch("app.core.shell_apps.is_platform_app", return_value=False),
+    ):
+        apps = await shell_apps_for_user(user, settings)
+
+    assert [app["id"] for app in apps] == ["odoo-base-ce-odoo-admin"]
 
 
 # --- capability-gated platform apps -----------------------------------------
