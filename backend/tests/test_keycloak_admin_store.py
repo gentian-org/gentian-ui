@@ -86,3 +86,31 @@ def test_session_from_raw_maps_keycloak_fields():
     assert session.ip_address == "203.0.113.10"
     assert session.started_at == 1_700_000_000
     assert session.last_access_at == 1_700_000_500
+
+
+def test_group_from_raw_reads_the_default_grant_marker():
+    """Keycloak stores every group attribute as a list of strings."""
+    provisioned = KeycloakAdminStore._group_from_raw(
+        {
+            "id": "g1",
+            "name": "gentian:tenant:demo:app:odoo-crm-ce",
+            "attributes": {"gentianDefaultGrant": ["true"]},
+        }
+    )
+    assert provisioned.default_grant is True
+
+
+def test_group_from_raw_defaults_to_no_grant():
+    """An app that was installed rather than provisioned carries no marker, and
+    an installed app must not be ticked when a tenant admin adds a user."""
+    installed = KeycloakAdminStore._group_from_raw(
+        {
+            "id": "g2",
+            "name": "gentian:tenant:demo:app:odoo-mrp-ce",
+            "attributes": {"gentianOdooModules": ["mrp"]},
+        }
+    )
+    assert installed.default_grant is False
+
+    bare = KeycloakAdminStore._group_from_raw({"id": "g3", "name": "custom-group"})
+    assert bare.default_grant is False

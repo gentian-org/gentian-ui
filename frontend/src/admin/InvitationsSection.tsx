@@ -157,8 +157,20 @@ export function InvitationsSection({
     });
   }, [appEntitlementGroups]);
 
-  // ── Default group selection: all app entitlement groups ON, others OFF ────
-  const defaultAppGroupIds = useCallback(() => visibleAppGroups.map((g) => g.id), [visibleAppGroups]);
+  // ── Default group selection: the apps the tenant provisioned ──────────────
+  //
+  // Provision and Install differ in the App Store by whether every existing user
+  // is granted the app, and the operator records which was chosen on the group.
+  // That is the same question being asked here about a user who does not exist
+  // yet, so the answer is the same: provisioned apps come ticked and are opted
+  // out of, installed ones come unticked and are opted in to.
+  //
+  // This used to tick every app group, which made the choice at install time
+  // mean nothing for anybody hired afterwards.
+  const defaultAppGroupIds = useCallback(
+    () => visibleAppGroups.filter((g) => g.defaultGrant).map((g) => g.id),
+    [visibleAppGroups],
+  );
 
   const [form, setForm] = useState({
     firstName: "",

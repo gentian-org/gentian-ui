@@ -117,6 +117,8 @@ class GroupResponse(BaseModel):
     memberCount: int = 0
     gentianOdooModules: list[str] = Field(default_factory=list)
     gentianOdooGroupRoles: list[str] = Field(default_factory=list)
+    # Whether adding a user should tick this group by default.
+    defaultGrant: bool = False
 
 
 class AdminContextResponse(BaseModel):
@@ -314,6 +316,7 @@ def _group_response(group: Any) -> GroupResponse:
         memberCount=group.member_count,
         gentianOdooModules=getattr(group, "gentian_odoo_modules", []),
         gentianOdooGroupRoles=getattr(group, "gentian_odoo_group_roles", []),
+        defaultGrant=bool(getattr(group, "default_grant", False)),
     )
 
 

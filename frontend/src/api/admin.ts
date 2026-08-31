@@ -36,6 +36,9 @@ export type AdminGroup = {
   memberCount: number;
   gentianOdooModules?: string[];
   gentianOdooGroupRoles?: string[];
+  /** The tenant provisioned this app rather than only installing it, so adding
+   *  a member ticks it by default. */
+  defaultGrant?: boolean;
 };
 
 function tenantQuery(tenant?: string) {

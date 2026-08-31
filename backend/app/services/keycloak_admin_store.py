@@ -13,6 +13,14 @@ from fastapi import HTTPException, status
 from app.services.admin_store import CONFIGURE_TOTP_ACTION, INVITE_EMAIL_ATTR, PROFILE_PROMPT_ACTIONS, UPDATE_PASSWORD_ACTION, Group, Member, UserSession
 
 
+
+def _attribute_is_true(value: Any) -> bool:
+    """Keycloak stores every group attribute as a list of strings."""
+    if isinstance(value, list):
+        return any(str(v).strip().lower() == "true" for v in value)
+    return str(value or "").strip().lower() == "true"
+
+
 class KeycloakAdminStore:
     def __init__(
         self,
@@ -775,6 +783,7 @@ class KeycloakAdminStore:
             member_count=int(raw.get("subGroupCount") or 0),
             gentian_odoo_modules=modules,
             gentian_odoo_group_roles=roles,
+            default_grant=_attribute_is_true(attributes.get("gentianDefaultGrant")),
         )
 
     @staticmethod
