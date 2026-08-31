@@ -13,7 +13,11 @@ from app.core.gentian_groups import (
     user_is_platform_admin,
 )
 from app.core.tenant import extract_tenant_from_claims
-from app.services.k8s_catalogue import get_app_profile, is_platform_app, list_installed_profiles, list_platform_app_profiles
+from app.services.k8s_catalogue import (
+    get_app_profile,
+    list_installed_profiles,
+    list_platform_app_profiles,
+)
 
 ADMIN_SHELL_APP = {
     "id": "admin",

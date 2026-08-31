@@ -2,6 +2,8 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from app.core.config import Settings
 from app.core.shell_apps import (
     app_launch_url,
@@ -9,6 +11,18 @@ from app.core.shell_apps import (
     shell_apps_for_user,
     user_can_see_portal_tile,
 )
+
+
+@pytest.fixture(autouse=True)
+def platform_profiles():
+    """Platform-app tiles come from the cluster's AppProfiles, which these tests
+    do not have -- unmocked, every shell_apps_for_user case died in the k8s
+    client. The tile sets under test are the tenant's own, so the platform list
+    is empty unless a test sets a return value on this fixture.
+    """
+    with patch("app.core.shell_apps.list_platform_app_profiles", return_value=[]) as listed:
+        yield listed
+
 
 APP_STORE_PROFILE = {
     "metadata": {"name": "app-store", "annotations": {"gentianos.io/platform-app": "true"}},
@@ -175,7 +189,7 @@ def test_member_does_not_see_admin_app_tile():
     )
 
 
-async def test_shell_apps_for_tenant_admin_includes_admin_and_app_store_only():
+async def test_shell_apps_for_tenant_admin_includes_admin_and_app_store_only(platform_profiles):
     settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
     settings.auth_disabled = False
     user = {
@@ -191,16 +205,11 @@ async def test_shell_apps_for_tenant_admin_includes_admin_and_app_store_only():
             return APP_STORE_PROFILE
         return None
 
+    platform_profiles.return_value = ["app-store"]
+
     with (
         patch("app.core.shell_apps.list_installed_profiles", return_value=["element"]),
         patch("app.core.shell_apps.get_app_profile", side_effect=fake_profile),
-        patch(
-            "app.core.shell_apps.is_platform_app",
-            side_effect=lambda profile: profile.get("metadata", {})
-            .get("annotations", {})
-            .get("gentianos.io/platform-app")
-            == "true",
-        ),
     ):
         apps = await shell_apps_for_user(user, settings)
 
@@ -224,7 +233,6 @@ async def test_shell_apps_for_member_includes_entitled_app():
     with (
         patch("app.core.shell_apps.list_installed_profiles", return_value=["element"]),
         patch("app.core.shell_apps.get_app_profile", return_value=ELEMENT_PROFILE),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings)
     assert apps == [
@@ -255,7 +263,6 @@ async def test_shell_apps_for_openproject_uses_bridge_auth_mode():
     with (
         patch("app.core.shell_apps.list_installed_profiles", return_value=["openproject"]),
         patch("app.core.shell_apps.get_app_profile", return_value=OPENPROJECT_PROFILE),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings)
     assert apps == [
@@ -306,7 +313,6 @@ async def test_shell_apps_for_nextcloud_uses_bridge_auth_mode():
     with (
         patch("app.core.shell_apps.list_installed_profiles", return_value=["nextcloud-office"]),
         patch("app.core.shell_apps.get_app_profile", return_value=nextcloud_profile),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings)
     assert apps == [
@@ -357,7 +363,6 @@ async def test_shell_apps_uses_annotated_portal_auth_mode():
     with (
         patch("app.core.shell_apps.list_installed_profiles", return_value=["some-app"]),
         patch("app.core.shell_apps.get_app_profile", return_value=custom_profile),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings)
     assert len(apps) == 1
@@ -388,7 +393,6 @@ async def test_shell_apps_for_member_without_entitlement_empty():
     with (
         patch("app.core.shell_apps.list_installed_profiles", return_value=["element"]),
         patch("app.core.shell_apps.get_app_profile", return_value=element_profile),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings)
     assert apps == []
@@ -412,7 +416,6 @@ async def test_addon_tile_needs_that_addons_own_group():
             return_value=["odoo-base-ce", "odoo-crm-ce"],
         ),
         patch("app.core.shell_apps.get_app_profile", side_effect=_fake_odoo_profile),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         entitled = await shell_apps_for_user(
             user_with(
@@ -459,7 +462,6 @@ async def test_base_tile_hidden_when_no_addon_is_entitled():
             return_value=["odoo-base-ce", "odoo-crm-ce"],
         ),
         patch("app.core.shell_apps.get_app_profile", side_effect=_fake_odoo_profile),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings)
 
@@ -484,7 +486,6 @@ async def test_base_tile_shown_once_one_addon_is_entitled():
             return_value=["odoo-base-ce", "odoo-crm-ce"],
         ),
         patch("app.core.shell_apps.get_app_profile", side_effect=_fake_odoo_profile),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings)
 
@@ -509,7 +510,6 @@ async def test_base_without_activated_addons_is_not_hollow():
             return_value=["odoo-base-ce"],
         ),
         patch("app.core.shell_apps.get_app_profile", side_effect=_fake_odoo_profile),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings)
 
