@@ -3,6 +3,7 @@ from fastapi.responses import Response
 
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
+from app.core.gentian_groups import user_is_platform_admin, user_is_tenant_admin
 from app.core.tenant import resolve_user_context
 from app.services.shell_prefs_store import (
     ALLOWED_BACKGROUND_MIMES,
@@ -111,10 +112,12 @@ class ApplyTemplateRequest(BaseModel):
 def require_admin(user: dict, settings: Settings) -> None:
     if settings.auth_disabled:
         return
-    roles = user.get("roles") or []
-    if "portal-admin" in roles or "platform-admin" in roles:
+    if user_is_platform_admin(user) or user_is_tenant_admin(user):
         return
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin permissions required")
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Settings templates require tenant or platform administrator privileges",
+    )
 
 @router.get("/templates")
 def list_templates(

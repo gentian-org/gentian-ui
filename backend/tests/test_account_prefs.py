@@ -1,8 +1,11 @@
 import io
 
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
+from app.api.routes import prefs as prefs_routes
+from app.core.config import Settings
 from app.main import app
 
 
@@ -195,3 +198,23 @@ async def test_check_iframe_embeddable():
         assert "embeddable" in data
 
 
+def _auth_settings() -> Settings:
+    s = Settings(ENVIRONMENT="local", KERNEL_DOMAIN="desk.gentian.org")
+    s.auth_disabled = False
+    return s
+
+
+def test_tenant_admins_may_manage_settings_templates():
+    """Settings templates are a tenant-admin tool, and the portal JWT carries
+    entitlements as `groups`, never as `roles`. Asserted against the guard with
+    auth enabled: the CRUD test above runs with auth disabled, where the guard
+    returns early and proves nothing."""
+    settings = _auth_settings()
+
+    prefs_routes.require_admin({"groups": ["gentian:tenant:demo:admins"]}, settings)  # no raise
+    prefs_routes.require_admin({"groups": ["gentian:platform:superadmin"]}, settings)  # no raise
+
+    member = {"groups": ["gentian:tenant:demo:members"]}
+    with pytest.raises(HTTPException) as exc:
+        prefs_routes.require_admin(member, settings)
+    assert exc.value.status_code == 403
