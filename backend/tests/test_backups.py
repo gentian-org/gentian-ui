@@ -3,6 +3,7 @@
 from typing import Any
 
 import pytest
+from kubernetes.client.rest import ApiException
 from httpx import ASGITransport, AsyncClient
 
 from app.api.routes import admin as admin_routes
@@ -439,3 +440,41 @@ async def test_a_failed_export_takes_its_transient_keys_with_it(cluster: FakeClu
         assert response.status_code == 503, response.text
 
     assert cluster.destination_keys == {}
+
+
+def test_reusing_a_backup_name_replaces_the_secret_without_update(monkeypatch):
+    """The portal holds create, get and delete on tenant Secrets — not update.
+
+    Reusing a backup name is the normal case, not an edge one: the console
+    offers a name derived from the clock, so a retry inside the same minute
+    proposes the same name and finds the previous attempt's Secret. Replacing it
+    with an update failed with a 403 that named the portal's ServiceAccount and
+    told the person nothing they could act on.
+    """
+    from app.services import k8s_backup
+
+    calls: list[str] = []
+
+    class FakeCoreApi:
+        def create_namespaced_secret(self, namespace, body):
+            calls.append("create")
+            # The first create collides with the leftover; the second succeeds.
+            if calls.count("create") == 1:
+                raise ApiException(status=409, reason="AlreadyExists")
+
+        def delete_namespaced_secret(self, name, namespace):
+            calls.append("delete")
+
+        def replace_namespaced_secret(self, name, namespace, body):
+            calls.append("replace")
+            raise AssertionError(
+                "replace needs the update verb, which the portal is not granted"
+            )
+
+    monkeypatch.setattr(k8s_backup, "_core_api", lambda: FakeCoreApi())
+    name = k8s_backup.create_passphrase_secret("corp", "export-2026-09-02-19-54", "hunter2hunter2")
+
+    assert name == "tenant-export-passphrase-export-2026-09-02-19-54"
+    assert calls == ["create", "delete", "create"], (
+        f"expected create → delete → create using only the verbs the portal has, got {calls}"
+    )

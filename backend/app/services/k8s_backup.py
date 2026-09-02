@@ -146,15 +146,7 @@ def create_passphrase_secret(tenant: str, export_name: str, passphrase: str) -> 
         type="Opaque",
         data={PASSPHRASE_KEY: base64.b64encode(passphrase.encode()).decode()},
     )
-    api = _core_api()
-    try:
-        api.create_namespaced_secret(namespace=tenant_namespace(tenant), body=secret)
-    except ApiException as exc:
-        if exc.status != 409:
-            raise
-        api.replace_namespaced_secret(
-            name=name, namespace=tenant_namespace(tenant), body=secret
-        )
+    _create_or_replace_secret(tenant, name, secret)
     return name
 
 
@@ -207,15 +199,7 @@ def create_destination_secret(
             DESTINATION_SECRET_KEY: base64.b64encode(secret_key.encode()).decode(),
         },
     )
-    api = _core_api()
-    try:
-        api.create_namespaced_secret(namespace=tenant_namespace(tenant), body=secret)
-    except ApiException as exc:
-        if exc.status != 409:
-            raise
-        api.replace_namespaced_secret(
-            name=name, namespace=tenant_namespace(tenant), body=secret
-        )
+    _create_or_replace_secret(tenant, name, secret)
     return name
 
 
@@ -228,6 +212,44 @@ def delete_destination_secret(tenant: str, export_name: str) -> None:
     except ApiException as exc:
         if exc.status != 404:
             raise
+
+
+
+def _create_or_replace_secret(tenant: str, name: str, secret: client.V1Secret) -> None:
+    """Create a Secret, replacing one left behind by an earlier attempt.
+
+    Delete-then-create rather than replace, because the portal is granted
+    create, get and delete on tenant Secrets and deliberately not update. The
+    replace this used to do therefore failed with
+
+      secrets "tenant-export-passphrase-..." is forbidden: User
+      "system:serviceaccount:platform-kernel:gentian-portal-..." cannot update
+      resource "secrets" in API group "" in the namespace "tenant-..."
+
+    and the person saw it only when they reused a backup name — which is the
+    normal case, since the console offers a name derived from the clock and a
+    retry inside the same minute proposes the same one.
+
+    Widening the portal's RBAC to update would have been the other repair. It is
+    the wrong one: update on tenant Secrets is a strictly larger permission than
+    this needs, and what this needs is expressible with the verbs it already has.
+    """
+    api = _core_api()
+    namespace = tenant_namespace(tenant)
+    try:
+        api.create_namespaced_secret(namespace=namespace, body=secret)
+        return
+    except ApiException as exc:
+        if exc.status != 409:
+            raise
+
+    try:
+        api.delete_namespaced_secret(name=name, namespace=namespace)
+    except ApiException as exc:
+        # Gone between the create and here is the outcome we wanted anyway.
+        if exc.status != 404:
+            raise
+    api.create_namespaced_secret(namespace=namespace, body=secret)
 
 
 def delete_export(tenant: str, name: str) -> bool:
