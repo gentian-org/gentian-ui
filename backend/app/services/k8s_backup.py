@@ -26,6 +26,13 @@ PLURAL = "tenantexports"
 PASSPHRASE_SECRET_PREFIX = "tenant-export-passphrase-"
 PASSPHRASE_KEY = "passphrase"
 
+# One-off object storage keys for a single export. The field names match what
+# the operator's capture Jobs read (backup.DestinationAccessKeyField and its
+# pair), so a Secret written here is one they can consume unchanged.
+DESTINATION_SECRET_PREFIX = "tenant-export-destination-keys-"
+DESTINATION_ACCESS_KEY = "accessKey"
+DESTINATION_SECRET_KEY = "secretKey"
+
 _NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$")
 
 
@@ -95,6 +102,7 @@ def create_export(
     *,
     apps: list[str] | None = None,
     encryption: dict[str, Any] | None = None,
+    destination: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     body: dict[str, Any] = {
         "apiVersion": f"{GROUP}/{VERSION}",
@@ -106,6 +114,8 @@ def create_export(
         body["spec"]["apps"] = apps
     if encryption:
         body["spec"]["encryption"] = encryption
+    if destination:
+        body["spec"]["destination"] = destination
     return _custom_objects_api().create_namespaced_custom_object(
         GROUP, VERSION, tenant_namespace(tenant), PLURAL, body
     )
@@ -157,6 +167,63 @@ def delete_passphrase_secret(tenant: str, export_name: str) -> None:
     try:
         _core_api().delete_namespaced_secret(
             name=passphrase_secret_name(export_name), namespace=tenant_namespace(tenant)
+        )
+    except ApiException as exc:
+        if exc.status != 404:
+            raise
+
+
+def destination_secret_name(export_name: str) -> str:
+    return f"{DESTINATION_SECRET_PREFIX}{export_name}"
+
+
+def create_destination_secret(
+    tenant: str, export_name: str, access_key: str, secret_key: str
+) -> str:
+    """Store one-off object storage keys for one export, and return the name.
+
+    The same shape as the passphrase, and for the same reason: the keys reach
+    the cluster only as this Secret, the operator stages a copy beside the
+    capture Jobs and removes both when the export ends, so the platform holds
+    them for the length of one backup rather than standing.
+
+    Named from the export, never from anything the caller supplies — the
+    operator reads this name out of the spec, and a caller who could choose it
+    could point the export at a Secret they do not own.
+    """
+    name = destination_secret_name(export_name)
+    secret = client.V1Secret(
+        metadata=client.V1ObjectMeta(
+            name=name,
+            namespace=tenant_namespace(tenant),
+            labels={
+                "app.kubernetes.io/managed-by": "gentian-portal",
+                "gentianos.io/tenant-export": export_name,
+            },
+        ),
+        type="Opaque",
+        data={
+            DESTINATION_ACCESS_KEY: base64.b64encode(access_key.encode()).decode(),
+            DESTINATION_SECRET_KEY: base64.b64encode(secret_key.encode()).decode(),
+        },
+    )
+    api = _core_api()
+    try:
+        api.create_namespaced_secret(namespace=tenant_namespace(tenant), body=secret)
+    except ApiException as exc:
+        if exc.status != 409:
+            raise
+        api.replace_namespaced_secret(
+            name=name, namespace=tenant_namespace(tenant), body=secret
+        )
+    return name
+
+
+def delete_destination_secret(tenant: str, export_name: str) -> None:
+    """Best-effort cleanup for an export that was never created."""
+    try:
+        _core_api().delete_namespaced_secret(
+            name=destination_secret_name(export_name), namespace=tenant_namespace(tenant)
         )
     except ApiException as exc:
         if exc.status != 404:

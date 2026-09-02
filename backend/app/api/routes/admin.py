@@ -84,8 +84,10 @@ from app.services.k8s_backup_policy import (
     validate_schedule,
 )
 from app.services.k8s_backup import (
+    create_destination_secret,
     create_export,
     create_passphrase_secret,
+    delete_destination_secret,
     delete_export,
     delete_passphrase_secret,
     get_export,
@@ -1697,10 +1699,35 @@ class BackupEncryptionRequest(BaseModel):
     recipients: list[str] = Field(default_factory=list)
 
 
+class BackupDestinationRequest(BaseModel):
+    """Where one manual backup is written.
+
+    Mirrors TenantExport.spec.destination. Validated here as well as by the
+    CRD's own rules, because a form that submits and then fails at the API
+    server reports the API server's wording, and the person filling it in is
+    a tenant administrator rather than someone who reads CEL.
+    """
+
+    # policy: wherever the workspace's backup policy points, which is where the
+    # nightly schedule writes. platform: the platform's own storage. custom: an
+    # endpoint given here.
+    mode: Literal["policy", "platform", "custom"] = "policy"
+    endpoint: str = ""
+    bucket: str = ""
+    region: str = ""
+    # managed reuses the credential the Credential Manager already holds for
+    # this workspace — the keys the schedule uses. transient takes keys typed
+    # into the form, which are stored for the length of the export and removed.
+    credentialSource: Literal["managed", "transient"] = "managed"
+    accessKey: str = ""
+    secretKey: str = ""
+
+
 class BackupCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=40)
     apps: list[str] = Field(default_factory=list)
     encryption: BackupEncryptionRequest = Field(default_factory=BackupEncryptionRequest)
+    destination: BackupDestinationRequest = Field(default_factory=BackupDestinationRequest)
 
 
 class BackupAppStatus(BaseModel):
@@ -1845,14 +1872,27 @@ async def create_backup(
     elif body.encryption.recipients:
         encryption["recipients"] = body.encryption.recipients
 
+    destination, destination_created = _build_destination(resolved, body)
+
     try:
-        created = create_export(resolved, body.name, apps=body.apps, encryption=encryption)
+        created = create_export(
+            resolved,
+            body.name,
+            apps=body.apps,
+            encryption=encryption,
+            destination=destination,
+        )
     except Exception as exc:  # noqa: BLE001
-        # Leaving the passphrase behind for an export that was never created
+        # Leaving either secret behind for an export that was never created
         # would put it in the namespace with nothing to consume or clean it up.
         if passphrase_created:
             try:
                 delete_passphrase_secret(resolved, body.name)
+            except Exception:  # noqa: BLE001
+                pass
+        if destination_created:
+            try:
+                delete_destination_secret(resolved, body.name)
             except Exception:  # noqa: BLE001
                 pass
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
@@ -1865,9 +1905,71 @@ async def create_backup(
         details={
             "encryption": body.encryption.mode,
             "apps": ",".join(body.apps) if body.apps else "all",
+            "destination": body.destination.mode,
+            "destinationEndpoint": body.destination.endpoint,
+            "credentialSource": (
+                body.destination.credentialSource
+                if body.destination.mode == "custom"
+                else ""
+            ),
         },
     )
     return _backup_response(created)
+
+
+
+def _build_destination(
+    tenant: str, body: BackupCreateRequest
+) -> tuple[dict[str, Any] | None, bool]:
+    """Turn the form's destination into a spec, creating a Secret if needed.
+
+    Returns the spec fragment and whether a transient Secret was created, so
+    the caller can remove it if the export itself fails to create.
+
+    Omits the fragment entirely for the default. A spec that always carries
+    `destination: {mode: policy}` says the same thing as one that carries
+    nothing and invites the reader to wonder what was overridden.
+    """
+    d = body.destination
+    if d.mode == "policy":
+        return None, False
+    if d.mode == "platform":
+        return {"mode": "platform"}, False
+
+    if not d.endpoint:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="an endpoint is required when writing to your own S3 storage",
+        )
+    spec: dict[str, Any] = {
+        "mode": "custom",
+        "endpoint": d.endpoint,
+        "credentialSource": d.credentialSource,
+    }
+    if d.bucket:
+        spec["bucket"] = d.bucket
+    if d.region:
+        spec["region"] = d.region
+
+    if d.credentialSource == "managed":
+        # Nothing to create: the operator authenticates with the credential the
+        # Credential Manager already holds for this workspace, which is where
+        # the scheduled backups' keys live.
+        return spec, False
+
+    if not d.accessKey or not d.secretKey:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="an access key and a secret key are required for one-off credentials",
+        )
+    try:
+        secret_name = create_destination_secret(tenant, body.name, d.accessKey, d.secretKey)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+    spec["credentialSecretRef"] = secret_name
+    return spec, True
 
 
 @router.delete("/backups/{name}", status_code=status.HTTP_204_NO_CONTENT)

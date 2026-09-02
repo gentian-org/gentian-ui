@@ -536,6 +536,27 @@ export type Backup = {
   message: string;
 };
 
+/** Where one manual backup is written. Mirrors TenantExport.spec.destination. */
+export type BackupTarget = {
+  /**
+   * policy follows the workspace's backup policy — the same place the nightly
+   * schedule writes. platform is the platform's own storage. custom is an
+   * endpoint given here.
+   */
+  mode: "policy" | "platform" | "custom";
+  endpoint?: string;
+  bucket?: string;
+  region?: string;
+  /**
+   * managed reuses the credential the Credential Manager already holds for
+   * this workspace. transient takes keys entered on the form, which are kept
+   * for the length of the export and then removed.
+   */
+  credentialSource?: "managed" | "transient";
+  accessKey?: string;
+  secretKey?: string;
+};
+
 export type BackupCreateBody = {
   name: string;
   apps: string[];
@@ -544,6 +565,7 @@ export type BackupCreateBody = {
     passphrase?: string;
     recipients?: string[];
   };
+  destination?: BackupTarget;
 };
 
 export function fetchBackups(tenant?: string) {

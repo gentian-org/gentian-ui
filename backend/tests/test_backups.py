@@ -21,6 +21,7 @@ class FakeCluster:
     def __init__(self) -> None:
         self.exports: list[dict[str, Any]] = []
         self.secrets: dict[str, str] = {}
+        self.destination_keys: dict[str, tuple[str, str]] = {}
         self.fail_create = False
 
     def list_exports(self, tenant: str) -> list[dict[str, Any]]:
@@ -39,6 +40,7 @@ class FakeCluster:
         *,
         apps: list[str] | None = None,
         encryption: dict[str, Any] | None = None,
+        destination: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if self.fail_create:
             raise RuntimeError("apiserver unavailable")
@@ -47,6 +49,8 @@ class FakeCluster:
             spec["apps"] = apps
         if encryption:
             spec["encryption"] = encryption
+        if destination:
+            spec["destination"] = destination
         item = {
             "metadata": {"name": name, "namespace": f"tenant-{tenant}", "creationTimestamp": "2026-08-18T03:00:00Z"},
             "spec": spec,
@@ -54,6 +58,15 @@ class FakeCluster:
         }
         self.exports.append(item)
         return item
+
+    def create_destination_secret(
+        self, tenant: str, export_name: str, access_key: str, secret_key: str
+    ) -> str:
+        self.destination_keys[export_name] = (access_key, secret_key)
+        return f"tenant-export-destination-keys-{export_name}"
+
+    def delete_destination_secret(self, tenant: str, export_name: str) -> None:
+        self.destination_keys.pop(export_name, None)
 
     def create_passphrase_secret(self, tenant: str, export_name: str, passphrase: str) -> str:
         name = k8s_backup.passphrase_secret_name(export_name)
@@ -77,6 +90,8 @@ def cluster(monkeypatch) -> FakeCluster:
     monkeypatch.setattr(admin_routes, "list_exports", fake.list_exports)
     monkeypatch.setattr(admin_routes, "get_export", fake.get_export)
     monkeypatch.setattr(admin_routes, "create_export", fake.create_export)
+    monkeypatch.setattr(admin_routes, "create_destination_secret", fake.create_destination_secret)
+    monkeypatch.setattr(admin_routes, "delete_destination_secret", fake.delete_destination_secret)
     monkeypatch.setattr(admin_routes, "create_passphrase_secret", fake.create_passphrase_secret)
     monkeypatch.setattr(admin_routes, "delete_passphrase_secret", fake.delete_passphrase_secret)
     monkeypatch.setattr(admin_routes, "delete_export", fake.delete_export)
@@ -279,3 +294,148 @@ async def test_deleting_a_missing_backup_is_a_404(cluster: FakeCluster):
     async with await _client() as client:
         resp = await client.delete("/api/v1/admin/backups/never-existed")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_no_destination_means_the_policy_and_says_nothing(cluster: FakeCluster):
+    """The default writes no destination at all.
+
+    A spec that always carried `destination: {mode: policy}` would say the same
+    thing as one that carried nothing, and invite whoever reads it to wonder
+    what was overridden.
+    """
+    async with await _client() as client:
+        response = await client.post("/api/v1/admin/backups", json={"name": "nightly", "apps": []})
+        assert response.status_code == 201, response.text
+
+    assert "destination" not in cluster.exports[0]["spec"]
+
+
+@pytest.mark.asyncio
+async def test_platform_target_needs_no_endpoint_and_no_keys(cluster: FakeCluster):
+    async with await _client() as client:
+        response = await client.post(
+            "/api/v1/admin/backups",
+            json={"name": "before-upgrade", "apps": [], "destination": {"mode": "platform"}},
+        )
+        assert response.status_code == 201, response.text
+
+    assert cluster.exports[0]["spec"]["destination"] == {"mode": "platform"}
+    assert cluster.destination_keys == {}
+
+
+@pytest.mark.asyncio
+async def test_s3_with_the_managed_credential_stores_no_keys(cluster: FakeCluster):
+    """The point of the managed source: a different bucket, nobody retyping a secret."""
+    async with await _client() as client:
+        response = await client.post(
+            "/api/v1/admin/backups",
+            json={
+                "name": "one-off",
+                "apps": [],
+                "destination": {
+                    "mode": "custom",
+                    "endpoint": "https://sos-ch-gva-2.exo.io",
+                    "bucket": "elsewhere",
+                    "region": "ch-gva-2",
+                    "credentialSource": "managed",
+                },
+            },
+        )
+        assert response.status_code == 201, response.text
+
+    spec = cluster.exports[0]["spec"]["destination"]
+    assert spec["credentialSource"] == "managed"
+    assert spec["endpoint"] == "https://sos-ch-gva-2.exo.io"
+    # No Secret was written, and none is referenced: the operator authenticates
+    # with what the Credential Manager already holds.
+    assert "credentialSecretRef" not in spec
+    assert cluster.destination_keys == {}
+
+
+@pytest.mark.asyncio
+async def test_transient_keys_become_a_secret_the_spec_only_names(cluster: FakeCluster):
+    async with await _client() as client:
+        response = await client.post(
+            "/api/v1/admin/backups",
+            json={
+                "name": "handover",
+                "apps": [],
+                "destination": {
+                    "mode": "custom",
+                    "endpoint": "https://s3.example.org",
+                    "credentialSource": "transient",
+                    "accessKey": "AKIAEXAMPLE",
+                    "secretKey": "s3cr3t-value",
+                },
+            },
+        )
+        assert response.status_code == 201, response.text
+
+    spec = cluster.exports[0]["spec"]["destination"]
+    assert spec["credentialSecretRef"] == "tenant-export-destination-keys-handover"
+    assert cluster.destination_keys["handover"] == ("AKIAEXAMPLE", "s3cr3t-value")
+    # The keys reach the cluster as a Secret and never as spec fields, for the
+    # reason the passphrase does: a spec is readable by anyone who can read the
+    # resource, and object storage keys in a manifest are keys in every backup
+    # of etcd.
+    assert "accessKey" not in spec
+    assert "secretKey" not in spec
+
+
+@pytest.mark.asyncio
+async def test_a_custom_target_without_an_endpoint_is_refused(cluster: FakeCluster):
+    async with await _client() as client:
+        response = await client.post(
+            "/api/v1/admin/backups",
+            json={"name": "nowhere", "apps": [], "destination": {"mode": "custom"}},
+        )
+        assert response.status_code == 400, response.text
+
+    assert cluster.exports == []
+
+
+@pytest.mark.asyncio
+async def test_transient_without_keys_is_refused_before_anything_is_created(cluster: FakeCluster):
+    async with await _client() as client:
+        response = await client.post(
+            "/api/v1/admin/backups",
+            json={
+                "name": "half",
+                "apps": [],
+                "destination": {
+                    "mode": "custom",
+                    "endpoint": "https://s3.example.org",
+                    "credentialSource": "transient",
+                    "accessKey": "AKIAEXAMPLE",
+                },
+            },
+        )
+        assert response.status_code == 400, response.text
+
+    assert cluster.exports == []
+    assert cluster.destination_keys == {}
+
+
+@pytest.mark.asyncio
+async def test_a_failed_export_takes_its_transient_keys_with_it(cluster: FakeCluster):
+    """Otherwise the keys sit in the namespace with no export to consume them."""
+    cluster.fail_create = True
+    async with await _client() as client:
+        response = await client.post(
+            "/api/v1/admin/backups",
+            json={
+                "name": "doomed",
+                "apps": [],
+                "destination": {
+                    "mode": "custom",
+                    "endpoint": "https://s3.example.org",
+                    "credentialSource": "transient",
+                    "accessKey": "AKIAEXAMPLE",
+                    "secretKey": "s3cr3t-value",
+                },
+            },
+        )
+        assert response.status_code == 503, response.text
+
+    assert cluster.destination_keys == {}

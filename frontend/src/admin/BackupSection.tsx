@@ -59,6 +59,13 @@ export function BackupSection({ tenant }: BackupSectionProps) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(defaultName);
   const [mode, setMode] = useState<"recipient" | "passphrase">("recipient");
+  const [target, setTarget] = useState<"policy" | "platform" | "custom">("policy");
+  const [endpoint, setEndpoint] = useState("");
+  const [bucket, setBucket] = useState("");
+  const [region, setRegion] = useState("");
+  const [credentialSource, setCredentialSource] = useState<"managed" | "transient">("managed");
+  const [accessKey, setAccessKey] = useState("");
+  const [secretKey, setSecretKey] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [confirmPassphrase, setConfirmPassphrase] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +104,10 @@ export function BackupSection({ tenant }: BackupSectionProps) {
       );
       setPassphrase("");
       setConfirmPassphrase("");
+      // The keys were for one export. Leaving them in the form invites the
+      // next backup to reuse credentials the person meant to use once.
+      setAccessKey("");
+      setSecretKey("");
       setName(defaultName());
       await queryClient.invalidateQueries({ queryKey: ["admin", "backups", tenant] });
     },
@@ -157,10 +168,40 @@ export function BackupSection({ tenant }: BackupSectionProps) {
       }
     }
 
+    if (target === "custom") {
+      if (!endpoint.trim()) {
+        setError("Enter the S3 endpoint to write this backup to.");
+        return;
+      }
+      if (credentialSource === "transient" && (!accessKey.trim() || !secretKey.trim())) {
+        setError("Enter both an access key and a secret key, or use the stored credentials.");
+        return;
+      }
+    }
+
     createMutation.mutate({
       name,
       apps: [],
       encryption: mode === "passphrase" ? { mode, passphrase } : { mode },
+      // Omitted for the default. Sending {mode: "policy"} would say the same
+      // thing and leave a destination on the record that overrode nothing.
+      ...(target === "policy"
+        ? {}
+        : {
+            destination:
+              target === "platform"
+                ? { mode: "platform" as const }
+                : {
+                    mode: "custom" as const,
+                    endpoint: endpoint.trim(),
+                    bucket: bucket.trim(),
+                    region: region.trim(),
+                    credentialSource,
+                    ...(credentialSource === "transient"
+                      ? { accessKey: accessKey.trim(), secretKey: secretKey.trim() }
+                      : {}),
+                  },
+          }),
     });
   }
 
@@ -199,6 +240,165 @@ export function BackupSection({ tenant }: BackupSectionProps) {
             />
           </label>
         </div>
+
+        <fieldset className="admin-console__fieldset admin-console__fieldset--plain">
+          <legend>Where it goes</legend>
+
+          <div className="admin-console__choices">
+            <label
+              className={`admin-console__choice${
+                target === "policy" ? " admin-console__choice--selected" : ""
+              }`}
+            >
+              <input
+                type="radio"
+                name="backup-target"
+                checked={target === "policy"}
+                onChange={() => setTarget("policy")}
+              />
+              <span>
+                <span className="admin-console__choice-title">Where my backups normally go</span>
+                <span className="admin-console__choice-body">
+                  The destination this workspace is configured for — the same place the nightly backup writes.
+                </span>
+              </span>
+            </label>
+            <label
+              className={`admin-console__choice${
+                target === "platform" ? " admin-console__choice--selected" : ""
+              }`}
+            >
+              <input
+                type="radio"
+                name="backup-target"
+                checked={target === "platform"}
+                onChange={() => setTarget("platform")}
+              />
+              <span>
+                <span className="admin-console__choice-title">This platform's own storage</span>
+                <span className="admin-console__choice-body">
+                  A copy kept close, for just before a risky change. It shares a home with the data it protects, so it is not what you want for disaster recovery.
+                </span>
+              </span>
+            </label>
+            <label
+              className={`admin-console__choice${
+                target === "custom" ? " admin-console__choice--selected" : ""
+              }`}
+            >
+              <input
+                type="radio"
+                name="backup-target"
+                checked={target === "custom"}
+                onChange={() => setTarget("custom")}
+              />
+              <span>
+                <span className="admin-console__choice-title">My own S3 storage</span>
+                <span className="admin-console__choice-body">
+                  A bucket you name, on a provider you name. For handing a copy to someone, or keeping one somewhere this platform cannot reach.
+                </span>
+              </span>
+            </label>
+
+            {/* Outside the radio label on purpose: a label nested in a label is
+                invalid, and clicking the input would re-trigger the radio. */}
+            {target === "custom" && (
+              <div className="admin-console__choice-detail">
+                <label className="admin-console__label">
+                  <span className="admin-console__label-text">Endpoint</span>
+                  <input
+                    value={endpoint}
+                    onChange={(event) => setEndpoint(event.target.value)}
+                    placeholder="https://sos-ch-dk-2.exo.io"
+                    required
+                  />
+                </label>
+                <label className="admin-console__label">
+                  <span className="admin-console__label-text">Bucket</span>
+                  <input
+                    value={bucket}
+                    onChange={(event) => setBucket(event.target.value)}
+                    placeholder="leave empty to keep this workspace's bucket name"
+                  />
+                </label>
+                <label className="admin-console__label">
+                  <span className="admin-console__label-text">Region</span>
+                  <input
+                    value={region}
+                    onChange={(event) => setRegion(event.target.value)}
+                    placeholder="ch-dk-2 — some providers need one, MinIO does not"
+                  />
+                </label>
+
+                <div className="admin-console__choices">
+                  <label
+                    className={`admin-console__choice${
+                      credentialSource === "managed" ? " admin-console__choice--selected" : ""
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="backup-credential-source"
+                      checked={credentialSource === "managed"}
+                      onChange={() => setCredentialSource("managed")}
+                    />
+                    <span>
+                      <span className="admin-console__choice-title">Use my stored keys</span>
+                      <span className="admin-console__choice-body">
+                        The credentials already held for this workspace — the ones the nightly
+                        backup uses. Nothing to type, and nothing new to keep safe.
+                      </span>
+                    </span>
+                  </label>
+
+                  <label
+                    className={`admin-console__choice${
+                      credentialSource === "transient" ? " admin-console__choice--selected" : ""
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="backup-credential-source"
+                      checked={credentialSource === "transient"}
+                      onChange={() => setCredentialSource("transient")}
+                    />
+                    <span>
+                      <span className="admin-console__choice-title">Enter keys for this backup</span>
+                      <span className="admin-console__choice-body">
+                        Used for this backup only. They are kept while it runs and removed when it
+                        finishes — they are not stored for next time.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
+                {credentialSource === "transient" && (
+                  <div className="admin-console__choice-detail">
+                    <label className="admin-console__label">
+                      <span className="admin-console__label-text">Access key</span>
+                      <input
+                        value={accessKey}
+                        onChange={(event) => setAccessKey(event.target.value)}
+                        autoComplete="off"
+                        required
+                      />
+                    </label>
+                    <label className="admin-console__label">
+                      <span className="admin-console__label-text">Secret key</span>
+                      <input
+                        type="password"
+                        value={secretKey}
+                        onChange={(event) => setSecretKey(event.target.value)}
+                        autoComplete="new-password"
+                        required
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </fieldset>
 
         <fieldset className="admin-console__fieldset admin-console__fieldset--plain">
           <legend>Encryption</legend>
