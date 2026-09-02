@@ -49,11 +49,20 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            {{- if .Values.credentialManager.url }}
+            {{- /* api.env wins when it names the same variable. Both of these
+                 also exist as dedicated values because the operator chart
+                 shares the cluster values file (credentialManager/appLifecycle
+                 carry operator-side keys too), and gentian-os _base.yaml sets
+                 them through api.env for every cluster. Rendering both halves
+                 produced a duplicate env name — harmless under client-side
+                 apply (last one won), fatal under server-side apply, which
+                 rejects the Deployment outright: the api never deployed, /api
+                 had no backend, and login failed with an empty 500. */}}
+            {{- if and .Values.credentialManager.url (not (hasKey (default dict .Values.api.env) "CREDENTIAL_MANAGER_URL")) }}
             - name: CREDENTIAL_MANAGER_URL
               value: {{ .Values.credentialManager.url | quote }}
             {{- end }}
-            {{- if .Values.appLifecycle.url }}
+            {{- if and .Values.appLifecycle.url (not (hasKey (default dict .Values.api.env) "APP_LIFECYCLE_URL")) }}
             - name: APP_LIFECYCLE_URL
               value: {{ .Values.appLifecycle.url | quote }}
             {{- end }}
