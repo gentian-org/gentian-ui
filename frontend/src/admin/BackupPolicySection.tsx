@@ -4,12 +4,14 @@ import {
   emptyRetention,
   fetchBackupPolicy,
   fetchClusterBackupPolicy,
+  mintBackupKey,
   resetBackupPolicy,
   saveBackupPolicy,
   saveClusterBackupPolicy,
   type BackupPolicy,
   type BackupPolicyBody,
   type BackupRetention,
+  type MintedKey,
 } from "@/api/admin";
 import {
   cronFrom,
@@ -28,6 +30,15 @@ type BackupPolicySectionProps = {
 };
 
 type StorageMode = "platform" | "external";
+type KeyMode = "platform" | "own";
+
+/** One key per line, so a tenant can name its own and the platform's together. */
+function splitKeys(text: string): string[] {
+  return text
+    .split(/[\s,]+/)
+    .map((k) => k.trim())
+    .filter(Boolean);
+}
 
 const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -38,6 +49,9 @@ type Draft = {
   region: string;
   schedule: ScheduleForm;
   retention: BackupRetention;
+  keyMode: KeyMode;
+  /** Free text while typing; split into keys only on save. */
+  keys: string;
   allowTenantOverride: boolean;
 };
 
@@ -50,6 +64,8 @@ function draftFrom(policy: BackupPolicy | undefined): Draft {
     region: policy?.destination.region ?? "",
     schedule: formFromCron(policy?.schedule ?? "", policy?.suspendSchedule ?? false),
     retention: policy?.retention ?? emptyRetention,
+    keyMode: policy?.encryption.mode ?? "platform",
+    keys: (policy?.encryption.recipients ?? []).join("\n"),
     allowTenantOverride: policy?.allowTenantOverride ?? true,
   };
 }
@@ -65,6 +81,13 @@ function bodyFrom(draft: Draft, confirm?: string): BackupPolicyBody {
     schedule: cronFrom(draft.schedule),
     suspendSchedule: draft.schedule.frequency === "off",
     retention: draft.retention,
+    encryption: {
+      mode: draft.keyMode,
+      // Cleared rather than kept when the platform key is chosen, so going back
+      // actually goes back. A list left behind would keep writing bundles the
+      // platform cannot read while the form said otherwise.
+      recipients: draft.keyMode === "own" ? splitKeys(draft.keys) : [],
+    },
     confirm,
   };
 }
@@ -260,6 +283,107 @@ function StorageFields({
   );
 }
 
+/** Which key backups are encrypted to — the platform's, or one you hold.
+ *
+ * The consequential choice on this page, and the one with no undo: bundles are
+ * encrypted when they are written, so a key changed today does nothing for the
+ * backups already taken, and a key lost tomorrow loses every backup made with
+ * it. Both halves are said out loud rather than left to a tooltip.
+ */
+function EncryptionFields({
+  draft,
+  setDraft,
+  minted,
+  onMint,
+  minting,
+}: {
+  draft: Draft;
+  setDraft: (d: Draft) => void;
+  minted: MintedKey | null;
+  onMint: () => void;
+  minting: boolean;
+}) {
+  return (
+    <div className="admin-console__stack">
+      <label className="admin-console__label">
+        <span className="admin-console__label-text">Who can read the backups</span>
+        <select
+          value={draft.keyMode}
+          onChange={(e) => setDraft({ ...draft, keyMode: e.target.value as KeyMode })}
+        >
+          <option value="platform">The platform&apos;s key (recommended)</option>
+          <option value="own">A key only you hold</option>
+        </select>
+        <span className="admin-console__hint">
+          {draft.keyMode === "platform"
+            ? "Your provider can open a backup, so they can help you restore one."
+            : "Backups are written in a form nobody here can read — including your provider. Restoring is then yours alone to do."}
+        </span>
+      </label>
+
+      {draft.keyMode === "own" && (
+        <>
+          <label className="admin-console__label">
+            <span className="admin-console__label-text">Your public key</span>
+            <textarea
+              rows={2}
+              spellCheck={false}
+              placeholder="age1…"
+              value={draft.keys}
+              onChange={(e) => setDraft({ ...draft, keys: e.target.value })}
+            />
+            <span className="admin-console__hint">
+              Run <code>age-keygen</code> on your own machine and paste the line that starts
+              with <code>age1</code>. Keep the other line — the one starting{" "}
+              <code>AGE-SECRET-KEY-</code> — somewhere safe and offline; it is what opens the
+              backups. One key per line: naming your provider&apos;s alongside your own lets
+              them help you restore while you still hold a key of your own.
+            </span>
+          </label>
+
+          <div className="admin-console__submit">
+            <button
+              type="button"
+              className="admin-console__btn"
+              disabled={minting}
+              onClick={onMint}
+            >
+              {minting ? "Generating…" : "Generate a key for me"}
+            </button>
+            <span className="admin-console__hint">
+              Convenient, and weaker: the private key is made on the server and shown to you
+              once. Generating it yourself is the stronger route.
+            </span>
+          </div>
+
+          {minted && (
+            <div className="admin-console__warning">
+              <p>
+                <strong>Save this now.</strong> This private key is shown once and is stored
+                nowhere. Lose it and every backup encrypted to it is unreadable, by you and by
+                anyone else.
+              </p>
+              <p className="admin-console__mono admin-console__wrap">{minted.identity}</p>
+              <p>
+                Write it to a file called <code>backup-key.txt</code>, keep it offline, and
+                treat a copy on the machine you would be restoring <em>from</em> as no copy at
+                all.
+              </p>
+            </div>
+          )}
+
+          <div className="admin-console__warning">
+            <p>
+              This applies to backups taken from now on. Ones already made stay encrypted to
+              whatever key was in force when they were written, and are still restorable.
+            </p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /** What applies after inheritance, and whether it can actually be used. */
 function EffectiveSummary({ policy }: { policy: BackupPolicy }) {
   const where = policy.effectiveEndpoint
@@ -270,6 +394,9 @@ function EffectiveSummary({ policy }: { policy: BackupPolicy }) {
       <p className="admin-console__card-meta">
         In force: <code>{where}</code>
         {policy.effectiveSchedule ? ` · ${policy.effectiveSchedule} UTC` : " · no schedule"}
+        {policy.effectiveRecipients.length > 0
+          ? " · encrypted to your own key"
+          : " · encrypted to the platform's key"}
       </p>
       {policy.credentialRequirement && !policy.credentialSatisfied && (
         <p className="admin-console__warning">
@@ -300,6 +427,9 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
   const [tenantDraft, setTenantDraft] = useState<Draft>(() => draftFrom(undefined));
   const [overriding, setOverriding] = useState(false);
   const [confirmName, setConfirmName] = useState("");
+  // Held in this component and never sent back: the private key exists in this
+  // response and nowhere else, so it must not survive a page reload either.
+  const [minted, setMinted] = useState<MintedKey | null>(null);
 
   useEffect(() => {
     if (clusterQuery.data) {
@@ -348,10 +478,24 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
     onSuccess: settled("Back to the cluster settings."),
     onError: failed,
   });
+  const mint = useMutation({
+    mutationFn: () => mintBackupKey(tenant),
+    onSuccess: (key) => {
+      setError(null);
+      setMinted(key);
+      // The public half goes straight into the form. Asking someone to copy it
+      // out of one box and into another is a step that can only go wrong, and
+      // pasting the wrong half is the mistake that would silently put the
+      // private key in a spec.
+      setTenantDraft((d) => ({ ...d, keyMode: "own", keys: key.recipient }));
+    },
+    onError: failed,
+  });
 
   const clusterPolicy = clusterQuery.data;
   const tenantPolicy = tenantQuery.data;
   const movingStorage = tenantDraft.storage === "external" && tenantDraft.endpoint.trim() !== "";
+  const ownKeyIncomplete = tenantDraft.keyMode === "own" && splitKeys(tenantDraft.keys).length === 0;
   const overrideBlocked = clusterPolicy ? !clusterPolicy.allowTenantOverride : false;
 
   return (
@@ -481,6 +625,15 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
               </>
             )}
 
+            <h4 className="admin-console__group-title">Who can read the backups</h4>
+            <EncryptionFields
+              draft={tenantDraft}
+              setDraft={setTenantDraft}
+              minted={minted}
+              onMint={() => mint.mutate()}
+              minting={mint.isPending}
+            />
+
             {movingStorage && (
               <div className="admin-console__warning">
                 <p>
@@ -506,7 +659,11 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
               <button
                 type="button"
                 className="admin-console__btn admin-console__btn--primary"
-                disabled={saveTenant.isPending || (movingStorage && confirmName.trim() !== tenant)}
+                disabled={
+                  saveTenant.isPending ||
+                  ownKeyIncomplete ||
+                  (movingStorage && confirmName.trim() !== tenant)
+                }
                 onClick={() => saveTenant.mutate()}
               >
                 {saveTenant.isPending ? "Saving…" : "Save"}

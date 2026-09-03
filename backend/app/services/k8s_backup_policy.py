@@ -92,6 +92,7 @@ def put_policy(
     schedule: str,
     suspend_schedule: bool,
     retention: dict[str, int] | None,
+    recipients: list[str] | None,
     allow_tenant_override: bool | None,
 ) -> dict[str, Any]:
     name = policy_name(scope, tenant)
@@ -106,6 +107,12 @@ def put_policy(
         spec["suspendSchedule"] = True
     if retention:
         spec["retention"] = retention
+    # Omitted when empty rather than written as an empty list, because absent
+    # means "inherit" and that is how a tenant hands the key back to the
+    # platform. An empty list would be a third state the operator has no
+    # meaning for.
+    if recipients:
+        spec["encryption"] = {"recipients": recipients}
     if allow_tenant_override is not None and scope == "cluster":
         spec["allowTenantOverride"] = allow_tenant_override
 

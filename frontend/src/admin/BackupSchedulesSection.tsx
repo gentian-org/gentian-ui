@@ -3,9 +3,12 @@ import { useState } from "react";
 import {
   deleteBackupSchedule,
   fetchBackupSchedules,
+  mintBackupKey,
   saveBackupSchedule,
   type BackupSchedule,
+  type BackupScheduleEncryption,
   type BackupRetention,
+  type MintedKey,
 } from "@/api/admin";
 import {
   cronFrom,
@@ -24,6 +27,14 @@ type BackupSchedulesSectionProps = {
 
 function formatTime(value: string | null): string {
   return value ? new Date(value).toLocaleString() : "—";
+}
+
+/** One key per line, so a schedule can name a tenant's key and the platform's. */
+function splitKeys(text: string): string[] {
+  return text
+    .split(/[\s,]+/)
+    .map((k) => k.trim())
+    .filter(Boolean);
 }
 
 function keptSummary(r: BackupRetention): string {
@@ -45,14 +56,44 @@ function EditForm({
 }: {
   schedule: BackupSchedule;
   onCancel: () => void;
-  onSave: (form: ScheduleForm, retention: BackupRetention) => void;
+  onSave: (
+    form: ScheduleForm,
+    retention: BackupRetention,
+    encryption: BackupScheduleEncryption,
+  ) => void;
   saving: boolean;
 }) {
   const [form, setForm] = useState<ScheduleForm>(() =>
     formFromCron(schedule.schedule, false),
   );
   const [retention, setRetention] = useState<BackupRetention>(schedule.retention);
+  const [keyMode, setKeyMode] = useState(schedule.encryption.mode);
+  const [keys, setKeys] = useState(schedule.encryption.recipients.join("\n"));
+  // Held here and never sent back: the private key is in the mint response and
+  // nowhere else, so it must not outlive this form either.
+  const [minted, setMinted] = useState<MintedKey | null>(null);
+  const [minting, setMinting] = useState(false);
+  const [mintError, setMintError] = useState<string | null>(null);
   const showTime = ["daily", "weekly", "monthly"].includes(form.frequency);
+  const ownKeyIncomplete = keyMode === "own" && splitKeys(keys).length === 0;
+
+  const generate = async () => {
+    setMinting(true);
+    setMintError(null);
+    try {
+      const key = await mintBackupKey(schedule.tenant);
+      setMinted(key);
+      setKeyMode("own");
+      // The public half straight into the field. Copying it by hand from one
+      // box to another is a step that can only go wrong, and pasting the wrong
+      // half would put the private key into a spec.
+      setKeys(key.recipient);
+    } catch (err) {
+      setMintError((err as Error).message);
+    } finally {
+      setMinting(false);
+    }
+  };
 
   return (
     <div className="admin-console__card-footer">
@@ -150,14 +191,83 @@ function EditForm({
         ))}
       </div>
 
+      <h4 className="admin-console__group-title">Who can read these backups</h4>
+      <label className="admin-console__label">
+        <span className="admin-console__label-text">Encryption key</span>
+        <select value={keyMode} onChange={(e) => setKeyMode(e.target.value as "platform" | "own")}>
+          <option value="platform">The platform&apos;s key (recommended)</option>
+          <option value="own">A key only you hold</option>
+        </select>
+        <span className="admin-console__hint">
+          {keyMode === "platform"
+            ? "Your provider can open a backup, so they can help you restore one."
+            : "Backups are written in a form nobody here can read — including your provider. Restoring is then yours alone to do."}
+        </span>
+      </label>
+
+      {keyMode === "own" && (
+        <>
+          <label className="admin-console__label">
+            <span className="admin-console__label-text">Your public key</span>
+            <textarea
+              rows={2}
+              spellCheck={false}
+              placeholder="age1…"
+              value={keys}
+              onChange={(e) => setKeys(e.target.value)}
+            />
+            <span className="admin-console__hint">
+              Run <code>age-keygen</code> on your own machine and paste the line starting{" "}
+              <code>age1</code>. One key per line; adding your provider&apos;s alongside your
+              own lets them help you restore.
+            </span>
+          </label>
+          <div className="admin-console__submit">
+            <button
+              type="button"
+              className="admin-console__btn"
+              disabled={minting}
+              onClick={generate}
+            >
+              {minting ? "Generating…" : "Generate a key for me"}
+            </button>
+            <span className="admin-console__hint">
+              Weaker than generating it yourself: the private key is made on the server and
+              shown once.
+            </span>
+          </div>
+          {mintError && <p className="admin-console__error">{mintError}</p>}
+          {minted && (
+            <div className="admin-console__warning">
+              <p>
+                <strong>Save this now.</strong> It is shown once and stored nowhere. Lose it and
+                every backup encrypted to it is unreadable, by you and by anyone else.
+              </p>
+              <p className="admin-console__mono admin-console__wrap">{minted.identity}</p>
+            </div>
+          )}
+          <p className="admin-console__warning">
+            This applies from the next run. Backups already taken keep the key they were
+            written with and are still restorable.
+          </p>
+        </>
+      )}
+
       <p className="admin-console__hint">{describeSchedule(form, "")}</p>
 
       <div className="admin-console__submit">
         <button
           type="button"
           className="admin-console__btn admin-console__btn--primary"
-          disabled={saving || !cronFrom(form)}
-          onClick={() => onSave(form, retention)}
+          disabled={saving || ownKeyIncomplete || !cronFrom(form)}
+          onClick={() =>
+            onSave(form, retention, {
+              mode: keyMode,
+              // Cleared when the platform key is chosen, so going back actually
+              // goes back rather than leaving a key nobody here can read.
+              recipients: keyMode === "own" ? splitKeys(keys) : [],
+            })
+          }
         >
           {saving ? "Saving…" : "Save"}
         </button>
@@ -184,13 +294,19 @@ export function BackupSchedulesSection({ tenant, isPlatformAdmin }: BackupSchedu
     queryClient.invalidateQueries({ queryKey: ["admin", "backup-schedules"] });
 
   const save = useMutation({
-    mutationFn: (vars: { schedule: BackupSchedule; form: ScheduleForm; retention: BackupRetention }) =>
+    mutationFn: (vars: {
+      schedule: BackupSchedule;
+      form: ScheduleForm;
+      retention: BackupRetention;
+      encryption: BackupScheduleEncryption;
+    }) =>
       saveBackupSchedule(
         vars.schedule.name,
         {
           schedule: cronFrom(vars.form),
           suspended: vars.schedule.suspended,
           retention: vars.retention,
+          encryption: vars.encryption,
         },
         vars.schedule.tenant,
       ),
@@ -215,7 +331,15 @@ export function BackupSchedulesSection({ tenant, isPlatformAdmin }: BackupSchedu
     mutationFn: (s: BackupSchedule) =>
       saveBackupSchedule(
         s.name,
-        { schedule: s.schedule, suspended: !s.suspended, retention: s.retention },
+        // The schedule's own encryption, restated: this endpoint replaces the
+        // spec, so omitting it would quietly move a tenant's backups back to
+        // the platform's key on a pause and resume.
+        {
+          schedule: s.schedule,
+          suspended: !s.suspended,
+          retention: s.retention,
+          encryption: s.encryption,
+        },
         s.tenant,
       ),
     onSuccess: async () => {
@@ -276,7 +400,16 @@ export function BackupSchedulesSection({ tenant, isPlatformAdmin }: BackupSchedu
               </p>
               <p className="admin-console__card-meta">
                 Last success {formatTime(s.lastSuccessfulTime)} · next {formatTime(s.nextScheduleTime)}
+                {s.encryption.mode === "own"
+                  ? " · encrypted to your own key"
+                  : " · encrypted to the platform's key"}
               </p>
+              {s.encryption.mode === "own" && (
+                <p className="admin-console__hint">
+                  Nobody here can read these backups. Restoring one needs the private key you
+                  hold — keep it somewhere that survives losing this cluster.
+                </p>
+              )}
               {s.message && <p className="admin-console__warning">{s.message}</p>}
               {!s.lastSuccessfulTime && s.lastScheduleTime && (
                 <p className="admin-console__warning">
@@ -327,7 +460,9 @@ export function BackupSchedulesSection({ tenant, isPlatformAdmin }: BackupSchedu
                 schedule={s}
                 saving={save.isPending}
                 onCancel={() => setEditing(null)}
-                onSave={(form, retention) => save.mutate({ schedule: s, form, retention })}
+                onSave={(form, retention, encryption) =>
+                  save.mutate({ schedule: s, form, retention, encryption })
+                }
               />
             )}
           </article>

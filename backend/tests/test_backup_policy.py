@@ -38,6 +38,7 @@ class FakePolicies:
         schedule: str,
         suspend_schedule: bool,
         retention: dict[str, int] | None,
+        recipients: list[str] | None,
         allow_tenant_override: bool | None,
     ) -> dict[str, Any]:
         name = "default" if scope == "cluster" else str(tenant)
@@ -52,6 +53,8 @@ class FakePolicies:
             spec["suspendSchedule"] = True
         if retention:
             spec["retention"] = retention
+        if recipients:
+            spec["encryption"] = {"recipients": recipients}
         if allow_tenant_override is not None and scope == "cluster":
             spec["allowTenantOverride"] = allow_tenant_override
         obj = {"metadata": {"name": name}, "spec": spec, "status": {}}
@@ -226,3 +229,107 @@ async def test_cluster_save_audits_against_a_real_tenant(policies: FakePolicies,
         )
     assert resp.status_code == 200
     assert seen["tenant"], "cluster policy audited against an empty tenant"
+
+
+# The tenant's own backup key: chosen here, in the same settings that decide
+# where bundles go and when, because it answers the same question — who ends up
+# holding a copy of the workspace's data.
+TENANT_KEY = "age17lr9cmnutfg66r92rwc20umdz82sgx3wq86c5lmht8d7sm8dlqpqr3d4zw"
+
+
+@pytest.mark.asyncio
+async def test_tenant_can_choose_its_own_backup_key(policies: FakePolicies):
+    """A tenant that names its own key gets bundles the platform cannot read.
+
+    No typed confirmation, unlike an external destination: the bundles stay in
+    the platform's storage, so nothing moves. What changes is who can open
+    them, which the console warns about at the point of choosing.
+    """
+    async with await _client() as client:
+        resp = await client.put(
+            "/api/v1/admin/backup-policy",
+            json={
+                "destination": {},
+                "schedule": "0 3 * * *",
+                "encryption": {"mode": "own", "recipients": [TENANT_KEY]},
+            },
+        )
+    assert resp.status_code == 200
+    assert policies.objects["demo"]["spec"]["encryption"] == {"recipients": [TENANT_KEY]}
+    assert resp.json()["encryption"] == {"mode": "own", "recipients": [TENANT_KEY]}
+
+
+@pytest.mark.asyncio
+async def test_switching_back_to_the_platform_key_clears_the_tenants(policies: FakePolicies):
+    """Going back has to actually go back.
+
+    A recipients list left behind would keep writing bundles the platform
+    cannot read while every screen said the platform key was in force — the
+    failure only visible on the day someone asks for help restoring.
+    """
+    async with await _client() as client:
+        await client.put(
+            "/api/v1/admin/backup-policy",
+            json={
+                "destination": {},
+                "encryption": {"mode": "own", "recipients": [TENANT_KEY]},
+            },
+        )
+        resp = await client.put(
+            "/api/v1/admin/backup-policy",
+            json={"destination": {}, "encryption": {"mode": "platform"}},
+        )
+    assert resp.status_code == 200
+    # Absent, not empty: absent is what the operator reads as "inherit".
+    assert "encryption" not in policies.objects["demo"]["spec"]
+    assert resp.json()["encryption"] == {"mode": "platform", "recipients": []}
+
+
+@pytest.mark.asyncio
+async def test_a_mistyped_key_is_refused_while_the_form_is_open(policies: FakePolicies):
+    async with await _client() as client:
+        resp = await client.put(
+            "/api/v1/admin/backup-policy",
+            json={
+                "destination": {},
+                "encryption": {"mode": "own", "recipients": ["not-a-key"]},
+            },
+        )
+    assert resp.status_code == 400
+    assert "age1" in resp.json()["detail"]
+    assert policies.objects == {}
+
+
+@pytest.mark.asyncio
+async def test_own_key_with_nothing_named_is_refused(policies: FakePolicies):
+    """"Own key" and no key would silently fall back to the platform's, which
+    is the opposite of what was asked for."""
+    async with await _client() as client:
+        resp = await client.put(
+            "/api/v1/admin/backup-policy",
+            json={"destination": {}, "encryption": {"mode": "own", "recipients": []}},
+        )
+    assert resp.status_code == 400
+    assert policies.objects == {}
+
+
+@pytest.mark.asyncio
+async def test_the_cluster_key_is_not_editable_from_the_console(policies: FakePolicies):
+    """The cluster's recipients are pinned in git and written by the installer.
+
+    That pinning is what makes "the key a bundle is encrypted to is the key the
+    repository says it is" checkable. A console that could change them would
+    remove the guarantee, and a mistake would make every tenant's bundles
+    unreadable by the platform at once.
+    """
+    async with await _client() as client:
+        resp = await client.put(
+            "/api/v1/admin/backup-policy/cluster",
+            json={
+                "destination": {},
+                "encryption": {"mode": "own", "recipients": [TENANT_KEY]},
+            },
+        )
+    assert resp.status_code == 400
+    assert "installer" in resp.json()["detail"]
+    assert policies.objects == {}

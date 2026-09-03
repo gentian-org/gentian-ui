@@ -610,6 +610,17 @@ export type BackupRetention = {
   keepYearly: number;
 };
 
+/** Who can read the bundles a policy or schedule produces. */
+export type BackupScheduleEncryption = {
+  /**
+   * platform: the cluster's key — its holder can help you restore.
+   * own: a key you hold — the platform writes bundles it cannot read, and
+   * nobody can help you restore.
+   */
+  mode: "platform" | "own";
+  recipients: string[];
+};
+
 export type BackupPolicy = {
   scope: "cluster" | "tenant";
   tenant: string;
@@ -619,11 +630,14 @@ export type BackupPolicy = {
   schedule: string;
   suspendSchedule: boolean;
   retention: BackupRetention;
+  encryption: BackupScheduleEncryption;
   allowTenantOverride: boolean;
   /** What applies after inheritance, resolved by the operator. */
   effectiveEndpoint: string;
   effectiveBucket: string;
   effectiveSchedule: string;
+  /** Empty means the platform's key; a key here means only its holder can read. */
+  effectiveRecipients: string[];
   /** A destination whose keys have not been supplied yet. */
   credentialRequirement: string;
   credentialSatisfied: boolean;
@@ -635,6 +649,7 @@ export type BackupPolicyBody = {
   schedule: string;
   suspendSchedule: boolean;
   retention: BackupRetention;
+  encryption: BackupScheduleEncryption;
   allowTenantOverride?: boolean;
   /** The tenant name, required when sending bundles to your own storage. */
   confirm?: string;
@@ -673,6 +688,7 @@ export type BackupSchedule = {
   tenant: string;
   schedule: string;
   suspended: boolean;
+  encryption: BackupScheduleEncryption;
   retention: BackupRetention;
   lastScheduleTime: string | null;
   lastSuccessfulTime: string | null;
@@ -686,7 +702,18 @@ export type BackupScheduleBody = {
   schedule: string;
   suspended: boolean;
   retention: BackupRetention;
+  encryption: BackupScheduleEncryption;
 };
+
+/** A freshly generated key pair. The identity is in this response and nowhere
+ * else: it is not stored and cannot be produced again. */
+export type MintedKey = { identity: string; recipient: string };
+
+export function mintBackupKey(tenant?: string) {
+  return apiFetch<MintedKey>(`/admin/backup-keys/mint${tenantQuery(tenant)}`, {
+    method: "POST",
+  });
+}
 
 export function fetchBackupSchedules(tenant?: string, allTenants = false) {
   const q = tenantQuery(tenant);

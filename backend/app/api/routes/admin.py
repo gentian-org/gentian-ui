@@ -83,6 +83,8 @@ from app.services.k8s_backup_policy import (
     validate_destination,
     validate_schedule,
 )
+from app.services.age_keys import looks_like_recipient
+from app.services.age_keys import mint as mint_age_key
 from app.services.k8s_backup import (
     create_destination_secret,
     create_export,
@@ -2039,6 +2041,24 @@ class BackupRetentionModel(BaseModel):
     keepYearly: int = 0
 
 
+class BackupScheduleEncryptionModel(BaseModel):
+    """Who can read the bundles this schedule produces.
+
+    A schedule cannot use a passphrase — there is nobody to type one at 03:00 —
+    so the choice is which key it encrypts to.
+
+    platform: the cluster's own key. Whoever holds its identity can help you
+    restore, which on the day you need it is worth a great deal.
+
+    own: a key you hold. The platform writes bundles it cannot read, including
+    its operators. Nobody can help you restore, and losing the key loses the
+    backups; that is the guarantee, not a side effect.
+    """
+
+    mode: Literal["platform", "own"] = "platform"
+    recipients: list[str] = Field(default_factory=list)
+
+
 class BackupPolicyResponse(BaseModel):
     scope: str
     tenant: str = ""
@@ -2049,11 +2069,15 @@ class BackupPolicyResponse(BaseModel):
     schedule: str = ""
     suspendSchedule: bool = False
     retention: BackupRetentionModel = Field(default_factory=BackupRetentionModel)
+    encryption: BackupScheduleEncryptionModel = Field(
+        default_factory=BackupScheduleEncryptionModel
+    )
     allowTenantOverride: bool = True
     # What is actually in force after inheritance, straight from the operator.
     effectiveEndpoint: str = ""
     effectiveBucket: str = ""
     effectiveSchedule: str = ""
+    effectiveRecipients: list[str] = Field(default_factory=list)
     # A destination whose keys have not been supplied yet. The console shows a
     # link to the credential manager rather than an error.
     credentialRequirement: str = ""
@@ -2066,6 +2090,9 @@ class BackupPolicyRequest(BaseModel):
     schedule: str = ""
     suspendSchedule: bool = False
     retention: BackupRetentionModel = Field(default_factory=BackupRetentionModel)
+    encryption: BackupScheduleEncryptionModel = Field(
+        default_factory=BackupScheduleEncryptionModel
+    )
     allowTenantOverride: bool | None = None
     # Typed confirmation for a tenant overriding its destination: bundles then
     # leave the platform's storage, and that is worth naming deliberately.
@@ -2102,17 +2129,45 @@ def _policy_response(scope: str, tenant: str, item: dict[str, Any] | None) -> Ba
             keepMonthly=int(ret.get("keepMonthly", 0)),
             keepYearly=int(ret.get("keepYearly", 0)),
         ),
+        encryption=_schedule_encryption_response(spec),
         allowTenantOverride=bool(spec.get("allowTenantOverride", True)),
         effectiveEndpoint=st.get("effectiveEndpoint", ""),
         effectiveBucket=st.get("effectiveBucket", ""),
         effectiveSchedule=st.get("effectiveSchedule", ""),
+        effectiveRecipients=[r for r in (st.get("effectiveRecipients") or []) if r],
         credentialRequirement=st.get("credentialRequirement", ""),
         credentialSatisfied=bool(st.get("credentialSatisfied", True)),
         message=message,
     )
 
 
-def _policy_spec_from(body: BackupPolicyRequest) -> tuple[dict[str, str] | None, dict[str, int] | None]:
+
+def _clean_recipients(model: BackupScheduleEncryptionModel) -> list[str]:
+    """The age public keys in an encryption choice, refused if they cannot be.
+
+    Shape only — the bech32 checksum is what actually catches a mistyped key,
+    and age itself does that when it encrypts. The value of checking here is
+    timing: the person sees "that is not a key" while the form is still in
+    front of them, rather than at 03:00 in an export's status.
+    """
+    cleaned = [r.strip() for r in model.recipients if r.strip()]
+    if not cleaned:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="choose at least one key of your own, or use the platform key",
+        )
+    for recipient in cleaned:
+        if not looks_like_recipient(recipient):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"{recipient!r} is not an age public key (they look like age1...)",
+            )
+    return cleaned
+
+
+def _policy_spec_from(
+    body: BackupPolicyRequest,
+) -> tuple[dict[str, str] | None, dict[str, int] | None, list[str] | None]:
     dest = {
         k: v
         for k, v in (
@@ -2133,7 +2188,10 @@ def _policy_spec_from(body: BackupPolicyRequest) -> tuple[dict[str, str] | None,
         )
         if v > 0
     }
-    return (dest or None), (retention or None)
+    # None rather than an empty list when the platform key is chosen: absent
+    # means "inherit", which is how a tenant hands the key back.
+    recipients = _clean_recipients(body.encryption) if body.encryption.mode == "own" else None
+    return (dest or None), (retention or None), recipients
 
 
 def _reject_bad_policy(body: BackupPolicyRequest) -> None:
@@ -2167,7 +2225,20 @@ async def put_cluster_backup_policy(
     tenant's bundles go unless they say otherwise."""
     _require_platform_admin(user, settings)
     _reject_bad_policy(body)
-    destination, retention = _policy_spec_from(body)
+    if body.encryption.mode == "own":
+        # The cluster's own recipients are pinned in git and written by the
+        # installer, so that the key a bundle is encrypted to is the key the
+        # repository says it is. A console that could change them would remove
+        # exactly that guarantee — and a mistake here would make every tenant's
+        # bundles unreadable by the platform at once.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "the cluster's backup key is set by the installer, not here; "
+                "a tenant can choose its own key in its own backup settings"
+            ),
+        )
+    destination, retention, _ = _policy_spec_from(body)
 
     try:
         saved = put_policy(
@@ -2177,6 +2248,7 @@ async def put_cluster_backup_policy(
             schedule=body.schedule.strip(),
             suspend_schedule=body.suspendSchedule,
             retention=retention,
+            recipients=None,
             allow_tenant_override=body.allowTenantOverride,
         )
     except Exception as exc:  # noqa: BLE001
@@ -2239,7 +2311,7 @@ async def put_tenant_backup_policy(
             ),
         )
 
-    destination, retention = _policy_spec_from(body)
+    destination, retention, recipients = _policy_spec_from(body)
     try:
         saved = put_policy(
             "tenant",
@@ -2248,6 +2320,7 @@ async def put_tenant_backup_policy(
             schedule=body.schedule.strip(),
             suspend_schedule=body.suspendSchedule,
             retention=retention,
+            recipients=recipients,
             allow_tenant_override=None,
         )
     except Exception as exc:  # noqa: BLE001
@@ -2261,6 +2334,12 @@ async def put_tenant_backup_policy(
         details={
             "endpoint": body.destination.endpoint or "inherited",
             "schedule": body.schedule or ("suspended" if body.suspendSchedule else "inherited"),
+            # Which key, and its public half only. Who can read a tenant's
+            # bundles is the kind of change an audit trail exists for — and
+            # switching to a tenant key is the moment the platform stops being
+            # able to help with a restore.
+            "encryption": "own" if recipients else "platform",
+            "recipients": recipients or [],
         },
     )
     return _policy_response("tenant", resolved, saved)
@@ -2300,6 +2379,9 @@ class BackupScheduleResponse(BaseModel):
     tenant: str
     schedule: str = ""
     suspended: bool = False
+    encryption: BackupScheduleEncryptionModel = Field(
+        default_factory=BackupScheduleEncryptionModel
+    )
     retention: BackupRetentionModel = Field(default_factory=BackupRetentionModel)
     lastScheduleTime: str | None = None
     lastSuccessfulTime: str | None = None
@@ -2315,6 +2397,26 @@ class BackupScheduleRequest(BaseModel):
     schedule: str = ""
     suspended: bool = False
     retention: BackupRetentionModel = Field(default_factory=BackupRetentionModel)
+    encryption: BackupScheduleEncryptionModel = Field(
+        default_factory=BackupScheduleEncryptionModel
+    )
+
+
+
+def _schedule_encryption_response(spec: dict[str, Any]) -> BackupScheduleEncryptionModel:
+    """What a schedule's spec says about who can read its bundles.
+
+    Recipients present means the tenant named its own key; absent means the
+    cluster's, which the operator resolves for itself. The console has to be
+    able to tell those apart or it cannot show which one is in force — and
+    "which key is this encrypted to" is the question the whole choice exists to
+    answer.
+    """
+    enc = spec.get("encryption") or {}
+    recipients = [r for r in (enc.get("recipients") or []) if r]
+    if recipients:
+        return BackupScheduleEncryptionModel(mode="own", recipients=recipients)
+    return BackupScheduleEncryptionModel(mode="platform")
 
 
 def _schedule_response(item: dict[str, Any]) -> BackupScheduleResponse:
@@ -2332,6 +2434,7 @@ def _schedule_response(item: dict[str, Any]) -> BackupScheduleResponse:
         tenant=tenant_from_namespace(meta.get("namespace", "")),
         schedule=spec.get("schedule", ""),
         suspended=bool(spec.get("suspend", False)),
+        encryption=_schedule_encryption_response(spec),
         retention=BackupRetentionModel(
             keepLast=keep_last,
             keepDaily=int(ret.get("keepDaily", 0)),
@@ -2417,6 +2520,12 @@ async def update_backup_schedule(
             "keepMonthly": body.retention.keepMonthly,
             "keepYearly": body.retention.keepYearly,
         },
+        # Always written, both modes. Sending nothing would leave whatever the
+        # schedule carried before, so switching back to the platform key would
+        # silently keep encrypting to a key the tenant thought it had stopped
+        # using — and the export would still succeed, which is the worst shape
+        # for that mistake to take.
+        "encryption": _schedule_encryption(body.encryption),
     }
     try:
         saved = patch_schedule(resolved, name, spec)
@@ -2428,9 +2537,79 @@ async def update_backup_schedule(
         tenant=resolved,
         action="backup.schedule.updated",
         target=name,
-        details={"schedule": body.schedule, "suspended": str(body.suspended).lower()},
+        details={
+            "schedule": body.schedule,
+            "suspended": str(body.suspended).lower(),
+            "encryption": body.encryption.mode,
+            "recipients": ",".join(body.encryption.recipients),
+        },
     )
     return _schedule_response(saved)
+
+
+
+def _schedule_encryption(model: BackupScheduleEncryptionModel) -> dict[str, Any]:
+    """The spec fragment for a schedule's encryption choice.
+
+    recipient mode in both cases: a schedule has nobody to type a passphrase.
+    The difference is whose key. An empty recipients list means the cluster's,
+    which the operator resolves for itself; a non-empty one replaces it, which
+    is the operator's own rule — appending would leave the platform able to read
+    a bundle somebody asked to be readable only by them.
+    """
+    if model.mode == "platform":
+        # Explicit null, not an omitted key. The spec is merge-patched, so an
+        # omitted recipients list is left exactly as it was: a tenant switching
+        # back to the platform key would keep encrypting to its own, the export
+        # would still succeed, and nothing would say so until someone asked for
+        # help restoring. null is how a merge patch deletes a field.
+        return {"mode": "recipient", "recipients": None}
+
+    return {"mode": "recipient", "recipients": _clean_recipients(model)}
+
+
+class MintedKeyResponse(BaseModel):
+    """A freshly generated key pair. The identity is in this response and
+    nowhere else — it is not stored, logged, or recoverable."""
+
+    identity: str
+    recipient: str
+
+
+@router.post("/backup-keys/mint", response_model=MintedKeyResponse)
+async def mint_backup_key(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    *,
+    tenant: str | None = Depends(admin_tenant_query),
+) -> MintedKeyResponse:
+    """Generate a backup key pair for a tenant that wants its own.
+
+    Kept nowhere. The identity exists in this response and in whatever the
+    caller does with it; this service writes it to no store and no log, and
+    cannot produce it again.
+
+    Weaker than generating it yourself, and the console says so: minting here
+    means the private key existed in this process, so it is only as private as
+    this service is. `age-keygen` on your own machine is the stronger route and
+    the one the form recommends. This exists because an administrator without a
+    terminal would otherwise have no way to hold their own key at all.
+    """
+    _require_admin(user, settings)
+    resolved = resolve_admin_tenant(user, settings, tenant)
+
+    identity, recipient = mint_age_key()
+
+    # The recipient only. Writing the identity into an audit trail would undo
+    # the entire point of the endpoint.
+    await record_admin_audit(
+        user,
+        tenant=resolved,
+        action="backup.key.minted",
+        target=recipient,
+        details={"recipient": recipient},
+    )
+    return MintedKeyResponse(identity=identity, recipient=recipient)
 
 
 @router.delete("/backup-schedules/{name}", status_code=status.HTTP_204_NO_CONTENT)

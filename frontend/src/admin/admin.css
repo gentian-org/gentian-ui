@@ -232,6 +232,14 @@
   font-size: 0.8125rem;
 }
 
+/* A key shown once, on a screen of unknown width. It has to be readable in
+   full and selectable in one gesture: an age key broken across an ellipsis is
+   a key that gets half-copied and only fails months later, at a restore. */
+.admin-console__wrap {
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .admin-console__body code {
   padding: 0.05rem 0.3rem;
   border-radius: var(--gtn-r1);
