@@ -13,6 +13,7 @@ import {
   type BackupRetention,
   type MintedKey,
 } from "@/api/admin";
+import { qrDataUrl, saveKeyFile, saveKeyQr } from "@/admin/backupKeyFile";
 import {
   cronFrom,
   defaultSchedule,
@@ -285,24 +286,50 @@ function StorageFields({
 
 /** Which key backups are encrypted to — the platform's, or one you hold.
  *
- * The consequential choice on this page, and the one with no undo: bundles are
- * encrypted when they are written, so a key changed today does nothing for the
- * backups already taken, and a key lost tomorrow loses every backup made with
- * it. Both halves are said out loud rather than left to a tooltip.
+ * The consequential choice on this page and the one with no undo, so the words
+ * are spent on the consequence and nothing else. Choosing your own key is a
+ * button: it mints one, hands you the file and a printable QR, and fills the
+ * form in. Typing a key by hand is the rarer case and sits behind a link.
  */
 function EncryptionFields({
+  tenant,
   draft,
   setDraft,
   minted,
   onMint,
   minting,
 }: {
+  tenant: string;
   draft: Draft;
   setDraft: (d: Draft) => void;
   minted: MintedKey | null;
   onMint: () => void;
   minting: boolean;
 }) {
+  const [qr, setQr] = useState<string | null>(null);
+  const [pasting, setPasting] = useState(false);
+
+  // The QR is derived from the key, so it is rendered when one appears rather
+  // than waiting for a click: seeing the thing you are about to print is what
+  // makes "save this" a decision instead of an instruction.
+  useEffect(() => {
+    if (!minted) {
+      setQr(null);
+      return;
+    }
+    let live = true;
+    qrDataUrl(minted).then(
+      (url) => live && setQr(url),
+      () => live && setQr(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [minted]);
+
+  const own = draft.keyMode === "own";
+  const hasKey = splitKeys(draft.keys).length > 0;
+
   return (
     <div className="admin-console__stack">
       <label className="admin-console__label">
@@ -315,70 +342,89 @@ function EncryptionFields({
           <option value="own">A key only you hold</option>
         </select>
         <span className="admin-console__hint">
-          {draft.keyMode === "platform"
-            ? "Your provider can open a backup, so they can help you restore one."
-            : "Backups are written in a form nobody here can read — including your provider. Restoring is then yours alone to do."}
+          {own
+            ? "Nobody here can read them, including your provider. Restoring is yours alone to do."
+            : "Your provider can open a backup, so they can help you restore one."}
         </span>
       </label>
 
-      {draft.keyMode === "own" && (
-        <>
-          <label className="admin-console__label">
-            <span className="admin-console__label-text">Your public key</span>
-            <textarea
-              rows={2}
-              spellCheck={false}
-              placeholder="age1…"
-              value={draft.keys}
-              onChange={(e) => setDraft({ ...draft, keys: e.target.value })}
-            />
-            <span className="admin-console__hint">
-              Run <code>age-keygen</code> on your own machine and paste the line that starts
-              with <code>age1</code>. Keep the other line — the one starting{" "}
-              <code>AGE-SECRET-KEY-</code> — somewhere safe and offline; it is what opens the
-              backups. One key per line: naming your provider&apos;s alongside your own lets
-              them help you restore while you still hold a key of your own.
-            </span>
-          </label>
+      {own && !hasKey && !pasting && (
+        <div className="admin-console__submit">
+          <button
+            type="button"
+            className="admin-console__btn admin-console__btn--primary"
+            disabled={minting}
+            onClick={onMint}
+          >
+            {minting ? "Generating…" : "Generate backup key"}
+          </button>
+          <button type="button" className="admin-console__btn-link" onClick={() => setPasting(true)}>
+            I already have a key
+          </button>
+        </div>
+      )}
 
-          <div className="admin-console__submit">
-            <button
-              type="button"
-              className="admin-console__btn"
-              disabled={minting}
-              onClick={onMint}
-            >
-              {minting ? "Generating…" : "Generate a key for me"}
-            </button>
-            <span className="admin-console__hint">
-              Convenient, and weaker: the private key is made on the server and shown to you
-              once. Generating it yourself is the stronger route.
-            </span>
-          </div>
+      {own && (pasting || (hasKey && !minted)) && (
+        <label className="admin-console__label">
+          <span className="admin-console__label-text">Your public key</span>
+          <textarea
+            rows={2}
+            spellCheck={false}
+            placeholder="age1…"
+            value={draft.keys}
+            onChange={(e) => setDraft({ ...draft, keys: e.target.value })}
+          />
+          <span className="admin-console__hint">
+            The <code>age1</code> line from <code>age-keygen</code>. One per line.
+          </span>
+        </label>
+      )}
 
-          {minted && (
-            <div className="admin-console__warning">
-              <p>
-                <strong>Save this now.</strong> This private key is shown once and is stored
-                nowhere. Lose it and every backup encrypted to it is unreadable, by you and by
-                anyone else.
-              </p>
-              <p className="admin-console__mono admin-console__wrap">{minted.identity}</p>
-              <p>
-                Write it to a file called <code>backup-key.txt</code>, keep it offline, and
-                treat a copy on the machine you would be restoring <em>from</em> as no copy at
-                all.
-              </p>
+      {own && minted && (
+        <div className="admin-console__keycard">
+          <p className="admin-console__keycard-lead">
+            <strong>Save this now.</strong> It is shown once and stored nowhere. Without it
+            these backups cannot be opened by anyone, including you.
+          </p>
+          <div className="admin-console__keycard-body">
+            {qr && (
+              <img
+                className="admin-console__keycard-qr"
+                src={qr}
+                alt="Your backup key as a QR code, for printing"
+                width={160}
+                height={160}
+              />
+            )}
+            <div className="admin-console__submit admin-console__submit--stack">
+              <button
+                type="button"
+                className="admin-console__btn admin-console__btn--primary"
+                onClick={() => saveKeyFile(minted, tenant)}
+              >
+                Save key file
+              </button>
+              <button
+                type="button"
+                className="admin-console__btn"
+                onClick={() => void saveKeyQr(minted, tenant)}
+              >
+                Save QR as PNG
+              </button>
+              <span className="admin-console__hint">
+                Print the QR and keep it somewhere physical. A copy only on the machine you
+                would be restoring is no copy at all.
+              </span>
             </div>
-          )}
-
-          <div className="admin-console__warning">
-            <p>
-              This applies to backups taken from now on. Ones already made stay encrypted to
-              whatever key was in force when they were written, and are still restorable.
-            </p>
           </div>
-        </>
+        </div>
+      )}
+
+      {own && hasKey && (
+        <p className="admin-console__hint">
+          Applies from the next backup. Ones already taken keep the key they were written
+          with and are still restorable.
+        </p>
       )}
     </div>
   );
@@ -627,6 +673,7 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
 
             <h4 className="admin-console__group-title">Who can read the backups</h4>
             <EncryptionFields
+              tenant={tenant}
               draft={tenantDraft}
               setDraft={setTenantDraft}
               minted={minted}

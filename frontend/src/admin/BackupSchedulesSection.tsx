@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   deleteBackupSchedule,
   fetchBackupSchedules,
@@ -18,6 +18,7 @@ import {
   type Frequency,
   type ScheduleForm,
 } from "@/admin/backupSchedule";
+import { qrDataUrl, saveKeyFile, saveKeyQr } from "@/admin/backupKeyFile";
 import "./admin.css";
 
 type BackupSchedulesSectionProps = {
@@ -74,8 +75,26 @@ function EditForm({
   const [minted, setMinted] = useState<MintedKey | null>(null);
   const [minting, setMinting] = useState(false);
   const [mintError, setMintError] = useState<string | null>(null);
+  const [qr, setQr] = useState<string | null>(null);
+  const [pasting, setPasting] = useState(false);
   const showTime = ["daily", "weekly", "monthly"].includes(form.frequency);
-  const ownKeyIncomplete = keyMode === "own" && splitKeys(keys).length === 0;
+  const hasKey = splitKeys(keys).length > 0;
+  const ownKeyIncomplete = keyMode === "own" && !hasKey;
+
+  useEffect(() => {
+    if (!minted) {
+      setQr(null);
+      return;
+    }
+    let live = true;
+    qrDataUrl(minted).then(
+      (url) => live && setQr(url),
+      () => live && setQr(null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [minted]);
 
   const generate = async () => {
     setMinting(true);
@@ -199,58 +218,80 @@ function EditForm({
           <option value="own">A key only you hold</option>
         </select>
         <span className="admin-console__hint">
-          {keyMode === "platform"
-            ? "Your provider can open a backup, so they can help you restore one."
-            : "Backups are written in a form nobody here can read — including your provider. Restoring is then yours alone to do."}
+          {keyMode === "own"
+            ? "Nobody here can read them, including your provider."
+            : "Your provider can open a backup, so they can help you restore one."}
         </span>
       </label>
 
-      {keyMode === "own" && (
-        <>
-          <label className="admin-console__label">
-            <span className="admin-console__label-text">Your public key</span>
-            <textarea
-              rows={2}
-              spellCheck={false}
-              placeholder="age1…"
-              value={keys}
-              onChange={(e) => setKeys(e.target.value)}
-            />
-            <span className="admin-console__hint">
-              Run <code>age-keygen</code> on your own machine and paste the line starting{" "}
-              <code>age1</code>. One key per line; adding your provider&apos;s alongside your
-              own lets them help you restore.
-            </span>
-          </label>
-          <div className="admin-console__submit">
-            <button
-              type="button"
-              className="admin-console__btn"
-              disabled={minting}
-              onClick={generate}
-            >
-              {minting ? "Generating…" : "Generate a key for me"}
-            </button>
-            <span className="admin-console__hint">
-              Weaker than generating it yourself: the private key is made on the server and
-              shown once.
-            </span>
-          </div>
-          {mintError && <p className="admin-console__error">{mintError}</p>}
-          {minted && (
-            <div className="admin-console__warning">
-              <p>
-                <strong>Save this now.</strong> It is shown once and stored nowhere. Lose it and
-                every backup encrypted to it is unreadable, by you and by anyone else.
-              </p>
-              <p className="admin-console__mono admin-console__wrap">{minted.identity}</p>
-            </div>
-          )}
-          <p className="admin-console__warning">
-            This applies from the next run. Backups already taken keep the key they were
-            written with and are still restorable.
+      {keyMode === "own" && !hasKey && !pasting && (
+        <div className="admin-console__submit">
+          <button
+            type="button"
+            className="admin-console__btn admin-console__btn--primary"
+            disabled={minting}
+            onClick={generate}
+          >
+            {minting ? "Generating…" : "Generate backup key"}
+          </button>
+          <button type="button" className="admin-console__btn-link" onClick={() => setPasting(true)}>
+            I already have a key
+          </button>
+        </div>
+      )}
+
+      {keyMode === "own" && (pasting || (hasKey && !minted)) && (
+        <label className="admin-console__label">
+          <span className="admin-console__label-text">Your public key</span>
+          <textarea
+            rows={2}
+            spellCheck={false}
+            placeholder="age1…"
+            value={keys}
+            onChange={(e) => setKeys(e.target.value)}
+          />
+          <span className="admin-console__hint">
+            The <code>age1</code> line from <code>age-keygen</code>. One per line.
+          </span>
+        </label>
+      )}
+
+      {mintError && <p className="admin-console__error">{mintError}</p>}
+
+      {keyMode === "own" && minted && (
+        <div className="admin-console__keycard">
+          <p className="admin-console__keycard-lead">
+            <strong>Save this now.</strong> It is shown once and stored nowhere. Without it
+            these backups cannot be opened by anyone, including you.
           </p>
-        </>
+          <div className="admin-console__keycard-body">
+            {qr && (
+              <img
+                className="admin-console__keycard-qr"
+                src={qr}
+                alt="Your backup key as a QR code, for printing"
+                width={160}
+                height={160}
+              />
+            )}
+            <div className="admin-console__submit admin-console__submit--stack">
+              <button
+                type="button"
+                className="admin-console__btn admin-console__btn--primary"
+                onClick={() => saveKeyFile(minted, schedule.tenant)}
+              >
+                Save key file
+              </button>
+              <button
+                type="button"
+                className="admin-console__btn"
+                onClick={() => void saveKeyQr(minted, schedule.tenant)}
+              >
+                Save QR as PNG
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <p className="admin-console__hint">{describeSchedule(form, "")}</p>

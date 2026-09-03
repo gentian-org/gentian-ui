@@ -839,6 +839,63 @@
   color: var(--gtn-ember);
 }
 
+/* A key shown once, and the one screen in this console whose whole job is to be
+   acted on before it is dismissed. Given the weight of the warning treatment
+   because it is warning about something: closing this without saving loses the
+   key, and nothing later can say so. */
+.admin-console__keycard {
+  margin: 0 0 0.75rem;
+  padding: 0.75rem;
+  border-radius: var(--gtn-r1);
+  border-left: 3px solid var(--gtn-ember);
+  background: var(--gtn-ember-bg);
+  color: var(--gtn-ember);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.admin-console__keycard-lead {
+  margin: 0 0 0.75rem;
+}
+
+.admin-console__keycard-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+/* White plate under the symbol regardless of theme: a QR needs its quiet zone
+   light to scan, and the card behind it is not. */
+.admin-console__keycard-qr {
+  flex: 0 0 auto;
+  background: #fff;
+  padding: 0.4rem;
+  border-radius: var(--gtn-r1);
+  image-rendering: pixelated;
+}
+
+.admin-console__submit--stack {
+  flex: 1 1 12rem;
+}
+
+/* The secondary way through a step that already has a primary button. Reads as
+   prose so it does not compete with the action beside it. */
+.admin-console__btn-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gtn-ink-3);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.admin-console__btn-link:hover {
+  color: var(--gtn-ink-1);
+}
+
 .admin-console__error code {
   background: transparent;
   color: inherit;
