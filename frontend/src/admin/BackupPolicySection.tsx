@@ -4,6 +4,7 @@ import {
   emptyRetention,
   fetchBackupPolicy,
   fetchClusterBackupPolicy,
+  escrowBackupKey,
   mintBackupKey,
   resetBackupPolicy,
   saveBackupPolicy,
@@ -298,6 +299,9 @@ function EncryptionFields({
   minted,
   onMint,
   minting,
+  escrow,
+  onEscrowChange,
+  escrowed,
 }: {
   tenant: string;
   draft: Draft;
@@ -305,6 +309,10 @@ function EncryptionFields({
   minted: MintedKey | null;
   onMint: () => void;
   minting: boolean;
+  escrow: boolean;
+  onEscrowChange: (next: boolean) => void;
+  /** null until a mint settles: true kept, false attempted and failed. */
+  escrowed: boolean | null;
 }) {
   const [qr, setQr] = useState<string | null>(null);
   const [pasting, setPasting] = useState(false);
@@ -350,6 +358,17 @@ function EncryptionFields({
 
       {own && !hasKey && !pasting && (
         <div className="admin-console__submit">
+          <label className="admin-console__checkbox">
+            <input type="checkbox" checked={escrow} onChange={(e) => onEscrowChange(e.target.checked)} />
+            <span>
+              Keep a copy in the vault
+              <span className="admin-console__hint">
+                {escrow
+                  ? "You can restore without the downloaded file. A workspace administrator can read the key; the platform cannot."
+                  : "The download is the only copy. Lose it and these backups are unreadable by anyone."}
+              </span>
+            </span>
+          </label>
           <button
             type="button"
             className="admin-console__btn admin-console__btn--primary"
@@ -383,8 +402,11 @@ function EncryptionFields({
       {own && minted && (
         <div className="admin-console__keycard">
           <p className="admin-console__keycard-lead">
-            <strong>Save this now.</strong> It is shown once and stored nowhere. Without it
-            these backups cannot be opened by anyone, including you.
+            {escrowed
+              ? "A copy is in the vault, so this download is not your only one — but the vault goes with the cluster. Save it anyway."
+              : escrowed === false
+                ? "Could not keep a vault copy, so this download is the only one. Save it now."
+                : "Shown once and stored nowhere. Without it these backups cannot be opened by anyone, including you."}
           </p>
           <div className="admin-console__keycard-body">
             {qr && (
@@ -476,6 +498,10 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
   // Held in this component and never sent back: the private key exists in this
   // response and nowhere else, so it must not survive a page reload either.
   const [minted, setMinted] = useState<MintedKey | null>(null);
+  // Escrow on by default, matching the cluster's own arrangement: the likelier
+  // loss is a download that never got saved, not a vault that got breached.
+  const [escrow, setEscrow] = useState(true);
+  const [escrowed, setEscrowed] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (clusterQuery.data) {
@@ -525,9 +551,23 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
     onError: failed,
   });
   const mint = useMutation({
-    mutationFn: () => mintBackupKey(tenant),
-    onSuccess: (key) => {
+    mutationFn: async () => {
+      const key = await mintBackupKey(tenant);
+      if (!escrow) return { key, escrowed: null };
+      // A failed escrow is not a failed mint. The key exists either way, and
+      // discarding it because the copy could not be stored would be the worse
+      // outcome — so the result is reported on the card and the download is
+      // still offered.
+      try {
+        await escrowBackupKey(key.identity);
+        return { key, escrowed: true };
+      } catch {
+        return { key, escrowed: false };
+      }
+    },
+    onSuccess: ({ key, escrowed: kept }) => {
       setError(null);
+      setEscrowed(kept);
       setMinted(key);
       // The public half goes straight into the form. Asking someone to copy it
       // out of one box and into another is a step that can only go wrong, and
@@ -679,6 +719,9 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
               minted={minted}
               onMint={() => mint.mutate()}
               minting={mint.isPending}
+              escrow={escrow}
+              onEscrowChange={setEscrow}
+              escrowed={escrowed}
             />
 
             {movingStorage && (

@@ -112,6 +112,31 @@ async def set_credential(
     )
 
 
+@router.put("/backup-identity")
+async def escrow_backup_identity(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Keep a copy of a workspace's backup key, so a lost download is not fatal.
+
+    Forwarded rather than written here, for the same reason every other write on
+    this router is: this service holds no OpenBao token. The credential manager
+    exchanges the caller's own, and the path it writes is derived from the tenant
+    in the verified claim — so a workspace administrator can escrow into their
+    own subtree and nowhere else, and that is a property of OpenBao's policy
+    engine rather than of a check in this file.
+
+    The key passes through this process in one request body and is not logged,
+    stored, or echoed back; the upstream response carries metadata only.
+    """
+    body = await request.json()
+    return await _forward(
+        request, "PUT", "/v1/backup-identity", _token(credentials), settings, body
+    )
+
+
 @router.get("/repositories/list")
 async def list_repositories(
     request: Request,

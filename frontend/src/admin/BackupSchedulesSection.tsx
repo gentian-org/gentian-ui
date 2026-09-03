@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   deleteBackupSchedule,
+  escrowBackupKey,
   fetchBackupSchedules,
   mintBackupKey,
   saveBackupSchedule,
@@ -77,6 +78,10 @@ function EditForm({
   const [mintError, setMintError] = useState<string | null>(null);
   const [qr, setQr] = useState<string | null>(null);
   const [pasting, setPasting] = useState(false);
+  // On by default, matching the cluster's own arrangement: the likelier loss is
+  // a download that never got saved, not a vault that got breached.
+  const [escrow, setEscrow] = useState(true);
+  const [escrowed, setEscrowed] = useState<boolean | null>(null);
   const showTime = ["daily", "weekly", "monthly"].includes(form.frequency);
   const hasKey = splitKeys(keys).length > 0;
   const ownKeyIncomplete = keyMode === "own" && !hasKey;
@@ -101,6 +106,19 @@ function EditForm({
     setMintError(null);
     try {
       const key = await mintBackupKey(schedule.tenant);
+      if (escrow) {
+        // A failed escrow is not a failed mint: the key exists either way, and
+        // throwing it away because the copy could not be stored would be worse
+        // than saying so on the card.
+        try {
+          await escrowBackupKey(key.identity);
+          setEscrowed(true);
+        } catch {
+          setEscrowed(false);
+        }
+      } else {
+        setEscrowed(null);
+      }
       setMinted(key);
       setKeyMode("own");
       // The public half straight into the field. Copying it by hand from one
@@ -226,6 +244,17 @@ function EditForm({
 
       {keyMode === "own" && !hasKey && !pasting && (
         <div className="admin-console__submit">
+          <label className="admin-console__checkbox">
+            <input type="checkbox" checked={escrow} onChange={(e) => setEscrow(e.target.checked)} />
+            <span>
+              Keep a copy in the vault
+              <span className="admin-console__hint">
+                {escrow
+                  ? "You can restore without the downloaded file."
+                  : "The download is the only copy."}
+              </span>
+            </span>
+          </label>
           <button
             type="button"
             className="admin-console__btn admin-console__btn--primary"
@@ -261,8 +290,11 @@ function EditForm({
       {keyMode === "own" && minted && (
         <div className="admin-console__keycard">
           <p className="admin-console__keycard-lead">
-            <strong>Save this now.</strong> It is shown once and stored nowhere. Without it
-            these backups cannot be opened by anyone, including you.
+            {escrowed
+              ? "A copy is in the vault, so this download is not your only one — but the vault goes with the cluster. Save it anyway."
+              : escrowed === false
+                ? "Could not keep a vault copy, so this download is the only one. Save it now."
+                : "Shown once and stored nowhere. Without it these backups cannot be opened by anyone, including you."}
           </p>
           <div className="admin-console__keycard-body">
             {qr && (
