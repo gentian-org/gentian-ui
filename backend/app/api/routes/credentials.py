@@ -98,20 +98,11 @@ async def list_credentials(
     return await _forward(request, "GET", "/v1/credentials", _token(credentials), settings)
 
 
-@router.put("/{name}")
-async def set_credential(
-    name: str,
-    request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    body = await request.json()
-    return await _forward(
-        request, "PUT", f"/v1/credentials/{name}", _token(credentials), settings, body
-    )
-
-
+# Declared before the "/{name}" catch-all below. FastAPI matches routes in
+# registration order, so with that one first "PUT /credentials/backup-identity"
+# was read as a credential named "backup-identity" and forwarded to
+# /v1/credentials/backup-identity, which is not a requirement -- a 404 that
+# looked like the endpoint was missing rather than shadowed.
 @router.get("/backup-identity")
 async def get_backup_identity(
     request: Request,
@@ -151,6 +142,20 @@ async def escrow_backup_identity(
     body = await request.json()
     return await _forward(
         request, "PUT", "/v1/backup-identity", _token(credentials), settings, body
+    )
+
+
+@router.put("/{name}")
+async def set_credential(
+    name: str,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    body = await request.json()
+    return await _forward(
+        request, "PUT", f"/v1/credentials/{name}", _token(credentials), settings, body
     )
 
 
