@@ -112,6 +112,23 @@ async def set_credential(
     )
 
 
+@router.get("/backup-identity")
+async def get_backup_identity(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Whether this workspace already has an escrowed backup key, and which one.
+
+    Metadata only. The upstream reads OpenBao's metadata endpoint, which does
+    not carry the stored value, so the private half cannot come back through
+    here. The public half can, and is what the form needs to offer "keep using
+    the key you already have".
+    """
+    return await _forward(request, "GET", "/v1/backup-identity", _token(credentials), settings)
+
+
 @router.put("/backup-identity")
 async def escrow_backup_identity(
     request: Request,

@@ -1,15 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   deleteBackupSchedule,
-  escrowBackupKey,
   fetchBackupSchedules,
-  mintBackupKey,
   saveBackupSchedule,
   type BackupSchedule,
   type BackupScheduleEncryption,
   type BackupRetention,
-  type MintedKey,
 } from "@/api/admin";
 import {
   cronFrom,
@@ -19,7 +16,11 @@ import {
   type Frequency,
   type ScheduleForm,
 } from "@/admin/backupSchedule";
-import { qrDataUrl, saveKeyFile, saveKeyQr } from "@/admin/backupKeyFile";
+import {
+  BackupKeyChoice,
+  type KeyChoice,
+  type KeyDecision,
+} from "@/admin/BackupKeyChoice";
 import "./admin.css";
 
 type BackupSchedulesSectionProps = {
@@ -29,14 +30,6 @@ type BackupSchedulesSectionProps = {
 
 function formatTime(value: string | null): string {
   return value ? new Date(value).toLocaleString() : "—";
-}
-
-/** One key per line, so a schedule can name a tenant's key and the platform's. */
-function splitKeys(text: string): string[] {
-  return text
-    .split(/[\s,]+/)
-    .map((k) => k.trim())
-    .filter(Boolean);
 }
 
 function keptSummary(r: BackupRetention): string {
@@ -69,68 +62,17 @@ function EditForm({
     formFromCron(schedule.schedule, false),
   );
   const [retention, setRetention] = useState<BackupRetention>(schedule.retention);
-  const [keyMode, setKeyMode] = useState(schedule.encryption.mode);
-  const [keys, setKeys] = useState(schedule.encryption.recipients.join("\n"));
-  // Held here and never sent back: the private key is in the mint response and
-  // nowhere else, so it must not outlive this form either.
-  const [minted, setMinted] = useState<MintedKey | null>(null);
-  const [minting, setMinting] = useState(false);
-  const [mintError, setMintError] = useState<string | null>(null);
-  const [qr, setQr] = useState<string | null>(null);
-  const [pasting, setPasting] = useState(false);
-  // On by default, matching the cluster's own arrangement: the likelier loss is
-  // a download that never got saved, not a vault that got breached.
-  const [escrow, setEscrow] = useState(true);
-  const [escrowed, setEscrowed] = useState<boolean | null>(null);
+  const [keyChoice, setKeyChoice] = useState<KeyChoice>(
+    schedule.encryption.mode === "own" ? "existing" : "platform",
+  );
+  const [keyDecision, setKeyDecision] = useState<KeyDecision>({
+    choice: "platform",
+    recipients: [],
+    ready: true,
+  });
   const showTime = ["daily", "weekly", "monthly"].includes(form.frequency);
-  const hasKey = splitKeys(keys).length > 0;
-  const ownKeyIncomplete = keyMode === "own" && !hasKey;
 
-  useEffect(() => {
-    if (!minted) {
-      setQr(null);
-      return;
-    }
-    let live = true;
-    qrDataUrl(minted).then(
-      (url) => live && setQr(url),
-      () => live && setQr(null),
-    );
-    return () => {
-      live = false;
-    };
-  }, [minted]);
 
-  const generate = async () => {
-    setMinting(true);
-    setMintError(null);
-    try {
-      const key = await mintBackupKey(schedule.tenant);
-      if (escrow) {
-        // A failed escrow is not a failed mint: the key exists either way, and
-        // throwing it away because the copy could not be stored would be worse
-        // than saying so on the card.
-        try {
-          await escrowBackupKey(key.identity);
-          setEscrowed(true);
-        } catch {
-          setEscrowed(false);
-        }
-      } else {
-        setEscrowed(null);
-      }
-      setMinted(key);
-      setKeyMode("own");
-      // The public half straight into the field. Copying it by hand from one
-      // box to another is a step that can only go wrong, and pasting the wrong
-      // half would put the private key into a spec.
-      setKeys(key.recipient);
-    } catch (err) {
-      setMintError((err as Error).message);
-    } finally {
-      setMinting(false);
-    }
-  };
 
   return (
     <div className="admin-console__card-footer">
@@ -228,103 +170,13 @@ function EditForm({
         ))}
       </div>
 
-      <h4 className="admin-console__group-title">Who can read these backups</h4>
-      <label className="admin-console__label">
-        <span className="admin-console__label-text">Encryption key</span>
-        <select value={keyMode} onChange={(e) => setKeyMode(e.target.value as "platform" | "own")}>
-          <option value="platform">The platform&apos;s key (recommended)</option>
-          <option value="own">A key only you hold</option>
-        </select>
-        <span className="admin-console__hint">
-          {keyMode === "own"
-            ? "Nobody here can read them, including your provider."
-            : "Your provider can open a backup, so they can help you restore one."}
-        </span>
-      </label>
-
-      {keyMode === "own" && !hasKey && !pasting && (
-        <div className="admin-console__submit">
-          <label className="admin-console__checkbox">
-            <input type="checkbox" checked={escrow} onChange={(e) => setEscrow(e.target.checked)} />
-            <span>
-              Keep a copy in the vault
-              <span className="admin-console__hint">
-                {escrow
-                  ? "You can restore without the downloaded file."
-                  : "The download is the only copy."}
-              </span>
-            </span>
-          </label>
-          <button
-            type="button"
-            className="admin-console__btn admin-console__btn--primary"
-            disabled={minting}
-            onClick={generate}
-          >
-            {minting ? "Generating…" : "Generate backup key"}
-          </button>
-          <button type="button" className="admin-console__btn-link" onClick={() => setPasting(true)}>
-            I already have a key
-          </button>
-        </div>
-      )}
-
-      {keyMode === "own" && (pasting || (hasKey && !minted)) && (
-        <label className="admin-console__label">
-          <span className="admin-console__label-text">Your public key</span>
-          <textarea
-            rows={2}
-            spellCheck={false}
-            placeholder="age1…"
-            value={keys}
-            onChange={(e) => setKeys(e.target.value)}
-          />
-          <span className="admin-console__hint">
-            The <code>age1</code> line from <code>age-keygen</code>. One per line.
-          </span>
-        </label>
-      )}
-
-      {mintError && <p className="admin-console__error">{mintError}</p>}
-
-      {keyMode === "own" && minted && (
-        <div className="admin-console__keycard">
-          <p className="admin-console__keycard-lead">
-            {escrowed
-              ? "A copy is in the vault, so this download is not your only one — but the vault goes with the cluster. Save it anyway."
-              : escrowed === false
-                ? "Could not keep a vault copy, so this download is the only one. Save it now."
-                : "Shown once and stored nowhere. Without it these backups cannot be opened by anyone, including you."}
-          </p>
-          <div className="admin-console__keycard-body">
-            {qr && (
-              <img
-                className="admin-console__keycard-qr"
-                src={qr}
-                alt="Your backup key as a QR code, for printing"
-                width={160}
-                height={160}
-              />
-            )}
-            <div className="admin-console__submit admin-console__submit--stack">
-              <button
-                type="button"
-                className="admin-console__btn admin-console__btn--primary"
-                onClick={() => saveKeyFile(minted, schedule.tenant)}
-              >
-                Save key file
-              </button>
-              <button
-                type="button"
-                className="admin-console__btn"
-                onClick={() => void saveKeyQr(minted, schedule.tenant)}
-              >
-                Save QR as PNG
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BackupKeyChoice
+        tenant={schedule.tenant}
+        idPrefix={`schedule-${schedule.name}`}
+        choice={keyChoice}
+        onChoiceChange={setKeyChoice}
+        onDecision={setKeyDecision}
+      />
 
       <p className="admin-console__hint">{describeSchedule(form, "")}</p>
 
@@ -332,13 +184,13 @@ function EditForm({
         <button
           type="button"
           className="admin-console__btn admin-console__btn--primary"
-          disabled={saving || ownKeyIncomplete || !cronFrom(form)}
+          disabled={saving || !keyDecision.ready || !cronFrom(form)}
           onClick={() =>
             onSave(form, retention, {
-              mode: keyMode,
+              mode: keyChoice === "platform" ? "platform" : "own",
               // Cleared when the platform key is chosen, so going back actually
               // goes back rather than leaving a key nobody here can read.
-              recipients: keyMode === "own" ? splitKeys(keys) : [],
+              recipients: keyChoice === "platform" ? [] : keyDecision.recipients,
             })
           }
         >
