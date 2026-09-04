@@ -89,6 +89,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # The arm64 leg is emulated, and buildx does not provide the emulator —
+      # it needs qemu-user-static registered with binfmt_misc on the host. The
+      # runner image currently ships that, so the build works without this step
+      # and would keep working until the day it does not, failing as an
+      # "exec format error" deep inside a RUN line that says nothing about the
+      # runner. Declared here rather than inherited, for the reason the lint
+      # job installs PyYAML instead of relying on the image having it.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
