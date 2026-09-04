@@ -113,6 +113,12 @@ jobs:
           context: frontend
           file: frontend/Dockerfile
           push: true
+          # Without this the default builder produces an amd64-only image and
+          # says nothing about it. The failure lands much later, as an
+          # ImagePullBackOff on an arm64 node whose message never mentions
+          # architecture. The frontend Dockerfile pins its build stage to
+          # BUILDPLATFORM, so the arm64 leg here is only the runtime stage.
+          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}
             ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.short }}
@@ -130,6 +136,11 @@ jobs:
           context: backend
           file: backend/Dockerfile
           push: true
+          # The backend has no build/runtime split to exploit: uv resolves and
+          # installs into the target image, so the arm64 leg runs emulated. That
+          # is acceptable while the dependencies ship arm64 wheels — a package
+          # without one compiles from source under QEMU and this step gets slow.
+          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}
             ${{ env.API_IMAGE }}:${{ steps.meta.outputs.short }}

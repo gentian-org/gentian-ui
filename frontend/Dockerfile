@@ -1,5 +1,12 @@
 # Pin digest to avoid flaky Docker Hub tag resolution in CI (node:24-alpine).
-FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS build
+#
+# BUILDPLATFORM keeps npm and vite on the native runner. This stage emits
+# nothing but JavaScript in /app/dist, which is the same bytes whatever the
+# target architecture, so running it under QEMU for the arm64 leg would buy an
+# identical bundle for several times the wall clock. Only the runtime stage
+# below is built per target platform, where the architecture actually shows up
+# in the `serve` install.
+FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS build
 WORKDIR /app
 
 # No VITE_* build args. Vite substitutes import.meta.env.VITE_* at BUILD time,
