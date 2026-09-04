@@ -113,6 +113,19 @@ jobs:
           command: |
             docker pull node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd
 
+      # Three tags, and only one of them is safe to track.
+      #
+      #   develop           moving; the chart default and what a human pulls
+      #   <sha>             immutable, but published from whatever branch built
+      #                     it, so it says nothing about where the code came from
+      #   develop-<sha>     immutable AND branch-scoped
+      #
+      # Argo CD Image Updater must follow the third. It cannot follow the first:
+      # a candidate set of one name that never changes makes newest-build
+      # re-select the same entry every cycle, so the tag it writes back never
+      # moves and no build reaches the cluster. It must not follow the second:
+      # every branch publishes into that namespace, so a main build would be a
+      # valid candidate for a develop cluster.
       - name: Set image tag
         id: meta
         run: |
@@ -120,6 +133,7 @@ jobs:
           branch="${GITHUB_REF_NAME//\//-}"
           echo "tag=${branch}" >> "$GITHUB_OUTPUT"
           echo "short=${short}" >> "$GITHUB_OUTPUT"
+          echo "immutable=${branch}-${short}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push web
         uses: docker/build-push-action@v6
@@ -141,6 +155,7 @@ jobs:
           tags: |
             ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}
             ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.short }}
+            ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.immutable }}
           # No build-args. Vite freezes import.meta.env.VITE_* into the bundle
           # at build time, and this one image is deployed to every cluster — so
           # anything passed here is wrong everywhere except the cluster it names.
@@ -168,3 +183,4 @@ jobs:
           tags: |
             ${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}
             ${{ env.API_IMAGE }}:${{ steps.meta.outputs.short }}
+            ${{ env.API_IMAGE }}:${{ steps.meta.outputs.immutable }}
