@@ -715,10 +715,23 @@ export type MintedKey = { identity: string; recipient: string };
  * the caller's own workspace subtree. It is denied to External Secrets, so the
  * key can be read by a workspace administrator and not by the cluster.
  */
-export function escrowBackupKey(identity: string) {
+/** What the vault holds for this workspace. Never the key itself: the public
+ * half and metadata, read from OpenBao's metadata endpoint. */
+export type BackupKeyStatus = {
+  exists: boolean;
+  recipient: string;
+  setBy: string;
+  updatedAt: string;
+};
+
+export function fetchBackupKeyStatus() {
+  return apiFetch<BackupKeyStatus>("/credentials/backup-identity");
+}
+
+export function escrowBackupKey(identity: string, recipient: string) {
   return apiFetch<{ tenant: string; vaultPath: string; stored: boolean }>(
     "/credentials/backup-identity",
-    { method: "PUT", body: JSON.stringify({ identity }) },
+    { method: "PUT", body: JSON.stringify({ identity, recipient }) },
   );
 }
 

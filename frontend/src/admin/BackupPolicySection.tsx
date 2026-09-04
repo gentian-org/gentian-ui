@@ -4,17 +4,13 @@ import {
   emptyRetention,
   fetchBackupPolicy,
   fetchClusterBackupPolicy,
-  escrowBackupKey,
-  mintBackupKey,
   resetBackupPolicy,
   saveBackupPolicy,
   saveClusterBackupPolicy,
   type BackupPolicy,
   type BackupPolicyBody,
   type BackupRetention,
-  type MintedKey,
 } from "@/api/admin";
-import { qrDataUrl, saveKeyFile, saveKeyQr } from "@/admin/backupKeyFile";
 import {
   cronFrom,
   defaultSchedule,
@@ -24,6 +20,11 @@ import {
   type Frequency,
   type ScheduleForm,
 } from "@/admin/backupSchedule";
+import {
+  BackupKeyChoice,
+  type KeyChoice,
+  type KeyDecision,
+} from "@/admin/BackupKeyChoice";
 import "./admin.css";
 
 type BackupPolicySectionProps = {
@@ -32,15 +33,6 @@ type BackupPolicySectionProps = {
 };
 
 type StorageMode = "platform" | "external";
-type KeyMode = "platform" | "own";
-
-/** One key per line, so a tenant can name its own and the platform's together. */
-function splitKeys(text: string): string[] {
-  return text
-    .split(/[\s,]+/)
-    .map((k) => k.trim())
-    .filter(Boolean);
-}
 
 const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -51,9 +43,7 @@ type Draft = {
   region: string;
   schedule: ScheduleForm;
   retention: BackupRetention;
-  keyMode: KeyMode;
-  /** Free text while typing; split into keys only on save. */
-  keys: string;
+  keyChoice: KeyChoice;
   allowTenantOverride: boolean;
 };
 
@@ -66,13 +56,12 @@ function draftFrom(policy: BackupPolicy | undefined): Draft {
     region: policy?.destination.region ?? "",
     schedule: formFromCron(policy?.schedule ?? "", policy?.suspendSchedule ?? false),
     retention: policy?.retention ?? emptyRetention,
-    keyMode: policy?.encryption.mode ?? "platform",
-    keys: (policy?.encryption.recipients ?? []).join("\n"),
+    keyChoice: policy?.encryption.mode === "own" ? "existing" : "platform",
     allowTenantOverride: policy?.allowTenantOverride ?? true,
   };
 }
 
-function bodyFrom(draft: Draft, confirm?: string): BackupPolicyBody {
+function bodyFrom(draft: Draft, recipients: string[], confirm?: string): BackupPolicyBody {
   const external = draft.storage === "external";
   return {
     destination: {
@@ -84,11 +73,11 @@ function bodyFrom(draft: Draft, confirm?: string): BackupPolicyBody {
     suspendSchedule: draft.schedule.frequency === "off",
     retention: draft.retention,
     encryption: {
-      mode: draft.keyMode,
       // Cleared rather than kept when the platform key is chosen, so going back
       // actually goes back. A list left behind would keep writing bundles the
       // platform cannot read while the form said otherwise.
-      recipients: draft.keyMode === "own" ? splitKeys(draft.keys) : [],
+      mode: draft.keyChoice === "platform" ? "platform" : "own",
+      recipients: draft.keyChoice === "platform" ? [] : recipients,
     },
     confirm,
   };
@@ -285,173 +274,6 @@ function StorageFields({
   );
 }
 
-/** Which key backups are encrypted to — the platform's, or one you hold.
- *
- * The consequential choice on this page and the one with no undo, so the words
- * are spent on the consequence and nothing else. Choosing your own key is a
- * button: it mints one, hands you the file and a printable QR, and fills the
- * form in. Typing a key by hand is the rarer case and sits behind a link.
- */
-function EncryptionFields({
-  tenant,
-  draft,
-  setDraft,
-  minted,
-  onMint,
-  minting,
-  escrow,
-  onEscrowChange,
-  escrowed,
-}: {
-  tenant: string;
-  draft: Draft;
-  setDraft: (d: Draft) => void;
-  minted: MintedKey | null;
-  onMint: () => void;
-  minting: boolean;
-  escrow: boolean;
-  onEscrowChange: (next: boolean) => void;
-  /** null until a mint settles: true kept, false attempted and failed. */
-  escrowed: boolean | null;
-}) {
-  const [qr, setQr] = useState<string | null>(null);
-  const [pasting, setPasting] = useState(false);
-
-  // The QR is derived from the key, so it is rendered when one appears rather
-  // than waiting for a click: seeing the thing you are about to print is what
-  // makes "save this" a decision instead of an instruction.
-  useEffect(() => {
-    if (!minted) {
-      setQr(null);
-      return;
-    }
-    let live = true;
-    qrDataUrl(minted).then(
-      (url) => live && setQr(url),
-      () => live && setQr(null),
-    );
-    return () => {
-      live = false;
-    };
-  }, [minted]);
-
-  const own = draft.keyMode === "own";
-  const hasKey = splitKeys(draft.keys).length > 0;
-
-  return (
-    <div className="admin-console__stack">
-      <label className="admin-console__label">
-        <span className="admin-console__label-text">Who can read the backups</span>
-        <select
-          value={draft.keyMode}
-          onChange={(e) => setDraft({ ...draft, keyMode: e.target.value as KeyMode })}
-        >
-          <option value="platform">The platform&apos;s key (recommended)</option>
-          <option value="own">A key only you hold</option>
-        </select>
-        <span className="admin-console__hint">
-          {own
-            ? "Nobody here can read them, including your provider. Restoring is yours alone to do."
-            : "Your provider can open a backup, so they can help you restore one."}
-        </span>
-      </label>
-
-      {own && !hasKey && !pasting && (
-        <div className="admin-console__submit">
-          <label className="admin-console__checkbox">
-            <input type="checkbox" checked={escrow} onChange={(e) => onEscrowChange(e.target.checked)} />
-            <span>
-              Keep a copy in the vault
-              <span className="admin-console__hint">
-                {escrow
-                  ? "You can restore without the downloaded file. A workspace administrator can read the key; the platform cannot."
-                  : "The download is the only copy. Lose it and these backups are unreadable by anyone."}
-              </span>
-            </span>
-          </label>
-          <button
-            type="button"
-            className="admin-console__btn admin-console__btn--primary"
-            disabled={minting}
-            onClick={onMint}
-          >
-            {minting ? "Generating…" : "Generate backup key"}
-          </button>
-          <button type="button" className="admin-console__btn-link" onClick={() => setPasting(true)}>
-            I already have a key
-          </button>
-        </div>
-      )}
-
-      {own && (pasting || (hasKey && !minted)) && (
-        <label className="admin-console__label">
-          <span className="admin-console__label-text">Your public key</span>
-          <textarea
-            rows={2}
-            spellCheck={false}
-            placeholder="age1…"
-            value={draft.keys}
-            onChange={(e) => setDraft({ ...draft, keys: e.target.value })}
-          />
-          <span className="admin-console__hint">
-            The <code>age1</code> line from <code>age-keygen</code>. One per line.
-          </span>
-        </label>
-      )}
-
-      {own && minted && (
-        <div className="admin-console__keycard">
-          <p className="admin-console__keycard-lead">
-            {escrowed
-              ? "A copy is in the vault, so this download is not your only one — but the vault goes with the cluster. Save it anyway."
-              : escrowed === false
-                ? "Could not keep a vault copy, so this download is the only one. Save it now."
-                : "Shown once and stored nowhere. Without it these backups cannot be opened by anyone, including you."}
-          </p>
-          <div className="admin-console__keycard-body">
-            {qr && (
-              <img
-                className="admin-console__keycard-qr"
-                src={qr}
-                alt="Your backup key as a QR code, for printing"
-                width={160}
-                height={160}
-              />
-            )}
-            <div className="admin-console__submit admin-console__submit--stack">
-              <button
-                type="button"
-                className="admin-console__btn admin-console__btn--primary"
-                onClick={() => saveKeyFile(minted, tenant)}
-              >
-                Save key file
-              </button>
-              <button
-                type="button"
-                className="admin-console__btn"
-                onClick={() => void saveKeyQr(minted, tenant)}
-              >
-                Save QR as PNG
-              </button>
-              <span className="admin-console__hint">
-                Print the QR and keep it somewhere physical. A copy only on the machine you
-                would be restoring is no copy at all.
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {own && hasKey && (
-        <p className="admin-console__hint">
-          Applies from the next backup. Ones already taken keep the key they were written
-          with and are still restorable.
-        </p>
-      )}
-    </div>
-  );
-}
-
 /** What applies after inheritance, and whether it can actually be used. */
 function EffectiveSummary({ policy }: { policy: BackupPolicy }) {
   const where = policy.effectiveEndpoint
@@ -495,13 +317,13 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
   const [tenantDraft, setTenantDraft] = useState<Draft>(() => draftFrom(undefined));
   const [overriding, setOverriding] = useState(false);
   const [confirmName, setConfirmName] = useState("");
+  const [keyDecision, setKeyDecision] = useState<KeyDecision>({
+    choice: "platform",
+    recipients: [],
+    ready: true,
+  });
   // Held in this component and never sent back: the private key exists in this
   // response and nowhere else, so it must not survive a page reload either.
-  const [minted, setMinted] = useState<MintedKey | null>(null);
-  // Escrow on by default, matching the cluster's own arrangement: the likelier
-  // loss is a download that never got saved, not a vault that got breached.
-  const [escrow, setEscrow] = useState(true);
-  const [escrowed, setEscrowed] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (clusterQuery.data) {
@@ -534,14 +356,14 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
   const saveCluster = useMutation({
     mutationFn: () =>
       saveClusterBackupPolicy({
-        ...bodyFrom(clusterDraft),
+        ...bodyFrom(clusterDraft, []),
         allowTenantOverride: clusterDraft.allowTenantOverride,
       }),
     onSuccess: settled("Cluster default saved."),
     onError: failed,
   });
   const saveTenant = useMutation({
-    mutationFn: () => saveBackupPolicy(bodyFrom(tenantDraft, confirmName.trim()), tenant),
+    mutationFn: () => saveBackupPolicy(bodyFrom(tenantDraft, keyDecision.recipients, confirmName.trim()), tenant),
     onSuccess: settled("Backup settings saved."),
     onError: failed,
   });
@@ -550,38 +372,11 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
     onSuccess: settled("Back to the cluster settings."),
     onError: failed,
   });
-  const mint = useMutation({
-    mutationFn: async () => {
-      const key = await mintBackupKey(tenant);
-      if (!escrow) return { key, escrowed: null };
-      // A failed escrow is not a failed mint. The key exists either way, and
-      // discarding it because the copy could not be stored would be the worse
-      // outcome — so the result is reported on the card and the download is
-      // still offered.
-      try {
-        await escrowBackupKey(key.identity);
-        return { key, escrowed: true };
-      } catch {
-        return { key, escrowed: false };
-      }
-    },
-    onSuccess: ({ key, escrowed: kept }) => {
-      setError(null);
-      setEscrowed(kept);
-      setMinted(key);
-      // The public half goes straight into the form. Asking someone to copy it
-      // out of one box and into another is a step that can only go wrong, and
-      // pasting the wrong half is the mistake that would silently put the
-      // private key in a spec.
-      setTenantDraft((d) => ({ ...d, keyMode: "own", keys: key.recipient }));
-    },
-    onError: failed,
-  });
 
   const clusterPolicy = clusterQuery.data;
   const tenantPolicy = tenantQuery.data;
   const movingStorage = tenantDraft.storage === "external" && tenantDraft.endpoint.trim() !== "";
-  const ownKeyIncomplete = tenantDraft.keyMode === "own" && splitKeys(tenantDraft.keys).length === 0;
+  const keyIncomplete = !keyDecision.ready;
   const overrideBlocked = clusterPolicy ? !clusterPolicy.allowTenantOverride : false;
 
   return (
@@ -711,17 +506,12 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
               </>
             )}
 
-            <h4 className="admin-console__group-title">Who can read the backups</h4>
-            <EncryptionFields
+            <BackupKeyChoice
               tenant={tenant}
-              draft={tenantDraft}
-              setDraft={setTenantDraft}
-              minted={minted}
-              onMint={() => mint.mutate()}
-              minting={mint.isPending}
-              escrow={escrow}
-              onEscrowChange={setEscrow}
-              escrowed={escrowed}
+              idPrefix="backup-policy"
+              choice={tenantDraft.keyChoice}
+              onChoiceChange={(keyChoice) => setTenantDraft({ ...tenantDraft, keyChoice })}
+              onDecision={(d) => setKeyDecision(d)}
             />
 
             {movingStorage && (
@@ -751,7 +541,7 @@ export function BackupPolicySection({ tenant, isPlatformAdmin }: BackupPolicySec
                 className="admin-console__btn admin-console__btn--primary"
                 disabled={
                   saveTenant.isPending ||
-                  ownKeyIncomplete ||
+                  keyIncomplete ||
                   (movingStorage && confirmName.trim() !== tenant)
                 }
                 onClick={() => saveTenant.mutate()}
