@@ -810,6 +810,16 @@
   font-size: 0.8125rem;
 }
 
+/* A hint inside a field label explains the control above it, so it belongs on
+   its own line. Without this it is an inline span and renders on the same line
+   as the input it follows, which reads as a missing line break. Scoped to
+   labels rather than set on the class, because a hint beside a button is
+   deliberately inline. */
+.admin-console__label > .admin-console__hint {
+  display: block;
+  margin-top: 0.3rem;
+}
+
 .admin-console__error,
 .admin-console__success,
 .admin-console__warning {
