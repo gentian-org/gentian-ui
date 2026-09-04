@@ -71,9 +71,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: [test]
-    # develop only. A pull request has nowhere to deploy to, and a feature
-    # branch that published would be picked up by Image Updater and rolled out.
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
+    # The job runs everywhere; only the push is gated, per build step below.
+    # Gating the JOB meant a pull request never built an image at all, so the
+    # one place a broken Dockerfile could still be caught cheaply proved
+    # nothing and reported success — and a build that is only ever exercised
+    # by the run that also publishes it has no dry run anywhere.
     permissions:
       contents: read
       packages: write
@@ -112,7 +114,12 @@ jobs:
         with:
           context: frontend
           file: frontend/Dockerfile
-          push: true
+          # develop publishes, because that is what Argo CD Image Updater
+          # follows. Every other ref builds the image — which is the check —
+          # and pushes nothing.
+          push: >-
+            ${{ github.event_name != 'pull_request'
+            && github.ref == 'refs/heads/develop' }}
           # Without this the default builder produces an amd64-only image and
           # says nothing about it. The failure lands much later, as an
           # ImagePullBackOff on an arm64 node whose message never mentions
@@ -135,7 +142,12 @@ jobs:
         with:
           context: backend
           file: backend/Dockerfile
-          push: true
+          # develop publishes, because that is what Argo CD Image Updater
+          # follows. Every other ref builds the image — which is the check —
+          # and pushes nothing.
+          push: >-
+            ${{ github.event_name != 'pull_request'
+            && github.ref == 'refs/heads/develop' }}
           # The backend has no build/runtime split to exploit: uv resolves and
           # installs into the target image, so the arm64 leg runs emulated. That
           # is acceptable while the dependencies ship arm64 wheels — a package
