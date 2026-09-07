@@ -5,6 +5,17 @@ api:
   image:
     repository: ghcr.io/gentian-org/gentian-portal-api
     tag: "0.1.0"
+    # Always, not the IfNotPresent the templates fall back to. A cluster runs
+    # this chart with a moving tag (image.tag: develop), and a node that has
+    # already cached that tag never re-pulls it under IfNotPresent — so CI can
+    # publish for weeks while the node keeps serving the layer it downloaded
+    # once, through restarts and rollouts alike, with nothing reporting drift.
+    #
+    # Image Updater writing an immutable develop-<sha> tag makes each pull a
+    # fresh name and would settle it on its own, but the moving tag stays
+    # reachable — it is the chart default here and what a `docker pull` gets —
+    # so the policy covers it rather than assuming nobody uses it.
+    pullPolicy: Always
   replicaCount: 1
   resources:
     requests:
@@ -22,6 +33,17 @@ web:
   image:
     repository: ghcr.io/gentian-org/gentian-portal-web
     tag: "0.1.0"
+    # Always, not the IfNotPresent the templates fall back to. A cluster runs
+    # this chart with a moving tag (image.tag: develop), and a node that has
+    # already cached that tag never re-pulls it under IfNotPresent — so CI can
+    # publish for weeks while the node keeps serving the layer it downloaded
+    # once, through restarts and rollouts alike, with nothing reporting drift.
+    #
+    # Image Updater writing an immutable develop-<sha> tag makes each pull a
+    # fresh name and would settle it on its own, but the moving tag stays
+    # reachable — it is the chart default here and what a `docker pull` gets —
+    # so the policy covers it rather than assuming nobody uses it.
+    pullPolicy: Always
   replicaCount: 1
   port: 8080
   resources:
