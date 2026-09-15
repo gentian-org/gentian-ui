@@ -27,6 +27,72 @@ ADMIN_SHELL_APP = {
     "builtin": True,
 }
 
+# Kernel services with an operator-facing UI, as desktop tiles.
+#
+# These are not apps and cannot be modelled as AppProfiles. An AppProfile tile
+# reaches a desktop through tenant_shell_apps, which answers nothing at all for
+# a user whose tenant is the kernel domain -- a platform administrator signed in
+# to the kernel realm. So the cluster's own infrastructure had no tile surface:
+# LiteLLM's console is routed at llm.<kernelDomain> by the operator whenever the
+# claim enables LLM, and nothing in the portal ever offered a way in. The
+# litellm-me profile does declare a tile, but it is a tenant-scope platform app
+# and so lands in the same dead path.
+#
+# Kept as data rather than one more branch in shell_apps_for_user, because the
+# next kernel console (Argo CD is routed the same way, at argocd.<kernelDomain>)
+# should be a row here and not another if.
+#
+# subdomain is the host the kernel HTTPRoute serves, and capability gates the
+# tile on the cluster actually running the thing -- same rule as a platform
+# app's requires-capability, and for the same reason: a tile pointing at a host
+# that resolves to nothing is worse than no tile.
+KERNEL_SHELL_APPS = (
+    {
+        "id": "kernel-llm-gateway",
+        "title": "LLM Gateway",
+        "icon": "settings",
+        "subdomain": "llm",
+        "capability": "llm",
+    },
+)
+
+
+def kernel_shell_apps(settings: Settings, *, is_platform_admin: bool) -> list[dict[str, Any]]:
+    """Kernel service consoles this cluster runs, for a platform administrator.
+
+    Platform administrators only, deliberately: a tenant administrator
+    administers a tenant, and these consoles configure the cluster underneath
+    every tenant -- LiteLLM's holds the model routing and the budgets that apply
+    to all of them.
+    """
+    if not is_platform_admin:
+        return []
+    domain = settings.kernel_domain.strip().lower()
+    if not domain:
+        return []
+    available = settings.capability_set
+    apps: list[dict[str, Any]] = []
+    for spec in KERNEL_SHELL_APPS:
+        capability = str(spec.get("capability") or "")
+        if capability and capability not in available:
+            continue
+        apps.append(
+            {
+                "id": str(spec["id"]),
+                "title": str(spec["title"]),
+                "icon": str(spec["icon"]),
+                "launchUrl": f"https://{spec['subdomain']}.{domain}",
+                "linkTarget": "newwindow",
+                # Not "oidc": that tells the shell to decorate the URL with a
+                # login_hint, which these consoles do not read -- LiteLLM signs
+                # in through its own SSO flow at its own path.
+                "authMode": None,
+                "preopen": False,
+                "builtin": False,
+            }
+        )
+    return apps
+
 
 def tenant_host(tenant: str, kernel_domain: str) -> str:
     return f"{tenant}.{kernel_domain.strip().lower()}"
@@ -311,6 +377,15 @@ async def shell_apps_for_user(
     )
 
     apps = await tenant_shell_apps(user, settings, groups=groups, is_admin=is_admin)
+    # Outside tenant_shell_apps on purpose: it returns early for a user whose
+    # tenant is the kernel domain, which is exactly the administrator these
+    # tiles are for.
+    apps.extend(
+        kernel_shell_apps(
+            settings,
+            is_platform_admin=settings.auth_disabled or user_is_platform_admin(user),
+        )
+    )
     if is_admin:
         apps.append(dict(ADMIN_SHELL_APP))
     return apps

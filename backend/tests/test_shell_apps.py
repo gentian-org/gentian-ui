@@ -578,3 +578,100 @@ def test_capability_set_parses_the_setting():
     assert Settings(GENTIAN_CAPABILITIES="").capability_set == set()
     assert Settings(GENTIAN_CAPABILITIES="llm").capability_set == {"llm"}
     assert Settings(GENTIAN_CAPABILITIES="llm, mail ,").capability_set == {"llm", "mail"}
+
+
+# --- kernel service consoles -------------------------------------------------
+#
+# The regression these cover: a platform administrator signed in at the kernel
+# domain got only the built-in Admin Console. tenant_shell_apps returns early
+# for a kernel-domain user and every other tile came from there, so the
+# cluster's own service consoles had no tile surface at all.
+#
+# AUTH_DISABLED is passed under its alias, not as auth_disabled=False. The field
+# is declared Field(alias="AUTH_DISABLED") with no populate_by_name, so the snake
+# case keyword does not bind and conftest's os.environ["AUTH_DISABLED"]="true"
+# wins -- which would make every user a platform administrator and pass these
+# tests for the wrong reason.
+
+
+def _kernel_settings(capabilities: str = "llm"):
+    return Settings(
+        AUTH_DISABLED="false",
+        KERNEL_DOMAIN="desk.gentian.org",
+        GENTIAN_CAPABILITIES=capabilities,
+    )
+
+
+def _platform_admin_user():
+    return {
+        "preferred_username": "administrator",
+        "tenant": "desk.gentian.org",
+        "groups": ["gentian:platform:superadmin"],
+    }
+
+
+@pytest.fixture
+def no_installed_profiles():
+    """These cases are about kernel tiles, not the tenant's own.
+
+    Unpatched, list_installed_profiles reads AppProfiles from whatever cluster
+    the developer's kubeconfig points at, so the assertions would depend on a
+    live cluster's tenant.
+    """
+    with patch("app.core.shell_apps.list_installed_profiles", return_value=[]):
+        yield
+
+
+@pytest.mark.asyncio
+async def test_platform_admin_gets_llm_gateway_tile_at_kernel_domain(no_installed_profiles):
+    apps = await shell_apps_for_user(_platform_admin_user(), _kernel_settings())
+    by_id = {a["id"]: a for a in apps}
+    assert "kernel-llm-gateway" in by_id, "no LLM Gateway tile for the cluster admin"
+    tile = by_id["kernel-llm-gateway"]
+    # The host the kernel HTTPRoute actually serves (kernel_gateway_routes.go).
+    assert tile["launchUrl"] == "https://llm.desk.gentian.org"
+    assert tile["linkTarget"] == "newwindow"
+    # Decorating this URL with a login_hint would be wrong: LiteLLM authenticates
+    # through its own SSO path, not a query parameter on its root.
+    assert tile["authMode"] is None
+    # The built-in console is still there; this tile is in addition to it.
+    assert "admin" in by_id
+
+
+@pytest.mark.asyncio
+async def test_no_llm_gateway_tile_without_the_capability(no_installed_profiles):
+    """The cluster serves no LLM, so the tile would point at a dead host.
+
+    This is also the state every cluster was in while the portal Application
+    failed to pass llm.enabled through -- indistinguishable, from here, from a
+    cluster that genuinely has LLM off.
+    """
+    apps = await shell_apps_for_user(_platform_admin_user(), _kernel_settings(capabilities=""))
+    assert not [a for a in apps if a["id"] == "kernel-llm-gateway"]
+
+
+@pytest.mark.asyncio
+async def test_tenant_admin_does_not_get_kernel_consoles(no_installed_profiles):
+    """A tenant administrator administers a tenant.
+
+    LiteLLM's console holds the model routing and budgets that apply to every
+    tenant on the cluster, so it is not a tenant administrator's to open.
+    """
+    user = {
+        "preferred_username": "alice",
+        "tenant": "demo",
+        "groups": ["gentian:tenant:demo:admins"],
+    }
+    apps = await shell_apps_for_user(user, _kernel_settings())
+    assert not [a for a in apps if a["id"] == "kernel-llm-gateway"]
+
+
+@pytest.mark.asyncio
+async def test_member_does_not_get_kernel_consoles(no_installed_profiles):
+    user = {
+        "preferred_username": "bob",
+        "tenant": "demo",
+        "groups": ["gentian:tenant:demo:members"],
+    }
+    apps = await shell_apps_for_user(user, _kernel_settings())
+    assert not [a for a in apps if a["id"] == "kernel-llm-gateway"]
