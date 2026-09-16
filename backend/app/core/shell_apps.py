@@ -52,6 +52,12 @@ KERNEL_SHELL_APPS = (
         "title": "LLM Gateway",
         "icon": "settings",
         "subdomain": "llm",
+        # The console, not the API. LiteLLM serves its FastAPI landing page at
+        # /, and the Next.js admin dashboard -- models, virtual keys, team
+        # budgets, spend -- at /ui/. Linking to the host alone opened the
+        # former, which reads as "the tile is just a rendering of the API".
+        # Trailing slash included: /ui answers 307 to /ui/.
+        "path": "/ui/",
         "capability": "llm",
     },
 )
@@ -81,7 +87,7 @@ def kernel_shell_apps(settings: Settings, *, is_platform_admin: bool) -> list[di
                 "id": str(spec["id"]),
                 "title": str(spec["title"]),
                 "icon": str(spec["icon"]),
-                "launchUrl": f"https://{spec['subdomain']}.{domain}",
+                "launchUrl": f"https://{spec['subdomain']}.{domain}{spec.get('path', '')}",
                 "linkTarget": "newwindow",
                 # Not "oidc": that tells the shell to decorate the URL with a
                 # login_hint, which these consoles do not read -- LiteLLM signs

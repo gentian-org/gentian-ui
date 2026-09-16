@@ -628,8 +628,11 @@ async def test_platform_admin_gets_llm_gateway_tile_at_kernel_domain(no_installe
     by_id = {a["id"]: a for a in apps}
     assert "kernel-llm-gateway" in by_id, "no LLM Gateway tile for the cluster admin"
     tile = by_id["kernel-llm-gateway"]
-    # The host the kernel HTTPRoute actually serves (kernel_gateway_routes.go).
-    assert tile["launchUrl"] == "https://llm.desk.gentian.org"
+    # The host the kernel HTTPRoute actually serves (kernel_gateway_routes.go),
+    # and the admin console on it. LiteLLM serves its API landing page at / and
+    # the dashboard at /ui/, so the bare host is the wrong page -- with the
+    # trailing slash, because /ui answers 307 to /ui/.
+    assert tile["launchUrl"] == "https://llm.desk.gentian.org/ui/"
     assert tile["linkTarget"] == "newwindow"
     # Decorating this URL with a login_hint would be wrong: LiteLLM authenticates
     # through its own SSO path, not a query parameter on its root.
