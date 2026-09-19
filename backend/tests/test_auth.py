@@ -89,8 +89,12 @@ class _FakeStore:
         self.calls.append((realm, keycloak_username))
 
 
+# The stub below stays in the fake on purpose: it records a call that must never
+# happen again. Restoring the workspace email at login overwrote the recovery
+# address — the one address a locked-out user can still be reached at — so a
+# reintroduced call has to fail a test rather than a password reset months later.
 @pytest.mark.asyncio
-async def test_session_started_restores_email_when_store_configured():
+async def test_session_started_leaves_the_recovery_address_alone():
     store = _FakeStore()
     settings = Settings(
         KEYCLOAK_ADMIN_URL="http://keycloak.platform-kernel.svc:8080/auth",
@@ -101,7 +105,7 @@ async def test_session_started_restores_email_when_store_configured():
         "preferred_username": "jane@demo.desk.gentian.org",
     }
     await session_started(user=claims, settings=settings, credentials=None, store=store)
-    assert store.calls == [("demo", "jane@demo.desk.gentian.org")]
+    assert store.calls == []
 
 
 @pytest.mark.asyncio

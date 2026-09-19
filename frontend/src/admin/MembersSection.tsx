@@ -191,8 +191,11 @@ function MemberEditPanel({
     <div className="admin-console__edit-panel">
       <div className="admin-console__edit-panel-header">
         <div>
+          {/* The username, not the email field: the field carries the recovery
+              address now, and showing it here made a personal address look like
+              the account's identity. */}
           <div className="admin-console__mono" style={{ fontSize: "0.9375rem" }}>
-            {member.email ?? member.username}
+            {member.username}
           </div>
           <div style={{ fontSize: "0.8125rem", color: "var(--gtn-ink-4)" }}>
             {[member.firstName, member.lastName].filter(Boolean).join(" ") || "—"}
@@ -214,6 +217,11 @@ function MemberEditPanel({
                 value={inviteEmailDraft}
                 onChange={(e) => setInviteEmailDraft(e.target.value)}
                 placeholder="personal@example.com"
+                /* Without this the browser fills the saved login name into the
+                   empty box, which reads as the recovery address already being
+                   the account's own address — and saving it would have made that
+                   true. */
+                autoComplete="off"
                 style={{ flex: "1", minWidth: "12rem" }}
                 title="Personal inbox used to deliver invite links and password-reset emails. Set this when the member's login email is a workspace address."
               />
@@ -433,7 +441,8 @@ export function MembersSection({
               key={member.id}
               className={editingId === member.id ? "admin-console__row--editing" : ""}
             >
-              <td className="admin-console__mono">{member.email ?? member.username}</td>
+              {/* The workspace address, which is the username. */}
+              <td className="admin-console__mono">{member.username}</td>
               <td>{[member.firstName, member.lastName].filter(Boolean).join(" ") || "—"}</td>
               <td>{member.enabled ? "Enabled" : "Disabled"}</td>
               <td>
