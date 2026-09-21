@@ -75,7 +75,11 @@ class KeycloakAdminStore:
         localpart = username.split("@", 1)[0]
         body = {
             "username": username,
-            "email": email,
+            # The recovery address when there is one, not the workspace address.
+            # Keycloak mails this field, and it is where the address has to stay:
+            # the attribute below is a mirror for the admin console, not a store
+            # that can be trusted to keep anything.
+            "email": delivery_email or email,
             "firstName": first_name or "",
             "lastName": last_name or "",
             "enabled": enabled,
@@ -172,7 +176,20 @@ class KeycloakAdminStore:
             except HTTPException:
                 pass
             raise
-        return await self.get_member(realm, member_id)
+        member = await self.get_member(realm, member_id)
+        # Read back rather than assume. Every recovery address entered before this
+        # was accepted by the API and silently discarded by Keycloak, and the only
+        # signal was a password reset months later going to the wrong mailbox.
+        if invite_email and not member.invite_email:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "The account was created but the recovery email was not stored. "
+                    "A password reset would go to the workspace mailbox. "
+                    "Check the realm's user profile, then set the recovery email again."
+                ),
+            )
+        return member
 
     async def send_password_reset_by_email(self, realm: str, email: str) -> bool:
         """Send password-reset email if a user exists. Returns whether a user was found."""
@@ -263,15 +280,26 @@ class KeycloakAdminStore:
     ) -> Member:
         current = await self._request("GET", f"/admin/realms/{quote(realm, safe='')}/users/{member_id}")
         attributes = dict(current.get("attributes") or {})
+        # The recovery address goes in the email FIELD, and the attribute keeps a
+        # mirror for whoever reads the Keycloak console. Writing only the
+        # attribute is what made the Recovery email box appear to work while
+        # Keycloak discarded every value put in it.
+        #
+        # Cleared, the field falls back to the username — the workspace address —
+        # so it never keeps a stale recovery address, and the reset path says
+        # plainly that no recovery address is set.
+        effective_email = email if email is not None else current.get("email")
         if invite_email_set:
             normalized = (invite_email or "").strip()
             if normalized:
                 attributes[INVITE_EMAIL_ATTR] = [normalized]
+                effective_email = normalized
             else:
                 attributes.pop(INVITE_EMAIL_ATTR, None)
+                effective_email = current.get("username")
         body = {
             "username": current.get("username"),
-            "email": email if email is not None else current.get("email"),
+            "email": effective_email,
             "firstName": first_name if first_name is not None else current.get("firstName", ""),
             "lastName": last_name if last_name is not None else current.get("lastName", ""),
             "enabled": enabled if enabled is not None else current.get("enabled", True),
@@ -469,27 +497,18 @@ class KeycloakAdminStore:
             json=body,
         )
 
-    async def restore_workspace_email_for_login(self, realm: str, keycloak_username: str) -> None:
-        """Restore workspace email after invite/reset links when actions are complete."""
-        users = await self._request(
-            "GET",
-            f"/admin/realms/{quote(realm, safe='')}/users",
-            params={"username": keycloak_username, "exact": "true", "max": "1"},
-        )
-        if not users:
-            return
-        raw = users[0]
-        if UPDATE_PASSWORD_ACTION in (raw.get("requiredActions") or []):
-            return
-        workspace = str(raw.get("username") or "")
-        current_email = str(raw.get("email") or "")
-        if not workspace or "@" not in workspace or current_email == workspace:
-            return
-        await self._request(
-            "PUT",
-            f"/admin/realms/{quote(realm, safe='')}/users/{raw['id']}",
-            json=self._user_update_body(raw, email=workspace),
-        )
+    # restore_workspace_email_for_login is gone.
+    #
+    # It set the email field back to the username on the user's first login,
+    # which destroyed the recovery address: the field was the only place it
+    # survived, because the attribute meant to hold it was being discarded. A
+    # locked-out user was then sent their reset link to the mailbox they could
+    # not open, which is the one moment the address exists for.
+    #
+    # The workspace address is not lost by leaving the field alone — it is the
+    # username. Applications read it from the email CLAIM, which the platform
+    # maps from the username (see the groups Job in gentian-os), so they receive
+    # the same value as before whatever the field holds.
 
     async def _list_user_groups(self, realm: str, member_id: str) -> list[dict[str, Any]]:
         raw = await self._request(
@@ -724,11 +743,29 @@ class KeycloakAdminStore:
 
     @staticmethod
     def _member_from_raw(raw: dict[str, Any]) -> Member:
+        """Read a member, and work out which address is which.
+
+        The email FIELD holds the recovery address, because Keycloak's own
+        password reset mails that field and can be pointed at nothing else. The
+        workspace address is the username — christian@corp.example is the login
+        and the mailbox both — so a field that differs from the username is a
+        recovery address, and one that equals it means none has been set.
+
+        The gentian.inviteEmail attribute is read as a fallback and no longer
+        written as the source of truth. It could not be relied on: Keycloak
+        silently discards attributes a realm's user profile does not declare, and
+        the tenant realms had no user profile at all, so every recovery address
+        entered through it was dropped without an error.
+        """
+        username = raw.get("username") or ""
+        email = raw.get("email") or None
         invite_email = None
         attrs = raw.get("attributes") or {}
         invite_vals = attrs.get(INVITE_EMAIL_ATTR) or []
         if invite_vals:
             invite_email = invite_vals[0]
+        elif email and email.strip().lower() != username.strip().lower():
+            invite_email = email
         return Member(
             id=raw["id"],
             username=raw.get("username") or "",
