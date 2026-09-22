@@ -9,6 +9,7 @@ from app.api.routes import (
     apps,
     auth,
     credentials,
+    director,
     health,
     llm,
     notifications,
@@ -55,4 +56,5 @@ app.include_router(admin.router, prefix=settings.api_v1_str)
 app.include_router(notifications.router, prefix=settings.api_v1_str)
 app.include_router(llm.router, prefix=settings.api_v1_str)
 app.include_router(credentials.router, prefix=settings.api_v1_str)
+app.include_router(director.router, prefix=settings.api_v1_str)
 app.include_router(proxy.router)

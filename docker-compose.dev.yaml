@@ -21,6 +21,10 @@ services:
       AUTH_DISABLED: "true"
       KERNEL_DOMAIN: localhost
       BACKEND_CORS_ORIGINS: http://localhost:5173
+      # The director on the host: `make run-director-dev` in gentian-os.
+      DIRECTOR_URL: http://host.docker.internal:8090
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
     depends_on:

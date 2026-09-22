@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     # showing an empty catalogue that looks like a cluster with no plans.
     app_lifecycle_url: str | None = Field(default=None, alias="APP_LIFECYCLE_URL")
 
+    # The gentian-os director: the one writer to the deployments repository and
+    # the one reader of what it holds. The desktop forwards the signed-in
+    # person's token to it and decides nothing itself — the director asks
+    # OpenFGA. Unset means the director-backed routes report themselves
+    # unavailable.
+    director_url: str | None = Field(default=None, alias="DIRECTOR_URL")
+
     keycloak_admin_url: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_URL")
     keycloak_admin_username: str = Field(default="admin", alias="KEYCLOAK_ADMIN_USERNAME")
     keycloak_admin_password: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_PASSWORD")
