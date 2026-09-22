@@ -22,6 +22,9 @@ class FakeDirector:
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
+        if request.url.path.endswith("/tiles"):
+            return httpx.Response(200, json={"cluster": "demo-cluster", "kernelDomain": "k.example",
+                                             "tiles": [{"name": "headlamp", "url": "https://headlamp.k.example/"}]})
         if request.url.path.endswith("/apps") and request.method == "GET":
             return httpx.Response(200, json={"tenant": "demo", "apps": [{"profile": "nextcloud", "addons": ["deck"]}]})
         return httpx.Response(self.status, json=self.body, headers={"X-Request-Id": "req-1"})
@@ -98,3 +101,10 @@ async def test_an_unconfigured_director_is_reported_not_faked(client, monkeypatc
     response = await client.get("/api/v1/director/tenants/demo/apps", headers={"Authorization": "Bearer t"})
     assert response.status_code == 503
     assert "DIRECTOR_URL" in response.json()["detail"]
+
+
+async def test_kernel_tiles_come_from_the_director(client, fake):
+    response = await client.get("/api/v1/director/clusters/demo-cluster/tiles", headers={"Authorization": "Bearer t"})
+    assert response.status_code == 200
+    assert response.json()["tiles"][0]["name"] == "headlamp"
+    assert fake.requests[-1].url.path == "/v1/clusters/demo-cluster/tiles"

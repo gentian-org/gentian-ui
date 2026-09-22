@@ -110,3 +110,10 @@ async def deliver_entitlement(
     tenant: str, body: EntitlementBody, request: Request, token: str = Depends(_token)
 ) -> dict[str, Any]:
     return await _forward(request, director.deliver_entitlement(get_settings(), _name(tenant), body.grant, token=token))
+
+
+@router.get("/clusters/{cluster}/tiles")
+async def kernel_tiles(cluster: str, request: Request, token: str = Depends(_token)) -> dict[str, Any]:
+    """Tiles for the platform console: Headlamp, Argo CD, Keycloak — whichever
+    the director says this person may see."""
+    return await _forward(request, director.kernel_tiles(get_settings(), _name(cluster), token=token))

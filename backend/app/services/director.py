@@ -141,3 +141,8 @@ async def deliver_entitlement(settings: Settings, tenant: str, grant: str, *, to
     return await _call(
         settings, "POST", f"/v1/tenants/{tenant}/entitlements", token=token, json_body={"grant": grant}, **kw
     )
+
+
+async def kernel_tiles(settings: Settings, cluster: str, *, token: str, **kw: Any) -> dict[str, Any]:
+    """The kernel's own UIs, as the director filters them for this person."""
+    return await _call(settings, "GET", f"/v1/clusters/{cluster}/tiles", token=token, **kw)
