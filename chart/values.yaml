@@ -104,6 +104,9 @@ auth:
   # to /login in a loop that never reaches a password prompt. Add the scope to
   # the realm first, then list it here.
   scopes: openid profile email
+  # The issuer the forwarded token is verified against in edge mode: the
+  # zone's realm on the identity provider. The operator sets it.
+  issuer: ""
 
 openfga:
   apiUrl: ""
