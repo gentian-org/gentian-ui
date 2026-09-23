@@ -141,5 +141,14 @@ credentialManager:
 # have no plans.
 #
 #   http://gentian-os-lifecycle.gentian-system.svc.cluster.local:8082
+# The director: what the console asks for the cluster's own consoles, and for
+# anything else only it can decide. It answers about the caller, from their
+# relations to the cluster, so the console forwards the caller's token and adds
+# nothing of its own.
+director:
+  url: ""
+  # Which cluster this console belongs to, as the director names it.
+  cluster: ""
+
 appLifecycle:
   url: ""
