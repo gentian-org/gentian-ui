@@ -166,3 +166,11 @@ director:
 
 appLifecycle:
   url: ""
+
+# The chart's objects are <release>-gentian-portal-<part> unless a name is
+# given here. The operator installs the desktop as a component whose Release
+# carries the namespace in its name, and names the objects after the
+# component instead, so that the profile's exposures can address the
+# Services.
+nameOverride: ""
+fullnameOverride: ""
