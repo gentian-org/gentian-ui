@@ -129,6 +129,21 @@ export type ShellApp = {
   builtin?: boolean;
 };
 
+/** A kernel console, as the director decides this person may open it. */
+export type ClusterTile = {
+  name: string;
+  displayName: string;
+  description: string;
+  url: string;
+  icon: string;
+};
+
+export type ClusterTilesResponse = {
+  cluster: string;
+  kernelDomain: string;
+  tiles: ClusterTile[];
+};
+
 export type AppsResponse = {
   apps: ShellApp[];
 };

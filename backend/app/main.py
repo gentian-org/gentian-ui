@@ -7,6 +7,7 @@ from app.api.routes import (
     account,
     admin,
     apps,
+    cluster,
     auth,
     credentials,
     health,
@@ -49,6 +50,7 @@ app.include_router(health.router)
 app.include_router(auth.router, prefix=settings.api_v1_str)
 app.include_router(session.router, prefix=settings.api_v1_str)
 app.include_router(apps.router, prefix=settings.api_v1_str)
+app.include_router(cluster.router, prefix=settings.api_v1_str)
 app.include_router(prefs.router, prefix=settings.api_v1_str)
 app.include_router(account.router, prefix=settings.api_v1_str)
 app.include_router(admin.router, prefix=settings.api_v1_str)

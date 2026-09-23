@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     def capability_set(self) -> set[str]:
         return {c.strip() for c in self.capabilities.split(",") if c.strip()}
 
+    # The director, on the cluster network. It answers what only it can:
+    # which kernel consoles this person may open, decided from the cluster
+    # relations rather than from whether they are an administrator.
+    director_url: str | None = Field(default=None, alias="DIRECTOR_URL")
+    # Which cluster this console belongs to, as the director names it.
+    cluster_id: str | None = Field(default=None, alias="GENTIAN_CLUSTER_ID")
+
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
     portal_shell_secrets_namespace: str = Field(
         default="platform-kernel",
