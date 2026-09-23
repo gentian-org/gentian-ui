@@ -1,4 +1,6 @@
-{{- if .Values.rbac.create }}
+{{- /* Behind the edge the desktop holds no Kubernetes authority at all:
+     it talks to the director with the caller's token (AD-10). */ -}}
+{{- if and .Values.rbac.create (ne (.Values.auth.mode | default "pkce") "edge") }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

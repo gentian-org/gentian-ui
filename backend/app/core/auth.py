@@ -96,6 +96,15 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
         ) from exc
 
+    if settings.edge_session:
+        # Behind the edge the token names no groups and this process holds
+        # no admin credential to look any up. The director answers what the
+        # caller holds on this desktop's tenant; every admin decision below
+        # reads that answer (ui-restructure.md §2).
+        claims["tenant"] = settings.gentian_tenant or ""
+        claims["relations"] = await fetch_tenant_relations(credentials.credentials, settings)
+        return claims
+
     claims = _enrich_claims_from_userinfo(claims, credentials.credentials, settings)
     if not claims.get("groups"):
         groups = lookup_user_groups(claims, settings)
@@ -103,6 +112,28 @@ async def get_current_user(
             claims["groups"] = groups
     claims["tenant"] = resolve_user_context(claims, settings)
     return claims
+
+
+async def fetch_tenant_relations(token: str, settings: Settings) -> dict[str, bool]:
+    """What the caller holds on this desktop's tenant, as the director says.
+
+    Forwarded with the caller's own token: the director decides, this
+    process relays. A director that cannot be reached leaves the caller with
+    nothing, which is the safe direction.
+    """
+    if not settings.director_url or not settings.gentian_tenant:
+        return {}
+    url = f"{settings.director_url.rstrip('/')}/v1/tenants/{settings.gentian_tenant}/me"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, headers={"Authorization": f"Bearer {token}"})
+    except httpx.HTTPError:
+        return {}
+    if resp.status_code != 200:
+        return {}
+    body = resp.json()
+    relations = body.get("relations") if isinstance(body, dict) else None
+    return {k: bool(v) for k, v in relations.items()} if isinstance(relations, dict) else {}
 
 
 def _userinfo_url_for_issuer(issuer: str, settings: Settings) -> str | None:

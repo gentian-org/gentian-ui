@@ -184,3 +184,38 @@ jobs:
             ${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}
             ${{ env.API_IMAGE }}:${{ steps.meta.outputs.short }}
             ${{ env.API_IMAGE }}:${{ steps.meta.outputs.immutable }}
+  chart:
+    # The desktop is a component: the platform installs it per tenant from
+    # a chart the operator resolves through provider-helm, which pulls from a
+    # registry and not from git. So the chart is published as an OCI
+    # artefact, versioned like the images -- a moving prerelease per branch
+    # the profile can follow on a dev cluster, and an immutable one per
+    # commit for anything that pins.
+    runs-on: ubuntu-latest
+    needs: [test]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Chart version
+        id: chart
+        run: |
+          base="$(sed -n 's/^version: *//p' chart/Chart.yaml)"
+          short="${GITHUB_SHA::7}"
+          branch="${GITHUB_REF_NAME//\//-}"
+          echo "moving=${base}-${branch}" >> "$GITHUB_OUTPUT"
+          echo "immutable=${base}-${branch}.${short}" >> "$GITHUB_OUTPUT"
+      - name: Lint and package
+        run: |
+          helm lint chart
+          helm package chart --version "${{ steps.chart.outputs.immutable }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-immutable
+          helm package chart --version "${{ steps.chart.outputs.moving }}" --app-version "${{ steps.chart.outputs.moving }}" -d /tmp/chart-moving
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Push
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
+        run: |
+          helm push /tmp/chart-immutable/*.tgz oci://ghcr.io/gentian-org/charts
+          helm push /tmp/chart-moving/*.tgz oci://ghcr.io/gentian-org/charts

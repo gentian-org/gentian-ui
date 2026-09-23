@@ -17,7 +17,7 @@ import {
   nonCanonicalRedirectTarget,
 } from "@/auth/oidc";
 import { useSessionWatchdog } from "@/auth/useSessionWatchdog";
-import { loginPathWithReturnTo } from "@/lib/returnTo";
+import { loginPathWithReturnTo, safeReturnTo } from "@/lib/returnTo";
 
 type AuthContextValue = {
   isAuthenticated: boolean;
@@ -72,8 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useSessionWatchdog(authenticated, isLoading, handleSessionExpired);
 
   const login = useCallback((returnTo?: string) => {
+    if (config.authMode === "edge") {
+      window.location.assign(safeReturnTo(returnTo));
+      return;
+    }
     window.location.assign(loginPathWithReturnTo(returnTo));
-  }, []);
+  }, [config.authMode]);
   const logout = useCallback(() => {
     // Full-page navigation only — do not clear React auth state here or RequireAuth
     // on /desktop will immediately start a new OIDC login before Keycloak logout runs.
