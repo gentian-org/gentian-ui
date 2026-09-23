@@ -50,7 +50,7 @@ def test_tenant_notification_requires_group_membership():
 
 
 def test_validate_publish_audience_allows_platform_superadmin():
-    user = {"groups": ["gentian:platform:superadmin"]}
+    user = {"groups": ["gentian:platform:admin"]}
     audience = validate_publish_audience(
         user,
         resolved_tenant="kernel",

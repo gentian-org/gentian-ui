@@ -606,7 +606,7 @@ def _platform_admin_user():
     return {
         "preferred_username": "administrator",
         "tenant": "desk.gentian.org",
-        "groups": ["gentian:platform:superadmin"],
+        "groups": ["gentian:platform:admin"],
     }
 
 

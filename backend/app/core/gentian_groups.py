@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-PLATFORM_SUPERADMIN = "gentian:platform:superadmin"
+PLATFORM_SUPERADMIN = "gentian:platform:admin"
 PLATFORM_OPERATOR = "gentian:platform:operator"
 PLATFORM_BREAK_GLASS = "gentian:platform:break-glass"
 ROLE_MEMBER = "gentian:role:member"
@@ -98,7 +98,7 @@ def _local_username(user: dict[str, Any]) -> str:
 
 
 def is_platform_bootstrap_admin(user: dict[str, Any]) -> bool:
-    """Stage 1 install creates `administrator` in gentian:platform:superadmin via bootstrap Job."""
+    """Stage 1 install creates `administrator` in gentian:platform:admin via bootstrap Job."""
     return _local_username(user) == PLATFORM_BOOTSTRAP_USERNAME
 
 
