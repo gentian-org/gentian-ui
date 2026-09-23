@@ -221,7 +221,11 @@ jobs:
         run: |
           helm lint chart
           helm package chart --version "${{ steps.chart.outputs.immutable }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-immutable
-          helm package chart --version "${{ steps.chart.outputs.moving }}" --app-version "${{ steps.chart.outputs.moving }}" -d /tmp/chart-moving
+          # The moving chart's appVersion is the immutable version it is a
+          # copy of: a cluster that follows the branch reads the pin off the
+          # moving chart and installs the immutable one, since a Helm
+          # release under an unchanged version string is never upgraded.
+          helm package chart --version "${{ steps.chart.outputs.moving }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-moving
       - name: Log in to GHCR
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
