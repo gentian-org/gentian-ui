@@ -192,7 +192,9 @@ jobs:
     # the profile can follow on a dev cluster, and an immutable one per
     # commit for anything that pins.
     runs-on: ubuntu-latest
-    needs: [test]
+    # After the images: the chart names the images of the build it came
+    # from, so it must not exist before they do.
+    needs: [test, build]
     permissions:
       contents: read
       packages: write
@@ -206,6 +208,15 @@ jobs:
           branch="${GITHUB_REF_NAME//\//-}"
           echo "moving=${base}-${branch}" >> "$GITHUB_OUTPUT"
           echo "immutable=${base}-${branch}.${short}" >> "$GITHUB_OUTPUT"
+          echo "image=${branch}-${short}" >> "$GITHUB_OUTPUT"
+      # The chart's default image tag is the immutable, branch-scoped tag of
+      # this very build. A chart that says "0.1.0" names an image nobody
+      # publishes; a chart installed as a component has no image updater to
+      # fill the tag in later, so the chart itself has to be right.
+      - name: Name this build's images
+        run: |
+          sed -i 's/^\(\s*tag:\) "0\.1\.0"$/\1 "${{ steps.chart.outputs.image }}"/' chart/values.yaml
+          test "$(grep -c 'tag: "${{ steps.chart.outputs.image }}"' chart/values.yaml)" = 2
       - name: Lint and package
         run: |
           helm lint chart
