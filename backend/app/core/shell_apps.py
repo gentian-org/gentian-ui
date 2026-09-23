@@ -11,6 +11,7 @@ from app.core.gentian_groups import (
     normalize_groups,
     tenant_app_group,
     user_is_platform_admin,
+    user_is_tenant_admin,
 )
 from app.core.tenant import extract_tenant_from_claims
 from app.services.k8s_catalogue import (
@@ -372,6 +373,17 @@ async def shell_apps_for_user(
     user: dict[str, Any],
     settings: Settings,
 ) -> list[dict[str, Any]]:
+    if settings.edge_session:
+        # This process reads no Tenant and no AppProfile behind the edge
+        # (ui-restructure.md §2): the kernel consoles are its own to name,
+        # the admin tile follows the director's answer, and the tenant's
+        # apps are the director's to serve -- which it does not yet, so
+        # none are listed here rather than read from Kubernetes.
+        apps = kernel_shell_apps(settings, is_platform_admin=user_is_platform_admin(user))
+        if user_is_tenant_admin(user):
+            apps.append(dict(ADMIN_SHELL_APP))
+        return apps
+
     groups = normalize_groups(user)
     if settings.auth_disabled:
         groups = groups or ["gentian:tenant:demo:admins", "gentian:tenant:demo:members"]

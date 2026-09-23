@@ -51,6 +51,13 @@ spec:
             - name: OIDC_CLIENT_ID
               value: {{ .Values.auth.clientId | quote }}
             {{- end }}
+            {{- /* Behind the edge the forwarded token is verified against the
+                 zone's issuer, which the platform supplies; without one the
+                 BFF verifies nothing. */}}
+            {{- if and .Values.auth.issuer (not (hasKey (default dict .Values.api.env) "OIDC_ISSUER")) }}
+            - name: OIDC_ISSUER
+              value: {{ .Values.auth.issuer | quote }}
+            {{- end }}
             {{- if .Values.tenant }}
             - name: GENTIAN_TENANT
               value: {{ .Values.tenant | quote }}
