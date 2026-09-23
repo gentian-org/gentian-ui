@@ -24,9 +24,11 @@ function kernelConsoleApps(data: ClusterTilesResponse | undefined): ShellApp[] {
     title: tile.displayName,
     icon: tile.icon,
     launchUrl: tile.url,
-    // A new window, not an iframe: these are separate origins with their own
-    // sessions, and framing them would break the sign-in each one does.
-    linkTarget: "newwindow",
+    // In a window on the desktop, like every other tile. These are separate
+    // origins, but they are all under the kernel domain and all sign in
+    // against the same realm, so the session the person already holds carries
+    // into the frame.
+    linkTarget: "embedded",
     // No login hint. Each console runs its own OIDC flow against the same
     // realm, and the session the person already holds is what carries them
     // through it.
