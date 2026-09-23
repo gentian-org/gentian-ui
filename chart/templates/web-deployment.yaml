@@ -49,6 +49,8 @@ spec:
               value: {{ .Values.auth.scopes | default "openid profile email" | quote }}
             - name: AUTH_DISABLED
               value: {{ ternary "true" "false" .Values.auth.disabled | quote }}
+            - name: AUTH_MODE
+              value: {{ .Values.auth.mode | default "pkce" | quote }}
             {{- range $key, $value := .Values.web.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}

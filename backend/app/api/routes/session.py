@@ -9,6 +9,7 @@ from app.core.gentian_groups import (
     is_tenant_admin,
     normalize_groups,
     user_is_platform_admin,
+    user_is_tenant_admin,
 )
 from app.core.shell_apps import shell_apps_for_user
 from app.core.tenant import resolve_user_context
@@ -66,6 +67,22 @@ async def get_me(
     groups = normalize_groups(user)
     if settings.auth_disabled:
         groups = groups or ["gentian:tenant:demo:admins"]
+    if settings.edge_session:
+        # Rendered from the director's answer and nothing else: the shell's
+        # tiles come from /cluster/tiles and the tenant's apps from the
+        # director; this process knows no group and decides no admin.
+        return {
+            "sub": user.get("sub"),
+            "username": user.get("preferred_username") or user.get("sub"),
+            "name": user.get("name"),
+            "email": user.get("email"),
+            "tenant": user.get("tenant"),
+            "groups": [],
+            "relations": user.get("relations") or {},
+            "isPlatformAdmin": user_is_platform_admin(user),
+            "isTenantAdmin": user_is_tenant_admin(user),
+            "shellApps": [],
+        }
     return {
         "sub": user.get("sub"),
         "username": user.get("preferred_username") or user.get("sub"),

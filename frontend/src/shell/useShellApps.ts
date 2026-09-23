@@ -7,7 +7,7 @@ import {
   type ShellApp,
 } from "@/api/client";
 import { useAuth } from "@/auth/AuthProvider";
-import { getAccessToken } from "@/auth/oidc";
+import { getAccessToken, isEdgeSession } from "@/auth/oidc";
 
 const ADMIN_APP: ShellApp = {
   id: "admin",
@@ -51,7 +51,7 @@ function shellAppsFromMe(me: MeResponse | undefined): ShellApp[] {
 export function useShellApps() {
   const { isAuthenticated, isLoading: authLoading, authDisabled } = useAuth();
   const sessionReady = authDisabled || (!authLoading && isAuthenticated);
-  const hasToken = authDisabled || Boolean(getAccessToken());
+  const hasToken = authDisabled || isEdgeSession() || Boolean(getAccessToken());
 
   const {
     data: me,

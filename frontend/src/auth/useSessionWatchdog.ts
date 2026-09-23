@@ -24,7 +24,7 @@ export function useSessionWatchdog(
   const config = getOidcConfig();
 
   useEffect(() => {
-    if (config.authDisabled || isLoading || !authenticated) {
+    if (config.authDisabled || config.authMode === "edge" || isLoading || !authenticated) {
       return;
     }
 

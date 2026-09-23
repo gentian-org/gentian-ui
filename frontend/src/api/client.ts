@@ -1,4 +1,4 @@
-import { getAccessToken, redirectToLoginForExpiredSession } from "@/auth/oidc";
+import { getAccessToken, isEdgeSession, redirectToLoginForExpiredSession } from "@/auth/oidc";
 
 const API_BASE = "/api/v1";
 
@@ -90,7 +90,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
           `OpenBao refused the token; the credential manager's log has OpenBao's own words.`,
       );
     }
-    if (response.status === 401 && token) {
+    if (response.status === 401 && (token || isEdgeSession())) {
       redirectToLoginForExpiredSession();
     }
     throw new ApiError(`API ${path} failed: ${response.status}${detail}`, fields);
@@ -101,6 +101,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const text = await response.text();
   if (!text) {
     return undefined as T;
+  }
+  if (isEdgeSession() && (response.headers.get("content-type") ?? "").includes("text/html")) {
+    // The edge session ended between two requests: what came back is the
+    // sign-in page, not an answer. Reload, and the edge signs in silently.
+    redirectToLoginForExpiredSession();
+    throw new ApiError(`API ${path}: the edge session has ended`);
   }
   return JSON.parse(text) as T;
 }

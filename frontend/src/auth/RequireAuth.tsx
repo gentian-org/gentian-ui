@@ -6,7 +6,7 @@ import { loginPathWithReturnTo } from "@/lib/returnTo";
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, authDisabled } = useAuth();
   const config = getOidcConfig();
-  const oidcConfigured = Boolean(config.issuer && config.clientId);
+  const oidcConfigured = config.authMode === "edge" || Boolean(config.issuer && config.clientId);
 
   useEffect(() => {
     if (isLoading || authDisabled || isAuthenticated || !oidcConfigured) {

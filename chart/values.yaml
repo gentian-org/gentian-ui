@@ -77,8 +77,22 @@ gateway:
 existingSecret:
   name: gentian-portal-secrets
 
+# The tenant this desktop is the desktop of. Behind the edge every relation
+# is asked on it; empty under pkce, where the token says.
+tenant: ""
+
 auth:
   disabled: false
+  # pkce: the bundle runs the code flow as a public client and keeps the
+  # token. edge: the Gateway holds the session with the zone's one
+  # confidential client and forwards the token (AD-13); the desktop holds no
+  # token, no client secret, no Keycloak credential and no Kubernetes RBAC --
+  # what the caller may do is the director's answer. The v5 platform runs
+  # every desktop this way.
+  mode: pkce
+  # The client whose tokens the API accepts: the bundle's own under pkce, the
+  # zone's under edge (gentian-edge-kernel for the platform desktop).
+  clientId: ""
   # OIDC public-client settings handed to the browser at RUNTIME (the web
   # container renders them into /config.js at start). Keep them out of build
   # args: Vite freezes import.meta.env.VITE_* into the bundle, and one image is

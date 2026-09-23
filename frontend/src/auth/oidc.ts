@@ -10,6 +10,14 @@ export type OidcConfig = {
   redirectUri: string;
   scopes: string;
   authDisabled: boolean;
+  /**
+   * How a session comes to exist. "pkce": this bundle runs the code flow as a
+   * public client and keeps the token. "edge": the Gateway ran the code flow
+   * with the zone's one confidential client, keeps the session in its own
+   * cookie and forwards the token to the BFF on every request (AD-13); the
+   * bundle holds no token, runs no flow and asks the BFF who it is.
+   */
+  authMode: "pkce" | "edge";
 };
 
 const TOKEN_STORAGE_KEY = "gentian.access_token";
@@ -206,6 +214,7 @@ type RuntimeConfig = {
   oidcClientId?: string;
   oidcScopes?: string;
   authDisabled?: string;
+  authMode?: string;
   kernelDomain?: string;
 };
 
@@ -249,8 +258,17 @@ export function getOidcConfig(): OidcConfig {
     scopes: runtime.oidcScopes || import.meta.env.VITE_OIDC_SCOPES || "openid profile email",
     authDisabled:
       (runtime.authDisabled ?? import.meta.env.VITE_AUTH_DISABLED) === "true",
+    authMode: runtime.authMode === "edge" ? "edge" : "pkce",
   };
 }
+
+/** True when the Gateway holds the session (AD-13). */
+export function isEdgeSession(): boolean {
+  return getOidcConfig().authMode === "edge";
+}
+
+/** Where the edge ends its session: Envoy Gateway's logout path on this host. */
+export const EDGE_LOGOUT_PATH = "/oauth2/logout";
 
 function randomUrlSafeString(length: number): string {
   const bytes = new Uint8Array(length);
@@ -290,6 +308,11 @@ export function getAccessTokenExpiryMs(token: string): number | null {
 
 /** Clear portal tokens and send the user back to login (unless already there). */
 export function redirectToLoginForExpiredSession(): void {
+  if (isEdgeSession()) {
+    // The edge decides: a request with no live session is sent to sign in.
+    window.location.reload();
+    return;
+  }
   clearAccessToken();
   if (window.location.pathname.startsWith("/login")) {
     return;
@@ -301,7 +324,7 @@ export function redirectToLoginForExpiredSession(): void {
 /** Return a stored access token, clearing it when missing or expired. */
 export function getAccessToken(): string | null {
   const config = getOidcConfig();
-  if (config.authDisabled) {
+  if (config.authDisabled || config.authMode === "edge") {
     return null;
   }
   const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
@@ -358,6 +381,11 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
     typeof options === "string" ? { returnTo: options } : options;
   const returnTo = normalized.returnTo ?? "/desktop";
   const config = getOidcConfig();
+  if (config.authMode === "edge") {
+    // Any navigation without a session is the edge's to answer.
+    window.location.assign(returnTo);
+    return;
+  }
   if (config.authDisabled || !config.issuer || !config.clientId) {
     return;
   }
@@ -417,6 +445,10 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
 }
 
 export async function logoutRedirect(): Promise<void> {
+  if (isEdgeSession()) {
+    window.location.assign(EDGE_LOGOUT_PATH);
+    return;
+  }
   const accessToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
   const idToken = sessionStorage.getItem(ID_TOKEN_STORAGE_KEY);
   if (accessToken) {
@@ -442,13 +474,17 @@ export async function logoutRedirect(): Promise<void> {
 
 export function isAuthenticated(): boolean {
   const config = getOidcConfig();
-  if (config.authDisabled) {
+  if (config.authDisabled || config.authMode === "edge") {
+    // Behind the edge a request reaches this bundle only with a session.
     return true;
   }
   return getAccessToken() !== null;
 }
 
 export async function handleOAuthCallback(): Promise<boolean> {
+  if (isEdgeSession()) {
+    return false;
+  }
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
   if (!code) {

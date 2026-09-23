@@ -73,8 +73,20 @@ class Settings(BaseSettings):
     matrix_bridge_password: str | None = Field(default=None, alias="MATRIX_BRIDGE_PASSWORD")
 
     auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
+    # pkce: the bundle runs the code flow and sends its own bearer. edge: the
+    # Gateway holds the session and forwards the zone client's token (AD-13);
+    # what the caller may do comes from the director, never from groups
+    # this process reads off the token or looks up itself.
+    auth_mode: str = Field(default="pkce", alias="AUTH_MODE")
+    # The tenant this desktop is the desktop of (a component of it). Behind
+    # the edge every relation is asked on this tenant.
+    gentian_tenant: str | None = Field(default=None, alias="GENTIAN_TENANT")
 
     cors_origins: str = Field(default="http://localhost:5173", alias="BACKEND_CORS_ORIGINS")
+
+    @property
+    def edge_session(self) -> bool:
+        return self.auth_mode == "edge"
 
     @property
     def portal_client_id(self) -> str:

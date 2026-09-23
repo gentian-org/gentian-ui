@@ -45,6 +45,16 @@ spec:
               value: {{ .Values.capabilities | default (ternary "llm" "" .Values.llm.enabled) | quote }}
             - name: AUTH_DISABLED
               value: {{ ternary "true" "false" .Values.auth.disabled | quote }}
+            - name: AUTH_MODE
+              value: {{ .Values.auth.mode | default "pkce" | quote }}
+            {{- if .Values.auth.clientId }}
+            - name: OIDC_CLIENT_ID
+              value: {{ .Values.auth.clientId | quote }}
+            {{- end }}
+            {{- if .Values.tenant }}
+            - name: GENTIAN_TENANT
+              value: {{ .Values.tenant | quote }}
+            {{- end }}
             {{- range $key, $value := .Values.api.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
