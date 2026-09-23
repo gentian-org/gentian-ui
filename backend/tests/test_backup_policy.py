@@ -207,7 +207,7 @@ def test_only_platform_admins_may_set_cluster_defaults():
         admin_routes._require_platform_admin(tenant_admin, settings)
     assert exc.value.status_code == 403
 
-    platform_admin = {"groups": ["gentian:platform:superadmin"]}
+    platform_admin = {"groups": ["gentian:platform:admin"]}
     admin_routes._require_platform_admin(platform_admin, settings)  # no raise
 
 

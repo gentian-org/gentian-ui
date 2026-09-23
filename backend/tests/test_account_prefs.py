@@ -212,7 +212,7 @@ def test_tenant_admins_may_manage_settings_templates():
     settings = _auth_settings()
 
     prefs_routes.require_admin({"groups": ["gentian:tenant:demo:admins"]}, settings)  # no raise
-    prefs_routes.require_admin({"groups": ["gentian:platform:superadmin"]}, settings)  # no raise
+    prefs_routes.require_admin({"groups": ["gentian:platform:admin"]}, settings)  # no raise
 
     member = {"groups": ["gentian:tenant:demo:members"]}
     with pytest.raises(HTTPException) as exc:
