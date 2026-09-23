@@ -60,6 +60,41 @@ KERNEL_SHELL_APPS = (
         "path": "/ui/",
         "capability": "llm",
     },
+    {
+        # The cluster's deployments. Argo CD signs the administrator in through
+        # the same Keycloak session the portal holds, so the tile opens on the
+        # applications view rather than on a login form.
+        "id": "kernel-gitops",
+        "title": "Deployments",
+        "icon": "projects",
+        "subdomain": "argocd",
+        "path": "/applications",
+        "capability": "gitops",
+    },
+    {
+        # The cluster itself: nodes, workloads, events. Reached through the
+        # kernel's own identity, never a pasted service account token.
+        "id": "kernel-cluster",
+        "title": "Cluster",
+        "icon": "analytics",
+        "subdomain": "headlamp",
+        "path": "/",
+        "capability": "cluster-view",
+    },
+    {
+        # Identity. The realm console, not the account page: this tile is for
+        # the administrator who manages users, groups and clients.
+        #
+        # {realm} is filled in below. The kernel realm's name is a setting, and
+        # a console URL naming the wrong realm lands on a permission error that
+        # reads like a login failure.
+        "id": "kernel-identity",
+        "title": "Identity",
+        "icon": "users",
+        "subdomain": "id",
+        "path": "/auth/admin/{realm}/console/",
+        "capability": "identity",
+    },
 )
 
 
@@ -76,18 +111,20 @@ def kernel_shell_apps(settings: Settings, *, is_platform_admin: bool) -> list[di
     domain = settings.kernel_domain.strip().lower()
     if not domain:
         return []
+    realm = (settings.kernel_realm or "kernel").strip()
     available = settings.capability_set
     apps: list[dict[str, Any]] = []
     for spec in KERNEL_SHELL_APPS:
         capability = str(spec.get("capability") or "")
         if capability and capability not in available:
             continue
+        path = str(spec.get("path") or "").format(realm=realm, domain=domain)
         apps.append(
             {
                 "id": str(spec["id"]),
                 "title": str(spec["title"]),
                 "icon": str(spec["icon"]),
-                "launchUrl": f"https://{spec['subdomain']}.{domain}{spec.get('path', '')}",
+                "launchUrl": f"https://{spec['subdomain']}.{domain}{path}",
                 "linkTarget": "newwindow",
                 # Not "oidc": that tells the shell to decorate the URL with a
                 # login_hint, which these consoles do not read -- LiteLLM signs

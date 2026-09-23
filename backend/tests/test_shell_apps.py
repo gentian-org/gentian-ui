@@ -678,3 +678,34 @@ async def test_member_does_not_get_kernel_consoles(no_installed_profiles):
     }
     apps = await shell_apps_for_user(user, _kernel_settings())
     assert not [a for a in apps if a["id"] == "kernel-llm-gateway"]
+
+
+@pytest.mark.asyncio
+async def test_platform_admin_gets_the_three_kernel_consoles(no_installed_profiles):
+    """Deployments, Cluster and Identity, on the hosts the kernel routes serve.
+
+    These are what the cluster administrator's desktop is for: each opens on
+    the console itself, carried by the Keycloak session the portal already
+    holds, rather than on a login form or a token prompt.
+    """
+    settings = _kernel_settings("gitops,cluster-view,identity")
+    apps = await shell_apps_for_user(_platform_admin_user(), settings)
+    by_id = {a["id"]: a for a in apps}
+    assert by_id["kernel-gitops"]["launchUrl"] == "https://argocd.desk.gentian.org/applications"
+    assert by_id["kernel-cluster"]["launchUrl"] == "https://headlamp.desk.gentian.org/"
+    # The realm is a setting, and a console URL naming the wrong one lands on a
+    # permission error that reads like a login failure.
+    assert (
+        by_id["kernel-identity"]["launchUrl"]
+        == "https://id.desk.gentian.org/auth/admin/kernel/console/"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_console_the_cluster_does_not_run_has_no_tile(no_installed_profiles):
+    """A tile pointing at a host that resolves to nothing is worse than no tile."""
+    apps = await shell_apps_for_user(_platform_admin_user(), _kernel_settings("gitops"))
+    ids = {a["id"] for a in apps}
+    assert "kernel-gitops" in ids
+    assert "kernel-cluster" not in ids
+    assert "kernel-identity" not in ids
