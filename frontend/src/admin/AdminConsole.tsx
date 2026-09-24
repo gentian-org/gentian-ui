@@ -14,9 +14,11 @@ import { NotificationsSection } from "@/admin/NotificationsSection";
 import { ResourcesSection } from "@/admin/ResourcesSection";
 import { PlatformSecuritySection } from "@/admin/PlatformSecuritySection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
+import { TenantsSection } from "@/admin/TenantsSection";
 import "./admin.css";
 
 type AdminTab =
+  | "tenants"
   | "people"
   | "resources"
   | "backup"
@@ -46,6 +48,10 @@ type AdminTab =
  * wearing a different name.
  */
 const TABS: { id: AdminTab; label: string; platformOnly?: boolean }[] = [
+  // First, and platform-only, because bringing a customer on is what an MSP
+  // employee opens this console to do. A tenant administrator sees their own
+  // tenant's screens and has no business listing the others.
+  { id: "tenants", label: "Tenants", platformOnly: true },
   { id: "people", label: "People" },
   { id: "resources", label: "Resources" },
   { id: "backup", label: "Backup" },
@@ -134,7 +140,9 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
         </nav>
 
         <div className="admin-console__body">
-          {tab === "people" ? (
+          {tab === "tenants" ? (
+            <TenantsSection />
+          ) : tab === "people" ? (
             <IdentitySection realm={realm} kernelDomain={contextQuery.data.kernelDomain} />
           ) : tab === "security" ? (
             <SecurityPoliciesSection tenant={tenant} />

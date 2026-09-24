@@ -52,3 +52,49 @@ export async function updateClusterSettings(
   });
   return { ...body, changed: Boolean(body.commit) };
 }
+
+/**
+ * One tenant, as the deployments repository has it.
+ *
+ * From git and not from the cluster: a tenant whose manifest is committed but
+ * which the operator has not finished provisioning is still a tenant, and the
+ * screen says committed rather than pretending it is absent.
+ */
+export type ClusterTenant = {
+  name: string;
+  displayName?: string;
+  /** The Keycloak realm this tenant's people live in. */
+  realm?: string;
+  /** Profile names installed into it. */
+  apps: string[];
+  /** True for a tenant the director refuses to retire. */
+  protected: boolean;
+};
+
+export type ClusterTenantsResponse = {
+  cluster: string;
+  tenants: ClusterTenant[];
+};
+
+export function fetchClusterTenants() {
+  return apiFetch<ClusterTenantsResponse>("/cluster/tenants");
+}
+
+export async function createClusterTenant(
+  name: string,
+  displayName: string,
+): Promise<ClusterSettingsWriteResult> {
+  const body = await apiFetch<{ status: string; commit?: string }>("/cluster/tenants", {
+    method: "POST",
+    body: JSON.stringify({ name, displayName }),
+  });
+  return { ...body, changed: Boolean(body.commit) };
+}
+
+export async function retireClusterTenant(name: string): Promise<ClusterSettingsWriteResult> {
+  const body = await apiFetch<{ status: string; commit?: string }>(
+    `/cluster/tenants/${encodeURIComponent(name)}`,
+    { method: "DELETE" },
+  );
+  return { ...body, changed: Boolean(body.commit) };
+}

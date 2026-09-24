@@ -127,6 +127,49 @@ async def set_cluster_settings(
     return await _forward("PATCH", url, _token(credentials), json_body=body)
 
 
+@router.get("/tenants")
+async def cluster_tenants(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """The customers this cluster carries, as the deployments repository has them.
+
+    Read from git rather than from the cluster on purpose: a tenant whose
+    manifest is committed but which the operator has not finished provisioning
+    is still a tenant, and the screen should show it as committed rather than
+    pretending it is not there yet.
+    """
+    url = f"{_base_url(settings)}/v1/clusters/{_cluster(settings)}/tenants"
+    return await _forward("GET", url, _token(credentials))
+
+
+@router.post("/tenants")
+async def create_cluster_tenant(
+    body: dict,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Bring a tenant on. One request is one commit, with the caller as author."""
+    url = f"{_base_url(settings)}/v1/clusters/{_cluster(settings)}/tenants"
+    return await _forward("POST", url, _token(credentials), json_body=body)
+
+
+@router.delete("/tenants/{tenant}")
+async def retire_cluster_tenant(
+    tenant: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Retire a tenant: git stops describing it, and Argo CD prunes what git
+    no longer names. Whether the data goes with it is the manifest's
+    deletionPolicy, which the operator honours and this does not decide."""
+    url = f"{_base_url(settings)}/v1/clusters/{_cluster(settings)}/tenants/{tenant}"
+    return await _forward("DELETE", url, _token(credentials))
+
+
 @router.get("/tiles")
 async def cluster_tiles(
     request: Request,
