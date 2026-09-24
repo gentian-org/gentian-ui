@@ -271,38 +271,29 @@ export function isEdgeSession(): boolean {
 export const EDGE_LOGOUT_PATH = "/oauth2/logout";
 
 /**
+ * Where the edge answers sign-out itself, ending both sessions in one go.
+ *
  * Signing out behind the edge has to end two sessions, and the order matters.
+ * Envoy Gateway's own logout path clears the Gateway's cookies and nothing
+ * else, so Keycloak still holds the browser's SSO session and the very next
+ * request is signed straight back in without a prompt. That looked like Sign
+ * out doing nothing at all.
  *
- * /oauth2/logout on its own only clears the Gateway's own cookies. Keycloak
- * still holds the browser's SSO session, so the very next request is signed
- * back in without a prompt and Sign out looks like a page reload — which is
- * exactly what it did.
+ * This bundle cannot fix that by itself. Ending the Keycloak session without
+ * the person being asked to confirm needs an id_token_hint, and the only ID
+ * token in this browser is in the zone's cookie, which is httpOnly and belongs
+ * to the edge. Building the URL here with client_id instead was the previous
+ * attempt, and it does not avoid the confirmation: Keycloak shows it for any
+ * logout that carries no hint, because a request naming no session might have
+ * come from a link on somebody else's site.
  *
- * So the browser goes to Keycloak first. Keycloak ends the SSO session, tells
- * the director over the back channel that the session is gone, and then
- * returns the browser to /oauth2/logout, where the Gateway drops its cookies.
- * What is left is a console with no session at either layer, which is what
- * signing out means.
- *
- * client_id with post_logout_redirect_uri and no id_token_hint is deliberate:
- * this bundle holds no token to hint with, and Keycloak accepts the pair
- * without showing the "do you want to log out?" confirmation. The URI must be
- * registered on the client; the kernel realm bootstrap registers this origin.
+ * So the edge does it. This path is answered by the edge authorization
+ * service, which reads the cookie, redirects to the realm carrying the hint,
+ * and names the Gateway's own logout as where to return. Keycloak ends the
+ * session without asking, the Gateway then drops its cookies, and the person
+ * lands on the portal signed out of both layers.
  */
-export function edgeLogoutUrl(): string {
-  const config = getOidcConfig();
-  if (!config.issuer || !config.clientId) {
-    // No issuer to end a session at. Clearing the edge's cookies is still
-    // better than doing nothing, even though Keycloak will sign the next
-    // request straight back in.
-    return EDGE_LOGOUT_PATH;
-  }
-  const params = new URLSearchParams({
-    client_id: config.clientId,
-    post_logout_redirect_uri: `${window.location.origin}${EDGE_LOGOUT_PATH}`,
-  });
-  return `${externalLogoutIssuer(config.issuer)}/protocol/openid-connect/logout?${params.toString()}`;
-}
+export const EDGE_SIGN_OUT_PATH = "/oauth2/sign-out";
 
 function randomUrlSafeString(length: number): string {
   const bytes = new Uint8Array(length);
@@ -480,7 +471,7 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
 
 export async function logoutRedirect(): Promise<void> {
   if (isEdgeSession()) {
-    window.location.assign(edgeLogoutUrl());
+    window.location.assign(EDGE_SIGN_OUT_PATH);
     return;
   }
   const accessToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
