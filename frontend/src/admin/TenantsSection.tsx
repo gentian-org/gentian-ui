@@ -21,7 +21,12 @@ import "./admin.css";
  * those can be renamed afterwards without moving data. The screen says so
  * before the field rather than after the refusal.
  */
-export function TenantsSection() {
+type TenantsSectionProps = {
+  /** Open one tenant, which is where all of its own screens live. */
+  onOpen: (tenant: string) => void;
+};
+
+export function TenantsSection({ onOpen }: TenantsSectionProps) {
   const queryClient = useQueryClient();
   const tenantsQuery = useQuery({
     queryKey: ["cluster", "tenants"],
@@ -123,7 +128,13 @@ export function TenantsSection() {
             {tenants.map((tenant) => (
               <tr key={tenant.name}>
                 <td>
-                  <span className="admin-console__mono">{tenant.name}</span>
+                  <button
+                    type="button"
+                    className="admin-console__btn-link admin-console__mono"
+                    onClick={() => onOpen(tenant.name)}
+                  >
+                    {tenant.name}
+                  </button>
                   {tenant.displayName && tenant.displayName !== tenant.name ? (
                     <div className="admin-console__card-meta">{tenant.displayName}</div>
                   ) : null}
