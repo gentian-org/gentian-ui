@@ -1,60 +1,62 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { fetchAdminContext, fetchGroups } from "@/api/admin";
+import { fetchAdminContext } from "@/api/admin";
 import { AuditSection } from "@/admin/AuditSection";
 import { BackupPolicySection } from "@/admin/BackupPolicySection";
 import { BackupSchedulesSection } from "@/admin/BackupSchedulesSection";
 import { BackupSection } from "@/admin/BackupSection";
 import { CredentialsSection } from "@/admin/CredentialsSection";
 import { CustomizationDebtSection } from "@/admin/CustomizationDebtSection";
-import { GroupsSection } from "@/admin/GroupsSection";
+import { ClusterSettingsSection } from "@/admin/ClusterSettingsSection";
+import { IdentitySection } from "@/admin/IdentitySection";
 import { IntegrationsSection } from "@/admin/IntegrationsSection";
-import { InvitationsSection } from "@/admin/InvitationsSection";
-import { MembersSection } from "@/admin/MembersSection";
 import { NotificationsSection } from "@/admin/NotificationsSection";
 import { ResourcesSection } from "@/admin/ResourcesSection";
 import { PlatformSecuritySection } from "@/admin/PlatformSecuritySection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
-import { SessionsSection } from "@/admin/SessionsSection";
-import { TemplatesSection } from "@/admin/TemplatesSection";
 import "./admin.css";
 
 type AdminTab =
-  | "members"
-  | "invitations"
-  | "groups"
-  | "templates"
+  | "people"
+  | "resources"
+  | "backup"
   | "security"
   | "integrations"
-  | "resources"
-  | "platform"
-  | "customization"
   | "credentials"
-  | "sessions"
-  | "audit"
   | "notifications"
-  | "backup";
+  | "audit"
+  | "settings"
+  | "platform"
+  | "customization";
 
 /**
  * The tab strip, in display order. Kept as data so a new section is one entry
  * rather than another copy of the same button — the copies are how Backup and
  * Credentials ended up looking unlike the rest of the console.
+ *
+ * Ordered by what someone came here to do, not by the systems underneath.
+ * People first because it is the most common errand, then what the tenant runs
+ * and consumes, then what protects it, then the record, then the cluster's own
+ * configuration for whoever administers the platform.
+ *
+ * Four tabs are gone: Members, Groups, Invitations and Sessions. They needed a
+ * Keycloak administrator credential this console must not hold, and Keycloak's
+ * own console already does that job properly. Templates went with them — it
+ * copied one member's shell preferences onto another, which is a member screen
+ * wearing a different name.
  */
 const TABS: { id: AdminTab; label: string; platformOnly?: boolean }[] = [
-  { id: "invitations", label: "Invitations" },
-  { id: "members", label: "Members" },
-  { id: "groups", label: "Groups" },
-  { id: "templates", label: "Templates" },
+  { id: "people", label: "People" },
+  { id: "resources", label: "Resources" },
+  { id: "backup", label: "Backup" },
   { id: "security", label: "Security" },
   { id: "integrations", label: "Integrations" },
-  { id: "resources", label: "Resources" },
+  { id: "credentials", label: "Credentials" },
+  { id: "notifications", label: "Notifications" },
+  { id: "audit", label: "Audit" },
+  { id: "settings", label: "Cluster settings", platformOnly: true },
   { id: "platform", label: "Platform", platformOnly: true },
   { id: "customization", label: "Customization", platformOnly: true },
-  { id: "credentials", label: "Credentials" },
-  { id: "sessions", label: "Sessions" },
-  { id: "audit", label: "Audit" },
-  { id: "notifications", label: "Notifications" },
-  { id: "backup", label: "Backup" },
 ];
 
 type AdminConsoleProps = {
@@ -63,7 +65,7 @@ type AdminConsoleProps = {
 };
 
 export function AdminConsole({ embedded = false }: AdminConsoleProps) {
-  const [tab, setTab] = useState<AdminTab>("invitations");
+  const [tab, setTab] = useState<AdminTab>("people");
   const contextQuery = useQuery({
     queryKey: ["admin", "context"],
     queryFn: () => fetchAdminContext(),
@@ -75,12 +77,6 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
   // to read `?? "demo"`, which would have queried a real, unrelated tenant the
   // moment someone reordered any of that.
   const tenant = contextQuery.data?.tenant ?? "";
-
-  const groupsQuery = useQuery({
-    queryKey: ["admin", "groups", tenant],
-    queryFn: () => fetchGroups(tenant),
-    enabled: Boolean(contextQuery.data),
-  });
 
   if (contextQuery.isLoading) {
     return (
@@ -107,17 +103,6 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
   }
 
   const { realm, isPlatformAdmin } = contextQuery.data;
-  const allGroups = groupsQuery.data ?? [];
-  const privilegeGroups = allGroups.filter((group) => group.name.endsWith(":app-admins"));
-  const appEntitlementGroups = allGroups.filter(
-    (group) => group.name.includes(":app:") && !group.name.endsWith(":app-admins"),
-  );
-  const customGroups = allGroups.filter(
-    (group) =>
-      !group.name.endsWith(":members") &&
-      !group.name.endsWith(":app-admins") &&
-      !group.name.includes(":app:"),
-  );
 
   return (
     <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
@@ -149,39 +134,22 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
         </nav>
 
         <div className="admin-console__body">
-          {tab === "members" ? (
-            <MembersSection
-              tenant={tenant}
-              privilegeGroups={privilegeGroups}
-              appEntitlementGroups={appEntitlementGroups}
-              customGroups={customGroups}
-            />
-          ) : tab === "invitations" ? (
-            <InvitationsSection
-              tenant={tenant}
-              kernelDomain={contextQuery.data.kernelDomain}
-              privilegeGroups={privilegeGroups}
-              appEntitlementGroups={appEntitlementGroups}
-              customGroups={customGroups}
-            />
-          ) : tab === "groups" ? (
-            <GroupsSection tenant={tenant} />
-          ) : tab === "templates" ? (
-            <TemplatesSection tenant={tenant} />
+          {tab === "people" ? (
+            <IdentitySection realm={realm} kernelDomain={contextQuery.data.kernelDomain} />
           ) : tab === "security" ? (
             <SecurityPoliciesSection tenant={tenant} />
           ) : tab === "integrations" ? (
             <IntegrationsSection tenant={tenant} />
           ) : tab === "resources" ? (
             <ResourcesSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
+          ) : tab === "settings" ? (
+            <ClusterSettingsSection />
           ) : tab === "platform" ? (
             <PlatformSecuritySection />
           ) : tab === "customization" ? (
             <CustomizationDebtSection />
           ) : tab === "credentials" ? (
             <CredentialsSection />
-          ) : tab === "sessions" ? (
-            <SessionsSection tenant={tenant} />
           ) : tab === "notifications" ? (
             <NotificationsSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
           ) : tab === "backup" ? (

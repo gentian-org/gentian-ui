@@ -55,6 +55,78 @@ def _token(credentials: HTTPAuthorizationCredentials | None) -> str:
     return credentials.credentials
 
 
+async def _forward(
+    method: str,
+    url: str,
+    token: str,
+    *,
+    params: dict[str, str] | None = None,
+    json_body: object | None = None,
+) -> Response:
+    """Pass one request to the director as the caller and hand back its answer.
+
+    Verbatim in both directions: the status the director chose, the body it
+    wrote, nothing added. A 403 from it means the caller does not hold the
+    relation, and turning that into a friendlier status here would be the
+    console inventing an authorisation answer it is not entitled to give.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            upstream = await client.request(
+                method,
+                url,
+                params=params,
+                json=json_body,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"The director is unreachable: {exc}",
+        ) from exc
+
+    return Response(
+        content=upstream.content,
+        status_code=upstream.status_code,
+        media_type=upstream.headers.get("content-type", "application/json"),
+    )
+
+
+@router.get("/settings")
+async def cluster_settings(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What this cluster is configured with, and what of it may be changed.
+
+    The director answers with the catalogue and the values together, so the
+    screen is rendered from one response: what each setting means, what it
+    accepts, and what it is now. The console adds no knowledge of its own --
+    a setting it has never heard of still renders, and one the director drops
+    disappears without a release here.
+    """
+    url = f"{_base_url(settings)}/v1/clusters/{_cluster(settings)}/settings"
+    return await _forward("GET", url, _token(credentials))
+
+
+@router.patch("/settings")
+async def set_cluster_settings(
+    body: dict,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Change settings. One request is one commit to the deployments repository.
+
+    202 with a commit means git has it and the cluster does not yet; 200 means
+    the state asked for already held. The console shows that difference rather
+    than pretending a save was the end of it.
+    """
+    url = f"{_base_url(settings)}/v1/clusters/{_cluster(settings)}/settings"
+    return await _forward("PATCH", url, _token(credentials), json_body=body)
+
+
 @router.get("/tiles")
 async def cluster_tiles(
     request: Request,
