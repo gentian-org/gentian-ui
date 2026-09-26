@@ -20,7 +20,7 @@ publish flow). See [README.md](README.md) for scope and layout.
 
 ## Security & licensing
 
-* **Never commit secrets** (OIDC client secrets, API keys) — see [docs/security.md](docs/security.md).
+* **Never commit secrets** (OIDC client secrets, API keys) — see [docs/SECURITY.md](docs/SECURITY.md).
 * **Respect third-party license terms** when adding dependencies or vendoring code.
 
 ## Directory map
@@ -64,7 +64,7 @@ publish flow). See [README.md](README.md) for scope and layout.
 
 Production uses **Gateway API** (`chart/templates/httproute.yaml`) on
 `kernel-public-gateway`. Routes `/api`, `/healthz`, `/readyz` → API; `/` → web.
-See [docs/security.md](docs/security.md).
+See [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Local dev
 
@@ -77,4 +77,4 @@ docker compose -f docker-compose.dev.yaml up --build
 
 `AUTH_DISABLED=true` and `VITE_AUTH_DISABLED=true` skip OIDC locally.
 
-See [docs/security.md](docs/security.md) and [docs/architecture.md](docs/architecture.md).
+See [docs/SECURITY.md](docs/SECURITY.md) and [docs/architecture.md](docs/architecture.md).

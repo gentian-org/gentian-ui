@@ -34,5 +34,25 @@ chart/            Kernel Helm chart (portal.<domain>)
 ## Related
 
 - [docs/architecture.md](docs/architecture.md) — target shell behaviour
-- [docs/frontend-stack.md](docs/frontend-stack.md) — why React
+- [docs/FRONTEND-STACK.md](docs/FRONTEND-STACK.md) — why React
 - [AGENTS.md](AGENTS.md) — conventions for coding agents
+
+## Layout
+
+This repository is one component of the platform and follows the gentian-apps
+app layout, so that moving it into `gentian-apps/apps/desktop/` or into a
+repository of its own is a move of files and nothing else:
+
+```
+backend/          FastAPI — a router in front of the director, plus preferences
+frontend/         React SPA — Vite, TanStack Router/Query, Zustand, Tailwind
+chart/            Helm — api + web Deployments, no RBAC, no mounted token
+docs/             AGENTS.md (at the root, because this is its own repository),
+                  SECURITY.md, FRONTEND-STACK.md, architecture.md
+```
+
+No `profile/`. The desktop's ComponentProfile lives in the gentian-os chart
+(`charts/gentian-os/templates/componentprofile-desktop.yaml`), because the
+platform installs the desktop for every tenant itself rather than offering it
+in a catalogue — `apps/_template/README.md` states this exception. One
+declaration, in the repository that does the installing.
