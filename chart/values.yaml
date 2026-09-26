@@ -113,9 +113,6 @@ openfga:
   storeId: ""
   authzenEnabled: true
 
-rbac:
-  create: true
-
 networkPolicy:
   create: false
 

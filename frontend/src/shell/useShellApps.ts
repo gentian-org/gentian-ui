@@ -9,14 +9,6 @@ import {
 import { useAuth } from "@/auth/AuthProvider";
 import { getAccessToken, isEdgeSession } from "@/auth/oidc";
 
-const ADMIN_APP: ShellApp = {
-  id: "admin",
-  title: "Admin Console",
-  icon: "admin",
-  launchUrl: null,
-  builtin: true,
-};
-
 /** The director's tiles, in the shape the desktop renders. */
 function kernelConsoleApps(data: ClusterTilesResponse | undefined): ShellApp[] {
   return (data?.tiles ?? []).map((tile) => ({
@@ -38,14 +30,16 @@ function kernelConsoleApps(data: ClusterTilesResponse | undefined): ShellApp[] {
   }));
 }
 
+// No built-in administration console any more.
+//
+// It used to be a tile this file invented for anybody who looked like an
+// administrator, opening a copy of the console bundled into this image. The
+// console is a component now, installed for every tenant from its own
+// ComponentProfile and reached at admin.<zone>, so its tile arrives the way
+// every other tile does -- from the director, against a relation the caller
+// actually holds, rather than from a guess made here about who is an admin.
 function shellAppsFromMe(me: MeResponse | undefined): ShellApp[] {
-  if (me?.shellApps && me.shellApps.length > 0) {
-    return me.shellApps;
-  }
-  if (me?.isPlatformAdmin || me?.isTenantAdmin) {
-    return [ADMIN_APP];
-  }
-  return [];
+  return me?.shellApps ?? [];
 }
 
 export function useShellApps() {
@@ -90,7 +84,6 @@ export function useShellApps() {
     const list = [...shellAppsFromMe(me), ...kernelConsoleApps(clusterTiles)];
     
     const getSortIndex = (id: string) => {
-      if (id === "admin") return 0;
       if (id === "app-store" || id.startsWith("app-store-")) return 1;
       if (
         id === "subscriptions" ||
@@ -112,8 +105,11 @@ export function useShellApps() {
   }, [me, clusterTiles]);
 
   const isAdminUser = Boolean(me?.isPlatformAdmin || me?.isTenantAdmin);
+  // An administrator whose only tile is the administration console. Named by
+  // the component's own id now that the tile comes from the director rather
+  // than from a constant in this file.
   const adminOnly =
-    isAdminUser && apps.length > 0 && apps.every((app) => app.id === "admin");
+    isAdminUser && apps.length > 0 && apps.every((app) => app.id.endsWith("admin-console"));
 
   return {
     me,

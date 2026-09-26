@@ -1,10 +1,4 @@
 import { useEffect } from "react";
-import { getAccessToken } from "@/auth/oidc";
-import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
-import {
-  fetchPortalBridgeTicket,
-  portalBridgeLaunchUrl,
-} from "@/auth/portalBridge";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { useShellApps } from "@/shell/useShellApps";
@@ -37,7 +31,6 @@ export function DesktopPage() {
   const openOrFocusWindow = useWindowsStore((s) => s.openOrFocusWindow);
   const focusWindow = useWindowsStore((s) => s.focusWindow);
   const openWindow = useWindowsStore((s) => s.openWindow);
-  const closeWindow = useWindowsStore((s) => s.closeWindow);
   const setWindowUrl = useWindowsStore((s) => s.setWindowUrl);
 
   const loadPrefs = usePrefsStore((s) => s.loadPrefs);
@@ -49,7 +42,7 @@ export function DesktopPage() {
   }, []);
 
   useEffect(() => {
-    const builtinIds = ["admin", "account", "settings"] as const;
+    const builtinIds = ["account", "settings"] as const;
     if (
       activeAppId &&
       (builtinIds as readonly string[]).includes(activeAppId) &&
@@ -119,43 +112,20 @@ export function DesktopPage() {
     }
 
     setActiveAppId(app.id);
-    if (app.builtin && app.id === "admin") {
-      if (options?.forceNewWindow) {
-        // Builtins can't run in separate browser tab directly without routing wrapper, so we focus or open normal
-        openOrFocusWindow({
-          id: "admin-console",
-          appId: app.id,
-          title: app.title,
-          builtinComponent: "admin",
-        });
-      } else {
-        openOrFocusWindow({
-          id: "admin-console",
-          appId: app.id,
-          title: app.title,
-          builtinComponent: "admin",
-        });
-      }
-      return;
-    }
+    // No branch for the administration console. It is a component with a URL
+    // of its own now, so it opens through the ordinary tile path below.
     if (!app.launchUrl) {
       return;
     }
     const appLaunchBase = app.launchUrl;
-    const useMatrixBridge =
-      app.authMode === "matrix-bridge" && app.linkTarget === "embedded" && !options?.forceLogin;
-    const usePortalBridge =
-      app.authMode === "portal-bridge" &&
-      app.linkTarget === "embedded" &&
-      !options?.forceLogin;
-    // Silent bootstrap loader template
-    const loadingPage =
-      "data:text/html;charset=utf-8," +
-      encodeURIComponent(
-        "<!DOCTYPE html><html><head><meta charset='utf-8'></head><body style='font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;color:#1a2e28'><p>Opening " +
-          app.title.replace(/</g, "") +
-          "…</p></body></html>",
-      );
+    // No bridge tickets.
+    //
+    // Two app kinds used to open through one: this page asked the backend to
+    // mint a one-time ticket, and the app redeemed it on its own origin into a
+    // session. That made the desktop a minter of credentials and put it in the
+    // trust path of those apps. Behind the edge it is also unnecessary -- the
+    // zone's session covers every host in the zone, so the app completes its
+    // own sign-in silently on first open (gentian-os S7A.6).
 
     void (async () => {
       const linkTarget = (options?.forceLogin || options?.forceNewWindow) ? "newwindow" : app.linkTarget;
@@ -166,73 +136,19 @@ export function DesktopPage() {
         forceLogin: options?.forceLogin,
       });
 
-      let launchUrl = appUrl;
-
-      // If opening in a new window/tab, redirect top-level or open window immediately
       const openInNewTab = options?.forceNewWindow || linkTarget === "newwindow";
       if (openInNewTab) {
         window.open(appUrl, "_blank");
         return;
       }
 
-      const needsBridgeTicket = useMatrixBridge || usePortalBridge;
-      const winId = crypto.randomUUID();
-      if (needsBridgeTicket && !options?.forceLogin) {
-        openWindow({
-          id: winId,
-          appId: app.id,
-          title: app.title,
-          url: loadingPage,
-        });
-      }
-
       document.body.style.cursor = "wait";
       try {
-        if (useMatrixBridge) {
-          const ticket = await fetchMatrixBridgeTicket();
-          if (ticket) {
-            launchUrl = matrixBridgeLaunchUrl(new URL(appUrl).origin, ticket);
-          } else if (needsBridgeTicket) {
-            closeWindow(winId);
-            return;
-          }
-        } else if (usePortalBridge) {
-          const ticket = await fetchPortalBridgeTicket();
-          if (ticket) {
-            const parsed = new URL(appUrl);
-            launchUrl = portalBridgeLaunchUrl(
-              parsed.origin,
-              ticket,
-              parsed.searchParams.get("open"),
-              parsed.searchParams.get("app"),
-            );
-          } else {
-            if (needsBridgeTicket) closeWindow(winId);
-            // An expired session already sent the user to login; alerting on top
-            // of that blocks the navigation behind a dialog telling them to do
-            // by hand what is happening anyway. Only report a ticket failure
-            // the user can still be in the desktop for.
-            if (getAccessToken()) {
-              window.alert(`Could not open ${app.title}. Try signing in again.`);
-            }
-            return;
-          }
-        }
-        // Embedded OIDC apps (Odoo) need no bootstrap here — the first-party
-        // Keycloak cookie already exists from the real redirect login that put
-        // the user on the desktop in the first place. See the comment above the
-        // open-webui pre-open effect.
-
-        if (needsBridgeTicket && !options?.forceLogin) {
-          setWindowUrl(winId, launchUrl);
-          return;
-        }
-
         openWindow({
-          id: winId,
+          id: crypto.randomUUID(),
           appId: app.id,
           title: app.title,
-          url: launchUrl,
+          url: appUrl,
         });
       } finally {
         document.body.style.cursor = "";

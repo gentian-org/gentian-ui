@@ -4,11 +4,11 @@ import {
   changeAccountPassword,
   fetchAccountProfile,
   fetchAccountSessions,
-  requestAccountTotp,
   revokeAccountSession,
   revokeAllAccountSessions,
   updateAccountProfile,
 } from "@/api/account";
+import { accountConsoleUrl } from "@/auth/oidc";
 import "@/styles/shell-panel.css";
 
 type AccountTab = "profile" | "password" | "security" | "sessions";
@@ -69,19 +69,6 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    },
-    onError: (err: Error) => {
-      setMessage(null);
-      setError(err.message);
-    },
-  });
-
-  const totpMutation = useMutation({
-    mutationFn: requestAccountTotp,
-    onSuccess: async () => {
-      setError(null);
-      setMessage("TOTP setup will be required on your next sign-in.");
-      await queryClient.invalidateQueries({ queryKey: ["account", "profile"] });
     },
     onError: (err: Error) => {
       setMessage(null);
@@ -281,17 +268,20 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
                     : "TOTP not configured"}
               </p>
               {!profile.totpConfigured && (
-                <button
-                  type="button"
+                // Set up where credentials live, with the session you already
+                // hold. This used to be a button here, and behind it this
+                // service set a required action on your account through
+                // Keycloak's ADMIN API -- an administrator credential, held by
+                // the desktop, to do something you were asking for about
+                // yourself (gentian-os S7A.6).
+                <a
                   className="shell-panel__btn shell-panel__btn--primary"
-                  disabled={totpMutation.isPending}
-                  onClick={() => {
-                    setMessage(null);
-                    totpMutation.mutate();
-                  }}
+                  href={accountConsoleUrl()}
+                  target="_blank"
+                  rel="noreferrer"
                 >
                   Set up authenticator app
-                </button>
+                </a>
               )}
             </section>
           )}

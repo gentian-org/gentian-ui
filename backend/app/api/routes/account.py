@@ -6,7 +6,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
-from app.services.admin_store import AdminStoreDep
 from app.services.keycloak_account import (
     AccountServiceError,
     account_error_to_http,
@@ -150,28 +149,3 @@ async def account_revoke_all_sessions(
         await revoke_all_sessions(token=token, claims=user, settings=settings)
     except AccountServiceError as exc:
         raise account_error_to_http(exc) from exc
-
-
-@router.post("/totp/request", status_code=status.HTTP_204_NO_CONTENT)
-async def account_request_totp(
-    user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-    *,
-    store: AdminStoreDep,
-) -> None:
-    """Ask the user to configure TOTP on next sign-in (self-service)."""
-    if settings.auth_disabled:
-        return
-    member_id = str(user.get("sub") or "")
-    if not member_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing user id")
-    realm = realm_for_user(user, settings)
-    try:
-        await store.enable_totp(realm, member_id, send_email=False)
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Could not start TOTP setup",
-        ) from exc

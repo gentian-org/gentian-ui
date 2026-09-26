@@ -1,11 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchMatrixBridgeTicket, matrixBridgeLaunchUrl } from "@/auth/matrixBridge";
-import {
-  fetchPortalBridgeTicket,
-  portalBridgeLaunchUrl,
-} from "@/auth/portalBridge";
 import { AccountPanel } from "@/account/AccountPanel";
-import { AdminConsole } from "@/admin/AdminConsole";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { MobileAppLayer } from "@/shell/MobileAppLayer";
@@ -15,7 +9,7 @@ import { SettingsPanel } from "@/settings/SettingsPanel";
 import { useAppsStore } from "@/stores/apps";
 import { buildAppLaunchUrl } from "@/lib/appLaunchUrl";
 
-type MobileOverlay = "admin" | "account" | "settings" | null;
+type MobileOverlay = "account" | "settings" | null;
 
 export function MobilePage() {
   const { me, apps, loadFailed, reload } = useShellApps();
@@ -29,9 +23,7 @@ export function MobilePage() {
   const [activeLaunchUrl, setActiveLaunchUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeAppId === "admin") {
-      setOverlay("admin");
-    } else if (activeAppId === "account") {
+    if (activeAppId === "account") {
       setOverlay("account");
     } else if (activeAppId === "settings") {
       setOverlay("settings");
@@ -48,11 +40,8 @@ export function MobilePage() {
       return;
     }
 
-    const useMatrixBridge =
-      activeApp.authMode === "matrix-bridge" && activeApp.linkTarget === "embedded";
-    const usePortalBridge =
-      activeApp.authMode === "portal-bridge" && activeApp.linkTarget === "embedded";
-
+    // No bridge tickets; see DesktopPage for why. The zone's session covers
+    // every host in the zone, so the app signs the person in itself.
     void (async () => {
       const launchBase = activeApp.launchUrl;
       if (!launchBase) {
@@ -60,43 +49,18 @@ export function MobilePage() {
         return;
       }
 
-      const appUrl = buildAppLaunchUrl(launchBase, {
-        username: me?.username,
-        linkTarget: activeApp.linkTarget,
-        authMode: activeApp.authMode,
-      });
-
-      let launchUrl = appUrl;
-      if (useMatrixBridge) {
-        const ticket = await fetchMatrixBridgeTicket();
-        if (ticket) {
-          launchUrl = matrixBridgeLaunchUrl(new URL(appUrl).origin, ticket);
-        }
-      } else if (usePortalBridge) {
-        const ticket = await fetchPortalBridgeTicket();
-        if (ticket) {
-          const parsed = new URL(appUrl);
-          launchUrl = portalBridgeLaunchUrl(
-            parsed.origin,
-            ticket,
-            parsed.searchParams.get("open"),
-            parsed.searchParams.get("app"),
-          );
-        } else {
-          return;
-        }
-      }
-
-      setActiveLaunchUrl(launchUrl);
+      setActiveLaunchUrl(
+        buildAppLaunchUrl(launchBase, {
+          username: me?.username,
+          linkTarget: activeApp.linkTarget,
+          authMode: activeApp.authMode,
+        }),
+      );
     })();
   }, [activeApp, me?.username, overlay]);
 
   function handleSelect(app: (typeof apps)[number]) {
     setActiveAppId(app.id);
-    if (app.id === "admin") {
-      setOverlay("admin");
-      return;
-    }
     // Embedded OIDC apps (Odoo) used to need a popup here to bootstrap a
     // first-party Keycloak cookie, because portal sign-in was a password grant
     // that never took the browser to Keycloak as a top-level page. Portal sign-in
@@ -120,11 +84,6 @@ export function MobilePage() {
   return (
     <div className="gentian-shell shell-surface relative min-h-full">
       <Background imageUrl={backgroundUrl} />
-      {overlay === "admin" && (
-        <div className="relative z-20">
-          <AdminConsole />
-        </div>
-      )}
       {overlay === "account" && (
         <div className="fixed inset-0 z-20 overflow-auto bg-[var(--gtn-paper-3)]">
           <AccountPanel />
@@ -153,7 +112,7 @@ export function MobilePage() {
         onOpenAccount={() => openOverlay("account")}
         onOpenSettings={() => openOverlay("settings")}
       />
-      {overlay && overlay !== "admin" && (
+      {overlay && (
         <button
           type="button"
           className="fixed top-4 right-4 z-30 shell-panel__btn"

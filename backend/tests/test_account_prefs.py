@@ -56,17 +56,6 @@ async def test_prefs_background_roundtrip_auth_disabled():
 
 
 @pytest.mark.anyio
-async def test_forgot_password_auth_disabled():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.post(
-            "/api/v1/auth/forgot-password",
-            json={"email": "nobody@demo.desk.gentian.org"},
-        )
-    assert response.status_code == 204
-
-
-@pytest.mark.anyio
 async def test_custom_prefs_roundtrip_auth_disabled():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -125,27 +114,14 @@ async def test_templates_crud_and_apply():
         )
         assert apply_res.status_code == 204
 
-        # 5b. Invite a user with the template ID
-        invite_res = await client.post(
-            "/api/v1/admin/members/invite",
-            json={
-                "email": "charlie@demo.desk.gentian.org",
-                "firstName": "Charlie",
-                "lastName": "Template",
-                "settingsTemplateId": tpl_id,
-            },
-        )
-        assert invite_res.status_code == 201
-        new_member = invite_res.json()
-        new_member_id = new_member["id"]
-
-        # Fetch the newly invited user's preferences to make sure they match the template's
-        from app.db.tenant_engine import get_tenant_db_session
-        from app.models.user_shell_prefs import UserShellPrefsRow
-        with get_tenant_db_session("demo") as db_session:
-            row = db_session.get(UserShellPrefsRow, {"user_sub": new_member_id, "tenant": "demo"})
-            assert row is not None
-            assert row.prefs_json == payload
+        # No invite-time application any more.
+        #
+        # This used to invite somebody through the bundled console's
+        # /admin/members/invite and assert the template landed on the new
+        # account. Inviting is the administration console's now, through the
+        # director, so the trigger is gone; templates are applied explicitly,
+        # as above. That is a real if small loss, recorded rather than hidden
+        # (gentian-os S7A.6).
 
         # 6. Delete template
         del_res = await client.delete(f"/api/v1/prefs/templates/{tpl_id}")

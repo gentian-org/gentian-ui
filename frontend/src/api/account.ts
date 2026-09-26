@@ -82,18 +82,3 @@ export function revokeAccountSession(sessionId: string) {
 export function revokeAllAccountSessions() {
   return accountFetch<void>("/account/sessions/revoke-all", { method: "POST" });
 }
-
-export function requestAccountTotp() {
-  return accountFetch<void>("/account/totp/request", { method: "POST" });
-}
-
-export async function requestForgotPassword(email: string) {
-  const response = await fetch(`${API_BASE}/auth/forgot-password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
-  });
-  if (!response.ok && response.status !== 204) {
-    throw new Error("Could not send password reset email");
-  }
-}

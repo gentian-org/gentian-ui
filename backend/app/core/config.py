@@ -63,9 +63,23 @@ class Settings(BaseSettings):
     # showing an empty catalogue that looks like a cluster with no plans.
     app_lifecycle_url: str | None = Field(default=None, alias="APP_LIFECYCLE_URL")
 
+    # Keycloak's in-cluster base URL, NOT an administrator credential.
+    #
+    # It is used to reach the realm's public endpoints -- JWKS, and the account
+    # API with the caller's own token -- over the cluster network rather than
+    # out through the gateway and back. The name predates the split and is now
+    # misleading; it is spelled this way because gentian-os sets it, and
+    # renaming it is a change on both sides.
+    #
+    # KEYCLOAK_ADMIN_USERNAME and KEYCLOAK_ADMIN_PASSWORD are gone. They were a
+    # Keycloak administrator credential, read by four services that could list
+    # and write every account in the realm: the bundled administration console,
+    # its audit fetcher, its security-policy store, and a group lookup on the
+    # sign-in path. Nothing supplied them on v5, so the credential was latent
+    # rather than live -- and latent is not the same as absent. The director
+    # holds one per realm now, and every write through it is checked against
+    # OpenFGA with the caller's own token (gentian-os S7A.6 and S7A.17).
     keycloak_admin_url: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_URL")
-    keycloak_admin_username: str = Field(default="admin", alias="KEYCLOAK_ADMIN_USERNAME")
-    keycloak_admin_password: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_PASSWORD")
 
     portal_bff_client_id: str = Field(default="gentian-portal-bff", alias="PORTAL_BFF_CLIENT_ID")
     portal_bff_client_secret: str | None = Field(default=None, alias="PORTAL_BFF_CLIENT_SECRET")

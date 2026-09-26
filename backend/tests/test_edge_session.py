@@ -13,7 +13,6 @@ from fastapi.testclient import TestClient
 
 from app.api.routes import session
 from app.core import auth
-from app.core.admin_context import resolve_admin_tenant
 from app.core.config import Settings, get_settings
 from app.core.gentian_groups import user_is_platform_admin, user_is_tenant_admin
 
@@ -84,17 +83,11 @@ def test_admin_flags_are_the_directors_verdict_not_a_group():
     assert not user_is_platform_admin({"sub": "x", "tenant": "platform", "groups": ["gentian:platform:admin"], "relations": {}})
 
 
-def test_the_desktop_administers_its_own_tenant_only():
-    s = _settings("acme")
-    admin = {"sub": "tom", "tenant": "acme", "relations": {"can_administer": True}}
-    assert resolve_admin_tenant(admin, s, None) == "acme"
-    assert resolve_admin_tenant(admin, s, "acme") == "acme"
-    with pytest.raises(HTTPException) as e:
-        resolve_admin_tenant(admin, s, "other")
-    assert e.value.status_code == 403
-    with pytest.raises(HTTPException) as e:
-        resolve_admin_tenant({"sub": "mia", "tenant": "acme", "relations": {}}, s, None)
-    assert e.value.status_code == 403
+# The desktop administers nothing any more, so there is no cross-tenant
+# selection left to assert. resolve_admin_tenant existed to let a platform
+# administrator pick which tenant the bundled console acted on; the console is
+# its own component now and does that itself, against the director
+# (gentian-os S7A.6).
 
 
 def test_me_renders_the_verdict_and_no_groups(monkeypatch):
