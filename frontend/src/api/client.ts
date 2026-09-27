@@ -138,7 +138,13 @@ export type ShellApp = {
 /** A kernel console, as the director decides this person may open it. */
 export type ClusterTile = {
   name: string;
+  /** The label, and the fallback for a locale that has no translation. */
   displayName: string;
+  /**
+   * Translations of the label, keyed by locale ("de_DE"). Optional: a
+   * catalogue with none renders from displayName alone.
+   */
+  displayNames?: Record<string, string>;
   description: string;
   url: string;
   icon: string;

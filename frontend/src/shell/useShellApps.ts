@@ -7,13 +7,14 @@ import {
   type ShellApp,
 } from "@/api/client";
 import { useAuth } from "@/auth/AuthProvider";
+import { localisedLabel } from "@/lib/locale";
 import { getAccessToken, isEdgeSession } from "@/auth/oidc";
 
 /** The director's tiles, in the shape the desktop renders. */
 function kernelConsoleApps(data: ClusterTilesResponse | undefined): ShellApp[] {
   return (data?.tiles ?? []).map((tile) => ({
     id: `kernel-${tile.name}`,
-    title: tile.displayName,
+    title: localisedLabel(tile.displayName, tile.displayNames),
     icon: tile.icon,
     launchUrl: tile.url,
     // In a window on the desktop, like every other tile. These are separate
