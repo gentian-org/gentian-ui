@@ -62,10 +62,12 @@ void i18n
     nonExplicitSupportedLngs: true,
     load: "languageOnly",
     detection: {
-      // The viewer's own choice first, then what their browser asks for.
-      // AD-15's "from their account, and from the browser until they have
-      // said" — the account plugs in ahead of these once the desktop can read
-      // a locale from it.
+      // What to render before the account's preference has arrived. The
+      // account is the source of truth (see applyStoredLanguage) and it comes
+      // from the desktop's own settings, one HTTP round trip after the first
+      // paint; localStorage holds the last known answer so that round trip is
+      // not a flash of English on every load, and the browser's own languages
+      // answer for a person who has never chosen.
       order: ["localStorage", "navigator"],
       lookupLocalStorage: languageStorageKey,
       caches: ["localStorage"],
@@ -79,3 +81,26 @@ void i18n
   });
 
 export default i18n;
+
+/**
+ * Apply the language the account stores, and remember it for the next first
+ * paint.
+ *
+ * `undefined` means the person has never chosen: the browser decides, and the
+ * cached answer is cleared so a choice made on one machine and then removed
+ * does not linger on another.
+ *
+ * The desktop's settings are the source of truth, not this browser. That is
+ * what makes the choice follow a person to a second machine, and what lets a
+ * tenant administrator hand out a language with a settings template.
+ */
+export function applyStoredLanguage(language: string | undefined): void {
+  try {
+    if (language) window.localStorage.setItem(languageStorageKey, language);
+    else window.localStorage.removeItem(languageStorageKey);
+  } catch {
+    // Private windows and blocked site data both throw. The language still
+    // applies to this page; only the first-paint cache is lost.
+  }
+  void i18n.changeLanguage(language || undefined);
+}

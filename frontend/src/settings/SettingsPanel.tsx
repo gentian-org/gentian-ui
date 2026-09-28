@@ -6,20 +6,16 @@ import { useInvalidateShellBackground } from "@/shell/useShellBackground";
 import "@/styles/shell-panel.css";
 
 import { useTranslation } from "react-i18next";
-import i18n, { languages, languageStorageKey } from "@/lib/i18n";
+import { applyStoredLanguage, languages } from "@/lib/i18n";
+import { usePrefsStore } from "@/stores/prefs";
 type SettingsPanelProps = {
   embedded?: boolean;
 };
 
 export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
   const { t } = useTranslation();
-  // "" is "match my browser". Read from storage rather than from i18n's
-  // resolved language, because those differ: a German browser with no stored
-  // choice resolves to de while the chooser must still show "match my
-  // browser", or the viewer cannot tell a choice from a detection.
-  const [chosenLanguage, setChosenLanguage] = useState<string>(
-    () => window.localStorage.getItem(languageStorageKey) ?? "",
-  );
+  const customPrefs = usePrefsStore((state) => state.customPrefs);
+  const updateCustomPrefs = usePrefsStore((state) => state.updateCustomPrefs);
   const queryClient = useQueryClient();
   const invalidateBackground = useInvalidateShellBackground(queryClient);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -112,18 +108,18 @@ export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
             <select
               className="shell-panel__input"
               aria-label={t("settings.language")}
-              value={chosenLanguage}
+              // "" is "match my browser". Read from the account rather than
+              // from i18n's resolved language, because those differ: a German
+              // browser with no stored choice resolves to de while the chooser
+              // must still show "match my browser", or a person cannot tell
+              // their own choice from a detection.
+              value={customPrefs.language ?? ""}
               onChange={(e) => {
                 const next = e.target.value;
-                if (next === "") {
-                  // Back to following the browser: forget the choice rather
-                  // than storing whatever the browser happens to say today.
-                  window.localStorage.removeItem(languageStorageKey);
-                  void i18n.changeLanguage(undefined);
-                } else {
-                  void i18n.changeLanguage(next);
-                }
-                setChosenLanguage(next);
+                // The account first, so the choice follows this person to
+                // another machine; then this page, so it takes effect now.
+                void updateCustomPrefs((prev) => ({ ...prev, language: next || undefined }));
+                applyStoredLanguage(next || undefined);
               }}
             >
               <option value="">{t("settings.languageSystem")}</option>
