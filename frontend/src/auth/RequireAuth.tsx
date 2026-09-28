@@ -3,7 +3,9 @@ import { useAuth } from "@/auth/AuthProvider";
 import { getOidcConfig } from "@/auth/oidc";
 import { loginPathWithReturnTo } from "@/lib/returnTo";
 
+import { useTranslation } from "react-i18next";
 export function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const { isAuthenticated, isLoading, authDisabled } = useAuth();
   const config = getOidcConfig();
   const oidcConfigured = config.authMode === "edge" || Boolean(config.issuer && config.clientId);
@@ -27,7 +29,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   if (!authDisabled && !oidcConfigured) {
     return (
       <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-2 p-8 text-[var(--gtn-ink-1)]/70">
-        <p className="font-medium text-[var(--gtn-ink-1)]">OIDC not configured</p>
+        <p className="font-medium text-[var(--gtn-ink-1)]">{t("auth.oidcNotConfigured")}</p>
         <p className="text-sm">
           Set <code className="text-xs">VITE_OIDC_ISSUER</code> and{" "}
           <code className="text-xs">VITE_OIDC_CLIENT_ID</code> at build time, or{" "}

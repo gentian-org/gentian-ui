@@ -2,6 +2,7 @@ import { useState } from "react";
 import tileCatalogue from "../../public/tiles/catalogue.json";
 import { tileIconUrl } from "@/lib/tiles";
 
+import { useTranslation } from "react-i18next";
 type CustomizeTileModalProps = {
   initialTitle: string;
   initialIcon: string;
@@ -23,6 +24,7 @@ export function CustomizeTileModal({
   onClose,
   onDelete,
 }: CustomizeTileModalProps) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState(initialTitle);
   const [icon, setIcon] = useState(initialIcon);
   const [url, setUrl] = useState(initialUrl);
@@ -36,7 +38,7 @@ export function CustomizeTileModal({
     if (!file) return;
 
     if (file.size > 200 * 1024) {
-      setCustomIconError("Image must be smaller than 200 KB");
+      setCustomIconError(t("tile.iconTooLarge"));
       return;
     }
 
@@ -55,7 +57,7 @@ export function CustomizeTileModal({
     let finalUrl = url.trim();
     if (isLink) {
       if (!finalUrl) {
-        alert("Please enter a URL.");
+        alert(t("tile.urlRequired"));
         return;
       }
       // Auto-prefix protocol if missing
@@ -84,7 +86,7 @@ export function CustomizeTileModal({
       <div className="customize-modal-panel">
         <header className="customize-modal-header">
           <h2 className="customize-modal-title">
-            {isLink ? (initialTitle ? "Edit Link Shortcut" : "Add Link Shortcut") : "Customize App Tile"}
+            {isLink ? (initialTitle ? t("tile.editLink") : t("tile.addLink")) : t("tile.customize")}
           </h2>
           <button type="button" className="customize-modal-close" onClick={onClose}>
             &times;
@@ -99,7 +101,7 @@ export function CustomizeTileModal({
               className="customize-modal-input"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. My Website"
+              placeholder={t("tile.namePlaceholder")}
               required
             />
           </div>
@@ -129,14 +131,14 @@ export function CustomizeTileModal({
               </div>
 
               <div className="customize-modal-field">
-                <label className="customize-modal-label">Open target in</label>
+                <label className="customize-modal-label">{t("tile.openTargetIn")}</label>
                 <select
                   className="customize-modal-select"
                   value={openMode}
                   onChange={(e) => setOpenMode(e.target.value as "iframe" | "tab")}
                 >
                   <option value="iframe">Floating Window (embedded iframe)</option>
-                  <option value="tab">New Browser Tab</option>
+                  <option value="tab">{t("tile.newBrowserTab")}</option>
                 </select>
               </div>
             </>
@@ -147,7 +149,7 @@ export function CustomizeTileModal({
             <div className="customize-modal-icon-preview-container">
               <img
                 src={icon.startsWith("data:") ? icon : tileIconUrl(icon)}
-                alt="Selected icon preview"
+                alt={t("tile.iconPreview")}
                 className="customize-modal-icon-preview"
               />
               <div style={{ flex: 1 }}>
@@ -161,7 +163,7 @@ export function CustomizeTileModal({
                 <label htmlFor="custom-tile-icon-upload" className="customize-modal-upload-btn">
                   Upload custom image…
                 </label>
-                <span className="customize-modal-hint">PNG, JPEG or SVG under 200 KB</span>
+                <span className="customize-modal-hint">{t("tile.iconHint")}</span>
                 {customIconError && <p className="customize-modal-error">{customIconError}</p>}
               </div>
             </div>

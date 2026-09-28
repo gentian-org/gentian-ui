@@ -1,5 +1,6 @@
 import "@/styles/shell-panel.css";
 
+import { useTranslation } from "react-i18next";
 /**
  * This desktop does not sign anybody in.
  *
@@ -13,9 +14,10 @@ import "@/styles/shell-panel.css";
  * The route stays so a bookmark does not land on nothing, and says what to do.
  */
 export function SignInElsewhere() {
+  const { t } = useTranslation();
   return (
     <div className="shell-panel" style={{ maxWidth: "32rem", margin: "4rem auto" }}>
-      <h1 className="shell-panel__title">Sign in at the front door</h1>
+      <h1 className="shell-panel__title">{t("auth.signInElsewhere")}</h1>
       <p className="shell-panel__hint">
         This desktop is served behind the platform gateway, which signs you in before it
         hands the page over. Open the desktop's own address and you will be taken through

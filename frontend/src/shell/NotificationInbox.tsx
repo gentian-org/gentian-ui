@@ -3,6 +3,7 @@ import { useState } from "react";
 import { dismissInboxNotification, fetchNotificationInbox, type InboxNotification } from "@/api/notifications";
 import { BellIcon, TrayButton } from "@/shell/TrayButton";
 
+import { useTranslation } from "react-i18next";
 function severityClass(severity: InboxNotification["severity"]) {
   if (severity === "critical") {
     return "notification-inbox__item--critical";
@@ -18,6 +19,7 @@ function formatTime(epochMs: number) {
 }
 
 export function NotificationInbox() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -40,7 +42,7 @@ export function NotificationInbox() {
   return (
     <div className="notification-inbox">
       <TrayButton
-        label={count ? `Notifications (${count} unread)` : "Notifications"}
+        label={count ? `Notifications (${count} unread)` : t("shell.notifications")}
         onClick={() => setOpen((value) => !value)}
       >
         <span className="notification-inbox__bell">
@@ -50,9 +52,9 @@ export function NotificationInbox() {
       </TrayButton>
 
       {open && (
-        <div className="notification-inbox__panel" role="dialog" aria-label="Notifications">
+        <div className="notification-inbox__panel" role="dialog" aria-label={t("shell.notifications")}>
           <div className="notification-inbox__header">
-            <strong>Notifications</strong>
+            <strong>{t("shell.notifications")}</strong>
             <button
               type="button"
               className="notification-inbox__refresh"
@@ -62,9 +64,9 @@ export function NotificationInbox() {
             </button>
           </div>
           {inboxQuery.isLoading ? (
-            <p className="notification-inbox__empty">Loading…</p>
+            <p className="notification-inbox__empty">{t("shell.notificationsLoading")}</p>
           ) : items.length === 0 ? (
-            <p className="notification-inbox__empty">No notifications.</p>
+            <p className="notification-inbox__empty">{t("shell.notificationsEmpty")}</p>
           ) : (
             <ul className="notification-inbox__list">
               {items.map((item) => (

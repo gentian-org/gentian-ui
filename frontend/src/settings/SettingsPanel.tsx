@@ -5,11 +5,21 @@ import { DEFAULT_SHELL_BACKGROUND } from "@/lib/background";
 import { useInvalidateShellBackground } from "@/shell/useShellBackground";
 import "@/styles/shell-panel.css";
 
+import { useTranslation } from "react-i18next";
+import i18n, { languages, languageStorageKey } from "@/lib/i18n";
 type SettingsPanelProps = {
   embedded?: boolean;
 };
 
 export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
+  const { t } = useTranslation();
+  // "" is "match my browser". Read from storage rather than from i18n's
+  // resolved language, because those differ: a German browser with no stored
+  // choice resolves to de while the chooser must still show "match my
+  // browser", or the viewer cannot tell a choice from a detection.
+  const [chosenLanguage, setChosenLanguage] = useState<string>(
+    () => window.localStorage.getItem(languageStorageKey) ?? "",
+  );
   const queryClient = useQueryClient();
   const invalidateBackground = useInvalidateShellBackground(queryClient);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -52,7 +62,7 @@ export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
     mutationFn: (file: File) => uploadBackground(file),
     onSuccess: async () => {
       setError(null);
-      setMessage("Desktop background updated.");
+      setMessage(t("settings.backgroundUpdated"));
       if (localPreviewUrl) {
         URL.revokeObjectURL(localPreviewUrl);
         setLocalPreviewUrl(null);
@@ -69,7 +79,7 @@ export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
     mutationFn: deleteBackground,
     onSuccess: async () => {
       setError(null);
-      setMessage("Restored default desktop background.");
+      setMessage(t("settings.backgroundRestored"));
       if (localPreviewUrl) {
         URL.revokeObjectURL(localPreviewUrl);
         setLocalPreviewUrl(null);
@@ -89,13 +99,44 @@ export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
     <div className={rootClass}>
       <div className="shell-panel__frame">
         <header className="shell-panel__header">
-          <div className="shell-panel__eyebrow">Desktop shell</div>
-          <h1 className="shell-panel__title">Settings</h1>
+          <div className="shell-panel__eyebrow">{t("settings.shell")}</div>
+          <h1 className="shell-panel__title">{t("settings.title")}</h1>
         </header>
 
         <div className="shell-panel__body">
+          <section style={{ marginBottom: "2rem" }}>
+            <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("settings.language")}</h2>
+            <p className="shell-panel__hint" style={{ marginBottom: "1rem" }}>
+              {t("settings.languageHint")}
+            </p>
+            <select
+              className="shell-panel__input"
+              aria-label={t("settings.language")}
+              value={chosenLanguage}
+              onChange={(e) => {
+                const next = e.target.value;
+                if (next === "") {
+                  // Back to following the browser: forget the choice rather
+                  // than storing whatever the browser happens to say today.
+                  window.localStorage.removeItem(languageStorageKey);
+                  void i18n.changeLanguage(undefined);
+                } else {
+                  void i18n.changeLanguage(next);
+                }
+                setChosenLanguage(next);
+              }}
+            >
+              <option value="">{t("settings.languageSystem")}</option>
+              {languages.map((code) => (
+                <option key={code} value={code}>
+                  {t(`language.${code}`, { defaultValue: code })}
+                </option>
+              ))}
+            </select>
+          </section>
+
           <section>
-            <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Appearance</h2>
+            <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("settings.appearance")}</h2>
             <p className="shell-panel__hint" style={{ marginBottom: "1rem" }}>
               Choose a wallpaper for your desktop. JPEG, PNG, WebP, or GIF up to 5 MB.
             </p>
@@ -131,7 +172,7 @@ export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadMutation.isPending}
               >
-                {uploadMutation.isPending ? "Uploading…" : "Upload image"}
+                {uploadMutation.isPending ? t("settings.backgroundUploading") : t("settings.backgroundUpload")}
               </button>
               <button
                 type="button"
@@ -149,7 +190,7 @@ export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
             <div
               className="shell-panel__preview"
               style={{ backgroundImage: `url('${previewUrl}')` }}
-              aria-label="Background preview"
+              aria-label={t("settings.backgroundPreview")}
             />
           </section>
         </div>

@@ -8,6 +8,7 @@ import { AiWidget } from "@/shell/AiWidget";
 import { AppsGridIcon, MenuIcon, TrayButton } from "@/shell/TrayButton";
 import { usePrefsStore, type DesktopTile } from "@/stores/prefs";
 
+import { useTranslation } from "react-i18next";
 type AppMenuProps = {
   apps: ShellApp[];
   /** The session request failed; `apps` is empty for lack of an answer. */
@@ -42,6 +43,7 @@ export function AppMenu({
   onOpenAccount,
   onOpenSettings,
 }: AppMenuProps) {
+  const { t } = useTranslation();
   const [launcherOpen, setLauncherOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -237,11 +239,11 @@ export function AppMenu({
 
   return (
     <>
-      <nav className="app-menu" aria-label="App launcher">
+      <nav className="app-menu" aria-label={t("shell.appLauncher")}>
         <button
           type="button"
           className="app-menu__apps-btn"
-          aria-label="Apps"
+          aria-label={t("shell.apps")}
           aria-expanded={launcherOpen}
           onClick={() => setLauncherOpen(true)}
         >

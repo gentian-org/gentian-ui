@@ -9,9 +9,11 @@ import { SettingsPanel } from "@/settings/SettingsPanel";
 import { useAppsStore } from "@/stores/apps";
 import { buildAppLaunchUrl } from "@/lib/appLaunchUrl";
 
+import { useTranslation } from "react-i18next";
 type MobileOverlay = "account" | "settings" | null;
 
 export function MobilePage() {
+  const { t } = useTranslation();
   const { me, apps, loadFailed, reload } = useShellApps();
   const backgroundUrl = useShellBackgroundUrl();
 
@@ -96,7 +98,7 @@ export function MobilePage() {
       )}
       {!activeAppId && !overlay && (
         <div className="gentian-mobile__welcome" aria-live="polite">
-          <p className="gentian-mobile__welcome-text">Tap an app below to get started</p>
+          <p className="gentian-mobile__welcome-text">{t("shell.mobileHint")}</p>
         </div>
       )}
       {activeLaunchUrl && !overlay && (

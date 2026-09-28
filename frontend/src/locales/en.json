@@ -1,0 +1,81 @@
+{
+  "shell": {
+    "apps": "Apps",
+    "appLauncher": "App launcher",
+    "appsLoadFailed": "Your apps could not be loaded.",
+    "appsEmpty": "No apps are available to you yet.",
+    "notifications": "Notifications",
+    "notificationsLoading": "Loading…",
+    "notificationsEmpty": "No notifications.",
+    "minimizedWindows": "Minimized windows",
+    "mobileHint": "Tap an app below to get started"
+  },
+  "window": {
+    "minimize": "Minimize",
+    "openInNewTab": "Open in new tab",
+    "close": "Close"
+  },
+  "tile": {
+    "customize": "Customize App Tile",
+    "addLink": "Add Link Shortcut",
+    "editLink": "Edit Link Shortcut",
+    "namePlaceholder": "e.g. My Website",
+    "urlPlaceholder": "https://example.com",
+    "urlRequired": "Please enter a URL.",
+    "openTargetIn": "Open target in",
+    "newBrowserTab": "New Browser Tab",
+    "iconHint": "PNG, JPEG or SVG under 200 KB",
+    "iconTooLarge": "Image must be smaller than 200 KB",
+    "iconPreview": "Selected icon preview",
+    "deleteConfirm": "Are you sure you want to delete this desktop shortcut?"
+  },
+  "settings": {
+    "title": "Settings",
+    "shell": "Desktop shell",
+    "appearance": "Appearance",
+    "language": "Language",
+    "languageSystem": "Match my browser",
+    "backgroundPreview": "Background preview",
+    "backgroundUpload": "Upload image",
+    "backgroundUploading": "Uploading…",
+    "backgroundUpdated": "Desktop background updated.",
+    "backgroundRestored": "Restored default desktop background.",
+    "languageHint": "Choose the language of the desktop. Apps keep their own."
+  },
+  "account": {
+    "title": "Account",
+    "workspace": "Your workspace",
+    "sections": "Account sections",
+    "loading": "Loading account…",
+    "unavailable": "Account settings are unavailable.",
+    "email": "Email",
+    "emailHint": "Contact your administrator to change your login email.",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "updated": "Profile updated.",
+    "passwordCurrent": "Current password",
+    "passwordNew": "New password",
+    "passwordConfirm": "Confirm new password",
+    "passwordChanged": "Password changed.",
+    "passwordMismatch": "New passwords do not match.",
+    "passwordTooShort": "Password must be at least 8 characters.",
+    "sessionsLoading": "Loading sessions…",
+    "sessionsClient": "Client",
+    "sessionsLastActive": "Last active",
+    "sessionsThisDevice": "This device",
+    "sessionsSignOutOthers": "Ends all sessions except this browser.",
+    "sessionsSignedOutOthers": "Signed out of all other sessions."
+  },
+  "auth": {
+    "signInElsewhere": "Sign in at the front door",
+    "oidcNotConfigured": "OIDC not configured"
+  },
+  "ai": {
+    "placeholder": "Ask anything…",
+    "expand": "Expand to full app"
+  },
+  "language": {
+    "en": "English",
+    "de": "Deutsch"
+  }
+}

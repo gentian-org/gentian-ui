@@ -1,0 +1,81 @@
+{
+  "shell": {
+    "apps": "Apps",
+    "appLauncher": "App-Übersicht",
+    "appsLoadFailed": "Ihre Apps konnten nicht geladen werden.",
+    "appsEmpty": "Für Sie sind noch keine Apps verfügbar.",
+    "notifications": "Benachrichtigungen",
+    "notificationsLoading": "Wird geladen…",
+    "notificationsEmpty": "Keine Benachrichtigungen.",
+    "minimizedWindows": "Minimierte Fenster",
+    "mobileHint": "Tippen Sie unten auf eine App, um zu beginnen"
+  },
+  "window": {
+    "minimize": "Minimieren",
+    "openInNewTab": "In neuem Tab öffnen",
+    "close": "Schließen"
+  },
+  "tile": {
+    "customize": "App-Kachel anpassen",
+    "addLink": "Link-Verknüpfung hinzufügen",
+    "editLink": "Link-Verknüpfung bearbeiten",
+    "namePlaceholder": "z. B. Meine Website",
+    "urlPlaceholder": "https://example.com",
+    "urlRequired": "Bitte geben Sie eine URL ein.",
+    "openTargetIn": "Ziel öffnen in",
+    "newBrowserTab": "Neuem Browser-Tab",
+    "iconHint": "PNG, JPEG oder SVG unter 200 KB",
+    "iconTooLarge": "Das Bild muss kleiner als 200 KB sein.",
+    "iconPreview": "Vorschau des gewählten Symbols",
+    "deleteConfirm": "Möchten Sie diese Verknüpfung wirklich löschen?"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "shell": "Arbeitsoberfläche",
+    "appearance": "Darstellung",
+    "language": "Sprache",
+    "languageSystem": "Browsereinstellung übernehmen",
+    "backgroundPreview": "Hintergrundvorschau",
+    "backgroundUpload": "Bild hochladen",
+    "backgroundUploading": "Wird hochgeladen…",
+    "backgroundUpdated": "Hintergrund aktualisiert.",
+    "backgroundRestored": "Standardhintergrund wiederhergestellt.",
+    "languageHint": "Wählen Sie die Sprache der Arbeitsoberfläche. Apps behalten ihre eigene."
+  },
+  "account": {
+    "title": "Konto",
+    "workspace": "Ihr Arbeitsbereich",
+    "sections": "Kontobereiche",
+    "loading": "Konto wird geladen…",
+    "unavailable": "Die Kontoeinstellungen sind nicht verfügbar.",
+    "email": "E-Mail",
+    "emailHint": "Wenden Sie sich an Ihre Administration, um die Anmelde-E-Mail zu ändern.",
+    "firstName": "Vorname",
+    "lastName": "Nachname",
+    "updated": "Profil aktualisiert.",
+    "passwordCurrent": "Aktuelles Passwort",
+    "passwordNew": "Neues Passwort",
+    "passwordConfirm": "Neues Passwort bestätigen",
+    "passwordChanged": "Passwort geändert.",
+    "passwordMismatch": "Die neuen Passwörter stimmen nicht überein.",
+    "passwordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein.",
+    "sessionsLoading": "Sitzungen werden geladen…",
+    "sessionsClient": "Anwendung",
+    "sessionsLastActive": "Zuletzt aktiv",
+    "sessionsThisDevice": "Dieses Gerät",
+    "sessionsSignOutOthers": "Beendet alle Sitzungen außer dieser.",
+    "sessionsSignedOutOthers": "Von allen anderen Sitzungen abgemeldet."
+  },
+  "auth": {
+    "signInElsewhere": "Am Haupteingang anmelden",
+    "oidcNotConfigured": "OIDC ist nicht konfiguriert"
+  },
+  "ai": {
+    "placeholder": "Fragen Sie etwas…",
+    "expand": "Als volle App öffnen"
+  },
+  "language": {
+    "en": "English",
+    "de": "Deutsch"
+  }
+}
