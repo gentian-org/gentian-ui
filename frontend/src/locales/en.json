@@ -40,7 +40,8 @@
     "backgroundUploading": "Uploading…",
     "backgroundUpdated": "Desktop background updated.",
     "backgroundRestored": "Restored default desktop background.",
-    "languageHint": "Choose the language of the desktop. Apps keep their own."
+    "languageHint": "Choose the language of the desktop. Apps keep their own.",
+    "languageTenant": "My organisation's language ({{language}})"
   },
   "account": {
     "title": "Account",

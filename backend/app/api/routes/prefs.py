@@ -27,6 +27,12 @@ def get_prefs(user: dict = Depends(get_current_user), settings: Settings = Depen
         "hasBackground": summary.has_background,
         "backgroundUrl": f"{settings.api_v1_str}/prefs/background" if summary.has_background else None,
         "customPrefs": summary.prefs_json,
+        # The tenant's own language (AD-15). Beside the preferences rather
+        # than inside them, because it is not this person's choice: it is what
+        # they get until they make one, or until a settings template makes one
+        # for them. A template carries language in customPrefs like any other
+        # preference, so applying one wins over this by simply being present.
+        "tenantLanguage": settings.default_language or None,
     }
 
 

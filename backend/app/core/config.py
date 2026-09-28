@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     # so the safe answer when nothing has told us is to show nothing.
     capabilities: str = Field(default="", alias="GENTIAN_CAPABILITIES")
 
+    # The tenant's own language, ISO 639-1 (AD-15). What a person sees before
+    # they have chosen one and before a settings template has chosen for them,
+    # so a German tenant's people get a German desktop on their first sign-in
+    # rather than whatever their browser asks for.
+    #
+    # Set by the operator from the tenant's first declared language, so it
+    # follows the tenant rather than the image.
+    default_language: str = Field(default="", alias="GENTIAN_DEFAULT_LANGUAGE")
+
     @property
     def capability_set(self) -> set[str]:
         return {c.strip() for c in self.capabilities.split(",") if c.strip()}

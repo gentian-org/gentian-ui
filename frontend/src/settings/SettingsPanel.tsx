@@ -15,6 +15,7 @@ type SettingsPanelProps = {
 export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
   const { t } = useTranslation();
   const customPrefs = usePrefsStore((state) => state.customPrefs);
+  const tenantLanguage = usePrefsStore((state) => state.tenantLanguage);
   const updateCustomPrefs = usePrefsStore((state) => state.updateCustomPrefs);
   const queryClient = useQueryClient();
   const invalidateBackground = useInvalidateShellBackground(queryClient);
@@ -118,11 +119,22 @@ export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
                 const next = e.target.value;
                 // The account first, so the choice follows this person to
                 // another machine; then this page, so it takes effect now.
+                //
+                // Clearing a choice falls back to the tenant's language, not
+                // to the browser: the browser is the last resort, for a tenant
+                // that declared none. Someone who un-chooses should get what
+                // their colleagues get, which is what the option says.
                 void updateCustomPrefs((prev) => ({ ...prev, language: next || undefined }));
-                applyStoredLanguage(next || undefined);
+                applyStoredLanguage(next || tenantLanguage || undefined);
               }}
             >
-              <option value="">{t("settings.languageSystem")}</option>
+              <option value="">
+                {tenantLanguage
+                  ? t("settings.languageTenant", {
+                      language: t(`language.${tenantLanguage}`, { defaultValue: tenantLanguage }),
+                    })
+                  : t("settings.languageSystem")}
+              </option>
               {languages.map((code) => (
                 <option key={code} value={code}>
                   {t(`language.${code}`, { defaultValue: code })}

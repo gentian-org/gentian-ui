@@ -34,6 +34,10 @@ type PrefsState = {
     // with it. Absent means follow the browser.
     language?: string;
   };
+  // The tenant's own language, as the server reported it. Not a preference:
+  // it is what this person gets until they choose, so it lives beside
+  // customPrefs rather than in it.
+  tenantLanguage?: string;
   isLoading: boolean;
   loadPrefs: () => Promise<void>;
   updateCustomPrefs: (updater: (prev: PrefsState["customPrefs"]) => PrefsState["customPrefs"]) => Promise<void>;
@@ -47,10 +51,20 @@ export const usePrefsStore = create<PrefsState>((set, get) => ({
     try {
       const prefs = await fetchPrefs();
       const custom = prefs.customPrefs || {};
-      set({ customPrefs: custom });
-      // The account is the source of truth for the language, so applying it
-      // here is what makes a choice follow a person between browsers.
-      applyStoredLanguage(custom.language);
+      set({ customPrefs: custom, tenantLanguage: prefs.tenantLanguage ?? undefined });
+      // The language, in the order that makes each source mean what it says:
+      //
+      //   1. this person's own choice, in their preferences — which is also
+      //      what a settings template gives them, because a template is a
+      //      copy of somebody's preferences and `language` is one of them;
+      //   2. the tenant's language, so a German tenant's people get a German
+      //      desktop on their first sign-in without anybody configuring them
+      //      one at a time;
+      //   3. the browser, for a tenant that declared none.
+      //
+      // Passing undefined at step 3 is what hands the decision back to the
+      // browser, rather than freezing whatever it said today.
+      applyStoredLanguage(custom.language || prefs.tenantLanguage || undefined);
     } catch (err) {
       console.error("Failed to load preferences:", err);
     } finally {

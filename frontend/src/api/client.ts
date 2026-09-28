@@ -166,4 +166,11 @@ export type PrefsResponse = {
   hasBackground: boolean;
   backgroundUrl: string | null;
   customPrefs?: Record<string, any>;
+  /**
+   * The tenant's own language, ISO 639-1. What this person sees until they
+   * choose one, or until a settings template chooses for them — a template
+   * carries `language` in customPrefs like any other preference, so applying
+   * one wins over this by simply being present.
+   */
+  tenantLanguage?: string | null;
 };

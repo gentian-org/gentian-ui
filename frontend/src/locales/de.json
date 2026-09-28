@@ -40,7 +40,8 @@
     "backgroundUploading": "Wird hochgeladen…",
     "backgroundUpdated": "Hintergrund aktualisiert.",
     "backgroundRestored": "Standardhintergrund wiederhergestellt.",
-    "languageHint": "Wählen Sie die Sprache der Arbeitsoberfläche. Apps behalten ihre eigene."
+    "languageHint": "Wählen Sie die Sprache der Arbeitsoberfläche. Apps behalten ihre eigene.",
+    "languageTenant": "Sprache meiner Organisation ({{language}})"
   },
   "account": {
     "title": "Konto",
