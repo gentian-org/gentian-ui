@@ -37,6 +37,15 @@ spec:
               value: {{ .Values.kernelDomain | quote }}
             - name: KERNEL_REALM
               value: {{ .Values.kernelRealm | default "kernel" | quote }}
+            # The tenant's own language (AD-15). What a person sees before
+            # they have chosen one and before a settings template has chosen
+            # for them: a German tenant's people get a German desktop on their
+            # first sign-in rather than whatever their browser asks for.
+            #
+            # The operator sets it from the tenant's first declared language,
+            # so it follows the tenant rather than the image.
+            - name: GENTIAN_DEFAULT_LANGUAGE
+              value: {{ .Values.defaultLanguage | default "en" | quote }}
             # Capabilities this cluster actually serves. A platform app annotated
             # gentianos.io/requires-capability gets a desktop tile only when its
             # capability is listed here, so an undeployed component cannot offer

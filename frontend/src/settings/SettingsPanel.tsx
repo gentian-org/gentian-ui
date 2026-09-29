@@ -5,11 +5,18 @@ import { DEFAULT_SHELL_BACKGROUND } from "@/lib/background";
 import { useInvalidateShellBackground } from "@/shell/useShellBackground";
 import "@/styles/shell-panel.css";
 
+import { useTranslation } from "react-i18next";
+import { applyStoredLanguage, languages } from "@/lib/i18n";
+import { usePrefsStore } from "@/stores/prefs";
 type SettingsPanelProps = {
   embedded?: boolean;
 };
 
 export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
+  const { t } = useTranslation();
+  const customPrefs = usePrefsStore((state) => state.customPrefs);
+  const tenantLanguage = usePrefsStore((state) => state.tenantLanguage);
+  const updateCustomPrefs = usePrefsStore((state) => state.updateCustomPrefs);
   const queryClient = useQueryClient();
   const invalidateBackground = useInvalidateShellBackground(queryClient);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -52,7 +59,7 @@ export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
     mutationFn: (file: File) => uploadBackground(file),
     onSuccess: async () => {
       setError(null);
-      setMessage("Desktop background updated.");
+      setMessage(t("settings.backgroundUpdated"));
       if (localPreviewUrl) {
         URL.revokeObjectURL(localPreviewUrl);
         setLocalPreviewUrl(null);
@@ -69,7 +76,7 @@ export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
     mutationFn: deleteBackground,
     onSuccess: async () => {
       setError(null);
-      setMessage("Restored default desktop background.");
+      setMessage(t("settings.backgroundRestored"));
       if (localPreviewUrl) {
         URL.revokeObjectURL(localPreviewUrl);
         setLocalPreviewUrl(null);
@@ -89,13 +96,55 @@ export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
     <div className={rootClass}>
       <div className="shell-panel__frame">
         <header className="shell-panel__header">
-          <div className="shell-panel__eyebrow">Desktop shell</div>
-          <h1 className="shell-panel__title">Settings</h1>
+          <div className="shell-panel__eyebrow">{t("settings.shell")}</div>
+          <h1 className="shell-panel__title">{t("settings.title")}</h1>
         </header>
 
         <div className="shell-panel__body">
+          <section style={{ marginBottom: "2rem" }}>
+            <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("settings.language")}</h2>
+            <p className="shell-panel__hint" style={{ marginBottom: "1rem" }}>
+              {t("settings.languageHint")}
+            </p>
+            <select
+              className="shell-panel__input"
+              aria-label={t("settings.language")}
+              // "" is "match my browser". Read from the account rather than
+              // from i18n's resolved language, because those differ: a German
+              // browser with no stored choice resolves to de while the chooser
+              // must still show "match my browser", or a person cannot tell
+              // their own choice from a detection.
+              value={customPrefs.language ?? ""}
+              onChange={(e) => {
+                const next = e.target.value;
+                // The account first, so the choice follows this person to
+                // another machine; then this page, so it takes effect now.
+                //
+                // Clearing a choice falls back to the tenant's language, not
+                // to the browser: the browser is the last resort, for a tenant
+                // that declared none. Someone who un-chooses should get what
+                // their colleagues get, which is what the option says.
+                void updateCustomPrefs((prev) => ({ ...prev, language: next || undefined }));
+                applyStoredLanguage(next || tenantLanguage || undefined);
+              }}
+            >
+              <option value="">
+                {tenantLanguage
+                  ? t("settings.languageTenant", {
+                      language: t(`language.${tenantLanguage}`, { defaultValue: tenantLanguage }),
+                    })
+                  : t("settings.languageSystem")}
+              </option>
+              {languages.map((code) => (
+                <option key={code} value={code}>
+                  {t(`language.${code}`, { defaultValue: code })}
+                </option>
+              ))}
+            </select>
+          </section>
+
           <section>
-            <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Appearance</h2>
+            <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("settings.appearance")}</h2>
             <p className="shell-panel__hint" style={{ marginBottom: "1rem" }}>
               Choose a wallpaper for your desktop. JPEG, PNG, WebP, or GIF up to 5 MB.
             </p>
@@ -131,7 +180,7 @@ export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadMutation.isPending}
               >
-                {uploadMutation.isPending ? "Uploading…" : "Upload image"}
+                {uploadMutation.isPending ? t("settings.backgroundUploading") : t("settings.backgroundUpload")}
               </button>
               <button
                 type="button"
@@ -149,7 +198,7 @@ export function SettingsPanel({ embedded = false }: SettingsPanelProps) {
             <div
               className="shell-panel__preview"
               style={{ backgroundImage: `url('${previewUrl}')` }}
-              aria-label="Background preview"
+              aria-label={t("settings.backgroundPreview")}
             />
           </section>
         </div>

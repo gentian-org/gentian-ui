@@ -263,6 +263,17 @@ export function getOidcConfig(): OidcConfig {
 }
 
 /** True when the Gateway holds the session (AD-13). */
+/**
+ * The realm's own account console, where a person manages their credentials.
+ *
+ * Derived from the issuer, which already names the realm: no second source and
+ * nothing for this bundle to be told. It opens with the session they hold.
+ */
+export function accountConsoleUrl(): string {
+  const issuer = getOidcConfig().issuer.replace(/\/$/, "");
+  return `${issuer}/account/`;
+}
+
 export function isEdgeSession(): boolean {
   return getOidcConfig().authMode === "edge";
 }

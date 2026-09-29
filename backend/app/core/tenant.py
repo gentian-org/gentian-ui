@@ -1,8 +1,20 @@
-"""User tenant/realm context from JWT (M4).
+"""Which tenant this desktop serves.
 
-Catalogue apps pin a workload TENANT_ID and assert claims match. The kernel shell
-serves users from multiple Keycloak realms — tenant context comes from JWT claims
-only (see extract_tenant_from_claims).
+One answer, from the operator. The desktop is a component installed into one
+tenant, and GENTIAN_TENANT is what the component reconciler tells it — so the
+tenant is a fact it was handed, not something to work out.
+
+It used to be inferred, through a chain of five guesses: a tenant claim, then a
+`gentian:tenant:<t>:*` group, then the realm parsed out of the issuer, then the
+tenant a login-routing lookup derived from the email domain, then an `admin-`
+prefix on the username. Every one of those was a second opinion about something
+the platform already knew, and two of them needed things this service should not
+have: a Keycloak admin lookup to learn the caller's groups, and the login-routing
+table that belonged to a login page the edge has replaced.
+
+A wrong answer here is not cosmetic — it selects which tenant's preferences and
+notifications the caller sees — which is the reason it should come from one place
+(gentian-os S7A.6).
 """
 
 from typing import Any
@@ -10,77 +22,29 @@ from typing import Any
 from fastapi import HTTPException, status
 
 from app.core.config import Settings
-from app.core.login_routing import resolve_login_route
-from app.services.keycloak_user_groups import realm_from_issuer
-
-
-def extract_tenant_from_claims(
-    claims: dict[str, Any],
-    *,
-    kernel_domain: str | None = None,
-    kernel_realm: str | None = None,
-    tenancy_mode: str = "multi",
-) -> str | None:
-    """Resolve tenant id from standard Gentian / Keycloak claim shapes."""
-    for key in ("tenant", "tenant_id", "tenantId"):
-        value = claims.get(key)
-        if value:
-            tenant = str(value)
-            if kernel_domain and tenant == kernel_domain:
-                pass
-            else:
-                return tenant
-
-    groups = claims.get("groups") or claims.get("realm_access", {}).get("roles") or []
-    if isinstance(groups, str):
-        groups = [groups]
-    for group in groups:
-        group_str = str(group)
-        if group_str.startswith("gentian:tenant:"):
-            parts = group_str.split(":")
-            if len(parts) >= 3:
-                return parts[2]
-        if group_str.startswith("tenant:"):
-            return group_str.removeprefix("tenant:")
-
-    issuer = str(claims.get("iss") or "")
-    realm = realm_from_issuer(issuer)
-    if realm and realm not in {"master", kernel_realm or "kernel"}:
-        return realm
-
-    email = str(claims.get("email") or claims.get("preferred_username") or "")
-    if kernel_domain and "@" in email:
-        try:
-            route = resolve_login_route(
-                email,
-                kernel_domain=kernel_domain,
-                tenancy_mode=tenancy_mode,
-            )
-        except ValueError:
-            route = None
-        if route is not None and route.kind == "tenant" and route.idp_hint:
-            return route.idp_hint
-
-    sub = str(claims.get("preferred_username") or claims.get("sub") or "")
-    if sub.startswith("admin-"):
-        return sub.removeprefix("admin-").split("@", 1)[0]
-
-    return None
 
 
 def resolve_user_context(claims: dict[str, Any], settings: Settings) -> str:
-    """Attach tenant context to authenticated shell users."""
-    claim_tenant = extract_tenant_from_claims(
-        claims,
-        kernel_domain=settings.kernel_domain,
-        kernel_realm=settings.kernel_realm,
-        tenancy_mode=settings.tenancy_mode,
-    )
+    """The tenant this component belongs to.
 
-    if settings.is_production and claim_tenant is None:
+    The claims are still taken, and only as the local-development fallback:
+    with AUTH_DISABLED the stub user carries a tenant and there is no operator
+    to have set one.
+    """
+    if settings.gentian_tenant:
+        return settings.gentian_tenant
+
+    claim_tenant = claims.get("tenant")
+    if claim_tenant:
+        return str(claim_tenant)
+
+    if settings.is_production:
+        # In production this means the component was deployed without being
+        # told which tenant it serves. Refusing is the safe direction: serving
+        # the kernel domain's preferences to a tenant's people is worse than
+        # serving nobody.
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Missing tenant claim",
+            detail="This desktop was not told which tenant it serves.",
         )
-
-    return claim_tenant or settings.kernel_domain
+    return settings.kernel_domain

@@ -80,6 +80,10 @@ existingSecret:
 # The tenant this desktop is the desktop of. Behind the edge every relation
 # is asked on it; empty under pkce, where the token says.
 tenant: ""
+# The tenant's own language, as an ISO 639-1 code. Set by the operator from
+# the tenant's first declared language; what a person sees before they have
+# chosen one and before a settings template has chosen for them.
+defaultLanguage: ""
 
 auth:
   disabled: false
@@ -112,9 +116,6 @@ openfga:
   apiUrl: ""
   storeId: ""
   authzenEnabled: true
-
-rbac:
-  create: true
 
 networkPolicy:
   create: false

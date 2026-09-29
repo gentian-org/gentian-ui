@@ -9,7 +9,7 @@ import httpx
 from fastapi import HTTPException, status
 
 from app.core.config import Settings
-from app.services.keycloak_user_groups import realm_from_issuer
+from app.core.realm import realm_from_issuer
 
 
 class AccountServiceError(Exception):

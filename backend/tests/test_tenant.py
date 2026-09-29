@@ -1,37 +1,50 @@
-"""Tests for tenant claim resolution."""
+"""Which tenant this desktop serves.
+
+One fact from the operator, with a local-development fallback. The old test
+file asserted a five-step inference chain -- a tenant claim, a group name, the
+realm in the issuer, a login-routing lookup on the email domain, an `admin-`
+prefix -- and every one of those was a second opinion about something the
+platform already knew. Two of them needed a Keycloak administrator credential
+to answer. The chain is gone (gentian-os S7A.6), so what is left to assert is
+the precedence and the refusal.
+"""
+
+import pytest
+from fastapi import HTTPException
 
 from app.core.config import Settings
-from app.core.tenant import extract_tenant_from_claims, resolve_user_context
+from app.core.tenant import resolve_user_context
 
 
-def test_extract_tenant_from_member_group():
-    claims = {"groups": ["gentian:tenant:demo:members"]}
-    assert extract_tenant_from_claims(claims, kernel_domain="desk.gentian.org") == "demo"
+def _settings(**kw) -> Settings:
+    base = dict(AUTH_DISABLED="true", KERNEL_DOMAIN="desk.gentian.org", ENVIRONMENT="local")
+    base.update(kw)
+    return Settings(**base)
 
 
-def test_extract_tenant_from_issuer_realm():
-    claims = {"iss": "https://id.desk.gentian.org/auth/realms/demo"}
-    assert extract_tenant_from_claims(
-        claims,
-        kernel_domain="desk.gentian.org",
-        kernel_realm="kernel",
-    ) == "demo"
+def test_the_operators_answer_wins():
+    s = _settings(GENTIAN_TENANT="demo")
+    # Even against a claim that says something else: the claim is the caller's,
+    # the tenant is the component's, and a caller cannot move themselves into
+    # another tenant's preferences by carrying a different claim.
+    assert resolve_user_context({"tenant": "other"}, s) == "demo"
 
 
-def test_extract_tenant_from_workspace_email():
-    claims = {"email": "john-doe@demo.desk.gentian.org"}
-    assert extract_tenant_from_claims(claims, kernel_domain="desk.gentian.org") == "demo"
+def test_the_claim_is_the_local_development_fallback():
+    s = _settings()
+    assert resolve_user_context({"tenant": "demo"}, s) == "demo"
 
 
-def test_resolve_user_context_for_tenant_member():
-    settings = Settings(
-        KERNEL_DOMAIN="desk.gentian.org",
-        KERNEL_REALM="kernel",
-        ENVIRONMENT="development",
-    )
-    claims = {
-        "iss": "https://id.desk.gentian.org/auth/realms/demo",
-        "email": "john-doe@demo.desk.gentian.org",
-        "groups": ["gentian:tenant:demo:members", "gentian:tenant:demo:app:element"],
-    }
-    assert resolve_user_context(claims, settings) == "demo"
+def test_production_without_a_tenant_is_refused():
+    s = _settings(ENVIRONMENT="production", AUTH_DISABLED="false")
+    # A component deployed without being told which tenant it serves. Serving
+    # the kernel domain's preferences to a tenant's people is worse than
+    # serving nobody, so this refuses rather than guessing.
+    with pytest.raises(HTTPException) as exc:
+        resolve_user_context({}, s)
+    assert exc.value.status_code == 403
+
+
+def test_local_development_without_a_tenant_falls_back_to_the_kernel_domain():
+    s = _settings()
+    assert resolve_user_context({}, s) == "desk.gentian.org"

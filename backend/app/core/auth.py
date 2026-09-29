@@ -6,8 +6,6 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import Settings, get_settings
-from app.core.tenant import resolve_user_context
-from app.services.keycloak_user_groups import lookup_user_groups
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -96,21 +94,20 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
         ) from exc
 
-    if settings.edge_session:
-        # Behind the edge the token names no groups and this process holds
-        # no admin credential to look any up. The director answers what the
-        # caller holds on this desktop's tenant; every admin decision below
-        # reads that answer (ui-restructure.md §2).
-        claims["tenant"] = settings.gentian_tenant or ""
-        claims["relations"] = await fetch_tenant_relations(credentials.credentials, settings)
-        return claims
-
-    claims = _enrich_claims_from_userinfo(claims, credentials.credentials, settings)
-    if not claims.get("groups"):
-        groups = lookup_user_groups(claims, settings)
-        if groups:
-            claims["groups"] = groups
-    claims["tenant"] = resolve_user_context(claims, settings)
+    # Behind the edge, and only behind the edge.
+    #
+    # The token names no groups and this process holds no credential to look
+    # any up. The director answers what the caller holds on this desktop's
+    # tenant, with the caller's own token, and every decision the shell makes
+    # reads that answer.
+    #
+    # There used to be a second path for a browser-OIDC session, which enriched
+    # the claims from userinfo and then, if that still named no groups, asked
+    # Keycloak's ADMIN API what groups the person was in. That last step is a
+    # credential this service should not hold, and the path it served -- the
+    # desktop's own login page -- is gone with it.
+    claims["tenant"] = settings.gentian_tenant or ""
+    claims["relations"] = await fetch_tenant_relations(credentials.credentials, settings)
     return claims
 
 
@@ -134,44 +131,3 @@ async def fetch_tenant_relations(token: str, settings: Settings) -> dict[str, bo
     body = resp.json()
     relations = body.get("relations") if isinstance(body, dict) else None
     return {k: bool(v) for k, v in relations.items()} if isinstance(relations, dict) else {}
-
-
-def _userinfo_url_for_issuer(issuer: str, settings: Settings) -> str | None:
-    issuer = issuer.rstrip("/")
-    if settings.keycloak_admin_url and "/realms/" in issuer:
-        realm_path = issuer[issuer.index("/realms/") :]
-        return settings.keycloak_admin_url.rstrip("/") + realm_path + "/protocol/openid-connect/userinfo"
-    return f"{issuer}/protocol/openid-connect/userinfo"
-
-
-def _enrich_claims_from_userinfo(
-    claims: dict[str, Any], token: str, settings: Settings
-) -> dict[str, Any]:
-    """Fill missing profile/group claims from Keycloak userinfo."""
-    needs_groups = not claims.get("groups")
-    needs_username = not claims.get("preferred_username")
-    if not needs_groups and not needs_username:
-        return claims
-
-    issuer = (claims.get("iss") or "").rstrip("/")
-    userinfo_url = _userinfo_url_for_issuer(issuer, settings) if issuer else settings.oidc_userinfo_url
-    if not userinfo_url:
-        return claims
-    try:
-        resp = httpx.get(
-            userinfo_url,
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=10.0,
-        )
-        resp.raise_for_status()
-        info = resp.json()
-        merged = {**claims}
-        if needs_groups and info.get("groups"):
-            merged["groups"] = info["groups"]
-        if needs_username and info.get("preferred_username"):
-            merged["preferred_username"] = info["preferred_username"]
-        if not merged.get("email") and info.get("email"):
-            merged["email"] = info["email"]
-        return merged
-    except httpx.HTTPError:
-        return claims

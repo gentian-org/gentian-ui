@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { AccountPanel } from "@/account/AccountPanel";
-import { AdminConsole } from "@/admin/AdminConsole";
 import { SettingsPanel } from "@/settings/SettingsPanel";
 import type { ShellWindow } from "@/stores/windows";
 import { checkIframeEmbeddable } from "@/api/prefs";
@@ -29,14 +28,6 @@ export function WindowBody({ win, onIframeLoad }: WindowBodyProps) {
         setEmbeddable(true);
       });
   }, [win.url, win.builtinComponent]);
-
-  if (win.builtinComponent === "admin") {
-    return (
-      <div className="shell-window__body shell-window__body--component">
-        <AdminConsole embedded />
-      </div>
-    );
-  }
 
   if (win.builtinComponent === "account") {
     return (

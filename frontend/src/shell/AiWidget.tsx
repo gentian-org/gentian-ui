@@ -1,11 +1,13 @@
 import { useState } from "react";
 
+import { useTranslation } from "react-i18next";
 type AiWidgetProps = {
   isDesktop?: boolean;
   onExpand?: (prompt?: string) => void;
 };
 
 export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
+  const { t } = useTranslation();
   const [prompt, setPrompt] = useState("");
 
   function handleSubmit(e: React.FormEvent) {
@@ -47,7 +49,7 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
         <form onSubmit={handleSubmit} style={{ width: "100%", display: "flex", alignItems: "center", position: "relative" }}>
           <input
             type="text"
-            placeholder="Ask anything..."
+            placeholder={t("ai.placeholder")}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             style={{
@@ -84,7 +86,7 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
               alignItems: "center",
               justifyContent: "center",
             }}
-            title="Expand to Full App"
+            title={t("ai.expand")}
           >
             ⤢
           </button>

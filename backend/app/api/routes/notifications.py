@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
-from app.core.tenant import extract_tenant_from_claims
+from app.core.tenant import resolve_user_context
 from app.services.notification_audience import notification_visible_to_user
 from app.services.notification_store import NotificationStoreDep
 
@@ -57,9 +57,12 @@ def _inbox_response(notification: Any) -> InboxNotificationResponse:
 
 
 def _user_tenant(user: dict[str, Any], settings: Settings) -> str | None:
+    # The tenant this desktop serves, which the operator states. It used to be
+    # inferred from the caller's claims, which meant a person's inbox depended
+    # on a guess rather than on which component they were talking to.
     if settings.auth_disabled:
         return str(user.get("tenant") or "demo")
-    return extract_tenant_from_claims(user) or user.get("tenant")
+    return resolve_user_context(user, settings)
 
 
 @router.get("/inbox", response_model=list[InboxNotificationResponse])

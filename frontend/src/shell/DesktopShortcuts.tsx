@@ -5,6 +5,7 @@ import { CustomizeTileModal } from "@/shell/CustomizeTileModal";
 import { AiWidget } from "@/shell/AiWidget";
 import type { ShellApp } from "@/api/client";
 
+import { useTranslation } from "react-i18next";
 const GRID_X = 100;
 const GRID_Y = 110;
 
@@ -24,6 +25,7 @@ type DesktopShortcutsProps = {
 };
 
 export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: DesktopShortcutsProps) {
+  const { t } = useTranslation();
   const rawTiles = usePrefsStore((s) => s.customPrefs.desktopTiles);
   const rawCustomizations = usePrefsStore((s) => s.customPrefs.tileCustomizations);
   const updateCustomPrefs = usePrefsStore((s) => s.updateCustomPrefs);
@@ -128,7 +130,7 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
   }
 
   function handleDeleteShortcut(tileId: string) {
-    if (confirm("Are you sure you want to delete this desktop shortcut?")) {
+    if (confirm(t("tile.deleteConfirm"))) {
       updateCustomPrefs((prev) => ({
         ...prev,
         desktopTiles: (prev.desktopTiles || []).filter((t) => t.id !== tileId),

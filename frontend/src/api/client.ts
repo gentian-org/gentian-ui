@@ -138,7 +138,13 @@ export type ShellApp = {
 /** A kernel console, as the director decides this person may open it. */
 export type ClusterTile = {
   name: string;
+  /** The label, and the fallback for a locale that has no translation. */
   displayName: string;
+  /**
+   * Translations of the label, keyed by locale ("de_DE"). Optional: a
+   * catalogue with none renders from displayName alone.
+   */
+  displayNames?: Record<string, string>;
   description: string;
   url: string;
   icon: string;
@@ -160,4 +166,11 @@ export type PrefsResponse = {
   hasBackground: boolean;
   backgroundUrl: string | null;
   customPrefs?: Record<string, any>;
+  /**
+   * The tenant's own language, ISO 639-1. What this person sees until they
+   * choose one, or until a settings template chooses for them — a template
+   * carries `language` in customPrefs like any other preference, so applying
+   * one wins over this by simply being present.
+   */
+  tenantLanguage?: string | null;
 };

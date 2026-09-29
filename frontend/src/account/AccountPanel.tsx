@@ -4,13 +4,14 @@ import {
   changeAccountPassword,
   fetchAccountProfile,
   fetchAccountSessions,
-  requestAccountTotp,
   revokeAccountSession,
   revokeAllAccountSessions,
   updateAccountProfile,
 } from "@/api/account";
+import { accountConsoleUrl } from "@/auth/oidc";
 import "@/styles/shell-panel.css";
 
+import { useTranslation } from "react-i18next";
 type AccountTab = "profile" | "password" | "security" | "sessions";
 
 type AccountPanelProps = {
@@ -25,6 +26,7 @@ function formatTime(epochMs: number | null | undefined) {
 }
 
 export function AccountPanel({ embedded = false }: AccountPanelProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<AccountTab>("profile");
   const [firstName, setFirstName] = useState("");
@@ -50,7 +52,7 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
     mutationFn: () => updateAccountProfile({ firstName, lastName }),
     onSuccess: async (profile) => {
       setError(null);
-      setMessage("Profile updated.");
+      setMessage(t("account.updated"));
       setFirstName(profile.firstName);
       setLastName(profile.lastName);
       await queryClient.invalidateQueries({ queryKey: ["account", "profile"] });
@@ -65,23 +67,10 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
     mutationFn: () => changeAccountPassword(currentPassword, newPassword),
     onSuccess: () => {
       setError(null);
-      setMessage("Password changed.");
+      setMessage(t("account.passwordChanged"));
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    },
-    onError: (err: Error) => {
-      setMessage(null);
-      setError(err.message);
-    },
-  });
-
-  const totpMutation = useMutation({
-    mutationFn: requestAccountTotp,
-    onSuccess: async () => {
-      setError(null);
-      setMessage("TOTP setup will be required on your next sign-in.");
-      await queryClient.invalidateQueries({ queryKey: ["account", "profile"] });
     },
     onError: (err: Error) => {
       setMessage(null);
@@ -93,7 +82,7 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
     mutationFn: revokeAllAccountSessions,
     onSuccess: async () => {
       setError(null);
-      setMessage("Signed out of all other sessions.");
+      setMessage(t("account.sessionsSignedOutOthers"));
       await queryClient.invalidateQueries({ queryKey: ["account", "sessions"] });
     },
     onError: (err: Error) => {
@@ -125,11 +114,11 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
     <div className={rootClass}>
       <div className="shell-panel__frame">
         <header className="shell-panel__header">
-          <div className="shell-panel__eyebrow">Your workspace</div>
-          <h1 className="shell-panel__title">Account</h1>
+          <div className="shell-panel__eyebrow">{t("account.workspace")}</div>
+          <h1 className="shell-panel__title">{t("account.title")}</h1>
         </header>
 
-        <nav className="shell-panel__tabs" aria-label="Account sections">
+        <nav className="shell-panel__tabs" aria-label={t("account.sections")}>
           {(
             [
               ["profile", "Profile"],
@@ -154,12 +143,12 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
         </nav>
 
         <div className="shell-panel__body">
-          {profileQuery.isLoading && <p>Loading account…</p>}
+          {profileQuery.isLoading && <p>{t("account.loading")}</p>}
           {profileQuery.isError && (
             <p className="shell-panel__error">
               {profileQuery.error instanceof Error
                 ? profileQuery.error.message
-                : "Account settings are unavailable."}
+                : t("account.unavailable")}
             </p>
           )}
 
@@ -175,12 +164,12 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
               }}
             >
               <div className="shell-panel__field">
-                <label htmlFor="account-email">Email</label>
+                <label htmlFor="account-email">{t("account.email")}</label>
                 <input id="account-email" type="email" value={profile.email ?? ""} disabled />
-                <p className="shell-panel__hint">Contact your administrator to change your login email.</p>
+                <p className="shell-panel__hint">{t("account.emailHint")}</p>
               </div>
               <div className="shell-panel__field">
-                <label htmlFor="account-first">First name</label>
+                <label htmlFor="account-first">{t("account.firstName")}</label>
                 <input
                   id="account-first"
                   type="text"
@@ -189,7 +178,7 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
                 />
               </div>
               <div className="shell-panel__field">
-                <label htmlFor="account-last">Last name</label>
+                <label htmlFor="account-last">{t("account.lastName")}</label>
                 <input
                   id="account-last"
                   type="text"
@@ -214,18 +203,18 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
                 setMessage(null);
                 setError(null);
                 if (newPassword !== confirmPassword) {
-                  setError("New passwords do not match.");
+                  setError(t("account.passwordMismatch"));
                   return;
                 }
                 if (newPassword.length < 8) {
-                  setError("Password must be at least 8 characters.");
+                  setError(t("account.passwordTooShort"));
                   return;
                 }
                 passwordMutation.mutate();
               }}
             >
               <div className="shell-panel__field">
-                <label htmlFor="account-current-pw">Current password</label>
+                <label htmlFor="account-current-pw">{t("account.passwordCurrent")}</label>
                 <input
                   id="account-current-pw"
                   type="password"
@@ -236,7 +225,7 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
                 />
               </div>
               <div className="shell-panel__field">
-                <label htmlFor="account-new-pw">New password</label>
+                <label htmlFor="account-new-pw">{t("account.passwordNew")}</label>
                 <input
                   id="account-new-pw"
                   type="password"
@@ -247,7 +236,7 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
                 />
               </div>
               <div className="shell-panel__field">
-                <label htmlFor="account-confirm-pw">Confirm new password</label>
+                <label htmlFor="account-confirm-pw">{t("account.passwordConfirm")}</label>
                 <input
                   id="account-confirm-pw"
                   type="password"
@@ -281,17 +270,20 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
                     : "TOTP not configured"}
               </p>
               {!profile.totpConfigured && (
-                <button
-                  type="button"
+                // Set up where credentials live, with the session you already
+                // hold. This used to be a button here, and behind it this
+                // service set a required action on your account through
+                // Keycloak's ADMIN API -- an administrator credential, held by
+                // the desktop, to do something you were asking for about
+                // yourself (gentian-os S7A.6).
+                <a
                   className="shell-panel__btn shell-panel__btn--primary"
-                  disabled={totpMutation.isPending}
-                  onClick={() => {
-                    setMessage(null);
-                    totpMutation.mutate();
-                  }}
+                  href={accountConsoleUrl()}
+                  target="_blank"
+                  rel="noreferrer"
                 >
                   Set up authenticator app
-                </button>
+                </a>
               )}
             </section>
           )}
@@ -310,22 +302,22 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
                 >
                   Sign out everywhere
                 </button>
-                <p className="shell-panel__hint">Ends all sessions except this browser.</p>
+                <p className="shell-panel__hint">{t("account.sessionsSignOutOthers")}</p>
               </div>
-              {sessionsQuery.isLoading && <p>Loading sessions…</p>}
+              {sessionsQuery.isLoading && <p>{t("account.sessionsLoading")}</p>}
               <table className="shell-panel__table">
                 <thead>
                   <tr>
-                    <th>Client</th>
+                    <th>{t("account.sessionsClient")}</th>
                     <th>IP</th>
-                    <th>Last active</th>
+                    <th>{t("account.sessionsLastActive")}</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
                   {(sessionsQuery.data ?? []).map((session) => {
                     const clientName =
-                      session.clients[0]?.clientName ?? (session.current ? "This device" : "App");
+                      session.clients[0]?.clientName ?? (session.current ? t("account.sessionsThisDevice") : "App");
                     return (
                       <tr key={session.id ?? clientName}>
                         <td>

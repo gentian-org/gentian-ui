@@ -3,7 +3,10 @@ import { createWindowGeometry, maximizedGeometry, type WindowGeometry } from "@/
 
 export type WindowVisualState = "normal" | "minimized" | "maximized";
 
-export type ShellWindowBuiltin = "admin" | "account" | "settings";
+// The panels this shell renders itself. The administration console is not one
+// of them any more: it is a component at admin.<zone>, opened in a window like
+// every other tile.
+export type ShellWindowBuiltin = "account" | "settings";
 
 export type ShellWindow = {
   id: string;

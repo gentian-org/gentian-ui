@@ -12,6 +12,7 @@ import {
 import { WindowResizeHandles } from "@/windows/WindowResizeHandles";
 import { WindowBody } from "@/windows/WindowBody";
 
+import { useTranslation } from "react-i18next";
 function handleIframeLoad(win: ShellWindow, advanceWindowNavigation: (id: string) => void) {
   if (!win.pendingUrl) {
     return;
@@ -36,6 +37,7 @@ function WindowChromeButton({
 }
 
 export function WindowManager() {
+  const { t } = useTranslation();
   const windows = useWindowsStore((s) => s.windows);
   const focusWindow = useWindowsStore((s) => s.focusWindow);
   const closeWindow = useWindowsStore((s) => s.closeWindow);
@@ -88,7 +90,7 @@ export function WindowManager() {
           >
             <span className="shell-window__title">{win.title}</span>
             <div className="shell-window__controls">
-              <WindowChromeButton label="Minimize" onClick={() => minimizeWindow(win.id)}>
+              <WindowChromeButton label={t("window.minimize")} onClick={() => minimizeWindow(win.id)}>
                 <WindowMinimizeIcon className="shell-window__control-icon" />
               </WindowChromeButton>
               <WindowChromeButton
@@ -103,13 +105,13 @@ export function WindowManager() {
               </WindowChromeButton>
               {win.url && (
                 <WindowChromeButton
-                  label="Open in new tab"
+                  label={t("window.openInNewTab")}
                   onClick={() => window.open(win.url, "_blank")}
                 >
                   <WindowExternalIcon className="shell-window__control-icon" />
                 </WindowChromeButton>
               )}
-              <WindowChromeButton label="Close" onClick={() => closeWindow(win.id)}>
+              <WindowChromeButton label={t("window.close")} onClick={() => closeWindow(win.id)}>
                 <WindowCloseIcon className="shell-window__control-icon shell-window__control-icon--close" />
               </WindowChromeButton>
             </div>
@@ -133,7 +135,7 @@ export function WindowManager() {
         <div
           className="shell-window-taskbar"
           style={{ bottom: APP_MENU_HEIGHT }}
-          aria-label="Minimized windows"
+          aria-label={t("shell.minimizedWindows")}
         >
           {minimized.map((win) => (
             <button

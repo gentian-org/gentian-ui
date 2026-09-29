@@ -10,7 +10,7 @@ import { RequireAuth } from "@/auth/RequireAuth";
 import { defaultBasePath } from "@/lib/device";
 import { safeReturnTo } from "@/lib/returnTo";
 import { DesktopPage } from "@/pages/DesktopPage";
-import { LoginPage } from "@/pages/LoginPage";
+import { SignInElsewhere } from "@/pages/SignInElsewhere";
 import { MobilePage } from "@/pages/MobilePage";
 
 const rootRoute = createRootRoute({
@@ -30,7 +30,7 @@ const indexRoute = createRoute({
     if (isEdgeSession()) {
       throw redirect({ to: defaultBasePath() });
     }
-    throw redirect({ to: "/login", search: { returnTo: undefined, email: undefined } });
+    throw redirect({ to: "/login", search: { returnTo: undefined } });
   },
 });
 
@@ -39,9 +39,6 @@ const loginRoute = createRoute({
   path: "/login",
   validateSearch: (search: Record<string, unknown>) => ({
     returnTo: typeof search.returnTo === "string" ? search.returnTo : undefined,
-    // Carried from the apex portal once the email has been entered there, so the
-    // Keycloak form arrives pre-filled and only asks for a password.
-    email: typeof search.email === "string" ? search.email : undefined,
   }),
   // The edge owns the sign-in, so there is no login page behind it. A link or
   // a bookmark that still points here lands on the shell instead.
@@ -50,7 +47,7 @@ const loginRoute = createRoute({
       throw redirect({ to: safeReturnTo(search.returnTo) });
     }
   },
-  component: LoginPage,
+  component: SignInElsewhere,
 });
 
 // Legacy gentian-login paths → new shell routes (Stage 1 portal).
@@ -90,7 +87,7 @@ const shellRoute = createRoute({
     if (!getAccessToken()) {
       throw redirect({
         to: "/login",
-        search: { returnTo: location.pathname, email: undefined },
+        search: { returnTo: location.pathname },
       });
     }
   },
