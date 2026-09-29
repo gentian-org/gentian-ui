@@ -78,5 +78,30 @@
   "language": {
     "en": "English",
     "de": "Deutsch"
+  },
+  "store": {
+    "asked": "Angefragt vom App Store unter {{origin}}.",
+    "decline": "Abbrechen",
+    "working": "Wird ausgeführt…",
+    "install": {
+      "title": "Diese App installieren?",
+      "text": "{{subject}} wird für {{tenant}} installiert.",
+      "confirm": "Installieren"
+    },
+    "uninstall": {
+      "title": "Diese App entfernen?",
+      "text": "{{subject}} wird aus {{tenant}} entfernt. Die Daten bleiben erhalten, bis sie endgültig gelöscht werden.",
+      "confirm": "Entfernen"
+    },
+    "addons": {
+      "title": "Add-ons ändern?",
+      "text": "Die Add-ons von {{subject}} in {{tenant}} werden geändert.",
+      "confirm": "Ändern"
+    },
+    "grant": {
+      "title": "Diese Berechtigung eintragen?",
+      "text": "{{tenant}} wird für {{subject}} berechtigt.",
+      "confirm": "Eintragen"
+    }
   }
 }

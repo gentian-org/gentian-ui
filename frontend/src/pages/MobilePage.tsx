@@ -4,6 +4,7 @@ import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { MobileAppLayer } from "@/shell/MobileAppLayer";
 import { useShellApps } from "@/shell/useShellApps";
+import { StoreBridge } from "@/shell/StoreBridge";
 import { useShellBackgroundUrl } from "@/shell/useShellBackground";
 import { SettingsPanel } from "@/settings/SettingsPanel";
 import { useAppsStore } from "@/stores/apps";
@@ -14,7 +15,7 @@ type MobileOverlay = "account" | "settings" | null;
 
 export function MobilePage() {
   const { t } = useTranslation();
-  const { me, apps, loadFailed, reload } = useShellApps();
+  const { me, apps, loadFailed, reload, isAdminUser } = useShellApps();
   const backgroundUrl = useShellBackgroundUrl();
 
   const activeAppId = useAppsStore((s) => s.activeAppId);
@@ -86,6 +87,7 @@ export function MobilePage() {
   return (
     <div className="gentian-shell shell-surface relative min-h-full">
       <Background imageUrl={backgroundUrl} />
+      <StoreBridge enabled={isAdminUser} />
       {overlay === "account" && (
         <div className="fixed inset-0 z-20 overflow-auto bg-[var(--gtn-paper-3)]">
           <AccountPanel />
