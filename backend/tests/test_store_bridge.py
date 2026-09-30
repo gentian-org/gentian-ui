@@ -213,3 +213,21 @@ def test_a_desktop_that_does_not_know_its_tenant_says_so(monkeypatch):
     r = TestClient(_app(settings)).get("/api/v1/store/apps", headers=AUTH)
     assert r.status_code == 503
     assert seen == []
+
+
+@pytest.mark.parametrize("what,action", [("purge", "purge-app"), ("provision", "provision-app")])
+def test_an_action_names_the_profile_and_nothing_else(monkeypatch, what, action):
+    seen = _director(monkeypatch, {f"POST /actions/{action}": (202, {"status": "started"})})
+    r = TestClient(_app(_settings())).post(f"/api/v1/store/apps/xwiki-ce/{what}", headers=AUTH)
+    assert r.status_code == 202
+    assert seen[0]["json"] == {"profile": "xwiki-ce"}
+
+
+def test_a_purge_refused_because_the_app_is_still_there_says_so(monkeypatch):
+    _director(
+        monkeypatch,
+        {"POST /actions/purge-app": (409, {"error": "the app is still installed"})},
+    )
+    r = TestClient(_app(_settings())).post("/api/v1/store/apps/xwiki-ce/purge", headers=AUTH)
+    assert r.status_code == 409
+    assert r.json() == {"error": "the app is still installed"}

@@ -203,6 +203,46 @@ async def uninstall(
     return _relay(await _ask(settings, credentials, "DELETE", f"/apps/{_name(profile, 'profile')}"))
 
 
+async def _action(
+    action: str,
+    profile: str,
+    settings: Settings,
+    credentials: HTTPAuthorizationCredentials | None,
+) -> Response:
+    """Something done once to one app. The profile is all that travels."""
+    return _relay(
+        await _ask(
+            settings,
+            credentials,
+            "POST",
+            f"/actions/{action}",
+            body={"profile": _name(profile, "profile")},
+        )
+    )
+
+
+@router.post("/apps/{profile}/purge")
+async def purge(
+    profile: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Delete what an uninstalled app left behind. Refused while it is installed."""
+    return await _action("purge-app", profile, settings, credentials)
+
+
+@router.post("/apps/{profile}/provision")
+async def provision(
+    profile: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Grant an installed app to everybody who is a member now."""
+    return await _action("provision-app", profile, settings, credentials)
+
+
 @router.get("/apps/{profile}/addons")
 async def addons(
     profile: str,

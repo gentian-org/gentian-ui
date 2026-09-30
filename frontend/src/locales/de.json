@@ -102,6 +102,17 @@
       "title": "Diese Berechtigung eintragen?",
       "text": "{{tenant}} wird für {{subject}} berechtigt.",
       "confirm": "Eintragen"
+    },
+    "title": "App Store",
+    "purge": {
+      "title": "Daten dieser App endgültig löschen?",
+      "text": "Alles, was {{subject}} für {{tenant}} gespeichert hat, wird unwiderruflich gelöscht: Datenbanken, Dateien und Geheimnisse.",
+      "confirm": "Endgültig löschen"
+    },
+    "provision": {
+      "title": "Diese App allen freigeben?",
+      "text": "Alle heutigen Mitglieder von {{tenant}} erhalten {{subject}}, ebenso alle, die später hinzukommen.",
+      "confirm": "Freigeben"
     }
   }
 }

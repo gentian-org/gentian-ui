@@ -52,7 +52,7 @@ export type BridgeReply =
   | { ok: false; status: number; error: string };
 
 /** What a write is, in the words the confirmation uses. */
-export type WriteKind = "install" | "uninstall" | "addons" | "grant";
+export type WriteKind = "install" | "uninstall" | "purge" | "provision" | "addons" | "grant";
 
 type Call = {
   method: "GET" | "POST" | "PUT" | "DELETE";
@@ -143,6 +143,26 @@ export function plan(req: BridgeRequest): Planned | { kind: "refused"; error: st
         write: "uninstall",
         subject: profile,
         call: { method: "DELETE", path: `/apps/${profile}` },
+      };
+    }
+    case "apps.purge": {
+      const profile = name(a.profile);
+      if (!profile) return { kind: "refused", error: "profile is not a profile name" };
+      return {
+        kind: "write",
+        write: "purge",
+        subject: profile,
+        call: { method: "POST", path: `/apps/${profile}/purge` },
+      };
+    }
+    case "apps.provision": {
+      const profile = name(a.profile);
+      if (!profile) return { kind: "refused", error: "profile is not a profile name" };
+      return {
+        kind: "write",
+        write: "provision",
+        subject: profile,
+        call: { method: "POST", path: `/apps/${profile}/provision` },
       };
     }
     case "addons.set": {

@@ -102,6 +102,17 @@
       "title": "Record this entitlement?",
       "text": "{{tenant}} will be entitled to {{subject}}.",
       "confirm": "Record"
+    },
+    "title": "App Store",
+    "purge": {
+      "title": "Purge this app's data?",
+      "text": "Everything {{subject}} stored for {{tenant}} is deleted for good: databases, files and secrets. This cannot be undone.",
+      "confirm": "Purge"
+    },
+    "provision": {
+      "title": "Grant this app to everyone?",
+      "text": "Everybody who is a member of {{tenant}} now gets {{subject}}, and so does whoever joins later.",
+      "confirm": "Grant"
     }
   }
 }
