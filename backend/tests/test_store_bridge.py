@@ -107,6 +107,30 @@ def test_an_install_carries_the_coordinate_and_nothing_else(monkeypatch):
     assert seen[0]["json"] == {"coordinate": "main/xwiki-ce"}
 
 
+def test_the_digest_travels_with_the_install_and_is_a_digest(monkeypatch):
+    """The director checks the bundle it fetches against this number, so it
+    has to arrive -- and has to be a digest, not something shaped like one."""
+    seen = _director(monkeypatch, {"POST /apps/xwiki-ce": (202, {"status": "recorded"})})
+    digest = "sha256:" + "ab" * 32
+    client = TestClient(_app(_settings()))
+    r = client.post(
+        "/api/v1/store/apps/xwiki-ce",
+        json={"coordinate": "main/xwiki-ce", "digest": digest},
+        headers=AUTH,
+    )
+    assert r.status_code == 202
+    assert seen[0]["json"] == {"coordinate": "main/xwiki-ce", "digest": digest}
+
+    for bad in ("sha256:abc", "md5:" + "ab" * 32, "sha256:" + "AB" * 32):
+        r = client.post(
+            "/api/v1/store/apps/xwiki-ce",
+            json={"coordinate": "main/xwiki-ce", "digest": bad},
+            headers=AUTH,
+        )
+        assert r.status_code == 400
+    assert len(seen) == 1
+
+
 @pytest.mark.parametrize(
     "profile",
     ["..", "a/b", "Nextcloud", "-leading", "trailing-", "a" * 64, "a.b"],

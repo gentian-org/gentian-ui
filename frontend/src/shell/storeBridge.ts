@@ -66,6 +66,7 @@ export type Planned =
   | { kind: "write"; write: WriteKind; subject: string; call: Call };
 
 const NAME = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+const DIGEST = /^sha256:[0-9a-f]{64}$/;
 // <catalogue>/<app>, both names.
 const COORDINATE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\/[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 
@@ -128,11 +129,21 @@ export function plan(req: BridgeRequest): Planned | { kind: "refused"; error: st
       if (coordinate && !COORDINATE.test(coordinate)) {
         return { kind: "refused", error: "coordinate is <catalogue>/<app>" };
       }
+      // Which bytes the entry is, as the store stated it. The director admits
+      // the bundle it fetches only because it hashes to this (AD-3).
+      const digest = typeof a.digest === "string" ? a.digest : "";
+      if (digest && !DIGEST.test(digest)) {
+        return { kind: "refused", error: "digest is sha256:<64 hex>" };
+      }
       return {
         kind: "write",
         write: "install",
         subject: profile,
-        call: { method: "POST", path: `/apps/${profile}`, body: { coordinate } },
+        call: {
+          method: "POST",
+          path: `/apps/${profile}`,
+          body: digest ? { coordinate, digest } : { coordinate },
+        },
       };
     }
     case "apps.uninstall": {

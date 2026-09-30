@@ -34,6 +34,7 @@ _TIMEOUT = httpx.Timeout(30.0)
 # because these land in a URL path: a name with a slash or a dot-dot in it
 # would address a different route of the director than the one written below.
 _NAME = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
+_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 def _base_url(settings: Settings) -> str:
@@ -182,10 +183,18 @@ async def install(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    # Only the coordinate goes on. The director reads nothing else from an
-    # install, and a body passed through whole would be a way to reach a
-    # field it grows later without anybody deciding the store may set it.
+    # The coordinate and the digest go on, and nothing else. The coordinate is
+    # what the entitlement is about; the digest is which bytes the entry IS,
+    # as the store stated it over its own TLS, and the director admits the
+    # bundle it fetches only because it hashes to that (AD-3). A body passed
+    # through whole would be a way to reach a field the director grows later
+    # without anybody deciding the store may set it.
     payload = {"coordinate": str(body.get("coordinate") or "")}
+    digest = str(body.get("digest") or "")
+    if digest:
+        if not _DIGEST.match(digest):
+            raise HTTPException(status_code=400, detail="digest is sha256:<64 hex>.")
+        payload["digest"] = digest
     return _relay(
         await _ask(
             settings, credentials, "POST", f"/apps/{_name(profile, 'profile')}", body=payload
