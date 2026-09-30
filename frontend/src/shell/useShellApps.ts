@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   apiFetch,
   type ClusterTilesResponse,
@@ -9,6 +10,7 @@ import {
 import { useAuth } from "@/auth/AuthProvider";
 import { localisedLabel } from "@/lib/locale";
 import { getAccessToken, isEdgeSession } from "@/auth/oidc";
+import type { StoreContext } from "@/shell/storeBridge";
 
 /** The director's tiles, in the shape the desktop renders. */
 function kernelConsoleApps(data: ClusterTilesResponse | undefined): ShellApp[] {
@@ -31,6 +33,40 @@ function kernelConsoleApps(data: ClusterTilesResponse | undefined): ShellApp[] {
   }));
 }
 
+/**
+ * The App Store, for whoever may install.
+ *
+ * Not a component of the tenant's and not a profile: the store runs outside
+ * the cluster (AD-3), so there is nothing here to install. The tile exists
+ * when the Cluster claim names a store, and is shown to whoever holds
+ * can_install_app on this tenant -- both of which the director answered, so
+ * this decides nothing about who is an administrator.
+ *
+ * The address carries the tenant and the cluster so the page can say whose
+ * store it is before the bridge has answered. They are labels: what the store
+ * may do here is decided by the bridge, from the origin, not from a URL.
+ */
+function storeApp(context: StoreContext | undefined, title: string): ShellApp[] {
+  if (!context?.storeUrl || !context.storeOrigin) return [];
+  if (!context.relations?.can_install_app) return [];
+  const url = new URL(context.storeUrl);
+  url.searchParams.set("embedded", "1");
+  url.searchParams.set("tenant", context.tenant);
+  if (context.cluster) url.searchParams.set("cluster", context.cluster);
+  return [
+    {
+      id: "app-store",
+      title,
+      icon: "store",
+      launchUrl: url.toString(),
+      linkTarget: "embedded",
+      authMode: null,
+      preopen: false,
+      builtin: false,
+    },
+  ];
+}
+
 // No built-in administration console any more.
 //
 // It used to be a tile this file invented for anybody who looked like an
@@ -44,6 +80,7 @@ function shellAppsFromMe(me: MeResponse | undefined): ShellApp[] {
 }
 
 export function useShellApps() {
+  const { t } = useTranslation();
   const { isAuthenticated, isLoading: authLoading, authDisabled } = useAuth();
   const sessionReady = authDisabled || (!authLoading && isAuthenticated);
   const hasToken = authDisabled || isEdgeSession() || Boolean(getAccessToken());
@@ -81,8 +118,24 @@ export function useShellApps() {
     retry: false,
   });
 
+  // Which store this cluster listens to, and whether this person may install.
+  // The same answer the bridge pins its origin from, so the tile and the
+  // bridge cannot disagree about which store it is.
+  const { data: storeContext } = useQuery({
+    queryKey: ["store-context"],
+    queryFn: () => apiFetch<StoreContext>("/store/context"),
+    enabled: sessionReady && hasToken,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const storeTitle = t("store.title");
+
   const apps = useMemo(() => {
-    const list = [...shellAppsFromMe(me), ...kernelConsoleApps(clusterTiles)];
+    const list = [
+      ...storeApp(storeContext, storeTitle),
+      ...shellAppsFromMe(me),
+      ...kernelConsoleApps(clusterTiles),
+    ];
     
     const getSortIndex = (id: string) => {
       if (id === "app-store" || id.startsWith("app-store-")) return 1;
@@ -103,7 +156,7 @@ export function useShellApps() {
     adminApps.sort((a, b) => getSortIndex(a.id) - getSortIndex(b.id));
     
     return [...adminApps, ...userApps];
-  }, [me, clusterTiles]);
+  }, [me, clusterTiles, storeContext, storeTitle]);
 
   const isAdminUser = Boolean(me?.isPlatformAdmin || me?.isTenantAdmin);
   // An administrator whose only tile is the administration console. Named by

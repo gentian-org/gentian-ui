@@ -78,5 +78,41 @@
   "language": {
     "en": "English",
     "de": "Deutsch"
+  },
+  "store": {
+    "asked": "Angefragt vom App Store unter {{origin}}.",
+    "decline": "Abbrechen",
+    "working": "Wird ausgeführt…",
+    "install": {
+      "title": "Diese App installieren?",
+      "text": "{{subject}} wird für {{tenant}} installiert.",
+      "confirm": "Installieren"
+    },
+    "uninstall": {
+      "title": "Diese App entfernen?",
+      "text": "{{subject}} wird aus {{tenant}} entfernt. Die Daten bleiben erhalten, bis sie endgültig gelöscht werden.",
+      "confirm": "Entfernen"
+    },
+    "addons": {
+      "title": "Add-ons ändern?",
+      "text": "Die Add-ons von {{subject}} in {{tenant}} werden geändert.",
+      "confirm": "Ändern"
+    },
+    "grant": {
+      "title": "Diese Berechtigung eintragen?",
+      "text": "{{tenant}} wird für {{subject}} berechtigt.",
+      "confirm": "Eintragen"
+    },
+    "title": "App Store",
+    "purge": {
+      "title": "Daten dieser App endgültig löschen?",
+      "text": "Alles, was {{subject}} für {{tenant}} gespeichert hat, wird unwiderruflich gelöscht: Datenbanken, Dateien und Geheimnisse.",
+      "confirm": "Endgültig löschen"
+    },
+    "provision": {
+      "title": "Diese App allen freigeben?",
+      "text": "Alle heutigen Mitglieder von {{tenant}} erhalten {{subject}}, ebenso alle, die später hinzukommen.",
+      "confirm": "Freigeben"
+    }
   }
 }

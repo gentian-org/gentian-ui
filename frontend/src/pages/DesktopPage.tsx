@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { useShellApps } from "@/shell/useShellApps";
+import { StoreBridge } from "@/shell/StoreBridge";
 import { useShellBackgroundUrl } from "@/shell/useShellBackground";
 import { useAppsStore } from "@/stores/apps";
 import { useWindowsStore } from "@/stores/windows";
@@ -22,7 +23,7 @@ function snapToGrid(x: number, y: number) {
 }
 
 export function DesktopPage() {
-  const { me, apps, loadFailed, reload } = useShellApps();
+  const { me, apps, loadFailed, reload, isAdminUser } = useShellApps();
   const backgroundUrl = useShellBackgroundUrl();
 
   const activeAppId = useAppsStore((s) => s.activeAppId);
@@ -283,6 +284,7 @@ export function DesktopPage() {
 
 
       <WindowManager />
+      <StoreBridge enabled={isAdminUser} />
       <AppMenu
         apps={apps}
         loadFailed={loadFailed}

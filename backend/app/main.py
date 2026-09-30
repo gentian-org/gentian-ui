@@ -12,6 +12,7 @@ from app.api.routes import (
     notifications,
     prefs,
     session,
+    store,
 )
 from app.core.config import get_settings
 from app.core.logging_middleware import RedactingAccessLogMiddleware
@@ -71,3 +72,4 @@ app.include_router(account.router, prefix=settings.api_v1_str)
 app.include_router(notifications.router, prefix=settings.api_v1_str)
 app.include_router(llm.router, prefix=settings.api_v1_str)
 app.include_router(credentials.router, prefix=settings.api_v1_str)
+app.include_router(store.router, prefix=settings.api_v1_str)
