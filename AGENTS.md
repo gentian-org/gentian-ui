@@ -2,8 +2,10 @@
 
 ## Project overview
 
-`gentian-ui` is the kernel shell for Gentian OS — login hub, desktop/mobile bases, app
-launcher, and iframe window host. It dogfoods
+`gentian-ui` holds the platform's own UIs as apps in the gentian-apps layout:
+`apps/desktop/` (login hub, desktop/mobile bases, app launcher, iframe window host)
+and `apps/admin-console/` (the administration console, a director client; its own
+conventions are in `apps/admin-console/docs/AGENTS.md`). Both dogfood
 [gentian-app-template](https://github.com/gentian-org/gentian-app-template) — same
 backend/frontend/chart layout and security modules. This repo is the **kernel shell**
 instance; see template `docs/AGENTS.md` for catalogue-app specifics (`profile/`, AppProfile
@@ -11,8 +13,10 @@ publish flow). See [README.md](README.md) for scope and layout.
 
 ## Build & deployment — CI/GitOps only
 
-* CI builds the `gentian-portal-api`/`gentian-portal-web` images via
-  `.github/workflows/gentian-portal.yaml` on pushes to `develop`. Cluster rollout is automatic
+* CI builds each app from its own workflow on pushes to `develop`: the desktop's
+  `gentian-portal-api`/`gentian-portal-web` images and chart via
+  `.github/workflows/desktop.yaml`, the console's `admin-console-*` via
+  `.github/workflows/admin-console.yaml`. Cluster rollout is automatic
   via Argo CD Image Updater on the `gentian-portal` Application in `gentian-deployments`.
 * **Do not build/push images or deploy/patch the cluster yourself** — let CI and Argo CD
   reconcile. Deleting a stuck resource to speed up reconciliation is fine; hand-patching a
@@ -20,10 +24,10 @@ publish flow). See [README.md](README.md) for scope and layout.
 
 ## Security & licensing
 
-* **Never commit secrets** (OIDC client secrets, API keys) — see [docs/SECURITY.md](docs/SECURITY.md).
+* **Never commit secrets** (OIDC client secrets, API keys) — see [apps/desktop/docs/SECURITY.md](apps/desktop/docs/SECURITY.md).
 * **Respect third-party license terms** when adding dependencies or vendoring code.
 
-## Directory map
+## Directory map — the desktop (`apps/desktop/`; paths below are relative to it)
 
 | Path | Purpose |
 |------|---------|
@@ -62,14 +66,14 @@ publish flow). See [README.md](README.md) for scope and layout.
 
 ## Edge routing
 
-Production uses **Gateway API** (`chart/templates/httproute.yaml`) on
+Production uses **Gateway API** (`apps/<app>/chart/templates/httproute.yaml`) on
 `kernel-public-gateway`. Routes `/api`, `/healthz`, `/readyz` → API; `/` → web.
-See [docs/SECURITY.md](docs/SECURITY.md).
+See [apps/desktop/docs/SECURITY.md](apps/desktop/docs/SECURITY.md).
 
 ## Local dev
 
 ```bash
-docker compose -f docker-compose.dev.yaml up --build
+docker compose -f apps/desktop/docker-compose.dev.yaml up --build
 ```
 
 - UI: http://localhost:5173
@@ -77,4 +81,4 @@ docker compose -f docker-compose.dev.yaml up --build
 
 `AUTH_DISABLED=true` and `VITE_AUTH_DISABLED=true` skip OIDC locally.
 
-See [docs/SECURITY.md](docs/SECURITY.md) and [docs/architecture.md](docs/architecture.md).
+See [apps/desktop/docs/SECURITY.md](apps/desktop/docs/SECURITY.md) and [apps/desktop/docs/architecture.md](apps/desktop/docs/architecture.md).

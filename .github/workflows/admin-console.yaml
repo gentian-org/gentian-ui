@@ -1,0 +1,234 @@
+name: admin-console
+
+# The administration console: builds admin-console-api and admin-console-web
+# images and the admin-console chart, from apps/admin-console/, exactly the way
+# desktop.yaml builds the desktop -- the two are components of the same kind,
+# installed by the operator from a ComponentProfile gentian-os ships.
+#
+# Moved here from gentian-apps, where it was built by apps-ci.yaml: the console
+# is the platform's own UI, like the desktop, not a catalogue app.
+
+on:
+  push:
+    branches:
+      - develop
+      - "feat/**"
+      - "fix/**"
+      - "chore/**"
+    paths:
+      - "apps/admin-console/**"
+      - ".github/workflows/admin-console.yaml"
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "apps/admin-console/**"
+      - ".github/workflows/admin-console.yaml"
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  WEB_IMAGE: ghcr.io/gentian-org/admin-console-web
+  API_IMAGE: ghcr.io/gentian-org/admin-console-api
+
+jobs:
+  # The backend suite and the frontend typecheck, neither of which ran anywhere
+  # before this job existed: the workflow built images and asserted nothing
+  # about them, so the first thing to notice a broken build was a cluster.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Backend tests
+        working-directory: apps/admin-console/backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          ruff check app tests
+          python -m pytest -q
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # `npm run build` is `tsc && vite build`, so this is the typecheck and the
+      # production build in one. A type error and a bundle that cannot be
+      # produced are the same class of problem here: an image that starts and
+      # serves nothing.
+      - name: Frontend typecheck and build
+        working-directory: apps/admin-console/frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test]
+    # The job runs everywhere; only the push is gated, per build step below.
+    # Gating the JOB meant a pull request never built an image at all, so the
+    # one place a broken Dockerfile could still be caught cheaply proved
+    # nothing and reported success — and a build that is only ever exercised
+    # by the run that also publishes it has no dry run anywhere.
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The arm64 leg is emulated, and buildx does not provide the emulator —
+      # it needs qemu-user-static registered with binfmt_misc on the host. The
+      # runner image currently ships that, so the build works without this step
+      # and would keep working until the day it does not, failing as an
+      # "exec format error" deep inside a RUN line that says nothing about the
+      # runner. Declared here rather than inherited, for the reason the lint
+      # job installs PyYAML instead of relying on the image having it.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Pull Node base image
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 5
+          retry_wait_seconds: 20
+          command: |
+            docker pull node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd
+
+      # Three tags, and only one of them is safe to track.
+      #
+      #   develop           moving; the chart default and what a human pulls
+      #   <sha>             immutable, but published from whatever branch built
+      #                     it, so it says nothing about where the code came from
+      #   develop-<sha>     immutable AND branch-scoped
+      #
+      # Argo CD Image Updater must follow the third. It cannot follow the first:
+      # a candidate set of one name that never changes makes newest-build
+      # re-select the same entry every cycle, so the tag it writes back never
+      # moves and no build reaches the cluster. It must not follow the second:
+      # every branch publishes into that namespace, so a main build would be a
+      # valid candidate for a develop cluster.
+      - name: Set image tag
+        id: meta
+        run: |
+          short="${GITHUB_SHA::7}"
+          branch="${GITHUB_REF_NAME//\//-}"
+          echo "tag=${branch}" >> "$GITHUB_OUTPUT"
+          echo "short=${short}" >> "$GITHUB_OUTPUT"
+          echo "immutable=${branch}-${short}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push web
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/admin-console/frontend
+          file: apps/admin-console/frontend/Dockerfile
+          # develop publishes, because that is what Argo CD Image Updater
+          # follows. Every other ref builds the image — which is the check —
+          # and pushes nothing.
+          push: >-
+            ${{ github.event_name != 'pull_request'
+            && github.ref == 'refs/heads/develop' }}
+          # Without this the default builder produces an amd64-only image and
+          # says nothing about it. The failure lands much later, as an
+          # ImagePullBackOff on an arm64 node whose message never mentions
+          # architecture. The frontend Dockerfile pins its build stage to
+          # BUILDPLATFORM, so the arm64 leg here is only the runtime stage.
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.short }}
+            ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.immutable }}
+          # No build-args. Vite freezes import.meta.env.VITE_* into the bundle
+          # at build time, and this one image is deployed to every cluster — so
+          # anything passed here is wrong everywhere except the cluster it names.
+          # It named the test cluster (id.desk.gentian.org), which meant every
+          # other deployment ran a portal that believed it lived there and
+          # redirected tenant sessions to it. Deployment config now arrives from
+          # the environment at container start; see frontend/docker-entrypoint.sh.
+
+      - name: Build and push api
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/admin-console/backend
+          file: apps/admin-console/backend/Dockerfile
+          # develop publishes, because that is what Argo CD Image Updater
+          # follows. Every other ref builds the image — which is the check —
+          # and pushes nothing.
+          push: >-
+            ${{ github.event_name != 'pull_request'
+            && github.ref == 'refs/heads/develop' }}
+          # The backend has no build/runtime split to exploit: uv resolves and
+          # installs into the target image, so the arm64 leg runs emulated. That
+          # is acceptable while the dependencies ship arm64 wheels — a package
+          # without one compiles from source under QEMU and this step gets slow.
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.API_IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.API_IMAGE }}:${{ steps.meta.outputs.short }}
+            ${{ env.API_IMAGE }}:${{ steps.meta.outputs.immutable }}
+  chart:
+    # The console is a component: the platform installs it per tenant from
+    # a chart the operator resolves through provider-helm, which pulls from a
+    # registry and not from git. So the chart is published as an OCI
+    # artefact, versioned like the images -- a moving prerelease per branch
+    # the profile can follow on a dev cluster, and an immutable one per
+    # commit for anything that pins.
+    runs-on: ubuntu-latest
+    # After the images: the chart names the images of the build it came
+    # from, so it must not exist before they do.
+    needs: [test, build]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Chart version
+        id: chart
+        run: |
+          base="$(sed -n 's/^version: *//p' apps/admin-console/chart/Chart.yaml)"
+          short="${GITHUB_SHA::7}"
+          branch="${GITHUB_REF_NAME//\//-}"
+          echo "moving=${base}-${branch}" >> "$GITHUB_OUTPUT"
+          echo "immutable=${base}-${branch}.${short}" >> "$GITHUB_OUTPUT"
+          echo "image=${branch}-${short}" >> "$GITHUB_OUTPUT"
+      # The chart's default image tag is the immutable, branch-scoped tag of
+      # this very build. A chart that says "0.1.0" names an image nobody
+      # publishes; a chart installed as a component has no image updater to
+      # fill the tag in later, so the chart itself has to be right.
+      - name: Name this build's images
+        run: |
+          sed -i 's/^\(\s*tag:\) "0\.1\.0"$/\1 "${{ steps.chart.outputs.image }}"/' apps/admin-console/chart/values.yaml
+          test "$(grep -c 'tag: "${{ steps.chart.outputs.image }}"' apps/admin-console/chart/values.yaml)" = 2
+      - name: Lint and package
+        run: |
+          helm lint apps/admin-console/chart
+          helm package apps/admin-console/chart --version "${{ steps.chart.outputs.immutable }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-immutable
+          # The moving chart's appVersion is the immutable version it is a
+          # copy of: a cluster that follows the branch reads the pin off the
+          # moving chart and installs the immutable one, since a Helm
+          # release under an unchanged version string is never upgraded.
+          helm package apps/admin-console/chart --version "${{ steps.chart.outputs.moving }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-moving
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Push
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
+        run: |
+          helm push /tmp/chart-immutable/*.tgz oci://ghcr.io/gentian-org/charts
+          helm push /tmp/chart-moving/*.tgz oci://ghcr.io/gentian-org/charts

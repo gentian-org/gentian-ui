@@ -1,5 +1,9 @@
-name: gentian-portal
+name: desktop
 
+# The desktop: builds gentian-portal-api and gentian-portal-web images and the
+# gentian-portal chart, from apps/desktop/. The administration console beside it
+# has its own workflow of the same shape (admin-console.yaml).
+#
 # Builds gentian-portal-api and gentian-portal-web images. Cluster rollout is
 # automatic via Argo CD Image Updater on the gentian-portal Application
 # (see gentian-deployments/clusters/<cluster>/kernel/gentian-portal-*.yaml).
@@ -15,18 +19,14 @@ on:
       - "fix/**"
       - "chore/**"
     paths:
-      - "frontend/**"
-      - "backend/**"
-      - "chart/**"
-      - ".github/workflows/gentian-portal.yaml"
+      - "apps/desktop/**"
+      - ".github/workflows/desktop.yaml"
   pull_request:
     branches:
       - develop
     paths:
-      - "frontend/**"
-      - "backend/**"
-      - "chart/**"
-      - ".github/workflows/gentian-portal.yaml"
+      - "apps/desktop/**"
+      - ".github/workflows/desktop.yaml"
   workflow_dispatch:
 
 env:
@@ -48,7 +48,7 @@ jobs:
           python-version: "3.12"
 
       - name: Backend tests
-        working-directory: backend
+        working-directory: apps/desktop/backend
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
@@ -63,7 +63,7 @@ jobs:
       # produced are the same class of problem here: an image that starts and
       # serves nothing.
       - name: Frontend typecheck and build
-        working-directory: frontend
+        working-directory: apps/desktop/frontend
         run: |
           npm install
           npm run build
@@ -138,8 +138,8 @@ jobs:
       - name: Build and push web
         uses: docker/build-push-action@v6
         with:
-          context: frontend
-          file: frontend/Dockerfile
+          context: apps/desktop/frontend
+          file: apps/desktop/frontend/Dockerfile
           # develop publishes, because that is what Argo CD Image Updater
           # follows. Every other ref builds the image — which is the check —
           # and pushes nothing.
@@ -167,8 +167,8 @@ jobs:
       - name: Build and push api
         uses: docker/build-push-action@v6
         with:
-          context: backend
-          file: backend/Dockerfile
+          context: apps/desktop/backend
+          file: apps/desktop/backend/Dockerfile
           # develop publishes, because that is what Argo CD Image Updater
           # follows. Every other ref builds the image — which is the check —
           # and pushes nothing.
@@ -203,7 +203,7 @@ jobs:
       - name: Chart version
         id: chart
         run: |
-          base="$(sed -n 's/^version: *//p' chart/Chart.yaml)"
+          base="$(sed -n 's/^version: *//p' apps/desktop/chart/Chart.yaml)"
           short="${GITHUB_SHA::7}"
           branch="${GITHUB_REF_NAME//\//-}"
           echo "moving=${base}-${branch}" >> "$GITHUB_OUTPUT"
@@ -215,17 +215,17 @@ jobs:
       # fill the tag in later, so the chart itself has to be right.
       - name: Name this build's images
         run: |
-          sed -i 's/^\(\s*tag:\) "0\.1\.0"$/\1 "${{ steps.chart.outputs.image }}"/' chart/values.yaml
-          test "$(grep -c 'tag: "${{ steps.chart.outputs.image }}"' chart/values.yaml)" = 2
+          sed -i 's/^\(\s*tag:\) "0\.1\.0"$/\1 "${{ steps.chart.outputs.image }}"/' apps/desktop/chart/values.yaml
+          test "$(grep -c 'tag: "${{ steps.chart.outputs.image }}"' apps/desktop/chart/values.yaml)" = 2
       - name: Lint and package
         run: |
-          helm lint chart
-          helm package chart --version "${{ steps.chart.outputs.immutable }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-immutable
+          helm lint apps/desktop/chart
+          helm package apps/desktop/chart --version "${{ steps.chart.outputs.immutable }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-immutable
           # The moving chart's appVersion is the immutable version it is a
           # copy of: a cluster that follows the branch reads the pin off the
           # moving chart and installs the immutable one, since a Helm
           # release under an unchanged version string is never upgraded.
-          helm package chart --version "${{ steps.chart.outputs.moving }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-moving
+          helm package apps/desktop/chart --version "${{ steps.chart.outputs.moving }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-moving
       - name: Log in to GHCR
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
