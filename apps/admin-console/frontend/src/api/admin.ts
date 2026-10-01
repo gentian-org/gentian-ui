@@ -959,7 +959,13 @@ export type Person = {
   email: string;
   /** The display name, empty until they set one. */
   name?: string;
+  firstName?: string;
+  lastName?: string;
   enabled: boolean;
+  /** An authenticator is enrolled. Filled only by the single read. */
+  totpConfigured?: boolean;
+  /** They must enrol one at their next sign-in. */
+  totpRequired?: boolean;
   /**
    * Invited and not finished: the address is unverified or a required action
    * is outstanding. Worth its own column — somebody who cannot sign in yet
@@ -975,13 +981,21 @@ export type PersonGroup = {
   /** The path without the leading slash, which is the name the graph uses. */
   path: string;
   name: string;
+  /** Made by an administrator here, and so the only kind that can be deleted. */
+  custom?: boolean;
 };
+
+export type SettingsTemplate = { id: string; name: string };
 
 export type IdentitySettings = {
   tenant: string;
   realm: string;
   /** Keycloak's own spelling, e.g. "length(12) and notUsername(undefined)". */
   passwordPolicy: string;
+  /** What follows the @ in a login composed here; empty when unknown. */
+  loginDomain?: string;
+  /** Whether settings templates can be offered at all. */
+  templates?: boolean;
 };
 
 export type InviteResult = {
@@ -992,6 +1006,20 @@ export type InviteResult = {
    */
   mailed: boolean;
   warning?: string;
+  /** Present when a template was asked for. */
+  templateApplied?: boolean;
+};
+
+export type Invitation = {
+  /** Where the invitation and later password resets are mailed. */
+  email: string;
+  /** The part before @<loginDomain>. */
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  requireTotp?: boolean;
+  settingsTemplate?: string;
+  groups: string[];
 };
 
 export function fetchPeople(opts?: { search?: string; tenant?: string }) {
@@ -1016,7 +1044,7 @@ export function fetchIdentitySettings(tenant?: string) {
   return apiFetch<IdentitySettings>(`/admin/identity${tenantQuery(tenant)}`);
 }
 
-export function invitePerson(body: { email: string; groups: string[] }, tenant?: string) {
+export function invitePerson(body: Invitation, tenant?: string) {
   return apiFetch<InviteResult>(`/admin/people/invite${tenantQuery(tenant)}`, {
     method: "POST",
     body: JSON.stringify(body),
@@ -1038,4 +1066,53 @@ export function setPasswordPolicy(passwordPolicy: string, tenant?: string) {
     method: "POST",
     body: JSON.stringify({ passwordPolicy }),
   });
+}
+
+function postAction<T>(path: string, body: unknown, tenant?: string) {
+  return apiFetch<T>(`${path}${tenantQuery(tenant)}`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** Names, delivery address and whether they may sign in; omitted fields stay. */
+export function updatePerson(
+  body: { person: string; firstName?: string; lastName?: string; enabled?: boolean; email?: string },
+  tenant?: string,
+) {
+  return postAction<Person>("/admin/people/update", body, tenant);
+}
+
+export function removePerson(person: string, tenant?: string) {
+  return postAction<{ removed: boolean }>("/admin/people/remove", { person }, tenant);
+}
+
+export function sendPasswordReset(person: string, tenant?: string) {
+  return postAction<{ mailed: boolean }>("/admin/people/reset-password", { person }, tenant);
+}
+
+export function requireTotp(person: string, mail: boolean, tenant?: string) {
+  return postAction<{ totpRequired: boolean }>("/admin/people/require-totp", { person, mail }, tenant);
+}
+
+export function removeTotp(person: string, tenant?: string) {
+  return postAction<{ totpRequired: boolean }>("/admin/people/remove-totp", { person }, tenant);
+}
+
+export function createCustomGroup(name: string, tenant?: string) {
+  return postAction<PersonGroup>("/admin/groups/create", { name }, tenant);
+}
+
+export function deleteCustomGroup(group: string, tenant?: string) {
+  return postAction<{ deleted: boolean }>("/admin/groups/delete", { group }, tenant);
+}
+
+export function fetchGroupMembers(group: string, tenant?: string) {
+  const params = new URLSearchParams({ group });
+  if (tenant) params.set("tenant", tenant);
+  return apiFetch<{ group: string; people: Person[] }>(`/admin/groups/members?${params.toString()}`);
+}
+
+export function fetchSettingsTemplates(tenant?: string) {
+  return apiFetch<{ templates: SettingsTemplate[] }>(`/admin/templates${tenantQuery(tenant)}`);
 }

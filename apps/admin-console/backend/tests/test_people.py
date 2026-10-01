@@ -56,7 +56,10 @@ def test_people_are_asked_of_the_tenant(monkeypatch):
     seen: dict = {}
     _fake_client(
         monkeypatch,
-        {"tenant": "platform", "people": [{"id": "u1", "username": "ada@example.com", "pending": True}]},
+        {
+            "tenant": "platform",
+            "people": [{"id": "u1", "username": "ada@example.com", "pending": True}],
+        },
         seen,
     )
     r = TestClient(_app(_settings())).get(
@@ -97,14 +100,21 @@ def test_inviting_is_an_action_not_a_commit(monkeypatch):
     # /actions/ is the director's way of saying this happens once and leaves
     # no commit. A PUT here would be declaring a person as state.
     assert seen["url"] == "http://director.test:8080/v1/tenants/platform/actions/invite-person"
-    assert seen["json"] == {"email": "ada@example.com", "groups": ["gentian:tenant:platform:members"]}
+    assert seen["json"] == {
+        "email": "ada@example.com",
+        "groups": ["gentian:tenant:platform:members"],
+    }
 
 
 def test_an_invitation_whose_mail_failed_still_reports_the_person(monkeypatch):
     seen: dict = {}
     _fake_client(
         monkeypatch,
-        {"person": {"id": "new", "email": "ada@example.com"}, "mailed": False, "warning": "smtp down"},
+        {
+            "person": {"id": "new", "email": "ada@example.com"},
+            "mailed": False,
+            "warning": "smtp down",
+        },
         seen,
         status=202,
     )
@@ -145,7 +155,9 @@ def test_the_password_policy_is_read_and_written(monkeypatch):
         json={"passwordPolicy": "length(12)"},
         headers={"Authorization": "Bearer t"},
     )
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/actions/set-password-policy"
+    assert (
+        seen["url"] == "http://director.test:8080/v1/tenants/platform/actions/set-password-policy"
+    )
     assert seen["json"] == {"passwordPolicy": "length(12)"}
 
 
@@ -183,3 +195,67 @@ def test_a_realm_with_no_credential_is_relayed_as_the_platforms_problem(monkeypa
     )
     assert r.status_code == 503
     assert "demo" in r.json()["error"]
+
+
+def test_an_invitation_relays_the_whole_form(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"mailed": True}, seen, status=202)
+    client = TestClient(_app(_settings()))
+    res = client.post(
+        "/api/v1/admin/people/invite",
+        json={
+            "email": "jane@example.org",
+            "username": "jane-doe",
+            "firstName": "Jane",
+            "lastName": "Doe",
+            "requireTotp": True,
+            "settingsTemplate": "t1",
+            "groups": ["g"],
+            "smuggled": "nope",
+        },
+        headers={"Authorization": "Bearer t"},
+    )
+    assert res.status_code == 202
+    assert seen["url"].endswith("/v1/tenants/platform/actions/invite-person")
+    assert seen["json"] == {
+        "email": "jane@example.org",
+        "username": "jane-doe",
+        "firstName": "Jane",
+        "lastName": "Doe",
+        "requireTotp": True,
+        "settingsTemplate": "t1",
+        "groups": ["g"],
+    }
+
+
+def test_an_edit_relays_only_what_it_names(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"id": "u1"}, seen)
+    client = TestClient(_app(_settings()))
+    res = client.post(
+        "/api/v1/admin/people/update",
+        json={"person": "u1", "enabled": False},
+        headers={"Authorization": "Bearer t"},
+    )
+    assert res.status_code == 200
+    assert seen["url"].endswith("/actions/update-person")
+    assert seen["json"] == {"person": "u1", "enabled": False}
+
+
+def test_member_actions_reach_their_director_actions(monkeypatch):
+    client = TestClient(_app(_settings()))
+    for path, action, body in [
+        ("/api/v1/admin/people/remove", "remove-person", {"person": "u1"}),
+        ("/api/v1/admin/people/reset-password", "send-password-reset", {"person": "u1"}),
+        ("/api/v1/admin/people/require-totp", "require-totp", {"person": "u1", "mail": True}),
+        ("/api/v1/admin/people/remove-totp", "remove-totp", {"person": "u1"}),
+        ("/api/v1/admin/groups/create", "create-group", {"name": "sales"}),
+        ("/api/v1/admin/groups/delete", "delete-group", {"group": "gentian:tenant:x:sales"}),
+    ]:
+        seen: dict = {}
+        _fake_client(monkeypatch, {}, seen)
+        assert (
+            client.post(path, json=body, headers={"Authorization": "Bearer t"}).status_code == 200
+        ), path
+        assert seen["url"].endswith(f"/actions/{action}"), (path, seen["url"])
+        assert seen["json"] == body

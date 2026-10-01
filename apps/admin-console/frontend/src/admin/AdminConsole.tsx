@@ -9,7 +9,8 @@ import { CatalogueSection } from "@/admin/CatalogueSection";
 import { CredentialsSection } from "@/admin/CredentialsSection";
 import { CustomizationDebtSection } from "@/admin/CustomizationDebtSection";
 import { ClusterSettingsSection } from "@/admin/ClusterSettingsSection";
-import { IdentitySection } from "@/admin/IdentitySection";
+import { GroupsSection } from "@/admin/GroupsSection";
+import { MembersSection } from "@/admin/MembersSection";
 import { IntegrationsSection } from "@/admin/IntegrationsSection";
 import { NotificationsSection } from "@/admin/NotificationsSection";
 import { ResourcesSection } from "@/admin/ResourcesSection";
@@ -21,7 +22,8 @@ import { useTranslation } from "react-i18next";
 
 type AdminTab =
   | "tenants"
-  | "people"
+  | "members"
+  | "groups"
   | "resources"
   | "backup"
   | "security"
@@ -44,18 +46,18 @@ type AdminTab =
  * and consumes, then what protects it, then the record, then the cluster's own
  * configuration for whoever administers the platform.
  *
- * Four tabs are gone: Members, Groups, Invitations and Sessions. They needed a
- * Keycloak administrator credential this console must not hold, and Keycloak's
- * own console already does that job properly. Templates went with them — it
- * copied one member's shell preferences onto another, which is a member screen
- * wearing a different name.
+ * Members and Groups go through the director, which holds a credential per
+ * realm and asks OpenFGA about the caller before using it; this console holds
+ * none. Inviting somebody happens on Members, with the settings template the
+ * desktop applies before they first sign in.
  */
 const TABS: { id: AdminTab; labelKey: string; platformOnly?: boolean }[] = [
   // First, and platform-only, because bringing a customer on is what an MSP
   // employee opens this console to do. A tenant administrator sees their own
   // tenant's screens and has no business listing the others.
   { id: "tenants", labelKey: "tabTenants", platformOnly: true },
-  { id: "people", labelKey: "tabPeople" },
+  { id: "members", labelKey: "tabMembers" },
+  { id: "groups", labelKey: "tabGroups" },
   { id: "resources", labelKey: "tabResources" },
   { id: "backup", labelKey: "tabBackup" },
   { id: "security", labelKey: "tabSecurity" },
@@ -81,7 +83,7 @@ type AdminConsoleProps = {
 export function AdminConsole({ embedded = false }: AdminConsoleProps) {
   const { t } = useTranslation();
 
-  const [tab, setTab] = useState<AdminTab>("people");
+  const [tab, setTab] = useState<AdminTab>("members");
   const contextQuery = useQuery({
     queryKey: ["admin", "context"],
     queryFn: () => fetchAdminContext(),
@@ -151,8 +153,10 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
         <div className="admin-console__body">
           {tab === "tenants" ? (
             <TenantsSection />
-          ) : tab === "people" ? (
-            <IdentitySection realm={realm} kernelDomain={contextQuery.data.kernelDomain} />
+          ) : tab === "members" ? (
+            <MembersSection tenant={tenant} />
+          ) : tab === "groups" ? (
+            <GroupsSection tenant={tenant} />
           ) : tab === "security" ? (
             <SecurityPoliciesSection tenant={tenant} />
           ) : tab === "integrations" ? (

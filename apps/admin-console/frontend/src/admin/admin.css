@@ -1354,3 +1354,65 @@
 .usage-chart__tooltip-row--muted {
   color: var(--gtn-ink-4);
 }
+
+/* ── Group picker: a dropdown of checkboxes ─────────────────────────────── */
+.admin-console__picker {
+  position: relative;
+}
+.admin-console__picker-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r1);
+  background: var(--gtn-paper-3);
+  color: var(--gtn-ink-1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.admin-console__picker-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.admin-console__picker-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-console__picker-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  min-width: 16rem;
+  padding: 0.5rem;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r1);
+  background: var(--gtn-paper-1, var(--gtn-paper-3));
+  box-shadow: 0 8px 24px rgba(20, 21, 46, 0.12);
+}
+.admin-console__picker-filter {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+/* Scrolls rather than grows: a tenant gains a group with every app. */
+.admin-console__picker-list {
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.admin-console__picker-section + .admin-console__picker-section {
+  margin-top: 0.5rem;
+}
+.admin-console__picker-heading {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gtn-ink-4);
+  margin: 0.25rem 0;
+}

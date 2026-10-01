@@ -11,8 +11,7 @@ own console, on the argument that a console holding an administrator
 credential is a large thing to get wrong. The argument was right; the
 conclusion was not. The credential moves to the one component that already
 asks who is calling, rather than the screens moving to a console built for
-realm engineers. Keycloak's console stays reachable as the detail view behind
-the product view.
+realm engineers.
 
 The writes are ACTIONS, not commits. Inviting somebody happens once and leaves
 no declared state; people do not belong in an append-only history, which is the
@@ -34,6 +33,31 @@ _bearer = HTTPBearer(auto_error=False)
 
 def _tenant(settings: Settings, tenant: str | None) -> str:
     return tenant or settings.tenant_id
+
+
+def _fields(payload: dict, names: tuple[str, ...]) -> dict:
+    """The named fields the caller sent, and nothing else.
+
+    Only the ones present: an edit that did not mention a field leaves it as it
+    is, and relaying a default in its place would change it.
+    """
+    return {k: payload[k] for k in names if k in payload}
+
+
+async def _action(
+    settings: Settings,
+    tenant: str | None,
+    credentials: HTTPAuthorizationCredentials | None,
+    action: str,
+    body: dict,
+) -> Response:
+    return await director.forward(
+        settings,
+        "POST",
+        f"/v1/tenants/{_tenant(settings, tenant)}/actions/{action}",
+        bearer_of(credentials),
+        json_body=body,
+    )
 
 
 @router.get("/people")
@@ -145,7 +169,18 @@ async def invite(
         "POST",
         f"/v1/tenants/{_tenant(settings, tenant)}/actions/invite-person",
         bearer_of(credentials),
-        json_body={"email": payload.get("email", ""), "groups": payload.get("groups", [])},
+        json_body=_fields(
+            payload,
+            (
+                "email",
+                "username",
+                "firstName",
+                "lastName",
+                "requireTotp",
+                "settingsTemplate",
+                "groups",
+            ),
+        ),
     )
 
 
@@ -196,4 +231,143 @@ async def set_password_policy(
         f"/v1/tenants/{_tenant(settings, tenant)}/actions/set-password-policy",
         bearer_of(credentials),
         json_body={"passwordPolicy": payload.get("passwordPolicy")},
+    )
+
+
+# Editing somebody, and the groups and templates the member screens use. Each
+# is the director's action of the same name; the fields relayed are listed so
+# nothing else a caller sends travels on.
+
+
+@router.post("/people/update")
+async def update_person(
+    payload: dict = Body(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Names, delivery address, and whether they may sign in."""
+    return await _action(
+        settings,
+        tenant,
+        credentials,
+        "update-person",
+        _fields(payload, ("person", "firstName", "lastName", "enabled", "email")),
+    )
+
+
+@router.post("/people/remove")
+async def remove_person(
+    payload: dict = Body(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Remove somebody. The director refuses it for the caller themselves."""
+    return await _action(
+        settings, tenant, credentials, "remove-person", _fields(payload, ("person",))
+    )
+
+
+@router.post("/people/reset-password")
+async def reset_password(
+    payload: dict = Body(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Mail somebody a link to set a new password."""
+    return await _action(
+        settings, tenant, credentials, "send-password-reset", _fields(payload, ("person",))
+    )
+
+
+@router.post("/people/require-totp")
+async def require_totp(
+    payload: dict = Body(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Require an authenticator at the next sign-in; `mail` sends the link now."""
+    return await _action(
+        settings, tenant, credentials, "require-totp", _fields(payload, ("person", "mail"))
+    )
+
+
+@router.post("/people/remove-totp")
+async def remove_totp(
+    payload: dict = Body(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Delete somebody's authenticators, for a lost device."""
+    return await _action(
+        settings, tenant, credentials, "remove-totp", _fields(payload, ("person",))
+    )
+
+
+@router.post("/groups/create")
+async def create_group(
+    payload: dict = Body(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Make a custom group; the director places it in the tenant's subtree."""
+    return await _action(settings, tenant, credentials, "create-group", _fields(payload, ("name",)))
+
+
+@router.post("/groups/delete")
+async def delete_group(
+    payload: dict = Body(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Delete a custom group. The platform's own groups are refused."""
+    return await _action(
+        settings, tenant, credentials, "delete-group", _fields(payload, ("group",))
+    )
+
+
+@router.get("/groups/members")
+async def group_members(
+    group: str = Query(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Who is in one group."""
+    return await director.forward(
+        settings,
+        "GET",
+        f"/v1/tenants/{_tenant(settings, tenant)}/group-members",
+        bearer_of(credentials),
+        params={"group": group},
+    )
+
+
+@router.get("/templates")
+async def templates(
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """The desktop's settings templates an invitation may apply."""
+    return await director.forward(
+        settings,
+        "GET",
+        f"/v1/tenants/{_tenant(settings, tenant)}/templates",
+        bearer_of(credentials),
     )
