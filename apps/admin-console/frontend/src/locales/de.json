@@ -319,7 +319,15 @@
     "unsatisfied_one": "{{count}} erforderliche Zugangsberechtigung ist noch nicht hinterlegt.",
     "unsatisfied_other": "{{count}} erforderliche Zugangsberechtigungen sind noch nicht hinterlegt.",
     "valuesAreWriteOnlyThis": "Werte sind nur schreibbar. Hier steht, ob eine Zugangsberechtigung vorhanden ist, wer sie gesetzt hat und wann — nie der Wert selbst. Eine verlorene Zugangsberechtigung wird ausgetauscht, nicht wiederhergestellt.",
-    "whereYourAppsComeFrom": "Woher Ihre Apps kommen. Die Repositories des Clusters werden aufgeführt, sind aber nicht bearbeitbar — Ihre Apps hängen davon ab."
+    "whereYourAppsComeFrom": "Woher Ihre Apps kommen. Die Repositories des Clusters werden aufgeführt, sind aber nicht bearbeitbar — Ihre Apps hängen davon ab.",
+    "providerPlatform": "Plattform",
+    "provider_aws": "AWS",
+    "provider_azure": "Azure",
+    "provider_cloudflare": "Cloudflare",
+    "provider_google": "Google Cloud",
+    "provider_hetzner": "Hetzner",
+    "provider_infomaniak": "Infomaniak",
+    "provider_rfc2136": "RFC 2136"
   },
   "customizationDebt": {
     "aCheaperRungIsNow": "Eine günstigere Stufe ist inzwischen verfügbar",

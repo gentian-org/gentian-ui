@@ -7,6 +7,8 @@ export type CredentialStatus = {
   phase: string;
   scope: string;
   tenant?: string;
+  /** Who issues the credential (cloudflare, infomaniak, aws...); absent for the platform's own. */
+  provider?: string;
   optional: boolean;
   vaultPath: string;
   fields: CredentialField[];

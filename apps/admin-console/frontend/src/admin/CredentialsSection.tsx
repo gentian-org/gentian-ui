@@ -31,6 +31,22 @@ import { Trans, useTranslation } from "react-i18next";
  *   rules in two places, and the copy in the browser is the one an operator can
  *   skip.
  */
+/**
+ * One vendor's credentials together -- Infomaniak's DNS token beside its AI
+ * token, Cloudflare's DNS token beside its tunnel token -- with the platform's
+ * own (no provider) first. Within a group, by the name a person reads.
+ */
+export function groupByProvider(credentials: CredentialStatus[]): [string, CredentialStatus[]][] {
+  const groups = new Map<string, CredentialStatus[]>();
+  for (const c of credentials) {
+    const key = c.provider ?? "";
+    groups.set(key, [...(groups.get(key) ?? []), c]);
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)))
+    .map(([k, list]) => [k, [...list].sort((x, y) => x.displayName.localeCompare(y.displayName))]);
+}
+
 export function CredentialsSection() {
   const { t } = useTranslation();
 
@@ -98,17 +114,26 @@ export function CredentialsSection() {
       {credentials.length === 0 ? (
         <p className="admin-console__empty">{t("credentials.noCredentialsAreDeclaredFor")}</p>
       ) : (
-        <ul className="admin-console__cards">
-          {credentials.map((credential) => (
-            <CredentialCard
-              key={credential.name}
-              credential={credential}
-              onSaved={() =>
-                void queryClient.invalidateQueries({ queryKey: ["admin", "credentials"] })
-              }
-            />
-          ))}
-        </ul>
+        groupByProvider(credentials).map(([provider, group]) => (
+          <div key={provider || "platform"} className="admin-console__group">
+            <h3 className="admin-console__group-title">
+              {provider
+                ? t(`credentials.provider_${provider}`, { defaultValue: provider })
+                : t("credentials.providerPlatform")}
+            </h3>
+            <ul className="admin-console__cards">
+              {group.map((credential) => (
+                <CredentialCard
+                  key={credential.name}
+                  credential={credential}
+                  onSaved={() =>
+                    void queryClient.invalidateQueries({ queryKey: ["admin", "credentials"] })
+                  }
+                />
+              ))}
+            </ul>
+          </div>
+        ))
       )}
 
       <RepositoriesPanel

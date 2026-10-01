@@ -319,7 +319,15 @@
     "unsatisfied_one": "{{count}} required credential is not yet supplied.",
     "unsatisfied_other": "{{count}} required credentials are not yet supplied.",
     "valuesAreWriteOnlyThis": "Values are write-only. This shows whether a credential is present, who set it and when — never the value itself. A lost credential is rotated, not recovered.",
-    "whereYourAppsComeFrom": "Where your apps come from. The cluster's own repositories are listed but not editable — your apps depend on them."
+    "whereYourAppsComeFrom": "Where your apps come from. The cluster's own repositories are listed but not editable — your apps depend on them.",
+    "providerPlatform": "Platform",
+    "provider_aws": "AWS",
+    "provider_azure": "Azure",
+    "provider_cloudflare": "Cloudflare",
+    "provider_google": "Google Cloud",
+    "provider_hetzner": "Hetzner",
+    "provider_infomaniak": "Infomaniak",
+    "provider_rfc2136": "RFC 2136"
   },
   "customizationDebt": {
     "aCheaperRungIsNow": "A cheaper rung is now available",
