@@ -331,6 +331,18 @@ export function ExportSection({ tenant }: BackupSectionProps) {
 
               <div className="admin-console__card-aside admin-console__card-aside--top admin-console__hint">
                 {formatTime(backup.completedAt ?? backup.startedAt ?? backup.createdAt)}
+                {backup.phase === "Ready" && (
+                  // A plain link, not a fetch: the bundle can be gigabytes and
+                  // the browser's own download handles that; the session
+                  // cookie the edge set is what authorises it.
+                  <a
+                    className="admin-console__btn admin-console__btn--primary"
+                    href={`/api/v1/admin/backups/${encodeURIComponent(backup.name)}/download?tenant=${encodeURIComponent(tenant)}`}
+                    download={`${tenant}-${backup.name}.gentian`}
+                  >
+                    {t("export.download")}
+                  </a>
+                )}
                 <button
                   type="button"
                   className="admin-console__btn admin-console__btn--danger"

@@ -17,6 +17,7 @@ cluster's own storage, and lists what is there.
 """
 
 from fastapi import APIRouter, Depends, Query, Response
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core import director
@@ -56,6 +57,24 @@ async def backup(
         settings,
         "GET",
         f"/v1/tenants/{_tenant(settings, tenant)}/backups/{name}",
+        bearer_of(credentials),
+    )
+
+
+@router.get("/backups/{name}/download")
+async def download_backup(
+    name: str,
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> StreamingResponse:
+    """The bundle as one file, streamed through from the director. Not a
+    signed URL: the person's own session is what opens it, so it can be
+    revoked like anything else they may do here."""
+    return await director.stream(
+        settings,
+        f"/v1/tenants/{_tenant(settings, tenant)}/backups/{name}/download",
         bearer_of(credentials),
     )
 

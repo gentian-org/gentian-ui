@@ -679,6 +679,7 @@
     "opsRecovery": "Recovery and restore drills, one click each",
     "opsOpen": "Open the Operations Console",
     "opsInstalling": "The Operations Console is being installed ({{phase}}).",
-    "opsInstall": "Install 'operations-console' from the App Store to get them."
+    "opsInstall": "Install 'operations-console' from the App Store to get them.",
+    "download": "Download"
   }
 }

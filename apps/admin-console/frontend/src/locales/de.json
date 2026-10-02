@@ -679,6 +679,7 @@
     "opsRecovery": "Wiederherstellung und Übungen, je ein Klick",
     "opsOpen": "Betriebskonsole öffnen",
     "opsInstalling": "Die Betriebskonsole wird installiert ({{phase}}).",
-    "opsInstall": "Installieren Sie »operations-console« aus dem App Store."
+    "opsInstall": "Installieren Sie »operations-console« aus dem App Store.",
+    "download": "Herunterladen"
   }
 }

@@ -25,6 +25,7 @@ import json
 
 import httpx
 from fastapi import HTTPException, Response
+from fastapi.responses import StreamingResponse
 
 from app.core.config import Settings
 
@@ -73,6 +74,44 @@ async def forward(
         content=upstream.content,
         status_code=upstream.status_code,
         media_type=upstream.headers.get("content-type", "application/json"),
+    )
+
+
+async def stream(settings: Settings, path: str, token: str) -> StreamingResponse:
+    """Pass one GET to the director and stream its body through unchanged.
+
+    For a bundle download: the body can be gigabytes, so it is neither read
+    into memory nor given the ordinary timeout. The director's status and
+    the headers that name the file travel with it; a refusal arrives as the
+    director's JSON, with its status.
+    """
+    url = f"{base_url(settings)}{path}"
+    client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=None))
+    try:
+        request = client.build_request("GET", url, headers={"Authorization": f"Bearer {token}"})
+        upstream = await client.send(request, stream=True)
+    except httpx.RequestError as exc:
+        await client.aclose()
+        raise HTTPException(status_code=502, detail=f"The director is unreachable: {exc}") from exc
+
+    async def body():
+        try:
+            async for chunk in upstream.aiter_raw():
+                yield chunk
+        finally:
+            await upstream.aclose()
+            await client.aclose()
+
+    headers = {
+        k: v
+        for k, v in upstream.headers.items()
+        if k.lower() in ("content-disposition", "content-length")
+    }
+    return StreamingResponse(
+        body(),
+        status_code=upstream.status_code,
+        media_type=upstream.headers.get("content-type", "application/octet-stream"),
+        headers=headers,
     )
 
 
