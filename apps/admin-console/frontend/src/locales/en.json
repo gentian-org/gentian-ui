@@ -681,5 +681,23 @@
     "opsInstalling": "The Operations Console is being installed ({{phase}}).",
     "opsInstall": "Install 'operations-console' from the App Store to get them.",
     "download": "Download"
+  },
+  "import": {
+    "title": "Import a tenant from a bundle",
+    "lead": "The way back for an export, on this cluster or another: the tenant is declared from the bundle's own manifest, provisioned, and the data restored into it.",
+    "file": "Bundle (.gentian)",
+    "key": "Key",
+    "keyHint": "The passphrase the export was taken with, or the age identity (AGE-SECRET-KEY-…) that opens it. It is kept only as long as the restore runs.",
+    "name": "Name",
+    "nameHint": "Optional. The bundle names the tenant it came from; give another name to bring it up beside the original.",
+    "start": "Import",
+    "uploading": "Uploading…",
+    "chooseFile": "Choose a .gentian file first.",
+    "phase_declared": "<mono>{{tenant}}</mono> is committed; the operator provisions it next.",
+    "phase_provisioning": "<mono>{{tenant}}</mono>: {{message}}",
+    "phase_restoring": "<mono>{{tenant}}</mono>: restoring the bundle.",
+    "phase_ready": "<mono>{{tenant}}</mono> is imported.",
+    "phase_failed": "Import of <mono>{{tenant}}</mono> failed: {{message}}",
+    "passwordReset": "Members have no credentials yet: send them a password reset, and activate the administrator from the list above."
   }
 }

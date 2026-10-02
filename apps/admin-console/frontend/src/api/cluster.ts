@@ -141,3 +141,35 @@ export function activateTenantAdmin(tenant: string, recoveryEmail?: string) {
     body: JSON.stringify(recoveryEmail ? { recoveryEmail } : {}),
   });
 }
+
+/** Where an uploaded bundle went. */
+export type BundleRef = { bucket: string; prefix: string; endpoint?: string; region?: string };
+
+export async function uploadBundle(file: File): Promise<BundleRef> {
+  const body = await apiFetch<{ bundle: BundleRef }>("/cluster/bundles", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-tar" },
+    body: file,
+  });
+  return body.bundle;
+}
+
+export type ImportStatus = {
+  tenant: string;
+  phase: "declared" | "provisioning" | "restoring" | "ready" | "failed";
+  message?: string;
+  commit?: string;
+  restore?: string;
+  passwordResetRequired?: boolean;
+};
+
+export function importTenant(bundle: BundleRef, decryption: { passphrase?: string; identity?: string }, name?: string) {
+  return apiFetch<ImportStatus>("/cluster/tenants/import", {
+    method: "POST",
+    body: JSON.stringify({ bundle, decryption, ...(name ? { name } : {}) }),
+  });
+}
+
+export function fetchImportStatus(tenant: string) {
+  return apiFetch<ImportStatus>(`/cluster/tenants/${encodeURIComponent(tenant)}/import`);
+}

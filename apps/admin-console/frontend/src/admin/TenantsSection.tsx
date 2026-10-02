@@ -8,6 +8,7 @@ import {
 } from "@/api/cluster";
 import { AdminActivationPanel } from "./AdminActivationPanel";
 import { RetireTenantDialog, type RetireMode } from "./RetireTenantDialog";
+import { ImportTenantCard } from "./ImportTenantCard";
 import "./admin.css";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -270,6 +271,8 @@ export function TenantsSection() {
           </div>
         </form>
       </div>
+
+      <ImportTenantCard />
     </section>
   );
 }

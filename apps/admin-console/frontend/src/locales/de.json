@@ -681,5 +681,23 @@
     "opsInstalling": "Die Betriebskonsole wird installiert ({{phase}}).",
     "opsInstall": "Installieren Sie »operations-console« aus dem App Store.",
     "download": "Herunterladen"
+  },
+  "import": {
+    "title": "Mandant aus einem Bundle importieren",
+    "lead": "Der Weg zurück für einen Export, auf diesem oder einem anderen Cluster: Der Mandant wird aus dem Manifest des Bundles angelegt, bereitgestellt und die Daten darin wiederhergestellt.",
+    "file": "Bundle (.gentian)",
+    "key": "Schlüssel",
+    "keyHint": "Die Passphrase des Exports oder die age-Identität (AGE-SECRET-KEY-…), die ihn öffnet. Sie wird nur so lange aufbewahrt, wie die Wiederherstellung läuft.",
+    "name": "Name",
+    "nameHint": "Optional. Das Bundle nennt den Mandanten, von dem es stammt; ein anderer Name bringt ihn neben dem Original hoch.",
+    "start": "Importieren",
+    "uploading": "Wird hochgeladen …",
+    "chooseFile": "Zuerst eine .gentian-Datei wählen.",
+    "phase_declared": "<mono>{{tenant}}</mono> ist committet; der Operator stellt ihn als Nächstes bereit.",
+    "phase_provisioning": "<mono>{{tenant}}</mono>: {{message}}",
+    "phase_restoring": "<mono>{{tenant}}</mono>: Bundle wird wiederhergestellt.",
+    "phase_ready": "<mono>{{tenant}}</mono> ist importiert.",
+    "phase_failed": "Import von <mono>{{tenant}}</mono> fehlgeschlagen: {{message}}",
+    "passwordReset": "Die Mitglieder haben noch keine Zugangsdaten: Senden Sie ihnen ein Passwort-Reset und aktivieren Sie den Administrator aus der Liste oben."
   }
 }

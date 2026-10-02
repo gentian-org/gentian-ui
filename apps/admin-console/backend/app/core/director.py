@@ -115,6 +115,29 @@ async def stream(settings: Settings, path: str, token: str) -> StreamingResponse
     )
 
 
+async def forward_stream(
+    settings: Settings, method: str, path: str, token: str, body, content_type: str
+) -> Response:
+    """Pass one request whose body is streamed through unread -- a bundle
+    upload -- and hand back the director's answer verbatim."""
+    url = f"{base_url(settings)}{path}"
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, write=None, read=None)) as client:
+            upstream = await client.request(
+                method,
+                url,
+                content=body,
+                headers={"Authorization": f"Bearer {token}", "Content-Type": content_type},
+            )
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=f"The director is unreachable: {exc}") from exc
+    return Response(
+        content=upstream.content,
+        status_code=upstream.status_code,
+        media_type=upstream.headers.get("content-type", "application/json"),
+    )
+
+
 def unwrapped(answer: Response, key: str) -> Response:
     """Hand back one field of the director's answer as the screen reads it.
 

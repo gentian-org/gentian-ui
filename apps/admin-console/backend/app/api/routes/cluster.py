@@ -7,7 +7,7 @@ a setting or open a console is the director's answer, read from the
 authorization graph, and a refusal comes back as the refusal it is.
 """
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core import director
@@ -127,6 +127,60 @@ async def purge_cluster_tenant(
         _cluster_path(settings, f"/tenants/{tenant}/actions/purge"),
         bearer_of(credentials),
         json_body=payload,
+    )
+
+
+@router.post("/bundles")
+async def upload_bundle(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """A .gentian file, streamed through to the director as it arrives: a
+    bundle can be gigabytes, and nothing here needs to see inside it."""
+    return await director.forward_stream(
+        settings,
+        "POST",
+        _cluster_path(settings, "/bundles"),
+        bearer_of(credentials),
+        request.stream(),
+        request.headers.get("content-type", "application/x-tar"),
+    )
+
+
+@router.post("/tenants/import")
+async def import_tenant(
+    body: dict,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Create plus Restore from a bundle. The director reads the manifest
+    with the key given, declares the tenant from it and restores once the
+    operator has provisioned the shells; the status route follows it."""
+    payload = {k: body[k] for k in ("bundle", "decryption", "name") if k in body}
+    return await director.forward(
+        settings,
+        "POST",
+        _cluster_path(settings, "/tenants/import"),
+        bearer_of(credentials),
+        json_body=payload,
+    )
+
+
+@router.get("/tenants/{tenant}/import")
+async def import_status(
+    tenant: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    return await director.forward(
+        settings,
+        "GET",
+        _cluster_path(settings, f"/tenants/{tenant}/import"),
+        bearer_of(credentials),
     )
 
 
