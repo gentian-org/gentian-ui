@@ -89,10 +89,11 @@ export function fetchClusterTenants() {
 export async function createClusterTenant(
   name: string,
   displayName: string,
+  requireMFA = true,
 ): Promise<ClusterSettingsWriteResult> {
   const body = await apiFetch<{ status: string; commit?: string }>("/cluster/tenants", {
     method: "POST",
-    body: JSON.stringify({ name, displayName }),
+    body: JSON.stringify({ name, displayName, requireMFA }),
   });
   return { ...body, changed: Boolean(body.commit) };
 }
@@ -103,4 +104,25 @@ export async function retireClusterTenant(name: string): Promise<ClusterSettings
     { method: "DELETE" },
   );
   return { ...body, changed: Boolean(body.commit) };
+}
+
+/** How an administrator account was handed over: mailed, or a link to show once. */
+export type AdminActivation = {
+  tenant: string;
+  username: string;
+  activation: {
+    mailed: boolean;
+    email?: string;
+    link?: string;
+    /** Seconds since the epoch. */
+    expiresAt?: number;
+    actions: string[];
+  };
+};
+
+export function activateTenantAdmin(tenant: string, recoveryEmail?: string) {
+  return apiFetch<AdminActivation>(`/cluster/tenants/${encodeURIComponent(tenant)}/activate-admin`, {
+    method: "POST",
+    body: JSON.stringify(recoveryEmail ? { recoveryEmail } : {}),
+  });
 }

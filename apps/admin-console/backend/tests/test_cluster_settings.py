@@ -173,3 +173,36 @@ def test_no_token_is_refused_before_anything_is_forwarded():
     client = TestClient(_app(_settings()))
     r = client.get("/api/v1/cluster/settings")
     assert r.status_code == 401
+
+
+def test_activating_an_administrator_relays_only_the_recovery_address(monkeypatch):
+    seen: dict = {}
+    _fake_client(
+        monkeypatch,
+        lambda m, url: httpx.Response(
+            200,
+            json={
+                "tenant": "acme",
+                "username": "admin@acme.k",
+                "activation": {"mailed": False, "link": "x"},
+            },
+            request=httpx.Request(m, url),
+        ),
+        seen,
+    )
+    client = TestClient(_app(_settings()))
+    r = client.post(
+        "/api/v1/cluster/tenants/acme/activate-admin",
+        json={"recoveryEmail": "owner@example.org", "smuggled": True},
+        headers={"Authorization": "Bearer person-token"},
+    )
+    assert r.status_code == 200
+    assert seen["url"].endswith("/v1/clusters/demo/tenants/acme/actions/activate-admin")
+    assert seen["json"] == {"recoveryEmail": "owner@example.org"}
+
+    r = client.post(
+        "/api/v1/cluster/tenants/acme/activate-admin",
+        headers={"Authorization": "Bearer person-token"},
+    )
+    assert r.status_code == 200
+    assert seen["json"] == {}

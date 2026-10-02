@@ -105,6 +105,32 @@ async def retire_cluster_tenant(
     )
 
 
+@router.post("/tenants/{tenant}/activate-admin")
+async def activate_tenant_admin(
+    tenant: str,
+    body: dict | None = None,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Hand a tenant's administrator account to its holder.
+
+    The account has no password. The director issues a single-use link that
+    sets one (and a second factor unless the tenant opts out): mailed to the
+    recovery address when one is given, otherwise returned to show once.
+    """
+    payload = {}
+    if body and body.get("recoveryEmail"):
+        payload["recoveryEmail"] = body["recoveryEmail"]
+    return await director.forward(
+        settings,
+        "POST",
+        _cluster_path(settings, f"/tenants/{tenant}/actions/activate-admin"),
+        bearer_of(credentials),
+        json_body=payload,
+    )
+
+
 @router.get("/tiles")
 async def cluster_tiles(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),

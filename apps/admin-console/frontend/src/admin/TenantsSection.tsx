@@ -5,6 +5,7 @@ import {
   fetchClusterTenants,
   retireClusterTenant,
 } from "@/api/cluster";
+import { AdminActivationPanel } from "./AdminActivationPanel";
 import "./admin.css";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -32,6 +33,11 @@ export function TenantsSection() {
   });
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [requireMFA, setRequireMFA] = useState(true);
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  // The administrator account being handed over: right after creating a
+  // tenant (waiting out its provisioning), or for an existing one on request.
+  const [activating, setActivating] = useState<{ tenant: string; email: string; auto: boolean } | null>(null);
   const [lastCommit, setLastCommit] = useState<string | null>(null);
   // Retiring is not undoable from here, so it asks once, naming the tenant.
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -39,10 +45,13 @@ export function TenantsSection() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["cluster", "tenants"] });
 
   const createMutation = useMutation({
-    mutationFn: () => createClusterTenant(name.trim(), displayName.trim()),
+    mutationFn: () => createClusterTenant(name.trim(), displayName.trim(), requireMFA),
     onSuccess: (result) => {
+      setActivating({ tenant: name.trim(), email: recoveryEmail.trim(), auto: true });
       setName("");
       setDisplayName("");
+      setRecoveryEmail("");
+      setRequireMFA(true);
       setLastCommit(result.commit ?? null);
       void invalidate();
     },
@@ -103,6 +112,16 @@ export function TenantsSection() {
         </p>
       ) : null}
 
+      {activating && (
+        <AdminActivationPanel
+          key={activating.tenant}
+          tenant={activating.tenant}
+          initialEmail={activating.email}
+          auto={activating.auto}
+          onClose={() => setActivating(null)}
+        />
+      )}
+
       <div className="admin-console__table-wrap">
         <table className="admin-console__table">
           <thead>
@@ -131,37 +150,46 @@ export function TenantsSection() {
                 <td className="admin-console__mono">{tenant.realm ?? "—"}</td>
                 <td>{tenant.apps.length === 0 ? "—" : tenant.apps.join(", ")}</td>
                 <td>
-                  {tenant.protected ? (
-                    <span
-                      className="admin-console__badge admin-console__badge--info"
-                      title={t("tenants.thisTenantCarriesTheRealm")}
-                    >
-                      {t("tenants.protected")}</span>
-                  ) : confirming === tenant.name ? (
-                    <span className="admin-console__actions">
-                      <button
-                        type="button"
-                        className="admin-console__btn admin-console__btn--danger-solid"
-                        disabled={retireMutation.isPending}
-                        onClick={() => retireMutation.mutate(tenant.name)}
-                      >
-                        {t("tenants.retire")}{tenant.name}
-                      </button>
-                      <button
-                        type="button"
-                        className="admin-console__btn admin-console__btn--quiet"
-                        onClick={() => setConfirming(null)}
-                      >
-                        {t("tenants.cancel")}</button>
-                    </span>
-                  ) : (
+                  <span className="admin-console__actions">
                     <button
                       type="button"
-                      className="admin-console__btn admin-console__btn--danger"
-                      onClick={() => setConfirming(tenant.name)}
+                      className="admin-console__btn admin-console__btn--quiet"
+                      onClick={() => setActivating({ tenant: tenant.name, email: "", auto: false })}
                     >
-                      {t("tenants.retire2")}</button>
-                  )}
+                      {t("tenants.activateAdmin")}
+                    </button>
+                    {tenant.protected ? (
+                      <span
+                        className="admin-console__badge admin-console__badge--info"
+                        title={t("tenants.thisTenantCarriesTheRealm")}
+                      >
+                        {t("tenants.protected")}</span>
+                    ) : confirming === tenant.name ? (
+                      <span className="admin-console__actions">
+                        <button
+                          type="button"
+                          className="admin-console__btn admin-console__btn--danger-solid"
+                          disabled={retireMutation.isPending}
+                          onClick={() => retireMutation.mutate(tenant.name)}
+                        >
+                          {t("tenants.retire")}{tenant.name}
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-console__btn admin-console__btn--quiet"
+                          onClick={() => setConfirming(null)}
+                        >
+                          {t("tenants.cancel")}</button>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="admin-console__btn admin-console__btn--danger"
+                        onClick={() => setConfirming(tenant.name)}
+                      >
+                        {t("tenants.retire2")}</button>
+                    )}
+                  </span>
                 </td>
               </tr>
             ))}
@@ -217,6 +245,24 @@ export function TenantsSection() {
             <p className="admin-console__hint">
               {t("tenants.whatPeopleCallThisCustomer")}</p>
           </div>
+          <div className="admin-console__field">
+            <label className="admin-console__label" htmlFor="tenant-admin-email">
+              <span className="admin-console__label-text">{t("tenants.recoveryEmail")}</span>
+              <input
+                id="tenant-admin-email"
+                type="email"
+                value={recoveryEmail}
+                autoComplete="off"
+                placeholder={t("tenants.recoveryEmailPlaceholder")}
+                onChange={(event) => setRecoveryEmail(event.target.value)}
+              />
+            </label>
+            <p className="admin-console__hint">{t("tenants.recoveryEmailHint")}</p>
+          </div>
+          <label className="admin-console__checkbox">
+            <input type="checkbox" checked={requireMFA} onChange={(e) => setRequireMFA(e.target.checked)} />
+            <span>{t("tenants.requireMFA")}</span>
+          </label>
           <div className="admin-console__form-footer">
             <button
               type="submit"
