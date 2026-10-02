@@ -251,6 +251,11 @@ def test_member_actions_reach_their_director_actions(monkeypatch):
         ("/api/v1/admin/people/remove-totp", "remove-totp", {"person": "u1"}),
         ("/api/v1/admin/groups/create", "create-group", {"name": "sales"}),
         ("/api/v1/admin/groups/delete", "delete-group", {"group": "gentian:tenant:x:sales"}),
+        (
+            "/api/v1/admin/groups/rename",
+            "rename-group",
+            {"group": "gentian:tenant:x:sales", "name": "field"},
+        ),
     ]:
         seen: dict = {}
         _fake_client(monkeypatch, {}, seen)

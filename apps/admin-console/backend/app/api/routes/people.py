@@ -339,6 +339,20 @@ async def delete_group(
     )
 
 
+@router.post("/groups/rename")
+async def rename_group(
+    payload: dict = Body(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Rename a custom group. The platform's own groups keep their names."""
+    return await _action(
+        settings, tenant, credentials, "rename-group", _fields(payload, ("group", "name"))
+    )
+
+
 @router.get("/groups/members")
 async def group_members(
     group: str = Query(...),

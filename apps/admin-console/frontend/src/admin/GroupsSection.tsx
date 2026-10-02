@@ -5,8 +5,12 @@ import {
   createCustomGroup,
   deleteCustomGroup,
   fetchGroupMembers,
+  fetchPeople,
   fetchPersonGroups,
+  renameCustomGroup,
+  setMembership,
 } from "@/api/admin";
+import { Checklist } from "./Checklist";
 import { GROUP_KINDS, describeGroups, type DescribedGroup } from "./groupLabels";
 import "./admin.css";
 
@@ -14,10 +18,10 @@ import "./admin.css";
  * The tenant's groups: the ones the platform composes -- an app's entitlement,
  * the tenant's administrators -- and the ones an administrator makes here.
  *
- * Membership is changed from a member's own page; this one says who is in a
- * group, and makes and removes custom groups. A group the platform composed is
- * not deleted from here: it goes with the app or the tenant it belongs to, and
- * deleting it would only have it made again, empty.
+ * Every group can be opened to choose who is in it. A custom group can also be
+ * renamed and deleted; the platform's own keep their names and go with the app
+ * or tenant they belong to, because other things find them by name and
+ * deleting one would only have it made again, empty.
  */
 export function GroupsSection({ tenant }: { tenant: string }) {
   const { t } = useTranslation();
@@ -33,7 +37,7 @@ export function GroupsSection({ tenant }: { tenant: string }) {
     () => describeGroups(groupsQuery.data?.groups ?? [], tenant),
     [groupsQuery.data, tenant],
   );
-  const refresh = () => void queryClient.invalidateQueries({ queryKey: ["admin", "people", "groups"] });
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: ["admin", "people"] });
 
   const create = useMutation({
     mutationFn: () => createCustomGroup(name.trim()),
@@ -42,16 +46,16 @@ export function GroupsSection({ tenant }: { tenant: string }) {
       refresh();
     },
   });
-  const remove = useMutation({
-    mutationFn: (path: string) => deleteCustomGroup(path),
-    onSuccess: refresh,
-  });
 
   if (groupsQuery.isLoading) {
     return <p className="admin-console__loading">{t("groups.loading")}</p>;
   }
   if (groupsQuery.isError) {
-    return <p className="admin-console__error">{t("groups.cannotBeRead")} {String(groupsQuery.error)}</p>;
+    return (
+      <p className="admin-console__error">
+        {t("groups.cannotBeRead")} {String(groupsQuery.error)}
+      </p>
+    );
   }
 
   return (
@@ -63,69 +67,77 @@ export function GroupsSection({ tenant }: { tenant: string }) {
         </div>
       </header>
 
-      <div className="admin-console__card">
-        <form
-          className="admin-console__card-main"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (name.trim()) create.mutate();
-          }}
-        >
-          <h3 className="admin-console__card-title">{t("groups.createTitle")}</h3>
-          <p className="admin-console__card-desc">{t("groups.createLead")}</p>
-          <div className="admin-console__field-row">
-            <div className="admin-console__field">
-              <label htmlFor="group-name">{t("groups.name")}</label>
-              <input
-                id="group-name"
-                value={name}
-                placeholder={t("groups.namePlaceholder")}
-                onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-              />
+      <div className="admin-console__cards">
+        <div className="admin-console__card">
+          <form
+            className="admin-console__card-main admin-console__form-grid"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (name.trim()) create.mutate();
+            }}
+          >
+            <h3 className="admin-console__card-title">{t("groups.createTitle")}</h3>
+            <p className="admin-console__card-desc">{t("groups.createLead")}</p>
+            <div className="admin-console__field-row">
+              <div className="admin-console__field">
+                <label htmlFor="group-name">{t("groups.name")}</label>
+                <input
+                  id="group-name"
+                  value={name}
+                  placeholder={t("groups.namePlaceholder")}
+                  onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                />
+              </div>
             </div>
-          </div>
-          {create.isError && <p className="admin-console__error">{String(create.error)}</p>}
-          <div className="admin-console__form-footer">
-            <button
-              className="admin-console__btn admin-console__btn--primary"
-              type="submit"
-              disabled={!name.trim() || create.isPending}
-            >
-              {t("groups.create")}
-            </button>
-          </div>
-        </form>
+            {create.isError && <p className="admin-console__error">{String(create.error)}</p>}
+            <div className="admin-console__form-footer">
+              <button
+                className="admin-console__btn admin-console__btn--primary"
+                type="submit"
+                disabled={!name.trim() || create.isPending}
+              >
+                {t("groups.create")}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {GROUP_KINDS.map((kind) => {
+          const inKind = groups.filter((g) => g.kind === kind);
+          if (inKind.length === 0) return null;
+          return (
+            <div key={kind} className="admin-console__card">
+              <div className="admin-console__card-main">
+                <h3 className="admin-console__card-title">{t(`groupPicker.kind_${kind}`)}</h3>
+                <table className="admin-console__table">
+                  <thead>
+                    <tr>
+                      <th>{t("groups.name")}</th>
+                      <th>{t("groups.path")}</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inKind.map((g) => (
+                      <GroupRow
+                        key={g.path}
+                        group={g}
+                        open={open === g.path}
+                        onToggle={() => setOpen(open === g.path ? null : g.path)}
+                        onChanged={(renamedTo) => {
+                          if (renamedTo !== undefined) setOpen(renamedTo);
+                          refresh();
+                        }}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+        {groups.length === 0 && <p className="admin-console__empty">{t("groups.none")}</p>}
       </div>
-
-      {remove.isError && <p className="admin-console__error">{String(remove.error)}</p>}
-
-      {GROUP_KINDS.map((kind) => {
-        const inKind = groups.filter((g) => g.kind === kind);
-        if (inKind.length === 0) return null;
-        return (
-          <div key={kind} className="admin-console__card">
-            <div className="admin-console__card-main">
-              <h3 className="admin-console__card-title">{t(`groupPicker.kind_${kind}`)}</h3>
-              <table className="admin-console__table">
-                <tbody>
-                  {inKind.map((g) => (
-                    <GroupRow
-                      key={g.path}
-                      group={g}
-                      open={open === g.path}
-                      onToggle={() => setOpen(open === g.path ? null : g.path)}
-                      onDelete={() => {
-                        if (window.confirm(t("groups.deleteConfirm", { name: g.label }))) remove.mutate(g.path);
-                      }}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      })}
-      {groups.length === 0 && <p className="admin-console__empty">{t("groups.none")}</p>}
     </section>
   );
 }
@@ -134,58 +146,137 @@ function GroupRow({
   group,
   open,
   onToggle,
-  onDelete,
+  onChanged,
 }: {
   group: DescribedGroup;
   open: boolean;
   onToggle: () => void;
-  onDelete: () => void;
+  /** After a change; the new path when the group was renamed, null when deleted. */
+  onChanged: (renamedTo?: string | null) => void;
 }) {
   const { t } = useTranslation();
-  const members = useQuery({
-    queryKey: ["admin", "people", "group-members", group.path],
-    queryFn: () => fetchGroupMembers(group.path),
-    enabled: open,
-  });
-  const people = members.data?.people ?? [];
   return (
     <>
-      <tr>
+      <tr className={open ? "admin-console__row--editing" : undefined}>
         <td>{group.label}</td>
         <td className="admin-console__mono">{group.path}</td>
         <td>
-          <div className="admin-console__actions">
-            <button className="admin-console__btn admin-console__btn--quiet" type="button" onClick={onToggle}>
-              {open ? t("groups.hideMembers") : t("groups.showMembers")}
-            </button>
-            {group.custom && (
-              <button className="admin-console__btn admin-console__btn--danger" type="button" onClick={onDelete}>
-                {t("groups.delete")}
-              </button>
-            )}
-          </div>
+          <button className="admin-console__btn admin-console__btn--quiet" type="button" onClick={onToggle}>
+            {open ? t("groups.close") : t("groups.edit")}
+          </button>
         </td>
       </tr>
       {open && (
         <tr>
           <td colSpan={3}>
-            {members.isLoading ? (
-              <p className="admin-console__hint">{t("groups.readingMembers")}</p>
-            ) : people.length === 0 ? (
-              <p className="admin-console__hint">{t("groups.noMembers")}</p>
-            ) : (
-              <ul className="admin-console__stack">
-                {people.map((p) => (
-                  <li key={p.id}>
-                    <span className="admin-console__mono">{p.username}</span>
-                    {p.name ? ` — ${p.name}` : ""}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <GroupEditor group={group} onChanged={onChanged} />
           </td>
         </tr>
       )}
     </>
+  );
+}
+
+/**
+ * One group, opened: who is in it, ticked from the tenant's members, and for a
+ * custom group its name. Membership changes as each box is ticked, the same as
+ * on a member's own page.
+ */
+function GroupEditor({
+  group,
+  onChanged,
+}: {
+  group: DescribedGroup;
+  onChanged: (renamedTo?: string | null) => void;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [label, setLabel] = useState(group.label);
+
+  const people = useQuery({ queryKey: ["admin", "people", ""], queryFn: () => fetchPeople() });
+  const members = useQuery({
+    queryKey: ["admin", "people", "group-members", group.path],
+    queryFn: () => fetchGroupMembers(group.path),
+  });
+  const memberIds = new Set((members.data?.people ?? []).map((p) => p.id));
+
+  const membership = useMutation({
+    mutationFn: (v: { person: string; member: boolean }) =>
+      setMembership({ person: v.person, group: group.path, member: v.member }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "people", "group-members", group.path] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "people", "detail"] });
+    },
+  });
+  const rename = useMutation({
+    mutationFn: () => renameCustomGroup(group.path, label.trim()),
+    onSuccess: (renamed) => onChanged(renamed.path),
+  });
+  const remove = useMutation({
+    mutationFn: () => deleteCustomGroup(group.path),
+    onSuccess: () => onChanged(null),
+  });
+  const failure = [membership, rename, remove].find((m) => m.isError)?.error;
+
+  return (
+    <div className="admin-console__editor">
+      {group.custom && (
+        <div className="admin-console__field-row">
+          <div className="admin-console__field">
+            <label htmlFor={`g-name-${group.id}`}>{t("groups.name")}</label>
+            <input
+              id={`g-name-${group.id}`}
+              value={label}
+              onChange={(e) => setLabel(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+            />
+          </div>
+          <div className="admin-console__field" />
+        </div>
+      )}
+
+      <div className="admin-console__field">
+        <span>{t("groups.whoIsIn")}</span>
+        {people.isLoading || members.isLoading ? (
+          <p className="admin-console__hint">{t("groups.readingMembers")}</p>
+        ) : (
+          <Checklist
+            id={`g-members-${group.id}`}
+            items={(people.data?.people ?? []).map((p) => ({
+              key: p.id,
+              label: p.name || p.username,
+              detail: p.name ? p.username : undefined,
+            }))}
+            selected={memberIds}
+            disabled={membership.isPending}
+            onToggle={(person, member) => membership.mutate({ person, member })}
+          />
+        )}
+      </div>
+
+      {failure && <p className="admin-console__error">{String(failure)}</p>}
+
+      {group.custom && (
+        <div className="admin-console__editor-footer">
+          <button
+            className="admin-console__btn admin-console__btn--danger"
+            type="button"
+            disabled={remove.isPending}
+            onClick={() => {
+              if (window.confirm(t("groups.deleteConfirm", { name: group.label }))) remove.mutate();
+            }}
+          >
+            {t("groups.delete")}
+          </button>
+          <button
+            className="admin-console__btn admin-console__btn--primary"
+            type="button"
+            disabled={!label.trim() || label.trim() === group.label || rename.isPending}
+            onClick={() => rename.mutate()}
+          >
+            {t("groups.rename")}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

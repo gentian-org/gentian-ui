@@ -17,7 +17,7 @@
     "tabResources": "Ressourcen",
     "tabSecurity": "Sicherheit",
     "tabTenants": "Mandanten",
-    "tenant": "Mandant",
+    "tenant": "Mandant/",
     "tabMembers": "Mitglieder",
     "tabGroups": "Gruppen"
   },
@@ -623,18 +623,21 @@
     "create": "Anlegen",
     "deleteConfirm": "Die Gruppe {{name}} löschen? Ihre Mitglieder bleiben; nur die Gruppe geht.",
     "delete": "Löschen",
-    "showMembers": "Mitglieder",
-    "hideMembers": "Ausblenden",
     "readingMembers": "Wird gelesen…",
-    "noMembers": "Niemand ist in dieser Gruppe.",
-    "none": "Noch keine Gruppen."
+    "none": "Noch keine Gruppen.",
+    "path": "Gruppe",
+    "edit": "Bearbeiten",
+    "close": "Schliessen",
+    "rename": "Umbenennen",
+    "whoIsIn": "Mitglieder dieser Gruppe"
   },
   "groupPicker": {
-    "none": "Keine",
-    "filter": "Filtern",
-    "noMatch": "Keine Gruppe passt.",
     "kind_app": "Apps",
     "kind_role": "Rollen",
     "kind_custom": "Eigene Gruppen"
+  },
+  "checklist": {
+    "filter": "Filtern",
+    "empty": "Nichts passt."
   }
 }

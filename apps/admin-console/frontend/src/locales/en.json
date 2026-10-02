@@ -17,7 +17,7 @@
     "tabResources": "Resources",
     "tabSecurity": "Security",
     "tabTenants": "Tenants",
-    "tenant": "tenant",
+    "tenant": "tenant/",
     "tabMembers": "Members",
     "tabGroups": "Groups"
   },
@@ -623,18 +623,21 @@
     "create": "Create",
     "deleteConfirm": "Delete the group {{name}}? Its members stay; only the group goes.",
     "delete": "Delete",
-    "showMembers": "Members",
-    "hideMembers": "Hide",
     "readingMembers": "Reading…",
-    "noMembers": "Nobody is in this group.",
-    "none": "No groups yet."
+    "none": "No groups yet.",
+    "path": "Group",
+    "edit": "Edit",
+    "close": "Close",
+    "rename": "Rename",
+    "whoIsIn": "Members of this group"
   },
   "groupPicker": {
-    "none": "None",
-    "filter": "Filter",
-    "noMatch": "No group matches.",
     "kind_app": "Apps",
     "kind_role": "Roles",
     "kind_custom": "Custom groups"
+  },
+  "checklist": {
+    "filter": "Filter",
+    "empty": "Nothing matches."
   }
 }

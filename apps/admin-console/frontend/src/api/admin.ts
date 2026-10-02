@@ -1103,6 +1103,10 @@ export function createCustomGroup(name: string, tenant?: string) {
   return postAction<PersonGroup>("/admin/groups/create", { name }, tenant);
 }
 
+export function renameCustomGroup(group: string, name: string, tenant?: string) {
+  return postAction<PersonGroup>("/admin/groups/rename", { group, name }, tenant);
+}
+
 export function deleteCustomGroup(group: string, tenant?: string) {
   return postAction<{ deleted: boolean }>("/admin/groups/delete", { group }, tenant);
 }

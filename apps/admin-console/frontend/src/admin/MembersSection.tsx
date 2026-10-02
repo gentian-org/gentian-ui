@@ -16,7 +16,7 @@ import {
   updatePerson,
   type Person,
 } from "@/api/admin";
-import { GroupPicker } from "./GroupPicker";
+import { Checklist, type ChecklistItem } from "./Checklist";
 import { describeGroups, type DescribedGroup } from "./groupLabels";
 import "./admin.css";
 
@@ -87,54 +87,61 @@ export function MembersSection({ tenant }: { tenant: string }) {
         </div>
       </header>
 
-      <InviteCard
-        groups={groups}
-        loginDomain={settingsQuery.data?.loginDomain ?? ""}
-        templatesOffered={settingsQuery.data?.templates ?? false}
-        onInvited={refresh}
-      />
+      <div className="admin-console__cards">
+        <InviteCard
+          groups={groups}
+          loginDomain={settingsQuery.data?.loginDomain ?? ""}
+          templatesOffered={settingsQuery.data?.templates ?? false}
+          onInvited={refresh}
+        />
 
-      <div className="admin-console__card">
-        <div className="admin-console__card-main">
-          <h3 className="admin-console__card-title">
-            {t("members.count", { count: people.length })}
-            {pending > 0 && (
-              <span className="admin-console__badge">{t("members.pendingCount", { count: pending })}</span>
-            )}
-          </h3>
-          <table className="admin-console__table">
-            <thead>
-              <tr>
-                <th>{t("members.colLogin")}</th>
-                <th>{t("members.colName")}</th>
-                <th>{t("members.colState")}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {people.map((person) => (
-                <MemberRow
-                  key={person.id}
-                  person={person}
-                  groups={groups}
-                  editing={editing === person.id}
-                  onToggle={() => setEditing(editing === person.id ? null : person.id)}
-                  onChanged={refresh}
-                />
-              ))}
-              {people.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="admin-console__empty">
-                    {t(search ? "members.nobodyMatches" : "members.nobodyYet")}
-                  </td>
-                </tr>
+        <div className="admin-console__card">
+          <div className="admin-console__card-main">
+            <h3 className="admin-console__card-title">
+              {t("members.count", { count: people.length })}
+              {pending > 0 && (
+                <span className="admin-console__badge">{t("members.pendingCount", { count: pending })}</span>
               )}
-            </tbody>
-          </table>
+            </h3>
+            <table className="admin-console__table">
+              <thead>
+                <tr>
+                  <th>{t("members.colLogin")}</th>
+                  <th>{t("members.colName")}</th>
+                  <th>{t("members.colState")}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {people.map((person) => (
+                  <MemberRow
+                    key={person.id}
+                    person={person}
+                    groups={groups}
+                    editing={editing === person.id}
+                    onToggle={() => setEditing(editing === person.id ? null : person.id)}
+                    onChanged={refresh}
+                  />
+                ))}
+                {people.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="admin-console__empty">
+                      {t(search ? "members.nobodyMatches" : "members.nobodyYet")}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
   );
+}
+
+/** Groups as checklist rows, listed under what they are for. */
+function groupItems(groups: DescribedGroup[]): ChecklistItem[] {
+  return groups.map((g) => ({ key: g.path, label: g.label, section: g.kind }));
 }
 
 /** The part before the @ a person types: letters, digits, dots, dashes, underscores. */
@@ -219,7 +226,7 @@ function InviteCard({
   return (
     <div className="admin-console__card">
       <form
-        className="admin-console__card-main admin-console__form--invite"
+        className="admin-console__card-main admin-console__form-grid"
         autoComplete="off"
         onSubmit={(e) => {
           e.preventDefault();
@@ -293,31 +300,29 @@ function InviteCard({
           <p className="admin-console__hint">{t("members.inviteEmailHint")}</p>
         </div>
 
-        <div className="admin-console__field-row">
+        {templatesOffered && (
           <div className="admin-console__field">
-            <label htmlFor="inv-groups">{t("members.groups")}</label>
-            <GroupPicker
-              id="inv-groups"
-              groups={groups}
-              selected={chosen}
-              onToggle={(path, on) =>
-                setChosen(on ? [...chosen, path] : chosen.filter((p) => p !== path))
-              }
-            />
+            <label htmlFor="inv-template">{t("members.template")}</label>
+            <select id="inv-template" value={template} onChange={(e) => setTemplate(e.target.value)}>
+              <option value="">{t("members.templateNone")}</option>
+              {templates.map((tpl) => (
+                <option key={tpl.id} value={tpl.id}>
+                  {tpl.name}
+                </option>
+              ))}
+            </select>
           </div>
-          {templatesOffered && (
-            <div className="admin-console__field">
-              <label htmlFor="inv-template">{t("members.template")}</label>
-              <select id="inv-template" value={template} onChange={(e) => setTemplate(e.target.value)}>
-                <option value="">{t("members.templateNone")}</option>
-                {templates.map((tpl) => (
-                  <option key={tpl.id} value={tpl.id}>
-                    {tpl.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        )}
+
+        <div className="admin-console__field">
+          <span>{t("members.groups")}</span>
+          <Checklist
+            id="inv-groups"
+            items={groupItems(groups)}
+            selected={new Set(chosen)}
+            sectionLabel={(kind) => t(`groupPicker.kind_${kind}`)}
+            onToggle={(path, on) => setChosen(on ? [...chosen, path] : chosen.filter((p) => p !== path))}
+          />
         </div>
 
         <label className="admin-console__checkbox">
@@ -476,8 +481,7 @@ function MemberEditor({
   }
 
   return (
-    <div className="admin-console__edit-panel">
-      <div className="admin-console__edit-panel-body">
+    <div className="admin-console__editor">
         <div className="admin-console__field-row">
           <div className="admin-console__field">
             <label htmlFor={`m-first-${person.id}`}>{t("members.firstName")}</label>
@@ -506,16 +510,7 @@ function MemberEditor({
               onChange={(e) => setDraft({ ...draft, email: e.target.value })}
             />
           </div>
-          <div className="admin-console__field">
-            <label htmlFor={`m-groups-${person.id}`}>{t("members.groups")}</label>
-            <GroupPicker
-              id={`m-groups-${person.id}`}
-              groups={groups}
-              selected={p.groups ?? []}
-              disabled={membership.isPending}
-              onToggle={(group, member) => membership.mutate({ group, member })}
-            />
-          </div>
+          <div className="admin-console__field" />
         </div>
         <label className="admin-console__checkbox">
           <input
@@ -525,6 +520,18 @@ function MemberEditor({
           />
           <span>{t("members.maySignIn")}</span>
         </label>
+
+        <div className="admin-console__field">
+          <span>{t("members.groups")}</span>
+          <Checklist
+            id={`m-groups-${person.id}`}
+            items={groupItems(groups)}
+            selected={new Set(p.groups ?? [])}
+            disabled={membership.isPending}
+            sectionLabel={(kind) => t(`groupPicker.kind_${kind}`)}
+            onToggle={(group, member) => membership.mutate({ group, member })}
+          />
+        </div>
 
         <div className="admin-console__subsection">
           <h4 className="admin-console__subsection-title">{t("members.signIn")}</h4>
@@ -572,7 +579,7 @@ function MemberEditor({
         {notice && <p className="admin-console__success">{notice}</p>}
         {failure && <p className="admin-console__error">{String(failure)}</p>}
 
-        <div className="admin-console__edit-actions">
+        <div className="admin-console__editor-footer">
           <button
             className="admin-console__btn admin-console__btn--danger"
             type="button"
@@ -592,7 +599,6 @@ function MemberEditor({
             {save.isPending ? t("members.saving") : t("members.save")}
           </button>
         </div>
-      </div>
     </div>
   );
 }

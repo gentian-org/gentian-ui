@@ -1355,64 +1355,112 @@
   color: var(--gtn-ink-4);
 }
 
-/* ── Group picker: a dropdown of checkboxes ─────────────────────────────── */
-.admin-console__picker {
-  position: relative;
-}
-.admin-console__picker-button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* ── Checklist: a fixed box of checkbox rows that scrolls ───────────────── */
+/* Selectors carry two classes so they win over .admin-console__field label and
+   .admin-console__field input, which style a form's own labels and text boxes
+   and would otherwise stretch every checkbox across the row. */
+.admin-console__checklist-wrap {
+  display: grid;
   gap: 0.5rem;
+}
+.admin-console__checklist-wrap .admin-console__checklist-filter {
   width: 100%;
-  padding: 0.5rem 0.625rem;
-  border: 1px solid var(--gtn-border);
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--gtn-border-strong);
   border-radius: var(--gtn-r1);
+  font: inherit;
   background: var(--gtn-paper-3);
   color: var(--gtn-ink-1);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
-.admin-console__picker-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-.admin-console__picker-summary {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.admin-console__picker-panel {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 0.25rem);
-  left: 0;
-  right: 0;
-  min-width: 16rem;
-  padding: 0.5rem;
-  border: 1px solid var(--gtn-border);
-  border-radius: var(--gtn-r1);
-  background: var(--gtn-paper-1, var(--gtn-paper-3));
-  box-shadow: 0 8px 24px rgba(20, 21, 46, 0.12);
-}
-.admin-console__picker-filter {
-  width: 100%;
-  margin-bottom: 0.5rem;
-}
-/* Scrolls rather than grows: a tenant gains a group with every app. */
-.admin-console__picker-list {
-  max-height: 16rem;
+.admin-console__checklist-wrap .admin-console__checklist {
+  height: 14rem;
   overflow-y: auto;
+  border: 1px solid var(--gtn-border-strong);
+  border-radius: var(--gtn-r1);
+  background: var(--gtn-paper-3);
+  padding: 0.25rem 0;
 }
-.admin-console__picker-section + .admin-console__picker-section {
-  margin-top: 0.5rem;
-}
-.admin-console__picker-heading {
-  font-size: 0.75rem;
+.admin-console__checklist .admin-console__checklist-heading {
+  position: sticky;
+  top: 0;
+  padding: 0.375rem 0.75rem 0.25rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--gtn-ink-4);
-  margin: 0.25rem 0;
+  background: var(--gtn-paper-3);
+}
+.admin-console__checklist .admin-console__checklist-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--gtn-ink-1);
+  cursor: pointer;
+}
+.admin-console__checklist .admin-console__checklist-row:hover {
+  background: var(--gtn-paper-2, rgba(20, 21, 46, 0.04));
+}
+.admin-console__checklist .admin-console__checklist-row input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  flex: none;
+}
+.admin-console__checklist .admin-console__checklist-detail {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--gtn-ink-4);
+}
+.admin-console__checklist .admin-console__checklist-empty {
+  margin: 0;
+  padding: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--gtn-ink-4);
+}
+
+/* ── Members and Groups: breathing room ─────────────────────────────────── */
+/* A form inside a card, stacked with space between its parts. */
+.admin-console__form-grid {
+  display: grid;
+  gap: 1rem;
+}
+.admin-console__form-grid .admin-console__card-title {
+  margin: 0;
+}
+.admin-console__form-grid .admin-console__card-desc {
+  margin: -0.5rem 0 0;
+}
+.admin-console__form-grid .admin-console__form-footer {
+  margin-top: 0;
+}
+/* The panel a member or a group opens into. */
+.admin-console__editor {
+  display: grid;
+  gap: 1rem;
+  margin: 0.5rem 0 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-0, var(--gtn-paper-3));
+}
+.admin-console__editor .admin-console__subsection,
+.admin-console__editor .admin-console__actions {
+  margin-top: 0;
+}
+.admin-console__editor-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--gtn-border);
+}
+.admin-console__table td,
+.admin-console__table th {
+  vertical-align: middle;
 }
