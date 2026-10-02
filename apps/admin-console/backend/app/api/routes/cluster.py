@@ -105,6 +105,27 @@ async def retire_cluster_tenant(
     )
 
 
+@router.post("/tenants/{tenant}/purge")
+async def purge_cluster_tenant(
+    tenant: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Retire a tenant and delete its data.
+
+    The director commits deletionPolicy: Delete first and removes the tenant
+    once the cluster holds it, so the answer is the first commit; the tenant
+    is listed as purging until the second lands.
+    """
+    return await director.forward(
+        settings,
+        "POST",
+        _cluster_path(settings, f"/tenants/{tenant}/actions/purge"),
+        bearer_of(credentials),
+    )
+
+
 @router.post("/tenants/{tenant}/activate-admin")
 async def activate_tenant_admin(
     tenant: str,

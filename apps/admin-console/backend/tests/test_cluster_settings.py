@@ -206,3 +206,23 @@ def test_activating_an_administrator_relays_only_the_recovery_address(monkeypatc
     )
     assert r.status_code == 200
     assert seen["json"] == {}
+
+
+def test_purging_a_tenant_is_the_directors_purge_action(monkeypatch):
+    seen: dict = {}
+    _fake_client(
+        monkeypatch,
+        lambda m, url: httpx.Response(
+            202,
+            json={"status": "purge_requested", "commit": "abc"},
+            request=httpx.Request(m, url),
+        ),
+        seen,
+    )
+    client = TestClient(_app(_settings()))
+    r = client.post(
+        "/api/v1/cluster/tenants/acme/purge",
+        headers={"Authorization": "Bearer person-token"},
+    )
+    assert r.status_code == 202
+    assert seen["url"].endswith("/v1/clusters/demo/tenants/acme/actions/purge")

@@ -3,9 +3,11 @@ import { useState } from "react";
 import {
   createClusterTenant,
   fetchClusterTenants,
+  purgeClusterTenant,
   retireClusterTenant,
 } from "@/api/cluster";
 import { AdminActivationPanel } from "./AdminActivationPanel";
+import { RetireTenantDialog, type RetireMode } from "./RetireTenantDialog";
 import "./admin.css";
 import { Trans, useTranslation } from "react-i18next";
 
@@ -39,7 +41,7 @@ export function TenantsSection() {
   // tenant (waiting out its provisioning), or for an existing one on request.
   const [activating, setActivating] = useState<{ tenant: string; email: string; auto: boolean } | null>(null);
   const [lastCommit, setLastCommit] = useState<string | null>(null);
-  // Retiring is not undoable from here, so it asks once, naming the tenant.
+  // Retiring or purging asks in a dialog, behind the tenant's name typed out.
   const [confirming, setConfirming] = useState<string | null>(null);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["cluster", "tenants"] });
@@ -57,7 +59,8 @@ export function TenantsSection() {
     },
   });
   const retireMutation = useMutation({
-    mutationFn: (tenant: string) => retireClusterTenant(tenant),
+    mutationFn: ({ tenant, mode }: { tenant: string; mode: RetireMode }) =>
+      mode === "purge" ? purgeClusterTenant(tenant) : retireClusterTenant(tenant),
     onSuccess: (result) => {
       setConfirming(null);
       setLastCommit(result.commit ?? null);
@@ -106,11 +109,6 @@ export function TenantsSection() {
           {(createMutation.error as Error).message || t("tenants.couldNotCreate")}
         </p>
       ) : null}
-      {retireMutation.isError ? (
-        <p className="admin-console__error">
-          {(retireMutation.error as Error).message || t("tenants.couldNotRetire")}
-        </p>
-      ) : null}
 
       {activating && (
         <AdminActivationPanel
@@ -151,43 +149,37 @@ export function TenantsSection() {
                 <td>{tenant.apps.length === 0 ? "—" : tenant.apps.join(", ")}</td>
                 <td>
                   <span className="admin-console__actions">
-                    <button
-                      type="button"
-                      className="admin-console__btn admin-console__btn--quiet"
-                      onClick={() => setActivating({ tenant: tenant.name, email: "", auto: false })}
-                    >
-                      {t("tenants.activateAdmin")}
-                    </button>
+                    {tenant.purging ? null : (
+                      <button
+                        type="button"
+                        className="admin-console__btn admin-console__btn--quiet"
+                        onClick={() => setActivating({ tenant: tenant.name, email: "", auto: false })}
+                      >
+                        {t("tenants.activateAdmin")}
+                      </button>
+                    )}
                     {tenant.protected ? (
                       <span
                         className="admin-console__badge admin-console__badge--info"
                         title={t("tenants.thisTenantCarriesTheRealm")}
                       >
                         {t("tenants.protected")}</span>
-                    ) : confirming === tenant.name ? (
-                      <span className="admin-console__actions">
-                        <button
-                          type="button"
-                          className="admin-console__btn admin-console__btn--danger-solid"
-                          disabled={retireMutation.isPending}
-                          onClick={() => retireMutation.mutate(tenant.name)}
-                        >
-                          {t("tenants.retire")}{tenant.name}
-                        </button>
-                        <button
-                          type="button"
-                          className="admin-console__btn admin-console__btn--quiet"
-                          onClick={() => setConfirming(null)}
-                        >
-                          {t("tenants.cancel")}</button>
-                      </span>
+                    ) : tenant.purging ? (
+                      <span
+                        className="admin-console__badge admin-console__badge--warn"
+                        title={t("tenants.purgingHint")}
+                      >
+                        {t("tenants.purging")}</span>
                     ) : (
                       <button
                         type="button"
                         className="admin-console__btn admin-console__btn--danger"
-                        onClick={() => setConfirming(tenant.name)}
+                        onClick={() => {
+                          retireMutation.reset();
+                          setConfirming(tenant.name);
+                        }}
                       >
-                        {t("tenants.retire2")}</button>
+                        {t("tenants.retire")}</button>
                     )}
                   </span>
                 </td>
@@ -198,13 +190,17 @@ export function TenantsSection() {
       </div>
 
       {confirming ? (
-        <p className="admin-console__hint">
-          <Trans
-            i18nKey="tenants.retiringRemoves"
-            values={{ tenant: confirming }}
-            components={{ mono: <span className="admin-console__mono" /> }}
-          />
-        </p>
+        <RetireTenantDialog
+          tenant={confirming}
+          pending={retireMutation.isPending}
+          error={
+            retireMutation.isError
+              ? (retireMutation.error as Error).message || t("tenants.couldNotRetire")
+              : undefined
+          }
+          onConfirm={(mode) => retireMutation.mutate({ tenant: confirming, mode })}
+          onClose={() => setConfirming(null)}
+        />
       ) : null}
 
       <div className="admin-console__subsection">

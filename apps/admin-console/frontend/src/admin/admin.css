@@ -1464,3 +1464,43 @@
 .admin-console__table th {
   vertical-align: middle;
 }
+
+/* ── Dialog ─────────────────────────────────────────────────────────────── */
+
+/* A native <dialog> opened with showModal(): it holds focus and the page
+   behind it is inert, so only its own look is defined here. */
+.admin-console__dialog {
+  /* The base reset zeroes every margin; a modal dialog centres by auto. */
+  margin: auto;
+  width: min(34rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 0;
+  border: 1px solid var(--gtn-border-strong);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-1);
+  color: var(--gtn-ink-1);
+  box-shadow: var(--gtn-shadow-2);
+}
+
+.admin-console__dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+.admin-console__dialog-body {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.admin-console__dialog-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.admin-console__dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}

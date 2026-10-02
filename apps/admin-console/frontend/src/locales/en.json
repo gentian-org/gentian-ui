@@ -534,8 +534,6 @@
     "protected": "protected",
     "realm": "Realm",
     "retire": "Retire",
-    "retire2": "Retire",
-    "retiringRemoves": "Retiring removes <mono>{{tenant}}</mono> from git, and Argo CD prunes what git no longer names. Its data is kept or removed according to the tenant's own deletion policy, which defaults to keeping it.",
     "tenant": "Tenant",
     "tenants": "Tenants",
     "tenantsAreUnavailableThisNeeds": "Tenants are unavailable. This needs the cluster's audit relation, and the director has to be reachable from this console.",
@@ -557,7 +555,17 @@
     "activationLink": "Activation link",
     "copy": "Copy",
     "copied": "Copied",
-    "activationLinkHint": "Valid until {{expires}}. It sets the password; nobody else ever knows it. It is not shown again — issue a new one if it is lost."
+    "activationLinkHint": "Valid until {{expires}}. It sets the password; nobody else ever knows it. It is not shown again — issue a new one if it is lost.",
+    "dialogTitle": "Retire <mono>{{tenant}}</mono>",
+    "modeRetire": "Retire, keep its data",
+    "modeRetireBody": "The tenant leaves the cluster: its desktop and apps stop and nobody can sign in to it. Its realm, databases and files are kept (its manifest's deletion policy, Retain unless someone changed it), so adding the tenant again brings it back.",
+    "modePurge": "Purge, delete everything",
+    "modePurgeBody": "The tenant leaves the cluster and its data goes with it: the realm and every account in it, its databases, files, mail and secrets. This cannot be undone. The tenant is listed as purging until the cluster has taken the deletion in.",
+    "typeToConfirm": "Type <mono>{{tenant}}</mono> to confirm",
+    "retireTenant": "Retire tenant",
+    "purgeTenant": "Purge tenant",
+    "purging": "purging",
+    "purgingHint": "Its data is set to be deleted; the tenant is removed as soon as the cluster has taken that in."
   },
   "usage": {
     "committed": "committed",

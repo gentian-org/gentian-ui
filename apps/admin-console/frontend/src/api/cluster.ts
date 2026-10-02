@@ -75,6 +75,9 @@ export type ClusterTenant = {
   apps: string[];
   /** True for a tenant the director refuses to retire. */
   protected: boolean;
+  /** True while a purge is under way: its data is set to be deleted and the
+   * tenant goes once the cluster has taken that in. */
+  purging?: boolean;
 };
 
 export type ClusterTenantsResponse = {
@@ -102,6 +105,18 @@ export async function retireClusterTenant(name: string): Promise<ClusterSettings
   const body = await apiFetch<{ status: string; commit?: string }>(
     `/cluster/tenants/${encodeURIComponent(name)}`,
     { method: "DELETE" },
+  );
+  return { ...body, changed: Boolean(body.commit) };
+}
+
+/**
+ * Retire a tenant and delete its data. The answer is the first of two
+ * commits; the tenant is listed as purging until the second removes it.
+ */
+export async function purgeClusterTenant(name: string): Promise<ClusterSettingsWriteResult> {
+  const body = await apiFetch<{ status: string; commit?: string }>(
+    `/cluster/tenants/${encodeURIComponent(name)}/purge`,
+    { method: "POST" },
   );
   return { ...body, changed: Boolean(body.commit) };
 }

@@ -540,8 +540,6 @@
     "protected": "geschützt",
     "realm": "Realm",
     "retire": "Stilllegen",
-    "retire2": "Stilllegen",
-    "retiringRemoves": "Das Stilllegen entfernt <mono>{{tenant}}</mono> aus Git, und Argo CD räumt auf, was Git nicht mehr nennt. Die Daten bleiben erhalten oder werden gelöscht, je nach der Löschrichtlinie des Mandanten selbst, die standardmäßig auf Erhalten steht.",
     "tenant": "Mandant",
     "tenants": "Mandanten",
     "tenantsAreUnavailableThisNeeds": "Mandanten sind nicht verfügbar. Dafür wird die Audit-Relation des Clusters benötigt, und der Director muss von dieser Konsole aus erreichbar sein.",
@@ -563,7 +561,17 @@
     "activationLink": "Aktivierungslink",
     "copy": "Kopieren",
     "copied": "Kopiert",
-    "activationLinkHint": "Gültig bis {{expires}}. Er setzt das Passwort; niemand sonst kennt es. Er wird nicht noch einmal angezeigt — bei Verlust einen neuen ausstellen."
+    "activationLinkHint": "Gültig bis {{expires}}. Er setzt das Passwort; niemand sonst kennt es. Er wird nicht noch einmal angezeigt — bei Verlust einen neuen ausstellen.",
+    "dialogTitle": "<mono>{{tenant}}</mono> stilllegen",
+    "modeRetire": "Stilllegen, Daten behalten",
+    "modeRetireBody": "Der Mandant verlässt den Cluster: Desktop und Apps halten an, und niemand kann sich mehr anmelden. Realm, Datenbanken und Dateien bleiben erhalten (Löschrichtlinie im Manifest, Retain, sofern niemand sie geändert hat), sodass der Mandant zurückkehrt, wenn er wieder hinzugefügt wird.",
+    "modePurge": "Endgültig löschen",
+    "modePurgeBody": "Der Mandant verlässt den Cluster, und seine Daten gehen mit: der Realm mit allen Konten, Datenbanken, Dateien, E-Mail und Geheimnisse. Das lässt sich nicht rückgängig machen. Bis der Cluster die Löschung übernommen hat, wird der Mandant als »wird gelöscht« geführt.",
+    "typeToConfirm": "Zur Bestätigung <mono>{{tenant}}</mono> eingeben",
+    "retireTenant": "Mandant stilllegen",
+    "purgeTenant": "Mandant löschen",
+    "purging": "wird gelöscht",
+    "purgingHint": "Die Daten sind zur Löschung vorgemerkt; der Mandant wird entfernt, sobald der Cluster das übernommen hat."
   },
   "usage": {
     "committed": "zugesagt",
