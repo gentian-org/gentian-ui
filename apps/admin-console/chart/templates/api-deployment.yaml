@@ -134,11 +134,18 @@ spec:
               mountPath: {{ .Values.dropIns.mountPath | default "/etc/gentian/app/conf.d" }}
               readOnly: true
             {{- end }}
+          # Delays past the server's own start, so its first seconds are not
+          # reported as Unhealthy: a probe before the port is bound is a
+          # "connection refused" event on every rollout, and the next probe
+          # passes.
           livenessProbe:
+            initialDelaySeconds: 15
             httpGet:
               path: /healthz
               port: http
           readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 5
             httpGet:
               path: /readyz
               port: http

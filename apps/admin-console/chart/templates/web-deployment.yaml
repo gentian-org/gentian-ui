@@ -61,11 +61,18 @@ spec:
             {{- with .Values.web.securityContext }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          # Delays past the server's own start, so its first seconds are not
+          # reported as Unhealthy: a probe before the port is bound is a
+          # "connection refused" event on every rollout, and the next probe
+          # passes.
           livenessProbe:
+            initialDelaySeconds: 15
             httpGet:
               path: /
               port: http
           readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 5
             httpGet:
               path: /
               port: http
