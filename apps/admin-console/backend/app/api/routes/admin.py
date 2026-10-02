@@ -21,7 +21,7 @@ than a spinner or a fabricated empty state. The table below is the list of
 what is left; a screen leaves it by getting a real route above it.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
@@ -128,4 +128,19 @@ async def not_yet_mapped(
         status_code=501,
         detail=f"The {screen} screen is not yet a client of the director. "
         "It is being re-pointed from the desktop's backend, and until its director endpoints exist it cannot show anything.",
+    )
+
+
+@router.get("/apps/status")
+async def app_states(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What the cluster holds of this tenant's components, from the operator
+    through the director: whether each is Ready and why not. The console reads
+    it for one thing today -- whether the Operations Console is installed, so
+    the Export tab can link to it or promote it."""
+    return await director.forward(
+        settings, "GET", f"/v1/tenants/{settings.tenant_id}/apps/status", bearer_of(credentials)
     )

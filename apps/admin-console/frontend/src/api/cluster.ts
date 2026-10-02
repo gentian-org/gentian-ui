@@ -113,10 +113,10 @@ export async function retireClusterTenant(name: string): Promise<ClusterSettings
  * Retire a tenant and delete its data. The answer is the first of two
  * commits; the tenant is listed as purging until the second removes it.
  */
-export async function purgeClusterTenant(name: string): Promise<ClusterSettingsWriteResult> {
+export async function purgeClusterTenant(name: string, keepBundles = false): Promise<ClusterSettingsWriteResult> {
   const body = await apiFetch<{ status: string; commit?: string }>(
     `/cluster/tenants/${encodeURIComponent(name)}/purge`,
-    { method: "POST" },
+    { method: "POST", body: JSON.stringify(keepBundles ? { keepBundles: true } : {}) },
   );
   return { ...body, changed: Boolean(body.commit) };
 }

@@ -2,9 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { fetchAdminContext } from "@/api/admin";
 import { AuditSection } from "@/admin/AuditSection";
-import { BackupPolicySection } from "@/admin/BackupPolicySection";
-import { BackupSchedulesSection } from "@/admin/BackupSchedulesSection";
-import { BackupSection } from "@/admin/BackupSection";
+import { ExportSection } from "@/admin/ExportSection";
+import { OperationsPromo } from "@/admin/OperationsPromo";
 import { CatalogueSection } from "@/admin/CatalogueSection";
 import { CredentialsSection } from "@/admin/CredentialsSection";
 import { CustomizationDebtSection } from "@/admin/CustomizationDebtSection";
@@ -25,7 +24,7 @@ type AdminTab =
   | "members"
   | "groups"
   | "resources"
-  | "backup"
+  | "export"
   | "security"
   | "integrations"
   | "catalogue"
@@ -59,7 +58,7 @@ const TABS: { id: AdminTab; labelKey: string; platformOnly?: boolean }[] = [
   { id: "members", labelKey: "tabMembers" },
   { id: "groups", labelKey: "tabGroups" },
   { id: "resources", labelKey: "tabResources" },
-  { id: "backup", labelKey: "tabBackup" },
+  { id: "export", labelKey: "tabExport" },
   { id: "security", labelKey: "tabSecurity" },
   { id: "integrations", labelKey: "tabIntegrations" },
   // Near the end on purpose. Apps come from the App Store; this tab is the
@@ -175,11 +174,10 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <CredentialsSection />
           ) : tab === "notifications" ? (
             <NotificationsSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
-          ) : tab === "backup" ? (
+          ) : tab === "export" ? (
             <>
-              <BackupSchedulesSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
-              <BackupPolicySection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
-              <BackupSection tenant={tenant} />
+              <ExportSection tenant={tenant} />
+              <OperationsPromo />
             </>
           ) : (
             <AuditSection tenant={tenant} />

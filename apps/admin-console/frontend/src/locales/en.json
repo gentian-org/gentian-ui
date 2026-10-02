@@ -19,7 +19,8 @@
     "tabTenants": "Tenants",
     "tenant": "tenant/",
     "tabMembers": "Members",
-    "tabGroups": "Groups"
+    "tabGroups": "Groups",
+    "tabExport": "Export"
   },
   "audit": {
     "action": "Action",
@@ -565,7 +566,9 @@
     "retireTenant": "Retire tenant",
     "purgeTenant": "Purge tenant",
     "purging": "purging",
-    "purgingHint": "Its data is set to be deleted; the tenant is removed as soon as the cluster has taken that in."
+    "purgingHint": "Its data is set to be deleted; the tenant is removed as soon as the cluster has taken that in.",
+    "keepBundles": "Keep its backups",
+    "keepBundlesBody": "The backup bucket and the bundles in it stay. For a tenant that was handed a copy and whose provider keeps one under contract; otherwise the backups go with everything else."
   },
   "usage": {
     "committed": "committed",
@@ -664,5 +667,18 @@
   "checklist": {
     "filter": "Filter",
     "empty": "Nothing matches."
+  },
+  "export": {
+    "title": "Export",
+    "lead": "An export captures this workspace -- its apps' databases, files, volumes and its members -- into one encrypted bundle, staged in the cluster's own storage. Apps are paused one at a time while it runs.",
+    "start": "Export now",
+    "opsTitle": "Scheduled backups, kept off-site, restored in one click",
+    "opsLead": "Export is yours whenever you want it. The Operations Console looks after it for you -- a Gentian Corp app, free for organisations under fifty users.",
+    "opsScheduled": "Backups on a schedule, deduplicated, with retention you set",
+    "opsRemote": "Copies at a destination of your own, immutable against ransomware",
+    "opsRecovery": "Recovery and restore drills, one click each",
+    "opsOpen": "Open the Operations Console",
+    "opsInstalling": "The Operations Console is being installed ({{phase}}).",
+    "opsInstall": "Install 'operations-console' from the App Store to get them."
   }
 }

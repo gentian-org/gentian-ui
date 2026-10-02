@@ -100,9 +100,7 @@ def test_entries_are_relayed_untouched(monkeypatch):
     client = TestClient(_app(_settings()))
     answer = client.get("/api/v1/catalogue/sources/in-house/entries?tenant=demo", headers=_auth)
     assert answer.status_code == 200
-    assert seen["url"] == (
-        "http://director.test:8080/v1/tenants/demo/catalogues/in-house/entries"
-    )
+    assert seen["url"] == ("http://director.test:8080/v1/tenants/demo/catalogues/in-house/entries")
     # Verbatim: which editions are listed and what may be installed are the
     # director's to decide, and re-deciding them here would be a second answer.
     assert answer.json() == body

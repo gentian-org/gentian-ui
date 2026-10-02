@@ -1,3 +1,9 @@
+/**
+ * One export, now, to the cluster's own storage, encrypted to a key the
+ * tenant chooses -- the sovereign half of backup (sovereignty-concept.md §3).
+ * Scheduled backups, destinations and recovery are the Operations Console's;
+ * this screen promotes it beside the list.
+ */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
@@ -58,25 +64,18 @@ function phaseBadgeClass(phase: string): string {
   return "admin-console__badge admin-console__badge--info";
 }
 
-export function BackupSection({ tenant }: BackupSectionProps) {
+export function ExportSection({ tenant }: BackupSectionProps) {
   const { t } = useTranslation();
 
   const queryClient = useQueryClient();
   const [name, setName] = useState(defaultName);
-  const [keyChoice, setKeyChoice] = useState<KeyChoice>("platform");
+  const [keyChoice, setKeyChoice] = useState<KeyChoice>("new");
   const [keyDecision, setKeyDecision] = useState<KeyDecision>({
-    choice: "platform",
+    choice: "new",
     recipients: [],
-    ready: true,
+    ready: false,
   });
   const mode: "recipient" | "passphrase" = keyChoice === "passphrase" ? "passphrase" : "recipient";
-  const [target, setTarget] = useState<"policy" | "platform" | "custom">("policy");
-  const [endpoint, setEndpoint] = useState("");
-  const [bucket, setBucket] = useState("");
-  const [region, setRegion] = useState("");
-  const [credentialSource, setCredentialSource] = useState<"managed" | "transient">("managed");
-  const [accessKey, setAccessKey] = useState("");
-  const [secretKey, setSecretKey] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [confirmPassphrase, setConfirmPassphrase] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -115,10 +114,6 @@ export function BackupSection({ tenant }: BackupSectionProps) {
       );
       setPassphrase("");
       setConfirmPassphrase("");
-      // The keys were for one export. Leaving them in the form invites the
-      // next backup to reuse credentials the person meant to use once.
-      setAccessKey("");
-      setSecretKey("");
       setName(defaultName());
       await queryClient.invalidateQueries({ queryKey: ["admin", "backups", tenant] });
     },
@@ -194,17 +189,6 @@ export function BackupSection({ tenant }: BackupSectionProps) {
       return;
     }
 
-    if (target === "custom") {
-      if (!endpoint.trim()) {
-        setError(t("backup.enterEndpoint"));
-        return;
-      }
-      if (credentialSource === "transient" && (!accessKey.trim() || !secretKey.trim())) {
-        setError(t("backup.enterBothKeys"));
-        return;
-      }
-    }
-
     createMutation.mutate({
       name,
       apps: [],
@@ -212,25 +196,10 @@ export function BackupSection({ tenant }: BackupSectionProps) {
         mode === "passphrase"
           ? { mode, passphrase }
           : { mode, recipients: keyDecision.recipients },
-      // Omitted for the default. Sending {mode: "policy"} would say the same
-      // thing and leave a destination on the record that overrode nothing.
-      ...(target === "policy"
-        ? {}
-        : {
-            destination:
-              target === "platform"
-                ? { mode: "platform" as const }
-                : {
-                    mode: "custom" as const,
-                    endpoint: endpoint.trim(),
-                    bucket: bucket.trim(),
-                    region: region.trim(),
-                    credentialSource,
-                    ...(credentialSource === "transient"
-                      ? { accessKey: accessKey.trim(), secretKey: secretKey.trim() }
-                      : {}),
-                  },
-          }),
+      // The cluster's own storage, always: an export is staged there and
+      // fetched from there. Where scheduled backups go is the Operations
+      // Console's policy, not this form's.
+      destination: { mode: "platform" as const },
     });
   }
 
@@ -238,9 +207,9 @@ export function BackupSection({ tenant }: BackupSectionProps) {
     <section>
       <header className="admin-console__section-head">
         <div>
-          <h2 className="admin-console__section-title">{t("backup.backup")}</h2>
+          <h2 className="admin-console__section-title">{t("export.title")}</h2>
           <p className="admin-console__lead">
-            {t("backup.anExportCapturesThisTenant")}</p>
+            {t("export.lead")}</p>
         </div>
         <button
           type="button"
@@ -265,158 +234,6 @@ export function BackupSection({ tenant }: BackupSectionProps) {
             />
           </label>
         </div>
-
-        <fieldset className="admin-console__fieldset admin-console__fieldset--plain">
-          <legend>{t("backup.whereItGoes")}</legend>
-
-          <div className="admin-console__choices">
-            <label
-              className={`admin-console__choice${
-                target === "policy" ? " admin-console__choice--selected" : ""
-              }`}
-            >
-              <input
-                type="radio"
-                name="backup-target"
-                checked={target === "policy"}
-                onChange={() => setTarget("policy")}
-              />
-              <span>
-                <span className="admin-console__choice-title">{t("backup.whereMyBackupsNormallyGo")}</span>
-                <span className="admin-console__choice-desc">
-                  {t("backup.theDestinationThisWorkspaceIs")}</span>
-              </span>
-            </label>
-            <label
-              className={`admin-console__choice${
-                target === "platform" ? " admin-console__choice--selected" : ""
-              }`}
-            >
-              <input
-                type="radio"
-                name="backup-target"
-                checked={target === "platform"}
-                onChange={() => setTarget("platform")}
-              />
-              <span>
-                <span className="admin-console__choice-title">{t("backup.thisPlatformSOwnStorage")}</span>
-                <span className="admin-console__choice-desc">
-                  {t("backup.aCopyKeptCloseFor")}</span>
-              </span>
-            </label>
-            <label
-              className={`admin-console__choice${
-                target === "custom" ? " admin-console__choice--selected" : ""
-              }`}
-            >
-              <input
-                type="radio"
-                name="backup-target"
-                checked={target === "custom"}
-                onChange={() => setTarget("custom")}
-              />
-              <span>
-                <span className="admin-console__choice-title">{t("backup.myOwnS3Storage")}</span>
-                <span className="admin-console__choice-desc">
-                  {t("backup.aBucketYouNameOn")}</span>
-              </span>
-            </label>
-
-            {/* Outside the radio label on purpose: a label nested in a label is
-                invalid, and clicking the input would re-trigger the radio. */}
-            {target === "custom" && (
-              <div className="admin-console__choice-detail">
-                <label className="admin-console__label">
-                  <span className="admin-console__label-text">{t("backup.endpoint")}</span>
-                  <input
-                    value={endpoint}
-                    onChange={(event) => setEndpoint(event.target.value)}
-                    placeholder={t("backup.httpsSosChDk2")}
-                    required
-                  />
-                </label>
-                <label className="admin-console__label">
-                  <span className="admin-console__label-text">{t("backup.bucket")}</span>
-                  <input
-                    value={bucket}
-                    onChange={(event) => setBucket(event.target.value)}
-                    placeholder={t("backup.leaveEmptyToKeepThis")}
-                  />
-                </label>
-                <label className="admin-console__label">
-                  <span className="admin-console__label-text">{t("backup.region")}</span>
-                  <input
-                    value={region}
-                    onChange={(event) => setRegion(event.target.value)}
-                    placeholder={t("backup.chDk2SomeProviders")}
-                  />
-                </label>
-
-                <div className="admin-console__choices">
-                  <label
-                    className={`admin-console__choice${
-                      credentialSource === "managed" ? " admin-console__choice--selected" : ""
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="backup-credential-source"
-                      checked={credentialSource === "managed"}
-                      onChange={() => setCredentialSource("managed")}
-                    />
-                    <span>
-                      <span className="admin-console__choice-title">{t("backup.useMyStoredKeys")}</span>
-                      <span className="admin-console__choice-desc">
-                        {t("backup.theCredentialsAlreadyHeldFor")}</span>
-                    </span>
-                  </label>
-
-                  <label
-                    className={`admin-console__choice${
-                      credentialSource === "transient" ? " admin-console__choice--selected" : ""
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="backup-credential-source"
-                      checked={credentialSource === "transient"}
-                      onChange={() => setCredentialSource("transient")}
-                    />
-                    <span>
-                      <span className="admin-console__choice-title">{t("backup.enterKeysForThisBackup")}</span>
-                      <span className="admin-console__choice-desc">
-                        {t("backup.usedForThisBackupOnly")}</span>
-                    </span>
-                  </label>
-                </div>
-
-                {credentialSource === "transient" && (
-                  <div className="admin-console__choice-detail">
-                    <label className="admin-console__label">
-                      <span className="admin-console__label-text">{t("backup.accessKey")}</span>
-                      <input
-                        value={accessKey}
-                        onChange={(event) => setAccessKey(event.target.value)}
-                        autoComplete="off"
-                        required
-                      />
-                    </label>
-                    <label className="admin-console__label">
-                      <span className="admin-console__label-text">{t("backup.secretKey")}</span>
-                      <input
-                        type="password"
-                        value={secretKey}
-                        onChange={(event) => setSecretKey(event.target.value)}
-                        autoComplete="new-password"
-                        required
-                      />
-                    </label>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </fieldset>
 
         <BackupKeyChoice
           tenant={tenant}

@@ -26,12 +26,13 @@ export function RetireTenantDialog({
   tenant: string;
   pending: boolean;
   error?: string;
-  onConfirm: (mode: RetireMode) => void;
+  onConfirm: (mode: RetireMode, options: { keepBundles: boolean }) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<RetireMode>("retire");
+  const [keepBundles, setKeepBundles] = useState(false);
   const [typed, setTyped] = useState("");
 
   useEffect(() => {
@@ -66,7 +67,7 @@ export function RetireTenantDialog({
         className="admin-console__dialog-body"
         onSubmit={(e) => {
           e.preventDefault();
-          if (confirmed && !pending) onConfirm(mode);
+          if (confirmed && !pending) onConfirm(mode, { keepBundles: mode === "purge" && keepBundles });
         }}
       >
         <h3 id="retire-title" className="admin-console__dialog-title">
@@ -81,6 +82,16 @@ export function RetireTenantDialog({
           {card("retire", t("tenants.modeRetire"), t("tenants.modeRetireBody"))}
           {card("purge", t("tenants.modePurge"), t("tenants.modePurgeBody"))}
         </div>
+
+        {mode === "purge" && (
+          <label className="admin-console__choice">
+            <input type="checkbox" checked={keepBundles} onChange={(e) => setKeepBundles(e.target.checked)} />
+            <span>
+              <span className="admin-console__choice-title">{t("tenants.keepBundles")}</span>
+              <span className="admin-console__choice-desc">{t("tenants.keepBundlesBody")}</span>
+            </span>
+          </label>
+        )}
 
         <label className="admin-console__label" htmlFor="retire-confirm">
           <span className="admin-console__label-text">

@@ -226,3 +226,12 @@ def test_purging_a_tenant_is_the_directors_purge_action(monkeypatch):
     )
     assert r.status_code == 202
     assert seen["url"].endswith("/v1/clusters/demo/tenants/acme/actions/purge")
+    assert seen["json"] == {}
+
+    r = client.post(
+        "/api/v1/cluster/tenants/acme/purge",
+        json={"keepBundles": True, "smuggled": True},
+        headers={"Authorization": "Bearer person-token"},
+    )
+    assert r.status_code == 202
+    assert seen["json"] == {"keepBundles": True}

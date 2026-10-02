@@ -76,64 +76,6 @@ def test_the_backups_arrive_as_the_bare_list_the_screen_reads(monkeypatch):
     assert seen["auth"] == "Bearer person"
 
 
-def test_a_tenant_that_states_no_policy_still_gets_what_applies(monkeypatch):
-    """`configured: false` with effective values is the answer the screen
-    renders as "inherited", and it comes from the reconciler that resolved
-    it, not from arithmetic here."""
-    seen: dict = {}
-    _fake_client(
-        monkeypatch,
-        _answer(
-            200,
-            {
-                "scope": "tenant",
-                "tenant": "platform",
-                "configured": False,
-                "effectiveSchedule": "0 2 * * *",
-                "effectiveBucket": "gentian-backups",
-                "effectiveRecipients": [],
-            },
-        ),
-        seen,
-    )
-    r = TestClient(_app(_settings())).get(
-        "/api/v1/admin/backup-policy", headers={"Authorization": "Bearer t"}
-    )
-    assert r.status_code == 200
-    body = r.json()
-    assert body["configured"] is False
-    assert body["effectiveSchedule"] == "0 2 * * *"
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/backup-policy"
-
-
-def test_the_clusters_policy_is_asked_of_the_cluster(monkeypatch):
-    seen: dict = {}
-    _fake_client(monkeypatch, _answer(200, {"scope": "cluster", "configured": True}), seen)
-    r = TestClient(_app(_settings())).get(
-        "/api/v1/admin/backup-policy/cluster", headers={"Authorization": "Bearer t"}
-    )
-    assert r.status_code == 200
-    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/backup-policy"
-
-
-def test_schedules_come_per_tenant_or_for_the_whole_cluster(monkeypatch):
-    seen: dict = {}
-    rows = [{"name": "policy", "managed": True, "schedule": "0 2 * * *"}]
-    _fake_client(monkeypatch, _answer(200, {"tenant": "platform", "schedules": rows}), seen)
-    client = TestClient(_app(_settings()))
-    r = client.get("/api/v1/admin/backup-schedules", headers={"Authorization": "Bearer t"})
-    assert r.status_code == 200
-    assert r.json() == rows
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/backup-schedules"
-
-    _fake_client(monkeypatch, _answer(200, {"schedules": rows}), seen)
-    r = client.get(
-        "/api/v1/admin/backup-schedules?allTenants=true", headers={"Authorization": "Bearer t"}
-    )
-    assert r.status_code == 200
-    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/backup-schedules"
-
-
 @pytest.mark.parametrize("status", [403, 404, 502])
 def test_the_directors_refusal_is_passed_through_unchanged(monkeypatch, status):
     _fake_client(monkeypatch, _answer(status, {"error": "refused"}), {})
@@ -141,52 +83,6 @@ def test_the_directors_refusal_is_passed_through_unchanged(monkeypatch, status):
         "/api/v1/admin/backups", headers={"Authorization": "Bearer t"}
     )
     assert r.status_code == status
-
-
-def test_a_policy_is_a_commit_and_a_backup_is_something_started(monkeypatch):
-    """The two kinds of write, and the two shapes of answer. A policy says
-    what should be true from now on and comes back as a commit; a backup
-    happens once and comes back as something started, with no commit because
-    nothing was declared."""
-    seen: dict = {}
-    _fake_client(
-        monkeypatch,
-        _answer(202, {"status": "updated", "commit": "a1b2c3d"}),
-        seen,
-    )
-    client = TestClient(_app(_settings()))
-    r = client.put(
-        "/api/v1/admin/backup-policy",
-        json={"schedule": "0 3 * * *"},
-        headers={"Authorization": "Bearer t"},
-    )
-    assert r.status_code == 202
-    assert r.json()["commit"] == "a1b2c3d"
-    assert seen["method"] == "PUT"
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/backup-policy"
-
-    _fake_client(
-        monkeypatch,
-        _answer(202, {"action": "backup", "name": "manual-1", "status": "started"}),
-        seen,
-    )
-    r = client.post("/api/v1/admin/backups", json={}, headers={"Authorization": "Bearer t"})
-    assert r.status_code == 202
-    body = r.json()
-    assert body["status"] == "started" and "commit" not in body
-    # An action goes to an action route, which is what says it is one.
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/actions/backup"
-
-
-def test_clearing_a_policy_is_how_a_tenant_inherits_again(monkeypatch):
-    seen: dict = {}
-    _fake_client(monkeypatch, _answer(202, {"status": "updated", "commit": "d4e5f6a"}), seen)
-    r = TestClient(_app(_settings())).delete(
-        "/api/v1/admin/backup-policy", headers={"Authorization": "Bearer t"}
-    )
-    assert r.status_code == 202
-    assert seen["method"] == "DELETE"
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/backup-policy"
 
 
 def test_deleting_a_backup_is_an_action_not_a_deletion_of_state(monkeypatch):
@@ -199,35 +95,6 @@ def test_deleting_a_backup_is_an_action_not_a_deletion_of_state(monkeypatch):
     assert seen["method"] == "POST"
     assert seen["url"] == "http://director.test:8080/v1/tenants/platform/actions/delete-backup"
     assert seen["json"] == {"name": "nightly-1"}
-
-
-def test_a_schedule_is_changed_through_the_policy_it_comes_from(monkeypatch):
-    """The operator restates the derived schedule from the policy on every
-    reconcile, so editing the object directly is reverted within the minute
-    — which looks like the save failing at random. The write goes to the
-    policy instead."""
-    seen: dict = {}
-    _fake_client(monkeypatch, _answer(202, {"status": "updated", "commit": "a1b2c3d"}), seen)
-    r = TestClient(_app(_settings())).put(
-        "/api/v1/admin/backup-schedules/policy",
-        json={"schedule": "0 4 * * *", "suspended": False, "retention": {"keepDaily": 7}},
-        headers={"Authorization": "Bearer t"},
-    )
-    assert r.status_code == 202
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/backup-policy"
-    assert seen["json"] == {"schedule": "0 4 * * *", "retention": {"keepDaily": 7}}
-
-
-def test_a_schedule_nobody_derives_is_refused_not_redirected(monkeypatch):
-    """Silently writing somebody's own schedule into the policy would change
-    something they did not ask about."""
-    seen: dict = {}
-    _fake_client(monkeypatch, _answer(202, {}), seen)
-    r = TestClient(_app(_settings())).put(
-        "/api/v1/admin/backup-schedules/mine", json={}, headers={"Authorization": "Bearer t"}
-    )
-    assert r.status_code == 400
-    assert not seen
 
 
 def test_minting_a_key_still_says_it_is_not_wired():

@@ -108,6 +108,7 @@ async def retire_cluster_tenant(
 @router.post("/tenants/{tenant}/purge")
 async def purge_cluster_tenant(
     tenant: str,
+    body: dict | None = None,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
@@ -116,13 +117,16 @@ async def purge_cluster_tenant(
 
     The director commits deletionPolicy: Delete first and removes the tenant
     once the cluster holds it, so the answer is the first commit; the tenant
-    is listed as purging until the second lands.
+    is listed as purging until the second lands. keepBundles is the one
+    option relayed: it spares the backup bucket.
     """
+    payload = {"keepBundles": True} if body and body.get("keepBundles") else {}
     return await director.forward(
         settings,
         "POST",
         _cluster_path(settings, f"/tenants/{tenant}/actions/purge"),
         bearer_of(credentials),
+        json_body=payload,
     )
 
 

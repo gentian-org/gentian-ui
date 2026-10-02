@@ -1120,3 +1120,18 @@ export function fetchGroupMembers(group: string, tenant?: string) {
 export function fetchSettingsTemplates(tenant?: string) {
   return apiFetch<{ templates: SettingsTemplate[] }>(`/admin/templates${tenantQuery(tenant)}`);
 }
+
+/** One of the tenant's components as the cluster holds it. */
+export type AppState = {
+  profile: string;
+  name: string;
+  ready: boolean;
+  phase: string;
+  message?: string;
+  failure?: string;
+  pendingPrivileges?: string[];
+};
+
+export function fetchAppStates() {
+  return apiFetch<{ tenant: string; apps: AppState[] }>("/admin/apps/status");
+}

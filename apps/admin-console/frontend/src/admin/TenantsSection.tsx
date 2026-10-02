@@ -59,8 +59,8 @@ export function TenantsSection() {
     },
   });
   const retireMutation = useMutation({
-    mutationFn: ({ tenant, mode }: { tenant: string; mode: RetireMode }) =>
-      mode === "purge" ? purgeClusterTenant(tenant) : retireClusterTenant(tenant),
+    mutationFn: ({ tenant, mode, keepBundles }: { tenant: string; mode: RetireMode; keepBundles: boolean }) =>
+      mode === "purge" ? purgeClusterTenant(tenant, keepBundles) : retireClusterTenant(tenant),
     onSuccess: (result) => {
       setConfirming(null);
       setLastCommit(result.commit ?? null);
@@ -198,7 +198,7 @@ export function TenantsSection() {
               ? (retireMutation.error as Error).message || t("tenants.couldNotRetire")
               : undefined
           }
-          onConfirm={(mode) => retireMutation.mutate({ tenant: confirming, mode })}
+          onConfirm={(mode, { keepBundles }) => retireMutation.mutate({ tenant: confirming, mode, keepBundles })}
           onClose={() => setConfirming(null)}
         />
       ) : null}

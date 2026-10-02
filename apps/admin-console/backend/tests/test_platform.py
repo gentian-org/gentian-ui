@@ -146,7 +146,11 @@ def test_the_authorization_view_asks_the_right_scope(monkeypatch):
     view = {
         "object": "tenant:platform",
         "bindings": [
-            {"relation": "admin", "groups": ["gentian:tenant:platform:admins"], "grants": ["can_view"]}
+            {
+                "relation": "admin",
+                "groups": ["gentian:tenant:platform:admins"],
+                "grants": ["can_view"],
+            }
         ],
         "unheld": 0,
     }

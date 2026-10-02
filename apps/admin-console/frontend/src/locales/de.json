@@ -19,7 +19,8 @@
     "tabTenants": "Mandanten",
     "tenant": "Mandant/",
     "tabMembers": "Mitglieder",
-    "tabGroups": "Gruppen"
+    "tabGroups": "Gruppen",
+    "tabExport": "Export"
   },
   "audit": {
     "action": "Aktion",
@@ -571,7 +572,9 @@
     "retireTenant": "Mandant stilllegen",
     "purgeTenant": "Mandant löschen",
     "purging": "wird gelöscht",
-    "purgingHint": "Die Daten sind zur Löschung vorgemerkt; der Mandant wird entfernt, sobald der Cluster das übernommen hat."
+    "purgingHint": "Die Daten sind zur Löschung vorgemerkt; der Mandant wird entfernt, sobald der Cluster das übernommen hat.",
+    "keepBundles": "Backups behalten",
+    "keepBundlesBody": "Der Backup-Bucket und die Bundles darin bleiben. Für einen Mandanten, der eine Kopie erhalten hat und dessen Anbieter vertraglich eine aufbewahrt; sonst gehen die Backups mit allem anderen."
   },
   "usage": {
     "committed": "zugesagt",
@@ -664,5 +667,18 @@
   "checklist": {
     "filter": "Filtern",
     "empty": "Nichts passt."
+  },
+  "export": {
+    "title": "Export",
+    "lead": "Ein Export erfasst diesen Arbeitsbereich -- Datenbanken, Dateien und Volumes der Apps sowie die Mitglieder -- in einem verschlüsselten Bundle im Speicher des Clusters. Die Apps werden dabei nacheinander kurz angehalten.",
+    "start": "Jetzt exportieren",
+    "opsTitle": "Geplante Backups, extern aufbewahrt, mit einem Klick wiederhergestellt",
+    "opsLead": "Exportieren können Sie jederzeit selbst. Die Betriebskonsole übernimmt es für Sie -- eine App von Gentian Corp, kostenlos für Organisationen unter fünfzig Benutzern.",
+    "opsScheduled": "Backups nach Zeitplan, dedupliziert, mit Aufbewahrung nach Ihrer Wahl",
+    "opsRemote": "Kopien an einem eigenen Ziel, unveränderbar gegen Ransomware",
+    "opsRecovery": "Wiederherstellung und Übungen, je ein Klick",
+    "opsOpen": "Betriebskonsole öffnen",
+    "opsInstalling": "Die Betriebskonsole wird installiert ({{phase}}).",
+    "opsInstall": "Installieren Sie »operations-console« aus dem App Store."
   }
 }
