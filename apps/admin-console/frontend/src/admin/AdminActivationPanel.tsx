@@ -126,6 +126,11 @@ export function AdminActivationPanel({
         </>
       )}
 
+      {activation && !activation.mailed && activation.mailError && (
+        <p className="admin-console__hint">
+          {t("tenants.activationNotMailed", { email: activation.email ?? "" })}
+        </p>
+      )}
       {activation && !activation.mailed && activation.link && (
         <>
           <p className="admin-console__card-desc">{t("tenants.activationLinkLead", { user: result?.username })}</p>

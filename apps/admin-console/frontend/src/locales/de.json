@@ -574,7 +574,8 @@
     "purging": "wird gelöscht",
     "purgingHint": "Die Daten sind zur Löschung vorgemerkt; der Mandant wird entfernt, sobald der Cluster das übernommen hat.",
     "keepBundles": "Backups behalten",
-    "keepBundlesBody": "Der Backup-Bucket und die Bundles darin bleiben. Für einen Mandanten, der eine Kopie erhalten hat und dessen Anbieter vertraglich eine aufbewahrt; sonst gehen die Backups mit allem anderen."
+    "keepBundlesBody": "Der Backup-Bucket und die Bundles darin bleiben. Für einen Mandanten, der eine Kopie erhalten hat und dessen Anbieter vertraglich eine aufbewahrt; sonst gehen die Backups mit allem anderen.",
+    "activationNotMailed": "Der Realm kann noch keine E-Mail senden (das SMTP-Relay wird unter Zugangsdaten hinterlegt), daher wird der Link hier angezeigt. {{email}} bleibt die Wiederherstellungsadresse."
   },
   "usage": {
     "committed": "zugesagt",

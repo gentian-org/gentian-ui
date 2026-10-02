@@ -132,6 +132,8 @@ export type AdminActivation = {
     /** Seconds since the epoch. */
     expiresAt?: number;
     actions: string[];
+    /** Why a link meant for `email` is shown instead of mailed. */
+    mailError?: string;
   };
 };
 

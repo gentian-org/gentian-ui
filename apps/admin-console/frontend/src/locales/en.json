@@ -568,7 +568,8 @@
     "purging": "purging",
     "purgingHint": "Its data is set to be deleted; the tenant is removed as soon as the cluster has taken that in.",
     "keepBundles": "Keep its backups",
-    "keepBundlesBody": "The backup bucket and the bundles in it stay. For a tenant that was handed a copy and whose provider keeps one under contract; otherwise the backups go with everything else."
+    "keepBundlesBody": "The backup bucket and the bundles in it stay. For a tenant that was handed a copy and whose provider keeps one under contract; otherwise the backups go with everything else.",
+    "activationNotMailed": "The realm cannot send mail yet (the SMTP relay is supplied in Credentials), so the link is shown here. {{email}} is kept as the recovery address."
   },
   "usage": {
     "committed": "committed",
