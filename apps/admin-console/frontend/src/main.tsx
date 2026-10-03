@@ -8,6 +8,11 @@ import { router } from "@/router";
 // paints in the viewer's language rather than in English and then again.
 import "@/lib/i18n";
 import "./index.css";
+import { loadBrand } from "@/lib/brand";
+
+// The cluster's brand, before the first render: its stylesheet carries the
+// colours the first paint should already have.
+loadBrand();
 
 const queryClient = new QueryClient();
 

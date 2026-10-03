@@ -28,8 +28,7 @@ async function lookUp(address) {
   }
 }
 
-// What the operator of this cluster calls it. Read from config.json, which the
-// deployment mounts; the page works without it, under the default name.
+// The lookup directory, from config.json, which the deployment mounts.
 async function applyConfig() {
   try {
     const res = await fetch("/sign-in/config.json", { cache: "no-store" });
@@ -38,17 +37,34 @@ async function applyConfig() {
     if (typeof cfg.lookup === "string" && cfg.lookup.startsWith("/")) {
       lookup = cfg.lookup.endsWith("/") ? cfg.lookup : cfg.lookup + "/";
     }
-    if (typeof cfg.productName === "string" && cfg.productName.trim()) {
-      const name = cfg.productName.trim();
-      document.title = `Sign in · ${name}`;
-      $("product").textContent = name;
-      $("logo").setAttribute("aria-label", name);
-    }
-    if (typeof cfg.logoUrl === "string" && /^(https:\/\/|\/)/.test(cfg.logoUrl)) {
-      $("logo").style.backgroundImage = `url("${cfg.logoUrl.replace(/"/g, "")}")`;
+  } catch {
+    // No configuration: no lookup, and every unplaced address is asked for
+    // its workspace.
+  }
+}
+
+// What the cluster calls itself and its logo, from the brand the operator
+// publishes beside this page; the colours arrive by stylesheet. Without it
+// the page is the platform's own.
+async function applyBrand() {
+  try {
+    const res = await fetch("/branding/brand.json", { cache: "no-cache" });
+    if (!res.ok) return;
+    const brand = await res.json();
+    if (typeof brand.name !== "string" || !brand.name.trim()) return;
+    const name = brand.name.trim();
+    document.title = `Sign in · ${name}`;
+    $("product").textContent = name;
+    $("logo").setAttribute("aria-label", name);
+    const icon = (brand.icons || []).find(
+      (i) => i && typeof i.src === "string" && (!i.purpose || i.purpose.split(" ").includes("any")),
+    );
+    if (icon) {
+      const url = new URL(icon.src, `${window.location.origin}/branding/`).href;
+      if (url.startsWith("https://")) $("logo").style.backgroundImage = `url("${url.replace(/"/g, "")}")`;
     }
   } catch {
-    // No configuration is a configuration: the defaults.
+    // The platform's own.
   }
 }
 
@@ -107,3 +123,4 @@ $("back").addEventListener("click", () => {
 
 $("suffix").textContent = "." + kernelDomain;
 applyConfig();
+applyBrand();

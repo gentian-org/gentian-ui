@@ -52,37 +52,42 @@
   src: url("/fonts/CommitMono-700-Italic.otf") format("opentype");
 }
 
+/* ----- The cluster's brand ---------------------------------------------
+   Every palette, font and radius token below reads the brand's design token
+   (--brand-*, from https://id.<kernel>/branding/brand.css, which the page
+   loads at start) and keeps the platform's own value when it is absent. The
+   semantic mapping further down follows from these, so it follows the brand. */
 :root {
   /* ----- Ink ------------------------------------------------------------- */
-  --ink-0:    #07081A;
-  --ink-1:    #14152E;
-  --ink-2:    #232547;
-  --ink-3:    #45486B;
-  --ink-4:    #74779A;
-  --ink-5:    #A0A3C0;
+  --ink-0: var(--brand-color-ink-0, #07081A);
+  --ink-1: var(--brand-color-ink-1, #14152E);
+  --ink-2: var(--brand-color-ink-2, #232547);
+  --ink-3: var(--brand-color-ink-3, #45486B);
+  --ink-4: var(--brand-color-ink-4, #74779A);
+  --ink-5: var(--brand-color-ink-5, #A0A3C0);
 
   /* ----- Paper — warm oat ------------------------------------------------ */
-  --paper-0:  #F4F1EA;
-  --paper-1:  #ECE8DF;
-  --paper-2:  #DED9CC;
-  --paper-3:  #FFFFFF;
+  --paper-0: var(--brand-color-paper-0, #F4F1EA);
+  --paper-1: var(--brand-color-paper-1, #ECE8DF);
+  --paper-2: var(--brand-color-paper-2, #DED9CC);
+  --paper-3: var(--brand-color-paper-3, #FFFFFF);
 
   /* ----- Gentian seal ---------------------------------------------------- */
-  --gentian-50:  #ECECF7;
-  --gentian-100: #D5D5EE;
-  --gentian-200: #ADADDF;
-  --gentian-300: #7878CC;
-  --gentian-400: #4A4AB3;
-  --gentian-500: #262696;
-  --gentian-600: #1B1A82;
-  --gentian-700: #131370;
-  --gentian-800: #0A0A33;
+  --gentian-50: var(--brand-color-brand-50, #ECECF7);
+  --gentian-100: var(--brand-color-brand-100, #D5D5EE);
+  --gentian-200: var(--brand-color-brand-200, #ADADDF);
+  --gentian-300: var(--brand-color-brand-300, #7878CC);
+  --gentian-400: var(--brand-color-brand-400, #4A4AB3);
+  --gentian-500: var(--brand-color-brand-500, #262696);
+  --gentian-600: var(--brand-color-brand-600, #1B1A82);
+  --gentian-700: var(--brand-color-brand-700, #131370);
+  --gentian-800: var(--brand-color-brand-800, #0A0A33);
 
   /* ----- Semantic -------------------------------------------------------- */
-  --iris:    #4B5FB3;   --iris-bg:  #E5E9F6;
-  --moss:    #4F6B3A;   --moss-bg:  #E4EBD6;
-  --ember:   #B2671B;   --ember-bg: #F4E5CB;
-  --madder:  #9B2D2D;   --madder-bg:#F2D9D9;
+  --iris: var(--brand-color-status-info, #4B5FB3);   --iris-bg: var(--brand-color-status-info-bg, #E5E9F6);
+  --moss: var(--brand-color-status-success, #4F6B3A);   --moss-bg: var(--brand-color-status-success-bg, #E4EBD6);
+  --ember: var(--brand-color-status-warning, #B2671B);   --ember-bg: var(--brand-color-status-warning-bg, #F4E5CB);
+  --madder: var(--brand-color-status-danger, #9B2D2D);   --madder-bg: var(--brand-color-status-danger-bg, #F2D9D9);
 
   /* ----- Design-system semantic mapping ---------------------------------- */
   --bg:           var(--paper-0);
@@ -111,13 +116,13 @@
   --link:          var(--gentian-500);
   --link-visited:  var(--gentian-700);
 
-  --font-display: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-sans:    "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono:    "Commit Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-display: var(--brand-font-family-display, "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  --font-sans: var(--brand-font-family-sans, "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  --font-mono: var(--brand-font-family-mono, "Commit Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace);
 
-  --radius-1:    6px;
-  --radius-2:    10px;
-  --radius-3:    16px;
+  --radius-1: var(--brand-radius-1, 6px);
+  --radius-2: var(--brand-radius-2, 10px);
+  --radius-3: var(--brand-radius-3, 16px);
   --radius-pill: 999px;
 
   --shadow-1: 0 1px 2px rgba(20, 21, 46, 0.05);

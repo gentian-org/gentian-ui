@@ -22,9 +22,16 @@ login theme in gentian-os fills the username from it.
 
 | Key | Meaning |
 |---|---|
-| `productName` | The name shown on the card and in the title. |
-| `logoUrl` | An `https://` or same-origin logo replacing the default. |
 | `lookup` | A same-origin directory the page asks about addresses it cannot place: `GET <lookup><sha256-hex of the domain>.json` answering `{"url": "https://..."}`, or 404. gentian-os sets `/sign-in/lookup/` and the operator fills it with the tenants' custom domains; hashing the name means a domain is found only by someone who already knows it. |
+
+## The cluster's brand
+
+The same server serves `/branding/` (`brand.css`, `brand.json`,
+`brand.webmanifest`, icons), which the operator renders from the cluster's
+Branding and every page on the cluster loads: this one, the identity
+provider's, the desktop and the consoles. `brand.json` is served with
+`Access-Control-Allow-Origin: *` because the consoles read it from their own
+hosts; it holds nothing that is not on every page anyway.
 
 ## Development
 
