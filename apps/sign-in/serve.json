@@ -42,5 +42,6 @@
       "source": "sign-in/",
       "destination": "/sign-in/index.html"
     }
-  ]
+  ],
+  "symlinks": true
 }

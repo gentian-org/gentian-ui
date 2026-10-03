@@ -4,17 +4,22 @@ const kernelDomain = kernelDomainOf(window.location.hostname);
 const $ = (id) => document.getElementById(id);
 
 // An address on no workspace this page can place may still be one the cluster
-// serves under a domain of its own. An extension that gives tenants such
-// domains says where to ask, as config.json's lookup: a same-origin path
-// answering GET <lookup>?domain=<domain> with {"url": "https://..."} or 404.
-// The OS sets none, and then the page asks for the workspace's name.
+// serves under a custom domain. config.json's lookup names a same-origin
+// directory holding one file per such domain, named by the domain's SHA-256
+// and answering {"url": "https://..."}: the page finds a domain it already
+// knows, and nobody can list the domains the cluster serves.
 let lookup = "";
+
+async function sha256Hex(text) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 async function lookUp(address) {
   if (!lookup) return "";
   const domain = address.slice(address.lastIndexOf("@") + 1);
   try {
-    const res = await fetch(`${lookup}?domain=${encodeURIComponent(domain)}`, { cache: "no-store" });
+    const res = await fetch(`${lookup}${await sha256Hex(domain)}.json`, { cache: "no-store" });
     if (!res.ok) return "";
     const { url } = await res.json();
     return typeof url === "string" && url.startsWith("https://") ? url : "";
@@ -31,7 +36,7 @@ async function applyConfig() {
     if (!res.ok) return;
     const cfg = await res.json();
     if (typeof cfg.lookup === "string" && cfg.lookup.startsWith("/")) {
-      lookup = cfg.lookup;
+      lookup = cfg.lookup.endsWith("/") ? cfg.lookup : cfg.lookup + "/";
     }
     if (typeof cfg.productName === "string" && cfg.productName.trim()) {
       const name = cfg.productName.trim();

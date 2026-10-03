@@ -24,11 +24,12 @@ login theme in gentian-os fills the username from it.
 |---|---|
 | `productName` | The name shown on the card and in the title. |
 | `logoUrl` | An `https://` or same-origin logo replacing the default. |
-| `lookup` | A same-origin path the page asks about addresses it cannot place: `GET <lookup>?domain=<domain>` answering `{"url": "https://..."}` or 404. For an extension that serves tenants under domains of their own; the OS sets none. |
+| `lookup` | A same-origin directory the page asks about addresses it cannot place: `GET <lookup><sha256-hex of the domain>.json` answering `{"url": "https://..."}`, or 404. gentian-os sets `/sign-in/lookup/` and the operator fills it with the tenants' custom domains; hashing the name means a domain is found only by someone who already knows it. |
 
 ## Development
 
-Static files, no build: `site/sign-in/` is what is served. `npm test` runs the
+Static files, no build: `site/sign-in/` is what is served. `symlinks` is on in
+`serve.json` because a mounted ConfigMap is a directory of symlinks. `npm test` runs the
 routing tests with Node's own test runner. The image is built by
 `.github/workflows/sign-in.yaml` and run by gentian-os beside the identity
 provider (`kernel/services/keycloak-idp`).
