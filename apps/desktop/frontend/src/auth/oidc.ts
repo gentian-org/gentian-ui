@@ -282,38 +282,13 @@ export function isEdgeSession(): boolean {
 export const EDGE_LOGOUT_PATH = "/oauth2/logout";
 
 /**
- * Signing out behind the edge has to end two sessions, and the order matters.
- *
- * /oauth2/logout on its own only clears the Gateway's own cookies. Keycloak
- * still holds the browser's SSO session, so the very next request is signed
- * back in without a prompt and Sign out looks like a page reload — which is
- * exactly what it did.
- *
- * So the browser goes to Keycloak first. Keycloak ends the SSO session, tells
- * the director over the back channel that the session is gone, and then
- * returns the browser to /oauth2/logout, where the Gateway drops its cookies.
- * What is left is a console with no session at either layer, which is what
- * signing out means.
- *
- * client_id with post_logout_redirect_uri and no id_token_hint is deliberate:
- * this bundle holds no token to hint with, and Keycloak accepts the pair
- * without showing the "do you want to log out?" confirmation. The URI must be
- * registered on the client; the kernel realm bootstrap registers this origin.
+ * Where the edge answers a sign-out that ends both sessions: it reads the
+ * zone's ID token cookie, sends the person to the realm with the hint that
+ * lets it end the session without asking, and names the Gateway's logout as
+ * the way back.
  */
-export function edgeLogoutUrl(): string {
-  const config = getOidcConfig();
-  if (!config.issuer || !config.clientId) {
-    // No issuer to end a session at. Clearing the edge's cookies is still
-    // better than doing nothing, even though Keycloak will sign the next
-    // request straight back in.
-    return EDGE_LOGOUT_PATH;
-  }
-  const params = new URLSearchParams({
-    client_id: config.clientId,
-    post_logout_redirect_uri: `${window.location.origin}${EDGE_LOGOUT_PATH}`,
-  });
-  return `${externalLogoutIssuer(config.issuer)}/protocol/openid-connect/logout?${params.toString()}`;
-}
+export const EDGE_SIGN_OUT_PATH = "/oauth2/sign-out";
+
 
 function randomUrlSafeString(length: number): string {
   const bytes = new Uint8Array(length);
@@ -491,7 +466,12 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
 
 export async function logoutRedirect(): Promise<void> {
   if (isEdgeSession()) {
-    window.location.assign(edgeLogoutUrl());
+    // The edge's sign-out, not Keycloak's logout endpoint directly. Only the
+    // edge holds the zone's ID token cookie, and Keycloak ends a session
+    // without asking only when the logout carries that token as its hint;
+    // sent here with a client_id alone, it asked "do you want to log out?"
+    // every time. The Admin Console has done this since the edge learnt it.
+    window.location.assign(EDGE_SIGN_OUT_PATH);
     return;
   }
   const accessToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
