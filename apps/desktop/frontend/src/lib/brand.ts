@@ -61,7 +61,22 @@ export function loadBrand(): void {
   const sheet = document.createElement("link");
   sheet.rel = "stylesheet";
   sheet.href = base + "brand.css";
+  // The browser's own chrome takes the brand's primary colour too, once the
+  // stylesheet that defines it has arrived.
+  sheet.onload = () => {
+    const primary = getComputedStyle(document.documentElement).getPropertyValue("--brand-color-brand-500").trim();
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (primary && meta) meta.content = primary;
+  };
   document.head.prepend(sheet);
+  // The installed app is the brand's: its manifest names it and carries its
+  // icons. Served cross-origin with CORS; a start_url on another origin is
+  // ignored by the browser, so the app still starts here.
+  const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+  if (manifest) {
+    manifest.crossOrigin = "anonymous";
+    manifest.href = base + "brand.webmanifest";
+  }
   fetch(base + "brand.json", { cache: "no-cache", credentials: "omit" })
     .then((res) => (res.ok ? (res.json() as Promise<Brand>) : null))
     .then((brand) => {
