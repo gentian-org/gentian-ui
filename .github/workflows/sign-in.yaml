@@ -1,0 +1,90 @@
+name: sign-in
+
+# The sign-in router: builds the sign-in-web image from apps/sign-in/. Unlike
+# the consoles it is not a component and has no chart: gentian-os runs it
+# beside the identity provider, which is where it is served from.
+
+on:
+  push:
+    branches:
+      - develop
+      - "feat/**"
+      - "fix/**"
+      - "chore/**"
+    paths:
+      - "apps/sign-in/**"
+      - ".github/workflows/sign-in.yaml"
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "apps/sign-in/**"
+      - ".github/workflows/sign-in.yaml"
+  workflow_dispatch:
+
+env:
+  WEB_IMAGE: ghcr.io/gentian-org/sign-in-web
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Routing tests
+        working-directory: apps/sign-in
+        run: npm test
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # The same three tags as the consoles' images, for the same reasons:
+      # develop moves, <sha> and develop-<sha> do not, and only the last is
+      # both immutable and branch-scoped, which is what a pin should name.
+      - name: Set image tag
+        id: meta
+        run: |
+          short="${GITHUB_SHA::7}"
+          branch="${GITHUB_REF_NAME//\//-}"
+          echo "tag=${branch}" >> "$GITHUB_OUTPUT"
+          echo "short=${short}" >> "$GITHUB_OUTPUT"
+          echo "immutable=${branch}-${short}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push web
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/sign-in
+          file: apps/sign-in/Dockerfile
+          push: >-
+            ${{ github.event_name != 'pull_request'
+            && github.ref == 'refs/heads/develop' }}
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.short }}
+            ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.immutable }}
