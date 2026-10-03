@@ -137,24 +137,40 @@ export function useShellApps() {
       ...kernelConsoleApps(clusterTiles),
     ];
     
+    // The administration tiles first, in the order a platform administrator
+    // works through them: the console that configures, the one that looks
+    // after, then the three kernel consoles -- what the cluster runs, what git
+    // says it should, and who may sign in. The store and subscriptions follow,
+    // then every app.
+    const ADMIN_ORDER = [
+      "kernel-platform/admin-console/web",
+      "kernel-platform/operations-console/web",
+      "kernel-headlamp",
+      "kernel-argocd",
+      "kernel-keycloak",
+    ];
     const getSortIndex = (id: string) => {
-      if (id === "app-store" || id.startsWith("app-store-")) return 1;
+      // A tenant's own consoles carry its name in place of "platform".
+      const generic = id.replace(/^kernel-[^/]+\/(admin-console|operations-console)\//, "kernel-platform/$1/");
+      const pinned = ADMIN_ORDER.indexOf(generic);
+      if (pinned !== -1) return pinned;
+      if (id === "app-store" || id.startsWith("app-store-")) return ADMIN_ORDER.length;
       if (
         id === "subscriptions" ||
         id.startsWith("subscriptions-") ||
         id === "gentian-subscriptions" ||
         id.startsWith("gentian-subscriptions-")
       ) {
-        return 2;
+        return ADMIN_ORDER.length + 1;
       }
       return -1;
     };
-    
+
     const adminApps = list.filter((a) => getSortIndex(a.id) !== -1);
     const userApps = list.filter((a) => getSortIndex(a.id) === -1);
-    
+
     adminApps.sort((a, b) => getSortIndex(a.id) - getSortIndex(b.id));
-    
+
     return [...adminApps, ...userApps];
   }, [me, clusterTiles, storeContext, storeTitle]);
 
