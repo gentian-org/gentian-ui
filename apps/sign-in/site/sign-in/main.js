@@ -99,6 +99,13 @@ $("address-form").addEventListener("submit", async (event) => {
     return;
   }
   pending = routed.address;
+  // Say why the question is asked. An address one letter off the cluster's
+  // domain lands here too, and "which workspace?" alone reads as the page
+  // having failed to recognise a tenant it should know.
+  const domain = routed.address.slice(routed.address.lastIndexOf("@") + 1);
+  $("unplaced").textContent =
+    `${domain} is not a domain of this cluster. Addresses here end in @<workspace>.${kernelDomain}` +
+    ` — check the address, or name the workspace.`;
   $("address-form").hidden = true;
   $("workspace-form").hidden = false;
   $("workspace").focus();
