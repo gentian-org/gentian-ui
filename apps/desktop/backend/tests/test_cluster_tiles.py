@@ -29,6 +29,7 @@ def _settings(**over) -> Settings:
         KERNEL_DOMAIN="desk.gentian.org",
         DIRECTOR_URL=over.pop("director_url", "http://director.test:8080"),
         GENTIAN_CLUSTER_ID=over.pop("cluster_id", "demo"),
+        **over,
     )
 
 
@@ -127,3 +128,33 @@ def test_no_token_is_refused_before_anything_is_forwarded(header):
     headers = {"Authorization": header} if header is not None else {}
     r = client.get("/api/v1/cluster/tiles", headers=headers)
     assert r.status_code == 401
+
+
+def test_the_desktop_says_which_tenants_it_is_and_the_browser_cannot(monkeypatch):
+    """The director leaves out other tenants' consoles for the zone it is told.
+
+    That zone is this desktop's own tenant, from its configuration: a query
+    parameter from the browser naming another one is dropped.
+    """
+    seen = {}
+
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, params=None, headers=None):
+            seen["params"] = params
+            return httpx.Response(200, json={"tiles": []}, request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(cluster.httpx, "AsyncClient", FakeClient)
+    client = TestClient(_app(_settings(GENTIAN_TENANT="platform")))
+    r = client.get("/api/v1/cluster/tiles?tenant=test", headers={"Authorization": "Bearer t"})
+
+    assert r.status_code == 200
+    assert seen["params"] == {"tenant": "platform"}

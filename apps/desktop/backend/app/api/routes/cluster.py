@@ -69,11 +69,19 @@ async def cluster_tiles(
     for it would be wrong for every tenant user.
     """
     url = f"{_base_url(settings)}/v1/clusters/{_cluster(settings)}/tiles"
+    # Which tenant's desktop this is, stated here and not taken from the
+    # browser: the director leaves out other tenants' consoles, which sit
+    # behind their own zone's session and would open onto a sign-in this
+    # person has no account for.
+    params = dict(request.query_params)
+    params.pop("tenant", None)
+    if settings.gentian_tenant:
+        params["tenant"] = settings.gentian_tenant
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             upstream = await client.get(
                 url,
-                params=dict(request.query_params),
+                params=params,
                 headers={"Authorization": f"Bearer {_token(credentials)}"},
             )
     except httpx.RequestError as exc:
