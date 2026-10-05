@@ -1,4 +1,4 @@
-# The sign-in router: static files, nothing to build. Served by the same small
+# The concierge: static files, nothing to build. Served by the same small
 # static server the consoles' web images run, as the same unprivileged user.
 FROM node:22-alpine
 RUN npm install -g serve@14.2.4

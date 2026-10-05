@@ -1,6 +1,6 @@
-name: sign-in
+name: concierge
 
-# The sign-in router: builds the sign-in-web image from apps/sign-in/. Unlike
+# The concierge: builds the concierge-web image from apps/concierge/. Unlike
 # the consoles it is not a component and has no chart: gentian-os runs it
 # beside the identity provider, which is where it is served from.
 
@@ -12,18 +12,18 @@ on:
       - "fix/**"
       - "chore/**"
     paths:
-      - "apps/sign-in/**"
-      - ".github/workflows/sign-in.yaml"
+      - "apps/concierge/**"
+      - ".github/workflows/concierge.yaml"
   pull_request:
     branches:
       - develop
     paths:
-      - "apps/sign-in/**"
-      - ".github/workflows/sign-in.yaml"
+      - "apps/concierge/**"
+      - ".github/workflows/concierge.yaml"
   workflow_dispatch:
 
 env:
-  WEB_IMAGE: ghcr.io/gentian-org/sign-in-web
+  WEB_IMAGE: ghcr.io/gentian-org/concierge-web
 
 jobs:
   test:
@@ -36,7 +36,7 @@ jobs:
           node-version: "22"
 
       - name: Routing tests
-        working-directory: apps/sign-in
+        working-directory: apps/concierge
         run: npm test
 
   build:
@@ -78,8 +78,8 @@ jobs:
       - name: Build and push web
         uses: docker/build-push-action@v6
         with:
-          context: apps/sign-in
-          file: apps/sign-in/Dockerfile
+          context: apps/concierge
+          file: apps/concierge/Dockerfile
           push: >-
             ${{ github.event_name != 'pull_request'
             && github.ref == 'refs/heads/develop' }}

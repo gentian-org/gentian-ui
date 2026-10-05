@@ -1,5 +1,5 @@
 {
-  "name": "sign-in",
+  "name": "concierge",
   "private": true,
   "type": "module",
   "description": "Where an address signs in: routes an e-mail address to its workspace's console.",

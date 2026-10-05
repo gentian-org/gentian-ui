@@ -1,4 +1,4 @@
-# sign-in
+# concierge
 
 The page at `https://id.<kernel>/sign-in/`, which the kernel domain's apex
 sends people to. It asks for an e-mail address and sends the browser to the
@@ -40,5 +40,5 @@ hosts; it holds nothing that is not on every page anyway.
 Static files, no build: `site/sign-in/` is what is served. `symlinks` is on in
 `serve.json` because a mounted ConfigMap is a directory of symlinks. `npm test` runs the
 routing tests with Node's own test runner. The image is built by
-`.github/workflows/sign-in.yaml` and run by gentian-os beside the identity
+`.github/workflows/concierge.yaml` and run by gentian-os beside the identity
 provider (`kernel/services/keycloak-idp`).
