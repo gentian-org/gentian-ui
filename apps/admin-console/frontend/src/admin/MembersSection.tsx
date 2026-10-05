@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   fetchIdentitySettings,
@@ -176,7 +176,20 @@ function InviteCard({
   const [localEdited, setLocalEdited] = useState(false);
   const [email, setEmail] = useState("");
   const [template, setTemplate] = useState("");
-  const [chosen, setChosen] = useState<string[]>([]);
+  // The apps the tenant provisioned for everybody start ticked: a new person
+  // gets them unless somebody says otherwise. The list arrives after the form
+  // is drawn, so the defaults are applied when it does -- and only until
+  // somebody has changed the selection themselves.
+  const defaults = useMemo(() => groups.filter((g) => g.defaultGrant).map((g) => g.path), [groups]);
+  const [chosen, setChosenState] = useState<string[]>(defaults);
+  const [chosenEdited, setChosenEdited] = useState(false);
+  useEffect(() => {
+    if (!chosenEdited) setChosenState(defaults);
+  }, [defaults, chosenEdited]);
+  const setChosen = (next: string[]) => {
+    setChosenEdited(true);
+    setChosenState(next);
+  };
   const [requireTotpOnAccept, setRequireTotpOnAccept] = useState(false);
 
   const templatesQuery = useQuery({
@@ -200,7 +213,8 @@ function InviteCard({
     setLocalEdited(false);
     setEmail("");
     setTemplate("");
-    setChosen([]);
+    setChosenEdited(false);
+    setChosenState(defaults);
     setRequireTotpOnAccept(false);
   };
 

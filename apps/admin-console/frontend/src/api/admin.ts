@@ -983,6 +983,9 @@ export type PersonGroup = {
   name: string;
   /** Made by an administrator here, and so the only kind that can be deleted. */
   custom?: boolean;
+  /** An app the tenant provisioned for everybody rather than only installed:
+   *  ticked when a person is added, so it is opt-out for new people. */
+  defaultGrant?: boolean;
 };
 
 export type SettingsTemplate = { id: string; name: string };
