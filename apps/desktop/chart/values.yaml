@@ -170,7 +170,7 @@ director:
 
 # The usher: what the desktop asks which tiles a person may open. Read-only,
 # on the cluster network, answered with the caller's own token. Set by the
-# operator; empty falls back to the director's route.
+# operator; with none the desktop's tiles request answers 503.
 usher:
   url: ""
 

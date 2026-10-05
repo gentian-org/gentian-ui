@@ -1,10 +1,10 @@
-"""The console asks the director which kernel consoles a person may open.
+"""The desktop asks the usher which tiles a person may open.
 
-What matters here is that the console adds no authority of its own. The tile
-list is the director's answer about this person, decided from their relations
-to the cluster -- not a list the console filters by asking whether the caller
-is an administrator. So the caller's own token must reach the director
-unchanged, and whatever it answers must come back unchanged.
+What matters here is that the desktop adds no authority of its own, and that
+it never papers over a failure. The tile list is the usher's answer about this
+person, so the caller's own token must reach it unchanged, the tenant asked
+about must be this desktop's own, and whatever comes back -- including a
+refusal -- must come back unchanged.
 """
 
 import httpx
@@ -24,99 +24,83 @@ def _app(settings: Settings) -> FastAPI:
 
 
 def _settings(**over) -> Settings:
-    return Settings(
-        AUTH_DISABLED="true",
-        KERNEL_DOMAIN="desk.gentian.org",
-        DIRECTOR_URL=over.pop("director_url", "http://director.test:8080"),
-        GENTIAN_CLUSTER_ID=over.pop("cluster_id", "demo"),
-        **over,
-    )
+    values = {
+        "AUTH_DISABLED": "true",
+        "KERNEL_DOMAIN": "desk.gentian.org",
+        "USHER_URL": "http://usher.test:8080/",
+        "GENTIAN_TENANT": "acme",
+    }
+    values.update(over)
+    return Settings(**{k: v for k, v in values.items() if v is not None})
 
 
-def test_the_callers_token_is_what_reaches_the_director(monkeypatch):
+def _fake(monkeypatch, respond):
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, headers=None):
+            return respond(url, headers or {})
+
+    monkeypatch.setattr(cluster.httpx, "AsyncClient", FakeClient)
+
+
+def test_the_callers_token_reaches_the_usher_for_this_desktops_tenant(monkeypatch):
     seen = {}
 
-    class FakeClient:
-        def __init__(self, *a, **kw):
-            pass
+    def respond(url, headers):
+        seen["url"] = url
+        seen["auth"] = headers.get("Authorization")
+        return httpx.Response(
+            200, json={"tenant": "acme", "tiles": []}, request=httpx.Request("GET", url)
+        )
 
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def get(self, url, params=None, headers=None):
-            seen["url"] = url
-            seen["auth"] = (headers or {}).get("Authorization")
-            return httpx.Response(
-                200,
-                json={"cluster": "demo", "kernelDomain": "desk.gentian.org", "tiles": []},
-                request=httpx.Request("GET", url),
-            )
-
-    monkeypatch.setattr(cluster.httpx, "AsyncClient", FakeClient)
+    _fake(monkeypatch, respond)
     client = TestClient(_app(_settings()))
-    r = client.get("/api/v1/cluster/tiles", headers={"Authorization": "Bearer person-token"})
+    # The browser naming another tenant changes nothing: the tenant is this
+    # desktop's own, from its configuration.
+    r = client.get(
+        "/api/v1/cluster/tiles?tenant=other", headers={"Authorization": "Bearer person-token"}
+    )
 
     assert r.status_code == 200
-    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/tiles"
-    # The person's token, not a credential of the console's own.
+    assert seen["url"] == "http://usher.test:8080/v1/tenants/acme/tiles"
+    # The person's token, not a credential of the desktop's own.
     assert seen["auth"] == "Bearer person-token"
-
-
-def test_a_person_with_no_cluster_relation_gets_an_empty_list(monkeypatch):
-    """Holding nothing is an ordinary answer, not an error.
-
-    Every tenant user is in this position, and a console that rendered a
-    failure for them would be wrong for almost everyone who signs in.
-    """
-
-    class FakeClient:
-        def __init__(self, *a, **kw):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def get(self, url, params=None, headers=None):
-            return httpx.Response(
-                200,
-                json={"cluster": "demo", "kernelDomain": "desk.gentian.org", "tiles": []},
-                request=httpx.Request("GET", url),
-            )
-
-    monkeypatch.setattr(cluster.httpx, "AsyncClient", FakeClient)
-    client = TestClient(_app(_settings()))
-    r = client.get("/api/v1/cluster/tiles", headers={"Authorization": "Bearer t"})
-    assert r.status_code == 200
     assert r.json()["tiles"] == []
 
 
-def test_an_unconfigured_director_says_so_rather_than_pretending():
-    client = TestClient(_app(_settings(director_url=None)))
+@pytest.mark.parametrize("status", [403, 503])
+def test_the_ushers_refusal_comes_back_as_it_is(monkeypatch, status):
+    """A refusal or a failure is not turned into an empty desktop."""
+
+    def respond(url, headers):
+        return httpx.Response(status, json={"error": "x"}, request=httpx.Request("GET", url))
+
+    _fake(monkeypatch, respond)
+    client = TestClient(_app(_settings()))
+    r = client.get("/api/v1/cluster/tiles", headers={"Authorization": "Bearer t"})
+    assert r.status_code == status
+
+
+@pytest.mark.parametrize("missing", ["USHER_URL", "GENTIAN_TENANT"])
+def test_an_unconfigured_desktop_says_so_rather_than_pretending(missing):
+    client = TestClient(_app(_settings(**{missing: None})))
     r = client.get("/api/v1/cluster/tiles", headers={"Authorization": "Bearer t"})
     assert r.status_code == 503
 
 
-def test_an_unreachable_director_is_a_gateway_error(monkeypatch):
-    class FakeClient:
-        def __init__(self, *a, **kw):
-            pass
+def test_an_unreachable_usher_is_a_gateway_error(monkeypatch):
+    def respond(url, headers):
+        raise httpx.ConnectError("refused", request=httpx.Request("GET", url))
 
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def get(self, url, params=None, headers=None):
-            raise httpx.ConnectError("refused", request=httpx.Request("GET", url))
-
-    monkeypatch.setattr(cluster.httpx, "AsyncClient", FakeClient)
+    _fake(monkeypatch, respond)
     client = TestClient(_app(_settings()))
     r = client.get("/api/v1/cluster/tiles", headers={"Authorization": "Bearer t"})
     assert r.status_code == 502
@@ -128,72 +112,3 @@ def test_no_token_is_refused_before_anything_is_forwarded(header):
     headers = {"Authorization": header} if header is not None else {}
     r = client.get("/api/v1/cluster/tiles", headers=headers)
     assert r.status_code == 401
-
-
-def test_the_desktop_says_which_tenants_it_is_and_the_browser_cannot(monkeypatch):
-    """The director leaves out other tenants' consoles for the zone it is told.
-
-    That zone is this desktop's own tenant, from its configuration: a query
-    parameter from the browser naming another one is dropped.
-    """
-    seen = {}
-
-    class FakeClient:
-        def __init__(self, *a, **kw):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def get(self, url, params=None, headers=None):
-            seen["params"] = params
-            return httpx.Response(200, json={"tiles": []}, request=httpx.Request("GET", url))
-
-    monkeypatch.setattr(cluster.httpx, "AsyncClient", FakeClient)
-    client = TestClient(_app(_settings(GENTIAN_TENANT="platform")))
-    r = client.get("/api/v1/cluster/tiles?tenant=test", headers={"Authorization": "Bearer t"})
-
-    assert r.status_code == 200
-    assert seen["params"] == {"tenant": "platform"}
-
-
-def test_with_an_usher_the_tiles_are_asked_of_it_for_this_desktops_tenant(monkeypatch):
-    """The tenant's own people are answered by the usher.
-
-    The director's route is open only to people holding a relation on the
-    cluster, which a tenant's administrator does not. The tenant in the path
-    is this desktop's own, and nothing the browser sends changes it.
-    """
-    seen = {}
-
-    class FakeClient:
-        def __init__(self, *a, **kw):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def get(self, url, params=None, headers=None):
-            seen["url"] = url
-            seen["params"] = params
-            seen["auth"] = (headers or {}).get("Authorization")
-            return httpx.Response(
-                200, json={"tenant": "acme", "tiles": []}, request=httpx.Request("GET", url)
-            )
-
-    monkeypatch.setattr(cluster.httpx, "AsyncClient", FakeClient)
-    client = TestClient(_app(_settings(GENTIAN_TENANT="acme", USHER_URL="http://usher.test:8080/")))
-    r = client.get(
-        "/api/v1/cluster/tiles?tenant=other", headers={"Authorization": "Bearer person-token"}
-    )
-
-    assert r.status_code == 200
-    assert seen["url"] == "http://usher.test:8080/v1/tenants/acme/tiles"
-    assert seen["params"] == {}
-    assert seen["auth"] == "Bearer person-token"

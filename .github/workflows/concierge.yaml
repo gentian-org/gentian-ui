@@ -1,8 +1,9 @@
 name: concierge
 
-# The concierge: builds the concierge-web image from apps/concierge/. Unlike
-# the consoles it is not a component and has no chart: gentian-os runs it
-# beside the identity provider, which is where it is served from.
+# The concierge: builds the concierge-web image and the concierge chart from
+# apps/concierge/, the way the consoles' are built. gentian-os installs it as
+# a component of the platform tenant and publishes it on the cluster's bare
+# domain from that tenant's DMZ.
 
 on:
   push:
@@ -88,3 +89,43 @@ jobs:
             ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.tag }}
             ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.short }}
             ${{ env.WEB_IMAGE }}:${{ steps.meta.outputs.immutable }}
+
+  chart:
+    # A component is installed from a chart the operator resolves through
+    # provider-helm, which pulls from a registry. Published like the
+    # consoles': a moving prerelease per branch and an immutable one per
+    # commit, the moving one naming the immutable one in appVersion.
+    runs-on: ubuntu-latest
+    # After the image: the chart names the image of the build it came from.
+    needs: [test, build]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Chart version
+        id: chart
+        run: |
+          base="$(sed -n 's/^version: *//p' apps/concierge/chart/Chart.yaml)"
+          short="${GITHUB_SHA::7}"
+          branch="${GITHUB_REF_NAME//\//-}"
+          echo "moving=${base}-${branch}" >> "$GITHUB_OUTPUT"
+          echo "immutable=${base}-${branch}.${short}" >> "$GITHUB_OUTPUT"
+          echo "image=${branch}-${short}" >> "$GITHUB_OUTPUT"
+      - name: Name this build's image
+        run: |
+          sed -i 's/^\(\s*tag:\) "0\.1\.0"$/\1 "${{ steps.chart.outputs.image }}"/' apps/concierge/chart/values.yaml
+          test "$(grep -c 'tag: "${{ steps.chart.outputs.image }}"' apps/concierge/chart/values.yaml)" = 1
+      - name: Lint and package
+        run: |
+          helm lint apps/concierge/chart
+          helm package apps/concierge/chart --version "${{ steps.chart.outputs.immutable }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-immutable
+          helm package apps/concierge/chart --version "${{ steps.chart.outputs.moving }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-moving
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Push
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
+        run: |
+          helm push /tmp/chart-immutable/*.tgz oci://ghcr.io/gentian-org/charts
+          helm push /tmp/chart-moving/*.tgz oci://ghcr.io/gentian-org/charts

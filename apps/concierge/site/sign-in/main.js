@@ -41,6 +41,27 @@ async function applyConfig() {
     // No configuration: no lookup, and every unplaced address is asked for
     // its workspace.
   }
+  await forwardWhenSingle();
+}
+
+// A cluster with one tenant has one console, and nobody needs asking which.
+// The operator says so with one file in the lookup directory; where it is
+// absent this is a cluster of many workspaces and the form stays.
+async function forwardWhenSingle() {
+  if (!lookup) return;
+  try {
+    const res = await fetch(`${lookup}_single.json`, { cache: "no-store" });
+    if (!res.ok) return;
+    const { url } = await res.json();
+    if (typeof url !== "string") return;
+    const target = new URL(url);
+    // Only ever a console of this cluster.
+    if (target.protocol === "https:" && target.hostname === `console.${kernelDomain}`) {
+      window.location.replace(target.href);
+    }
+  } catch {
+    // The form stays.
+  }
 }
 
 // What the cluster calls itself and its logo, from the brand the operator

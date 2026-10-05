@@ -11,11 +11,9 @@
 const LABEL = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 const ADDRESS = /^[^\s@]+@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/;
 
-/** The kernel domain this page is served under: id.<kernel>, or the kernel
- * domain itself when it is served there. */
+/** The kernel domain this page is served on: the cluster's bare domain. */
 export function kernelDomainOf(hostname) {
-  const host = String(hostname || "").toLowerCase();
-  return host.startsWith("id.") ? host.slice(3) : host;
+  return String(hostname || "").toLowerCase();
 }
 
 /** Normalises an address, or returns "" when it is not one. */

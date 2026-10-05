@@ -56,5 +56,12 @@
       "destination": "/sign-in/index.html"
     }
   ],
-  "symlinks": true
+  "symlinks": true,
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/sign-in/",
+      "type": 302
+    }
+  ]
 }

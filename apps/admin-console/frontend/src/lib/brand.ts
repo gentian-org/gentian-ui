@@ -5,9 +5,9 @@ import { getOidcConfig } from "@/auth/oidc";
  * The cluster's brand: what this page calls the product, its icon, and its
  * look.
  *
- * The operator renders it from the cluster's Branding and the identity
- * provider's host serves it, at https://id.<kernel>/branding/, for every page
- * on the cluster: brand.css holds the design tokens as --brand-* custom
+ * The operator renders it from the cluster's Branding and the concierge
+ * serves it on the cluster's bare domain, at https://<kernel>/branding/, for
+ * every page on the cluster: brand.css holds the design tokens as --brand-* custom
  * properties, which the design system reads with its own values as fallback,
  * and brand.json the name, the icons and whether to show the platform
  * vendor's offers. Without either the page is the platform's own.
@@ -28,7 +28,7 @@ const listeners = new Set<() => void>();
 
 function brandBase(): string | null {
   const kernel = getOidcConfig().kernelDomain;
-  return kernel ? `https://id.${kernel}/branding/` : null;
+  return kernel ? `https://${kernel}/branding/` : null;
 }
 
 /** The icon a page shows as its logo: the first whose purpose admits "any". */

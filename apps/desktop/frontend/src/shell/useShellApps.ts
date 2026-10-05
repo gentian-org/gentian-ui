@@ -101,16 +101,18 @@ export function useShellApps() {
     retry: 1,
   });
 
-  // The cluster's own consoles, from the director. Asked separately because
-  // the answer is not the console's to compute: the director decides it from
-  // this person's relations to the cluster, so a tenant administrator and a
-  // platform administrator get different lists and neither is "everyone who
-  // is an admin".
+  // The tiles this person may open here, from the usher. Asked separately
+  // because the answer is not the desktop's to compute: the usher decides it
+  // from this person's relations, tile by tile.
   //
-  // A failure here is not a failure of the desktop. Someone with no cluster
-  // relation gets an empty list, which is the same shape as a director that
-  // cannot be reached, and the apps this person does hold still render.
-  const { data: clusterTiles } = useQuery({
+  // A failure here is a failure of the desktop and is shown as one. Someone
+  // who may open nothing gets an empty list with a 200; an error is a
+  // different thing, and rendering it as an empty desktop would hide it.
+  const {
+    data: clusterTiles,
+    isError: tilesFailed,
+    refetch: refetchTiles,
+  } = useQuery({
     queryKey: ["cluster-tiles"],
     queryFn: () => apiFetch<ClusterTilesResponse>("/cluster/tiles"),
     enabled: sessionReady && hasToken,
@@ -186,11 +188,14 @@ export function useShellApps() {
     apps,
     isAdminUser,
     adminOnly,
-    // The session request failed. Distinct from "this user has no apps": both
+    // The session request or the tiles request failed. Distinct from "this user has no apps": both
     // leave `apps` empty, and rendering them the same way turns any backend or
     // edge fault into a silent, plausible-looking empty desktop.
-    loadFailed: isError,
-    reload: refetch,
+    loadFailed: isError || tilesFailed,
+    reload: () => {
+      void refetch();
+      void refetchTiles();
+    },
     isLoading: !sessionReady || !hasToken || meLoading || (isFetching && !isFetched),
   };
 }

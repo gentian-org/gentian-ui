@@ -208,14 +208,3 @@ async def activate_tenant_admin(
         bearer_of(credentials),
         json_body=payload,
     )
-
-
-@router.get("/tiles")
-async def cluster_tiles(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    return await director.forward(
-        settings, "GET", _cluster_path(settings, "/tiles"), bearer_of(credentials)
-    )

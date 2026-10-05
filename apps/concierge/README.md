@@ -1,7 +1,9 @@
 # concierge
 
-The page at `https://id.<kernel>/sign-in/`, which the kernel domain's apex
-sends people to. It asks for an e-mail address and sends the browser to the
+The page on a cluster's bare domain, `https://<kernel>/`: the first thing
+anybody typing the cluster's address meets. gentian-os installs it as a
+component of the platform tenant from `chart/` and publishes it from that
+tenant's DMZ, with no session in front of it. It asks for an e-mail address and sends the browser to the
 console of the workspace the address belongs to:
 
 | Address | Goes to |
@@ -25,6 +27,10 @@ host.
 | Key | Meaning |
 |---|---|
 | `lookup` | A same-origin directory the page asks about addresses it cannot place: `GET <lookup><sha256-hex of the domain>.json` answering `{"url": "https://..."}`, or 404. gentian-os sets `/sign-in/lookup/` and the operator fills it with the tenants' custom domains; hashing the name means a domain is found only by someone who already knows it. |
+
+On a cluster with one tenant the operator puts `_single.json` in the lookup
+directory, naming that tenant's console, and the page sends everybody there
+without asking.
 
 ## The cluster's brand
 

@@ -11,9 +11,8 @@ import {
 const KERNEL = "gentian-os.org";
 
 test("the page knows the kernel from the identity provider's host", () => {
-  assert.equal(kernelDomainOf("id.gentian-os.org"), KERNEL);
-  assert.equal(kernelDomainOf("ID.Gentian-OS.org"), KERNEL);
   assert.equal(kernelDomainOf("gentian-os.org"), KERNEL);
+  assert.equal(kernelDomainOf("Gentian-OS.org"), KERNEL);
 });
 
 test("a tenant's address goes to that tenant's console", () => {
