@@ -2,10 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  HINT_COOKIE,
-  hintCookie,
   kernelDomainOf,
   routeAddress,
+  withLoginHint,
   workspaceConsole,
 } from "../site/sign-in/route.js";
 
@@ -48,11 +47,10 @@ test("a workspace named by hand is a tenant on this kernel, or nothing", () => {
   assert.equal(workspaceConsole("", KERNEL), "");
 });
 
-test("the hint reaches only the realm pages, briefly, and over TLS", () => {
-  const cookie = hintCookie("admin@test.gentian-os.org");
-  assert.ok(cookie.startsWith(`${HINT_COOKIE}=admin%40test.gentian-os.org;`));
-  assert.match(cookie, /Path=\/auth\/realms\//);
-  assert.match(cookie, /Max-Age=600/);
-  assert.match(cookie, /Secure/);
-  assert.doesNotMatch(cookie, /Domain=/);
+test("the address travels to the console as login_hint, and nowhere else", () => {
+  assert.equal(
+    withLoginHint("https://console.test.gentian-os.org/", "admin@test.gentian-os.org"),
+    "https://console.test.gentian-os.org/?login_hint=admin%40test.gentian-os.org",
+  );
+  assert.equal(withLoginHint("https://console.test.gentian-os.org/", ""), "https://console.test.gentian-os.org/");
 });

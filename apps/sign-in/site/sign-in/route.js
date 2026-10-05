@@ -58,11 +58,17 @@ export function workspaceConsole(name, kernelDomain) {
   return LABEL.test(tenant) ? consoleOf(`${tenant}.${kernelDomain}`) : "";
 }
 
-/** The cookie that carries the address to the identity provider's sign-in
- * form, which fills it in. Host-only on id.<kernel> and scoped to the realm
- * pages, so nothing but that form ever receives it, and short-lived. */
-export const HINT_COOKIE = "gentian_login_hint";
-
-export function hintCookie(address) {
-  return `${HINT_COOKIE}=${encodeURIComponent(address)}; Path=/auth/realms/; Max-Age=600; Secure; SameSite=Lax`;
+/**
+ * The console address with the person's address on it, as login_hint.
+ *
+ * The console is behind the edge, which starts the sign-in and hands the
+ * identity provider the address it was asked for inside the request's
+ * `state`. The identity provider's sign-in form reads the hint from there
+ * and fills the username. Nothing is stored anywhere to make that work: no
+ * cookie, and nothing on the identity provider's host.
+ */
+export function withLoginHint(consoleUrl, address) {
+  const url = new URL(consoleUrl);
+  if (address) url.searchParams.set("login_hint", address);
+  return url.toString();
 }

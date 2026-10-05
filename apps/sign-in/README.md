@@ -11,10 +11,12 @@ console of the workspace the address belongs to:
 | anything else | asks for the workspace's name |
 
 The page asks the server nothing, so it cannot reveal whether an account
-exists. It hands the address to the workspace's sign-in form through a
-short-lived cookie that only the identity provider's realm pages receive
-(`gentian_login_hint`, host-only on `id.<kernel>`, path `/auth/realms/`); the
-login theme in gentian-os fills the username from it.
+exists. It hands the address on as `?login_hint=` on the console's address:
+the edge in front of the console starts the sign-in and passes the address it
+was asked for to the identity provider inside the request's `state`, and the
+login theme in gentian-os reads the hint from there and fills the username.
+No cookie is set and nothing of this page's lives on the identity provider's
+host.
 
 ## Configuration
 

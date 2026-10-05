@@ -1,4 +1,4 @@
-import { hintCookie, kernelDomainOf, routeAddress, workspaceConsole } from "./route.js";
+import { kernelDomainOf, routeAddress, withLoginHint, workspaceConsole } from "./route.js";
 
 const kernelDomain = kernelDomainOf(window.location.hostname);
 const $ = (id) => document.getElementById(id);
@@ -69,8 +69,7 @@ async function applyBrand() {
 }
 
 function go(url, address) {
-  if (address) document.cookie = hintCookie(address);
-  window.location.assign(url);
+  window.location.assign(withLoginHint(url, address));
 }
 
 function showError(id, message) {
