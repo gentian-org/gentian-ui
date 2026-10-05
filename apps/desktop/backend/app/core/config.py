@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     # which kernel consoles this person may open, decided from the cluster
     # relations rather than from whether they are an administrator.
     director_url: str | None = Field(default=None, alias="DIRECTOR_URL")
+    # The usher, on the cluster network: the read-only service that answers
+    # which tiles this person may open on this tenant's desktop. It holds no
+    # authority; the tenant's own people are answered there, where the
+    # director answers only those who hold a relation on the cluster.
+    usher_url: str | None = Field(default=None, alias="USHER_URL")
     # Which cluster this console belongs to, as the director names it.
     cluster_id: str | None = Field(default=None, alias="GENTIAN_CLUSTER_ID")
 

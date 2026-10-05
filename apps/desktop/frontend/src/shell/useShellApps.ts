@@ -12,7 +12,7 @@ import { localisedLabel } from "@/lib/locale";
 import { getAccessToken, isEdgeSession } from "@/auth/oidc";
 import type { StoreContext } from "@/shell/storeBridge";
 
-/** The director's tiles, in the shape the desktop renders. */
+/** The usher's tiles, in the shape the desktop renders. */
 function kernelConsoleApps(data: ClusterTilesResponse | undefined): ShellApp[] {
   return (data?.tiles ?? []).map((tile) => ({
     id: `kernel-${tile.name}`,

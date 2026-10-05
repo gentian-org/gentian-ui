@@ -168,6 +168,12 @@ director:
   # Which cluster this console belongs to, as the director names it.
   cluster: ""
 
+# The usher: what the desktop asks which tiles a person may open. Read-only,
+# on the cluster network, answered with the caller's own token. Set by the
+# operator; empty falls back to the director's route.
+usher:
+  url: ""
+
 appLifecycle:
   url: ""
 

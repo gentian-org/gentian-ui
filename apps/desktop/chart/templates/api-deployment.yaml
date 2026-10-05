@@ -92,6 +92,10 @@ spec:
             - name: DIRECTOR_URL
               value: {{ .Values.director.url | quote }}
             {{- end }}
+            {{- if and .Values.usher.url (not (hasKey (default dict .Values.api.env) "USHER_URL")) }}
+            - name: USHER_URL
+              value: {{ .Values.usher.url | quote }}
+            {{- end }}
             {{- if .Values.director.cluster }}
             - name: GENTIAN_CLUSTER_ID
               value: {{ .Values.director.cluster | quote }}

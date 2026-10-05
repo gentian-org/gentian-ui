@@ -62,21 +62,34 @@ async def cluster_tiles(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """The kernel consoles this person may open, as the director decides them.
+    """The tiles this person may open on this desktop.
 
-    A person with no cluster relation gets an empty list rather than an error:
-    holding nothing is an ordinary answer, and a console that showed a failure
-    for it would be wrong for every tenant user.
+    Asked of the usher, which answers anybody who may enter the tenant and
+    filters each tile by that person's own relation. A person who may open
+    nothing gets an empty list rather than an error: holding nothing is an
+    ordinary answer.
     """
-    url = f"{_base_url(settings)}/v1/clusters/{_cluster(settings)}/tiles"
-    # Which tenant's desktop this is, stated here and not taken from the
-    # browser: the director leaves out other tenants' consoles, which sit
-    # behind their own zone's session and would open onto a sign-in this
-    # person has no account for.
-    params = dict(request.query_params)
-    params.pop("tenant", None)
-    if settings.gentian_tenant:
-        params["tenant"] = settings.gentian_tenant
+    usher = getattr(settings, "usher_url", None)
+    if usher and settings.gentian_tenant:
+        # The usher answers for one tenant, named in the path from this
+        # desktop's own configuration and never from the browser, and is open
+        # to whoever may enter that tenant.
+        url = f"{usher.rstrip('/')}/v1/tenants/{settings.gentian_tenant}/tiles"
+        params: dict = {}
+        upstream_name = "The usher"
+    else:
+        # A cluster whose operator runs no usher yet: the director's route,
+        # which answers only people holding a relation on the cluster.
+        url = f"{_base_url(settings)}/v1/clusters/{_cluster(settings)}/tiles"
+        # Which tenant's desktop this is, stated here and not taken from the
+        # browser: the director leaves out other tenants' consoles, which sit
+        # behind their own zone's session and would open onto a sign-in this
+        # person has no account for.
+        params = dict(request.query_params)
+        params.pop("tenant", None)
+        if settings.gentian_tenant:
+            params["tenant"] = settings.gentian_tenant
+        upstream_name = "The director"
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             upstream = await client.get(
@@ -87,7 +100,7 @@ async def cluster_tiles(
     except httpx.RequestError as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"The director is unreachable: {exc}",
+            detail=f"{upstream_name} is unreachable: {exc}",
         ) from exc
 
     return Response(

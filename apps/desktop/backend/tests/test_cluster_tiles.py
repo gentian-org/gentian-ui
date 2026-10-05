@@ -158,3 +158,42 @@ def test_the_desktop_says_which_tenants_it_is_and_the_browser_cannot(monkeypatch
 
     assert r.status_code == 200
     assert seen["params"] == {"tenant": "platform"}
+
+
+def test_with_an_usher_the_tiles_are_asked_of_it_for_this_desktops_tenant(monkeypatch):
+    """The tenant's own people are answered by the usher.
+
+    The director's route is open only to people holding a relation on the
+    cluster, which a tenant's administrator does not. The tenant in the path
+    is this desktop's own, and nothing the browser sends changes it.
+    """
+    seen = {}
+
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, params=None, headers=None):
+            seen["url"] = url
+            seen["params"] = params
+            seen["auth"] = (headers or {}).get("Authorization")
+            return httpx.Response(
+                200, json={"tenant": "acme", "tiles": []}, request=httpx.Request("GET", url)
+            )
+
+    monkeypatch.setattr(cluster.httpx, "AsyncClient", FakeClient)
+    client = TestClient(_app(_settings(GENTIAN_TENANT="acme", USHER_URL="http://usher.test:8080/")))
+    r = client.get(
+        "/api/v1/cluster/tiles?tenant=other", headers={"Authorization": "Bearer person-token"}
+    )
+
+    assert r.status_code == 200
+    assert seen["url"] == "http://usher.test:8080/v1/tenants/acme/tiles"
+    assert seen["params"] == {}
+    assert seen["auth"] == "Bearer person-token"

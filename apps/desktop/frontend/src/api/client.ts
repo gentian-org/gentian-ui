@@ -135,7 +135,7 @@ export type ShellApp = {
   builtin?: boolean;
 };
 
-/** A kernel console, as the director decides this person may open it. */
+/** A tile this person may open, as the usher answered for them. */
 export type ClusterTile = {
   name: string;
   /** The label, and the fallback for a locale that has no translation. */
@@ -151,8 +151,6 @@ export type ClusterTile = {
 };
 
 export type ClusterTilesResponse = {
-  cluster: string;
-  kernelDomain: string;
   tiles: ClusterTile[];
 };
 
