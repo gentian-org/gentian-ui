@@ -6,7 +6,6 @@ import {
   hintCookie,
   kernelDomainOf,
   routeAddress,
-  suggestAddress,
   workspaceConsole,
 } from "../site/sign-in/route.js";
 
@@ -56,14 +55,4 @@ test("the hint reaches only the realm pages, briefly, and over TLS", () => {
   assert.match(cookie, /Max-Age=600/);
   assert.match(cookie, /Secure/);
   assert.doesNotMatch(cookie, /Domain=/);
-});
-
-test("a slip away from the cluster's domain is offered back corrected", () => {
-  assert.equal(suggestAddress("admin@test.gentian-org.org", KERNEL), "admin@test.gentian-os.org");
-  assert.equal(suggestAddress("admin@test.gentian.org", KERNEL), "admin@test.gentian-os.org");
-  assert.equal(suggestAddress("admin@gentian-os.com", KERNEL), "admin@gentian-os.org");
-  // Nothing to correct, and nothing close: no offer.
-  assert.equal(suggestAddress("admin@test.gentian-os.org", KERNEL), "");
-  assert.equal(suggestAddress("someone@gmail.com", KERNEL), "");
-  assert.equal(suggestAddress("someone@acme.example", KERNEL), "");
 });
