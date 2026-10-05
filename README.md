@@ -17,3 +17,7 @@ Charts go to `oci://ghcr.io/gentian-org/charts` from `develop`, as
 
 No `profile/` in either app: the profiles live in gentian-os, with the platform
 that installs them. See [AGENTS.md](AGENTS.md) for conventions.
+
+## License
+
+Apache-2.0 — see [LICENSE](LICENSE). Permissive on purpose: the desktop and the consoles are what an organisation is most likely to change for itself.
