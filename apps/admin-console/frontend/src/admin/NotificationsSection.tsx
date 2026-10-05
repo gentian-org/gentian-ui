@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
-  fetchGroups,
   fetchNotifications,
+  fetchPersonGroups,
   publishNotification,
-  type AdminGroup,
+  type PersonGroup,
   type NotificationSeverity,
 } from "@/api/admin";
 import "./admin.css";
@@ -61,7 +61,7 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
 
   const groupsQuery = useQuery({
     queryKey: ["admin", "groups", tenant],
-    queryFn: () => fetchGroups(tenant),
+    queryFn: () => fetchPersonGroups(tenant),
   });
 
   const notificationsQuery = useQuery({
@@ -103,10 +103,20 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
     },
   });
 
-  const groups = groupsQuery.data ?? [];
+  // The groups answer names its tenant beside the list. This screen read it as
+  // a bare list, which is what an earlier endpoint returned, and crashed on
+  // the first render.
+  const groups = groupsQuery.data?.groups ?? [];
   const notifications = notificationsQuery.data ?? [];
+  // A list that could not be read is said to be unreadable. Drawn as empty it
+  // would say nothing was ever published, or that the tenant has no groups.
+  const loadError = notificationsQuery.isError
+    ? t("notifications.couldNotLoad", { reason: (notificationsQuery.error as Error).message })
+    : groupsQuery.isError
+      ? t("notifications.groupsCouldNotLoad", { reason: (groupsQuery.error as Error).message })
+      : null;
 
-  const toggleGroup = (group: AdminGroup) => {
+  const toggleGroup = (group: PersonGroup) => {
     setSelectedGroups((current) =>
       current.includes(group.name)
         ? current.filter((name) => name !== group.name)
@@ -131,6 +141,7 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
         {t("notifications.publishScopedBroadcastsToWorkspace")}</p>
 
       {error && <p className="admin-console__error">{error}</p>}
+      {loadError && <p className="admin-console__error">{loadError}</p>}
       {success && <p className="admin-console__success">{success}</p>}
 
       <form

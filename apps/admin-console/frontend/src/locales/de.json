@@ -383,6 +383,8 @@
   "notifications": {
     "audience": "Empfängerkreis",
     "audience2": "Empfängerkreis",
+    "couldNotLoad": "Die Benachrichtigungen konnten nicht geladen werden: {{reason}}",
+    "groupsCouldNotLoad": "Die Gruppen konnten nicht geladen werden: {{reason}}",
     "linkLabelOptional": "Linktext (optional)",
     "linkUrlOptional": "Link-URL (optional)",
     "message": "Nachricht",

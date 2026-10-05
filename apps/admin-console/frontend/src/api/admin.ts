@@ -135,10 +135,6 @@ export function updateMemberGroups(id: string, groupIds: string[], tenant?: stri
   });
 }
 
-export function fetchGroups(tenant?: string) {
-  return apiFetch<AdminGroup[]>(`/admin/groups${tenantQuery(tenant)}`);
-}
-
 export function createGroup(name: string, tenant?: string) {
   return apiFetch<AdminGroup>(`/admin/groups${tenantQuery(tenant)}`, {
     method: "POST",

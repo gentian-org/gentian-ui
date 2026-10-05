@@ -383,6 +383,8 @@
   "notifications": {
     "audience": "Audience",
     "audience2": "Audience",
+    "couldNotLoad": "The notifications could not be loaded: {{reason}}",
+    "groupsCouldNotLoad": "The groups could not be loaded: {{reason}}",
     "linkLabelOptional": "Link label (optional)",
     "linkUrlOptional": "Link URL (optional)",
     "message": "Message",
