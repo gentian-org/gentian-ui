@@ -1,4 +1,4 @@
-import { hintCookie, kernelDomainOf, routeAddress, workspaceConsole } from "./route.js";
+import { hintCookie, kernelDomainOf, routeAddress, suggestAddress, workspaceConsole } from "./route.js";
 
 const kernelDomain = kernelDomainOf(window.location.hostname);
 const $ = (id) => document.getElementById(id);
@@ -106,9 +106,21 @@ $("address-form").addEventListener("submit", async (event) => {
   $("unplaced").textContent =
     `${domain} is not a domain of this cluster. Addresses here end in @<workspace>.${kernelDomain}` +
     ` — check the address, or name the workspace.`;
+  // A slip away from this cluster's domain: offer the address they meant,
+  // one click from signing in with it.
+  const meant = suggestAddress(routed.address, kernelDomain);
+  const offer = $("suggestion");
+  offer.hidden = !meant;
+  if (meant) {
+    offer.textContent = `Did you mean ${meant}?`;
+    offer.onclick = () => {
+      const again = routeAddress(meant, kernelDomain);
+      if (again.kind === "console") go(again.url, again.address);
+    };
+  }
   $("address-form").hidden = true;
   $("workspace-form").hidden = false;
-  $("workspace").focus();
+  (meant ? offer : $("workspace")).focus();
 });
 
 $("workspace-form").addEventListener("submit", (event) => {
