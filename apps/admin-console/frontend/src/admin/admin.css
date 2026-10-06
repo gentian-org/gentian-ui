@@ -1505,3 +1505,17 @@
   justify-content: flex-end;
   gap: 0.5rem;
 }
+
+/* The licence report as it was sent: long lines scroll, nothing is wrapped
+   into something that was not in the body. */
+.admin-console__report-body {
+  margin: 0.5rem 0 1rem;
+  padding: 0.75rem 1rem;
+  overflow: auto;
+  max-height: 28rem;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-1);
+  font-size: 0.8rem;
+  white-space: pre;
+}

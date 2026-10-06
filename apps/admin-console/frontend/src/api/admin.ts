@@ -414,6 +414,39 @@ export function fetchCustomizationDebtReport() {
   return apiFetch<CustomizationDebtReport>("/admin/platform/customization-debt");
 }
 
+// What the cluster last reported about what it runs, and what became of the
+// attempt -- see docs/design/operations.md §6.2 in gentian-os. The usher
+// answers it to whoever holds can_audit on the cluster.
+export type LicenceReportOutcome = "accepted" | "failed" | "not-sent" | "sending";
+
+export type LicenceReportAttempt = {
+  at: string;
+  outcome: LicenceReportOutcome | string;
+  reason?: string;
+  httpStatus?: number;
+  error?: string;
+  nextAt?: string;
+};
+
+export type LicenceReportSent = {
+  sequence: number;
+  /** The request body byte for byte: it is what the signature is over. */
+  body: string;
+  signature: string;
+  keyId: string;
+};
+
+export type LicenceReport = {
+  enabled: boolean;
+  url?: string;
+  attempt?: LicenceReportAttempt;
+  report?: LicenceReportSent;
+};
+
+export function fetchLicenceReport() {
+  return apiFetch<LicenceReport>("/admin/platform/licence-report");
+}
+
 export function updatePlatformSecurityPolicy(allowedMacWaivers: MacWaiverEntry[]) {
   return apiFetch<PlatformSecurityPolicy>("/admin/platform/security-policy", {
     method: "PUT",

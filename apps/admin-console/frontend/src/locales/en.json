@@ -20,7 +20,8 @@
     "tenant": "tenant/",
     "tabMembers": "Members",
     "tabGroups": "Groups",
-    "tabExport": "Export"
+    "tabExport": "Export",
+    "tabLicenceReport": "Licence report"
   },
   "audit": {
     "action": "Action",
@@ -722,5 +723,34 @@
     "phase_ready": "<mono>{{tenant}}</mono> is imported.",
     "phase_failed": "Import of <mono>{{tenant}}</mono> failed: {{message}}",
     "passwordReset": "Members have no credentials yet: send them a password reset, and activate the administrator from the list above."
+  },
+  "licenceReport": {
+    "title": "Licence report",
+    "lead": "What this cluster reports about what it runs. The report contains no names or addresses, only addresses of the cluster and its tenants and counts.",
+    "loading": "Loading the licence report…",
+    "unavailable": "The licence report is not available.",
+    "off": "Licence reporting is turned off on this cluster. Nothing is sent, and the App Store is not offered.",
+    "state": "Licence reporting",
+    "on": "Turned on",
+    "sentTo": "Sent to",
+    "lastAttempt": "Last attempt",
+    "noAttempt": "No report has been due yet.",
+    "outcome": "Outcome",
+    "outcomeAccepted": "Accepted",
+    "outcomeFailed": "Failed",
+    "outcomeNotSent": "Not sent",
+    "outcomeSending": "Being sent",
+    "reasonSigningKeyAbsent": "The cluster has no signing key for its reports, so nothing was sent.",
+    "reasonSigningKeyInvalid": "The cluster's signing key for its reports cannot be used, so nothing was sent.",
+    "reasonInventoryUnavailable": "The cluster could not work out what it runs, so nothing was sent.",
+    "reasonEndpointUnreachable": "The address the report is sent to could not be reached. It is tried again.",
+    "reasonEndpointRefused": "The receiving end refused the report. It is tried again.",
+    "httpStatus": "The receiving end answered {{status}}.",
+    "nextAttempt": "Next attempt",
+    "exactlyWhatWasSent": "Exactly what was sent",
+    "sequence": "Report number {{sequence}}, indented here for reading.",
+    "signature": "Signature",
+    "keyId": "Key id",
+    "nothingSent": "No report has been sent yet."
   }
 }

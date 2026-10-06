@@ -99,6 +99,12 @@
       "confirm": "Ändern"
     },
     "title": "App Store",
+    "unavailable": {
+      "licenceReport": "Der App Store setzt die Lizenzmeldung voraus, die auf diesem Cluster ausgeschaltet ist.",
+      "other": "Der App Store wird auf diesem Cluster nicht angeboten ({{reason}}).",
+      "unknown": "Der Desktop konnte nicht ermitteln, ob der App Store auf diesem Cluster angeboten wird, und öffnet ihn deshalb nicht. Das ist ein Fehler des Clusters, keine Änderung Ihrer Berechtigungen.",
+      "close": "Schließen"
+    },
     "purge": {
       "title": "Daten dieser App endgültig löschen?",
       "text": "Alles, was {{subject}} für {{tenant}} gespeichert hat, wird unwiderruflich gelöscht: Datenbanken, Dateien und Geheimnisse.",

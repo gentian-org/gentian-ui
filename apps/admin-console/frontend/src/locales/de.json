@@ -20,7 +20,8 @@
     "tenant": "Mandant/",
     "tabMembers": "Mitglieder",
     "tabGroups": "Gruppen",
-    "tabExport": "Export"
+    "tabExport": "Export",
+    "tabLicenceReport": "Lizenzmeldung"
   },
   "audit": {
     "action": "Aktion",
@@ -722,5 +723,34 @@
     "phase_ready": "<mono>{{tenant}}</mono> ist importiert.",
     "phase_failed": "Import von <mono>{{tenant}}</mono> fehlgeschlagen: {{message}}",
     "passwordReset": "Die Mitglieder haben noch keine Zugangsdaten: Senden Sie ihnen ein Passwort-Reset und aktivieren Sie den Administrator aus der Liste oben."
+  },
+  "licenceReport": {
+    "title": "Lizenzmeldung",
+    "lead": "Was dieser Cluster darüber meldet, was auf ihm läuft. Die Meldung enthält keine Namen oder Anschriften, nur die Adressen des Clusters und seiner Mandanten sowie Zahlen.",
+    "loading": "Lizenzmeldung wird geladen…",
+    "unavailable": "Die Lizenzmeldung ist nicht verfügbar.",
+    "off": "Die Lizenzmeldung ist auf diesem Cluster ausgeschaltet. Es wird nichts gesendet, und der App Store wird nicht angeboten.",
+    "state": "Lizenzmeldung",
+    "on": "Eingeschaltet",
+    "sentTo": "Gesendet an",
+    "lastAttempt": "Letzter Versuch",
+    "noAttempt": "Bisher war keine Meldung fällig.",
+    "outcome": "Ergebnis",
+    "outcomeAccepted": "Angenommen",
+    "outcomeFailed": "Fehlgeschlagen",
+    "outcomeNotSent": "Nicht gesendet",
+    "outcomeSending": "Wird gesendet",
+    "reasonSigningKeyAbsent": "Der Cluster hat keinen Signaturschlüssel für seine Meldungen, deshalb wurde nichts gesendet.",
+    "reasonSigningKeyInvalid": "Der Signaturschlüssel des Clusters für seine Meldungen ist nicht verwendbar, deshalb wurde nichts gesendet.",
+    "reasonInventoryUnavailable": "Der Cluster konnte nicht ermitteln, was auf ihm läuft, deshalb wurde nichts gesendet.",
+    "reasonEndpointUnreachable": "Die Adresse, an die die Meldung geht, war nicht erreichbar. Es wird erneut versucht.",
+    "reasonEndpointRefused": "Die Gegenstelle hat die Meldung abgelehnt. Es wird erneut versucht.",
+    "httpStatus": "Die Gegenstelle hat mit {{status}} geantwortet.",
+    "nextAttempt": "Nächster Versuch",
+    "exactlyWhatWasSent": "Genau das wurde gesendet",
+    "sequence": "Meldung Nummer {{sequence}}, hier zum Lesen eingerückt.",
+    "signature": "Signatur",
+    "keyId": "Schlüssel-ID",
+    "nothingSent": "Bisher wurde keine Meldung gesendet."
   }
 }

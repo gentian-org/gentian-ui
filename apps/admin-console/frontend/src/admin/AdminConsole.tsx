@@ -12,6 +12,7 @@ import { ClusterSettingsSection } from "@/admin/ClusterSettingsSection";
 import { GroupsSection } from "@/admin/GroupsSection";
 import { MembersSection } from "@/admin/MembersSection";
 import { IntegrationsSection } from "@/admin/IntegrationsSection";
+import { LicenceReportSection } from "@/admin/LicenceReportSection";
 import { NotificationsSection } from "@/admin/NotificationsSection";
 import { ResourcesSection } from "@/admin/ResourcesSection";
 import { PlatformSecuritySection } from "@/admin/PlatformSecuritySection";
@@ -34,7 +35,8 @@ type AdminTab =
   | "audit"
   | "settings"
   | "platform"
-  | "customization";
+  | "customization"
+  | "licenceReport";
 
 /**
  * The tab strip, in display order. Kept as data so a new section is one entry
@@ -73,6 +75,9 @@ const TABS: { id: AdminTab; labelKey: string; platformOnly?: boolean }[] = [
   { id: "settings", labelKey: "tabClusterSettings", platformOnly: true },
   { id: "platform", labelKey: "tabPlatform", platformOnly: true },
   { id: "customization", labelKey: "tabCustomization", platformOnly: true },
+  // What the cluster reports about itself. Read-only, and the usher decides
+  // who may read it: this entry only keeps it out of a tenant's own console.
+  { id: "licenceReport", labelKey: "tabLicenceReport", platformOnly: true },
 ];
 
 type AdminConsoleProps = {
@@ -171,6 +176,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <PlatformSecuritySection />
           ) : tab === "customization" ? (
             <CustomizationDebtSection />
+          ) : tab === "licenceReport" ? (
+            <LicenceReportSection />
           ) : tab === "credentials" ? (
             <CredentialsSection />
           ) : tab === "notifications" ? (

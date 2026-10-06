@@ -132,6 +132,11 @@ export type ShellApp = {
   /** The app asks to be opened hidden at desktop mount; see gentianos.io/portal-preopen. */
   preopen?: boolean;
   builtin?: boolean;
+  /**
+   * Why this tile cannot be opened, in the person's language. A tile that
+   * carries it is shown and opens nothing: selecting it says this instead.
+   */
+  unavailable?: string;
 };
 
 /** A tile this person may open, as the usher answered for them. */
@@ -151,6 +156,12 @@ export type ClusterTile = {
 
 export type ClusterTilesResponse = {
   tiles: ClusterTile[];
+  /**
+   * Whether the App Store may be offered on this cluster at all. Optional in
+   * the type only because an usher that predates it does not send it; the
+   * desktop treats its absence as an answer it did not get, never as a yes.
+   */
+  appStore?: { available: boolean; reason?: string };
 };
 
 export type AppsResponse = {

@@ -311,3 +311,77 @@ def test_the_cluster_scope_needs_a_cluster_id(monkeypatch):
     )
     assert r.status_code == 501
     assert "GENTIAN_CLUSTER_ID" in r.json()["detail"]
+
+
+def _usher(monkeypatch, status: int, body, seen: dict):
+    """A fake usher that records the whole request, the bearer included."""
+
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def request(self, method, url, params=None, json=None, headers=None):
+            seen["method"], seen["url"] = method, url
+            seen["auth"] = (headers or {}).get("Authorization")
+            return httpx.Response(status, json=body, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(director.httpx, "AsyncClient", FakeClient)
+
+
+def test_the_licence_report_is_asked_of_the_usher_as_the_caller(monkeypatch):
+    """The cluster is this console's own, the token is the person's, and the
+    report comes back as the usher gave it: the body is the bytes that were
+    signed, so nothing here may re-render it."""
+    sent = '{"version":1,"sequence":12,"tenants":[{"url":"https://acme.example","users":40}]}'
+    answer = {
+        "enabled": True,
+        "url": "https://licence.example/v1/reports",
+        "attempt": {"at": "2026-03-04T05:06:07Z", "outcome": "accepted", "httpStatus": 202},
+        "report": {"sequence": 12, "body": sent, "signature": "ed25519=abc", "keyId": "0123"},
+    }
+    seen: dict = {}
+    _usher(monkeypatch, 200, answer, seen)
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/platform/licence-report?cluster=other",
+        headers={"Authorization": "Bearer person-token"},
+    )
+    assert r.status_code == 200
+    assert seen["method"] == "GET"
+    assert seen["url"] == "http://usher.test:8090/v1/clusters/demo/licence-report"
+    assert seen["auth"] == "Bearer person-token"
+    assert r.json() == answer
+    assert r.json()["report"]["body"] == sent
+
+
+def test_a_cluster_that_does_not_report_says_so(monkeypatch):
+    _usher(monkeypatch, 200, {"enabled": False}, {})
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/platform/licence-report", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 200
+    assert r.json() == {"enabled": False}
+
+
+@pytest.mark.parametrize("status", [403, 502])
+def test_the_ushers_refusal_of_the_licence_report_comes_back_as_it_is(monkeypatch, status):
+    """Who may read the report is the usher's decision, in the usher's words."""
+    _usher(monkeypatch, status, {"error": "can_audit on cluster:demo is required"}, {})
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/platform/licence-report", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == status
+    assert r.json() == {"error": "can_audit on cluster:demo is required"}
+
+
+def test_the_licence_report_needs_a_token_before_anything_is_asked(monkeypatch):
+    seen: dict = {}
+    _usher(monkeypatch, 200, {"enabled": False}, seen)
+    r = TestClient(_app(_settings())).get("/api/v1/admin/platform/licence-report")
+    assert r.status_code == 401
+    assert seen == {}

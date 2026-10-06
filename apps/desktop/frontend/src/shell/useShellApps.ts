@@ -33,6 +33,40 @@ function kernelConsoleApps(data: ClusterTilesResponse | undefined): ShellApp[] {
   }));
 }
 
+/** Whether the store is offered here, as far as the usher has said. */
+type StoreOffer =
+  | { state: "pending" }
+  | { state: "offered" }
+  | { state: "withheld"; why: string };
+
+const LICENCE_REPORT_DISABLED = "licence-report-disabled";
+
+/**
+ * What the usher said about the App Store, beside the tiles.
+ *
+ * Only an explicit yes offers the store. An answer without the field -- an
+ * usher that predates it -- and a tiles request that failed are both "the
+ * desktop was not told", and are said as that rather than taken for a yes.
+ */
+function storeOffer(
+  data: ClusterTilesResponse | undefined,
+  failed: boolean,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): StoreOffer {
+  if (!data) {
+    return failed ? { state: "withheld", why: t("store.unavailable.unknown") } : { state: "pending" };
+  }
+  const answer = data.appStore;
+  if (!answer || typeof answer.available !== "boolean") {
+    return { state: "withheld", why: t("store.unavailable.unknown") };
+  }
+  if (answer.available) return { state: "offered" };
+  if (answer.reason === LICENCE_REPORT_DISABLED) {
+    return { state: "withheld", why: t("store.unavailable.licenceReport") };
+  }
+  return { state: "withheld", why: t("store.unavailable.other", { reason: answer.reason ?? "" }) };
+}
+
 /**
  * The App Store, for whoever may install.
  *
@@ -46,9 +80,33 @@ function kernelConsoleApps(data: ClusterTilesResponse | undefined): ShellApp[] {
  * store it is before the bridge has answered. They are labels: what the store
  * may do here is decided by the bridge, from the origin, not from a URL.
  */
-function storeApp(context: StoreContext | undefined, title: string): ShellApp[] {
+function storeApp(
+  context: StoreContext | undefined,
+  title: string,
+  offer: StoreOffer,
+): ShellApp[] {
   if (!context?.storeUrl || !context.storeOrigin) return [];
   if (!context.relations?.can_install_app) return [];
+  // Nothing to show until the usher has been asked: a tile that opened the
+  // store first and was withdrawn a moment later would have loaded the frame.
+  if (offer.state === "pending") return [];
+  if (offer.state === "withheld") {
+    // The entry stays, so that whoever expects the store is told why it is
+    // not there, and carries no address: there is nothing to load.
+    return [
+      {
+        id: "app-store",
+        title,
+        icon: "store",
+        launchUrl: null,
+        linkTarget: "embedded",
+        authMode: null,
+        preopen: false,
+        builtin: false,
+        unavailable: offer.why,
+      },
+    ];
+  }
   const url = new URL(context.storeUrl);
   url.searchParams.set("embedded", "1");
   url.searchParams.set("tenant", context.tenant);
@@ -131,10 +189,17 @@ export function useShellApps() {
     retry: false,
   });
   const storeTitle = t("store.title");
+  const offer = storeOffer(clusterTiles, tilesFailed, t);
+  const offerState = offer.state;
+  const offerWhy = offer.state === "withheld" ? offer.why : "";
 
   const apps = useMemo(() => {
     const list = [
-      ...storeApp(storeContext, storeTitle),
+      ...storeApp(
+        storeContext,
+        storeTitle,
+        offerState === "withheld" ? { state: offerState, why: offerWhy } : { state: offerState },
+      ),
       ...shellAppsFromMe(me),
       ...kernelConsoleApps(clusterTiles),
     ];
@@ -174,7 +239,7 @@ export function useShellApps() {
     adminApps.sort((a, b) => getSortIndex(a.id) - getSortIndex(b.id));
 
     return [...adminApps, ...userApps];
-  }, [me, clusterTiles, storeContext, storeTitle]);
+  }, [me, clusterTiles, storeContext, storeTitle, offerState, offerWhy]);
 
   const isAdminUser = Boolean(me?.isPlatformAdmin || me?.isTenantAdmin);
   // An administrator whose only tile is the administration console. Named by
@@ -188,6 +253,9 @@ export function useShellApps() {
     apps,
     isAdminUser,
     adminOnly,
+    // Whether the usher said the App Store is offered on this cluster. The
+    // bridge listens only then: a store that is not offered is not answered.
+    storeOffered: offerState === "offered",
     // The session request or the tiles request failed. Distinct from "this user has no apps": both
     // leave `apps` empty, and rendering them the same way turns any backend or
     // edge fault into a silent, plausible-looking empty desktop.

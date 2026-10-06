@@ -99,6 +99,12 @@
       "confirm": "Change"
     },
     "title": "App Store",
+    "unavailable": {
+      "licenceReport": "The App Store needs licence reporting, which is turned off on this cluster.",
+      "other": "The App Store is not offered on this cluster ({{reason}}).",
+      "unknown": "The desktop could not find out whether the App Store is offered on this cluster, so it is not opened. This is a fault of the cluster, not a change to your access.",
+      "close": "Close"
+    },
     "purge": {
       "title": "Purge this app's data?",
       "text": "Everything {{subject}} stored for {{tenant}} is deleted for good: databases, files and secrets. This cannot be undone.",

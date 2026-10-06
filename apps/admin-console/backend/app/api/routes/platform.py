@@ -1,6 +1,7 @@
-"""Integrations, platform security, and how much customisation is carried.
+"""Integrations, platform security, how much customisation is carried, and
+what the cluster last reported about itself.
 
-Three screens, all reads of live state, all relayed from the usher. What an
+Four screens, all reads of live state, all relayed from the usher. What an
 app may consume from another, what the cluster permits to escape its default
 security posture, and which carried changes want attention are each computed
 by the operator from the CRs it reconciles — not here, and not by the screen,
@@ -94,6 +95,23 @@ async def customization_debt(
     return await director.read(
         settings,
         f"/v1/clusters/{director.cluster(settings)}/customizations",
+        bearer_of(credentials),
+    )
+
+
+@router.get("/platform/licence-report")
+async def licence_report(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What the cluster last reported about itself, exactly as it was sent,
+    and what became of the attempt; `{"enabled": false}` on a cluster that
+    does not report. Read under `can_audit` on the cluster, which the usher
+    decides: its refusal comes back as it is."""
+    return await director.read(
+        settings,
+        f"/v1/clusters/{director.cluster(settings)}/licence-report",
         bearer_of(credentials),
     )
 
