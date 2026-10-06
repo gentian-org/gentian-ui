@@ -1,4 +1,4 @@
-"""Three reads relayed from the director, and the writes that are not."""
+"""Three reads relayed from the usher, and the writes, which are the director's."""
 
 import httpx
 import pytest
@@ -24,6 +24,7 @@ def _settings() -> Settings:
         KERNEL_DOMAIN="desk.gentian.org",
         TENANT_ID="platform",
         DIRECTOR_URL="http://director.test:8080",
+        USHER_URL="http://usher.test:8090",
         GENTIAN_CLUSTER_ID="demo",
     )
 
@@ -64,27 +65,135 @@ def test_integrations_are_asked_of_the_tenant(monkeypatch):
     assert r.status_code == 200
     # The join the screen cares about survives the relay untouched.
     assert r.json()["effectiveAccess"][0]["ungranted"] == ["write"]
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/integrations"
+    assert seen["url"] == "http://usher.test:8090/v1/tenants/platform/integrations"
 
 
-def test_platform_security_and_customization_are_asked_of_the_cluster(monkeypatch):
+def _two_services(monkeypatch, answers: dict, seen: list):
+    """A fake that answers by host, for a route that asks two services."""
+
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def request(self, method, url, params=None, json=None, headers=None):
+            seen.append((method, url))
+            host = "usher" if url.startswith("http://usher.test") else "director"
+            status, body = answers[host]
+            return httpx.Response(status, json=body, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(director.httpx, "AsyncClient", FakeClient)
+
+
+def test_customization_is_asked_of_the_usher(monkeypatch):
     seen: dict = {}
-    _fake_client(monkeypatch, {"allowedMacWaivers": [], "catalogueRequests": []}, seen)
-    client = TestClient(_app(_settings()))
-    r = client.get("/api/v1/admin/platform/security-policy", headers={"Authorization": "Bearer t"})
-    assert r.status_code == 200
-    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/platform-security"
-
     _fake_client(monkeypatch, {"totalRecords": 0, "carriedDeltas": 0, "byRung": {}}, seen)
-    r = client.get(
+    r = TestClient(_app(_settings())).get(
         "/api/v1/admin/platform/customization-debt", headers={"Authorization": "Bearer t"}
     )
     assert r.status_code == 200
-    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/customizations"
+    assert seen["url"] == "http://usher.test:8090/v1/clusters/demo/customizations"
+
+
+def test_platform_security_is_the_clusters_view_with_the_declared_allowlist(monkeypatch):
+    """The screen edits the allowlist, so the list it starts from is the one
+    git declares -- the director's -- and not the one that last synced. What
+    the catalogue asks for is the cluster's view, the usher's."""
+    synced = [{"profile": "old", "policy": "p", "scope": "s"}]
+    declared = [
+        {"profile": "old", "policy": "p", "scope": "s"},
+        {"profile": "new", "policy": "p", "scope": "s"},
+    ]
+    requests = [
+        {"name": "new", "displayName": "New", "macWaivers": [{"policy": "p", "scope": "s"}]}
+    ]
+    seen: list = []
+    _two_services(
+        monkeypatch,
+        {
+            "usher": (200, {"allowedMacWaivers": synced, "catalogueRequests": requests}),
+            "director": (200, {"allowedMacWaivers": declared}),
+        },
+        seen,
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/platform/security-policy", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 200
+    assert r.json() == {"allowedMacWaivers": declared, "catalogueRequests": requests}
+    assert seen == [
+        ("GET", "http://usher.test:8090/v1/clusters/demo/platform-security"),
+        ("GET", "http://director.test:8080/v1/clusters/demo/platform-security"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "answers",
+    [
+        {"usher": (403, {"error": "forbidden"}), "director": (200, {"allowedMacWaivers": []})},
+        {
+            "usher": (200, {"allowedMacWaivers": [], "catalogueRequests": []}),
+            "director": (403, {"error": "forbidden", "request_id": "r1"}),
+        },
+    ],
+)
+def test_platform_security_is_refused_when_either_service_refuses(monkeypatch, answers):
+    """Half an answer would be an allowlist to edit that nobody declared, or
+    approvals with nothing asking for them."""
+    _two_services(monkeypatch, answers, [])
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/platform/security-policy", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 403
+    assert r.json()["error"] == "forbidden"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/admin/integrations",
+        "/api/v1/admin/platform/security-policy",
+        "/api/v1/admin/platform/customization-debt",
+    ],
+)
+def test_without_an_usher_the_reads_say_so_and_ask_nobody(monkeypatch, path):
+    """The director is not a fallback: it answers 404 on these, and a console
+    that asked it anyway would show an empty cluster."""
+    seen: dict = {}
+    _fake_client(monkeypatch, {}, seen)
+    settings = Settings(
+        AUTH_DISABLED="true",
+        TENANT_ID="platform",
+        DIRECTOR_URL="http://director.test:8080",
+        GENTIAN_CLUSTER_ID="demo",
+    )
+    r = TestClient(_app(settings)).get(path, headers={"Authorization": "Bearer t"})
+    assert r.status_code == 503
+    assert "USHER_URL" in r.json()["detail"]
+    assert not seen
+
+
+@pytest.mark.parametrize(
+    "body", [{"error": "the operator's API did not answer"}, {"detail": "no such tenant"}]
+)
+def test_the_ushers_error_reaches_the_screen_in_either_shape(monkeypatch, body):
+    """The usher writes {"error": ...} and passes the operator's own errors
+    through as they came, which may be {"detail": ...}. Neither is rewritten."""
+    _fake_client(monkeypatch, body, {}, status=502)
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/integrations", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 502
+    assert r.json() == body
 
 
 @pytest.mark.parametrize("status", [403, 502])
-def test_the_directors_refusal_is_passed_through_unchanged(monkeypatch, status):
+def test_a_refusal_is_passed_through_unchanged(monkeypatch, status):
     _fake_client(monkeypatch, {"error": "refused"}, {}, status=status)
     r = TestClient(_app(_settings())).get(
         "/api/v1/admin/integrations", headers={"Authorization": "Bearer t"}
@@ -195,6 +304,7 @@ def test_the_cluster_scope_needs_a_cluster_id(monkeypatch):
         KERNEL_DOMAIN="desk.gentian.org",
         TENANT_ID="platform",
         DIRECTOR_URL="http://director.test:8080",
+        USHER_URL="http://usher.test:8090",
     )
     r = TestClient(_app(settings)).get(
         "/api/v1/admin/authorization?scope=cluster", headers={"Authorization": "Bearer t"}

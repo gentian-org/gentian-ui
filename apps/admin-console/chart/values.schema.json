@@ -77,6 +77,12 @@
       "description": "Where people, groups and the realm's settings are relayed. Empty leaves those screens saying it is not configured.",
       "properties": { "url": { "type": "string" } }
     },
+    "usher": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where reads of live cluster state are relayed. Empty leaves those screens saying it is not configured.",
+      "properties": { "url": { "type": "string" } }
+    },
     "director": {
       "type": "object",
       "additionalProperties": false,

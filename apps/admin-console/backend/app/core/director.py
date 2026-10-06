@@ -191,6 +191,36 @@ def registrar_url(settings: Settings) -> str:
     return settings.registrar_url.rstrip("/")
 
 
+def usher_url(settings: Settings) -> str:
+    """Where reads of live cluster state go.
+
+    What the cluster holds of a tenant right now -- app states, resources,
+    backups, integrations, notices -- and the cluster's own state are the
+    usher's to answer; the director answers 404 on them and keeps the writes.
+    Unset is a 503 that names the setting, never a fall back to the director:
+    a console quietly asking the wrong service would read as an empty cluster.
+    """
+    if not settings.usher_url:
+        raise HTTPException(
+            status_code=503,
+            detail="The usher is not configured for this component: USHER_URL "
+            "(the chart value usher.url) is not set.",
+        )
+    return settings.usher_url.rstrip("/")
+
+
+async def read(
+    settings: Settings, path: str, token: str, *, params: dict[str, str] | None = None
+) -> Response:
+    """One read of live state, asked of the usher as the caller.
+
+    Its answer comes back unchanged, a refusal included. The usher writes its
+    own errors as {"error": ...} and passes the operator's through as they
+    came, which may be {"detail": ...}; neither is rewritten here.
+    """
+    return await forward_to(usher_url(settings), "GET", path, token, params=params)
+
+
 async def forward_to(
     base: str,
     method: str,

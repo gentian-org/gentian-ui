@@ -1,15 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Exports, as the director answers for them.
+"""Exports: read from the usher, taken and downloaded at the director.
 
 What bundles exist and what each run did is cluster state the export
-reconciler holds, relayed by the director to whoever may view the tenant.
+reconciler holds, answered by the usher to whoever may view the tenant.
 
 Two kinds of call, and the routes say which:
 
-    GET  ...                a READ of state -- what is.
+    GET  ...                a READ of state -- what is. Asked of the usher,
+                            except the bundle itself, which the usher's
+                            token does not fetch and the director streams.
     POST .../actions/x      an ACTION -- something that happens once, now.
-                            Answers what was started. There is no commit,
-                            because nothing was declared.
+                            Asked of the director. Answers what was started.
+                            There is no commit, because nothing was declared.
 
 Scheduled backups, the backup policy and its destinations are declared state
 and not this console's: they are the Operations Console's screens, which
@@ -40,8 +42,8 @@ async def backups(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    answer = await director.forward(
-        settings, "GET", f"/v1/tenants/{_tenant(settings, tenant)}/backups", bearer_of(credentials)
+    answer = await director.read(
+        settings, f"/v1/tenants/{_tenant(settings, tenant)}/backups", bearer_of(credentials)
     )
     return director.unwrapped(answer, "backups")
 
@@ -54,9 +56,8 @@ async def backup(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    return await director.forward(
+    return await director.read(
         settings,
-        "GET",
         f"/v1/tenants/{_tenant(settings, tenant)}/backups/{name}",
         bearer_of(credentials),
     )

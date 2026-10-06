@@ -126,6 +126,14 @@ custodian:
 registrar:
   url: ""
 
+# Where reads of live cluster state go: app states, resources, backups,
+# integrations, notices, and the cluster's own state. The usher takes the
+# caller's own token, as the director does, and changes nothing. Empty leaves
+# those screens answering that it is not configured; the director, which keeps
+# the writes, is not asked instead.
+usher:
+  url: ""
+
 director:
   url: ""
   cluster: ""

@@ -10,9 +10,18 @@ Unset `CUSTODIAN_URL` answers 503 saying so, rather than guessing at
 a host: a component that has not been told where something is has not been
 told, and inventing an address would turn a configuration mistake into a
 connection error somewhere else.
+
+Repositories are on the same screen and are two services' business. Which
+exist, and whether each has its credential, is the custodian's list. Where
+one points is configuration, so declaring or removing one is a commit the
+director makes; the custodian has no route for it. Its password is then a
+credential like any other, `repository-<name>`, set through the custodian
+once the declaration has reached the cluster.
 """
 
-from fastapi import APIRouter, Depends, Request, Response
+import re
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core import director
@@ -38,17 +47,84 @@ def _upstream(method: str, rest: str) -> str | None:
     """The custodian's path for one of the screen's."""
     if mapped := _PATHS.get((method, rest)):
         return mapped
-    # The per-credential and per-repository routes are named by the thing
-    # they act on, which the screen already URL-encodes.
+    # The per-credential route is named by the thing it acts on, which the
+    # screen already URL-encodes.
     if method == "PUT" and rest and "/" not in rest:
         return f"/v1/credentials/{rest}"
-    if rest.startswith("repositories/") and method in ("PUT", "DELETE"):
-        return f"/v1/repositories/{rest.removeprefix('repositories/')}"
     return None
 
 
+# A repository's name as the director accepts it. Checked here because it
+# lands in a URL path: a name with a dot-dot in it would address a different
+# route of the director than the one written below.
+_NAME = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
+
+# What a declaration may say. The director refuses a body with any other
+# field, so only these travel: whose repository it is follows from the route,
+# and its password is never part of a declaration.
+_DECLARATION = ("role", "type", "url", "branch", "writable", "confirm")
+
+
+def _repository_path(settings: Settings, name: str, scope: str, tenant: str | None) -> str:
+    """The director's route for one repository: this console's tenant's
+    unless the screen names another owner, the cluster's when it says so."""
+    if not _NAME.match(name):
+        raise HTTPException(
+            status_code=400,
+            detail="A repository's name is lower-case letters, digits and hyphens.",
+        )
+    if scope == "cluster":
+        return f"/v1/clusters/{director.cluster(settings)}/repositories/{name}"
+    return f"/v1/tenants/{tenant or settings.tenant_id}/repositories/{name}"
+
+
+@router.put("/repositories/{name}")
+async def declare_repository(
+    name: str,
+    body: dict,
+    scope: str = Query(default="tenant"),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """A WRITE of declared state: 202 with a commit, which Argo CD applies on
+    its next sync, or 200 when what was asked for already held. 428 means the
+    change wants the name retyped, and says so in the fields the screen's
+    danger zone reads."""
+    declaration = {k: body[k] for k in _DECLARATION if body.get(k) not in (None, "")}
+    return await director.forward(
+        settings,
+        "PUT",
+        _repository_path(settings, name, scope, tenant),
+        bearer_of(credentials),
+        json_body=declaration,
+    )
+
+
+@router.delete("/repositories/{name}")
+async def remove_repository(
+    name: str,
+    scope: str = Query(default="tenant"),
+    tenant: str | None = Query(default=None),
+    confirm: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Also a commit. Always wants the name repeated: without ?confirm= the
+    director answers 428, which is how the screen learns what to ask for."""
+    return await director.forward(
+        settings,
+        "DELETE",
+        _repository_path(settings, name, scope, tenant),
+        bearer_of(credentials),
+        params={"confirm": confirm} if confirm else None,
+    )
+
+
 @router.api_route("", methods=["GET"])
-@router.api_route("/{rest:path}", methods=["GET", "PUT", "DELETE"])
+@router.api_route("/{rest:path}", methods=["GET", "PUT"])
 async def credentials(
     request: Request,
     rest: str = "",

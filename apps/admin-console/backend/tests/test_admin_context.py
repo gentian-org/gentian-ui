@@ -138,3 +138,43 @@ def test_a_screen_not_yet_mapped_says_which_one():
     assert r.status_code == 501 and "Backup" in r.json()["detail"]
     r = client.get("/api/v1/admin/members", headers={"Authorization": "Bearer t"})
     assert r.status_code == 404
+
+
+def test_app_states_are_asked_of_the_usher_and_not_swallowed_by_the_catch_all(monkeypatch):
+    """The route was declared below the catch-all once, which answered
+    "No such route." before it was reached."""
+    seen = _director(monkeypatch, {"/apps/status": {"tenant": "platform", "apps": []}})
+    r = TestClient(_app(_settings(USHER_URL="http://usher.test:8090"))).get(
+        "/api/v1/admin/apps/status", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 200
+    assert r.json() == {"tenant": "platform", "apps": []}
+    assert seen == [("GET", "http://usher.test:8090/v1/tenants/platform/apps/status", "Bearer t")]
+
+
+def test_app_states_without_an_usher_say_so_and_ask_nobody(monkeypatch):
+    seen = _director(monkeypatch, {})
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/apps/status", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 503
+    assert "USHER_URL" in r.json()["detail"]
+    assert not seen
+
+
+def test_the_catch_all_is_the_last_route_of_its_router(monkeypatch):
+    """Routes are matched in the order they are declared, so anything below
+    the catch-all is unreachable. Asked of the assembled app as well, where
+    the order of the routers matters as much as the order within one."""
+    paths = [route.path for route in admin.router.routes]
+    assert paths.index("/admin/{rest:path}") == len(paths) - 1
+
+    from app.main import app
+
+    _director(monkeypatch, {"/apps/status": {"tenant": "platform", "apps": []}})
+    app.dependency_overrides[get_settings] = lambda: _settings(USHER_URL="http://usher.test:8090")
+    try:
+        r = TestClient(app).get("/api/v1/admin/apps/status", headers={"Authorization": "Bearer t"})
+    finally:
+        app.dependency_overrides.pop(get_settings, None)
+    assert r.status_code == 200

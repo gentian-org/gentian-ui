@@ -1,13 +1,13 @@
 """Integrations, platform security, and how much customisation is carried.
 
-Three screens, all reads, all relayed from the director. What an app may
-consume from another, what the cluster permits to escape its default security
-posture, and which carried changes want attention are each computed by the
-operator from the CRs it reconciles — not here, and not by the screen, because
-a second implementation of any of them is a second answer to the same
+Three screens, all reads of live state, all relayed from the usher. What an
+app may consume from another, what the cluster permits to escape its default
+security posture, and which carried changes want attention are each computed
+by the operator from the CRs it reconciles — not here, and not by the screen,
+because a second implementation of any of them is a second answer to the same
 question.
 
-The writes are commits. Changing what an app may consume is declared state,
+The writes are commits, and the director's. Changing what an app may consume is declared state,
 committed under `can_grant`; changing which waivers the platform permits is
 the cluster's own security configuration, committed under `can_set_admission`
 — which model v1 binds to break-glass, so an ordinary platform administrator
@@ -15,6 +15,8 @@ is refused it. That refusal is correct and the screen should say so: letting
 an app out of the pod-security baseline is meant to cost a deliberate
 elevation.
 """
+
+import json
 
 from fastapi import APIRouter, Depends, Query, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -41,9 +43,8 @@ async def integrations(
     A binding asking for more than its grant will not do what its author
     expected, and nothing else reports that.
     """
-    return await director.forward(
+    return await director.read(
         settings,
-        "GET",
         f"/v1/tenants/{tenant or settings.tenant_id}/integrations",
         bearer_of(credentials),
     )
@@ -58,13 +59,28 @@ async def platform_security_policy(
     """What the cluster permits to escape its default posture, and what the
     catalogue asks of it. The difference between the two lists is the point:
     a profile asking for something not permitted is refused at deploy time,
-    and seeing that before installing beats finding out afterwards."""
-    return await director.forward(
-        settings,
-        "GET",
-        f"/v1/clusters/{director.cluster(settings)}/platform-security",
-        bearer_of(credentials),
-    )
+    and seeing that before installing beats finding out afterwards.
+
+    Two services answer, because the screen does two things with it. What
+    the catalogue asks for is the cluster's view and the usher's. The
+    allowlist is the list the screen EDITS, so it is the one git declares,
+    which is the director's: read from the cluster it would be the last thing
+    that synced, and an edit made on top of that would drop a change
+    committed a moment earlier. The answer is the usher's with the declared
+    allowlist in its place. Either service's refusal is passed through as it
+    came, the usher's first.
+    """
+    path = f"/v1/clusters/{director.cluster(settings)}/platform-security"
+    token = bearer_of(credentials)
+    live = await director.read(settings, path, token)
+    if live.status_code != 200:
+        return live
+    declared = await director.forward(settings, "GET", path, token)
+    if declared.status_code != 200:
+        return declared
+    body = json.loads(live.body)
+    body["allowedMacWaivers"] = json.loads(declared.body).get("allowedMacWaivers") or []
+    return Response(content=json.dumps(body), status_code=200, media_type="application/json")
 
 
 @router.get("/platform/customization-debt")
@@ -75,9 +91,8 @@ async def customization_debt(
 ) -> Response:
     """How much the cluster is carrying above stock, and which of it wants
     attention. L0 is "we changed nothing" and is not counted as carried."""
-    return await director.forward(
+    return await director.read(
         settings,
-        "GET",
         f"/v1/clusters/{director.cluster(settings)}/customizations",
         bearer_of(credentials),
     )

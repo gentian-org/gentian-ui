@@ -1,17 +1,17 @@
-"""A tenant's resources, as the director answers for them.
+"""A tenant's resources: read from the usher, changed at the director.
 
 The Resources screen shows the ceiling the cluster enforces for a tenant, what
 is committed under it, the plans it may move to, and its history, and lets
-whoever may set the plan choose one. Every route here relays to the director
-as the caller. The director reads the cluster's answers from the operator and
+whoever may set the plan choose one. Every read here is live state and is
+relayed to the usher as the caller, which has the operator's answers and
 decides from the authorization graph whether this person may see them; the
 one write, choosing a plan, is a commit the director makes as the person, and
 the operator learns the plan from git like every other change to a tenant.
 
 Which tenant is asked is the screen's choice: a tenant administrator's own,
 or, for a platform operator managing from the cluster's view, any tenant of
-the cluster. The console does not check that choice; the director does, and
-its refusal comes back as the refusal it is.
+the cluster. The console does not check that choice; the service asked does,
+and its refusal comes back as the refusal it is.
 """
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -37,9 +37,7 @@ async def resource_state(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """The tenant's ceiling, what is under it, and the plan it is on."""
-    return await director.forward(
-        settings, "GET", _tenant_path(settings, tenant), bearer_of(credentials)
-    )
+    return await director.read(settings, _tenant_path(settings, tenant), bearer_of(credentials))
 
 
 @router.get("/plans")
@@ -50,10 +48,10 @@ async def resource_plans(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """The catalogue as it applies to this tenant and this person. Whether the
-    person chooses for themselves or for the cluster is the director's call,
+    person chooses for themselves or for the cluster is the usher's call,
     made from the graph; the screen asserts nothing about it."""
-    answer = await director.forward(
-        settings, "GET", _tenant_path(settings, tenant, "/plans"), bearer_of(credentials)
+    answer = await director.read(
+        settings, _tenant_path(settings, tenant, "/plans"), bearer_of(credentials)
     )
     return director.unwrapped(answer, "plans")
 
@@ -90,9 +88,8 @@ async def resource_usage(
         for k, v in {"from": from_, "to": to, "stepSeconds": stepSeconds}.items()
         if v is not None
     }
-    return await director.forward(
+    return await director.read(
         settings,
-        "GET",
         _tenant_path(settings, tenant, "/usage"),
         bearer_of(credentials),
         params=params,
@@ -109,9 +106,8 @@ async def resource_report(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     params = {k: v for k, v in {"from": from_, "to": to}.items() if v is not None}
-    return await director.forward(
+    return await director.read(
         settings,
-        "GET",
         _tenant_path(settings, tenant, "/report"),
         bearer_of(credentials),
         params=params,
@@ -124,11 +120,10 @@ async def tenant_resource_states(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Every tenant's ceiling side by side, for the cluster's view. The
-    director lists the tenants from git and asks the operator about each."""
-    answer = await director.forward(
+    """Every tenant's ceiling side by side, for the cluster's view: the
+    tenants the cluster holds, as the operator answers for them."""
+    answer = await director.read(
         settings,
-        "GET",
         f"/v1/clusters/{director.cluster(settings)}/resources",
         bearer_of(credentials),
     )

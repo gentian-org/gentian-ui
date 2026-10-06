@@ -36,6 +36,7 @@ def _settings() -> Settings:
         KERNEL_DOMAIN="desk.gentian.org",
         TENANT_ID="platform",
         DIRECTOR_URL="http://director.test:8080",
+        USHER_URL="http://usher.test:8090",
         GENTIAN_CLUSTER_ID="demo",
     )
 
@@ -73,7 +74,7 @@ def test_the_backups_arrive_as_the_bare_list_the_screen_reads(monkeypatch):
     )
     assert r.status_code == 200
     assert r.json() == items
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/backups"
+    assert seen["url"] == "http://usher.test:8090/v1/tenants/platform/backups"
     assert seen["auth"] == "Bearer person"
 
 
@@ -109,3 +110,67 @@ def test_minting_a_key_still_says_it_is_not_wired():
 
 def test_no_token_is_refused_before_anything_is_forwarded():
     assert TestClient(_app(_settings())).get("/api/v1/admin/backups").status_code == 401
+
+
+def test_one_backup_is_read_from_the_usher(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, _answer(200, {"name": "b1", "phase": "Ready"}), seen)
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/backups/b1", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 200
+    assert seen["url"] == "http://usher.test:8090/v1/tenants/platform/backups/b1"
+
+
+def test_taking_a_backup_stays_at_the_director(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, _answer(202, {"name": "b2"}), seen)
+    r = TestClient(_app(_settings())).post(
+        "/api/v1/admin/backups", json={}, headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 202
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/actions/backup"
+
+
+def test_the_bundle_is_downloaded_from_the_director(monkeypatch):
+    """The usher's token does not fetch a bundle, so this one GET did not move."""
+    seen: dict = {}
+
+    class FakeStreamClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        def build_request(self, method, url, headers=None):
+            seen["url"] = url
+            return httpx.Request(method, url, headers=headers)
+
+        async def send(self, request, stream=False):
+            return httpx.Response(200, stream=httpx.ByteStream(b"bundle"), request=request)
+
+        async def aclose(self):
+            pass
+
+    monkeypatch.setattr(director.httpx, "AsyncClient", FakeStreamClient)
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/backups/b1/download", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 200
+    assert r.content == b"bundle"
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/backups/b1/download"
+
+
+def test_without_an_usher_the_list_says_so_and_asks_nobody(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, _answer(200, {"backups": []}), seen)
+    settings = Settings(
+        AUTH_DISABLED="true",
+        TENANT_ID="platform",
+        DIRECTOR_URL="http://director.test:8080",
+        GENTIAN_CLUSTER_ID="demo",
+    )
+    r = TestClient(_app(settings)).get(
+        "/api/v1/admin/backups", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 503
+    assert "USHER_URL" in r.json()["detail"]
+    assert not seen

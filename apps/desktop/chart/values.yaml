@@ -168,9 +168,11 @@ director:
   # Which cluster this console belongs to, as the director names it.
   cluster: ""
 
-# The usher: what the desktop asks which tiles a person may open. Read-only,
-# on the cluster network, answered with the caller's own token. Set by the
-# operator; with none the desktop's tiles request answers 503.
+# The usher: what the desktop asks which tiles a person may open, and what
+# the App Store's window reads of the cluster's live state (how the installed
+# apps are doing, what the tenant has used of its plan). Read-only, on the
+# cluster network, answered with the caller's own token. Set by the operator;
+# with none those requests answer 503, and the director is not asked instead.
 usher:
   url: ""
 

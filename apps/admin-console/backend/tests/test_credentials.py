@@ -48,6 +48,7 @@ def _fake_client(monkeypatch, seen: dict, status: int = 200, body: dict | None =
 
         async def request(self, method, url, params=None, json=None, headers=None):
             seen["method"], seen["url"], seen["json"] = method, url, json
+            seen["params"] = params
             seen["auth"] = (headers or {}).get("Authorization")
             return httpx.Response(
                 status, json=body or {"credentials": []}, request=httpx.Request(method, url)
@@ -120,3 +121,118 @@ def test_without_a_custodian_it_says_so(monkeypatch):
 
 def test_no_token_is_refused_before_anything_is_forwarded():
     assert TestClient(_app(_settings())).get("/api/v1/credentials").status_code == 401
+
+
+def test_declaring_a_repository_is_a_commit_at_the_director(monkeypatch):
+    """Where software comes from is configuration, so the director commits it
+    and the custodian has no route for it. Only what a declaration may say
+    travels: the director refuses a body with any other field."""
+    seen: dict = {}
+    answer = {"status": "created", "name": "mine", "credentialName": "repository-mine"}
+    _fake_client(monkeypatch, seen, status=202, body=answer)
+    r = TestClient(_app(_settings())).put(
+        "/api/v1/credentials/repositories/mine",
+        json={
+            "role": "apps",
+            "type": "git",
+            "url": "https://git.example/acme/apps",
+            "branch": "",
+            "writable": False,
+            "tenant": "other",
+            "credential": {"vaultPath": "elsewhere"},
+            "password": "s3cret",
+        },
+        headers={"Authorization": "Bearer person"},
+    )
+    assert r.status_code == 202
+    assert r.json()["credentialName"] == "repository-mine"
+    assert seen["method"] == "PUT"
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/repositories/mine"
+    assert seen["json"] == {
+        "role": "apps",
+        "type": "git",
+        "url": "https://git.example/acme/apps",
+        "writable": False,
+    }
+    assert seen["auth"] == "Bearer person"
+
+
+def test_the_clusters_own_repository_is_asked_of_the_cluster(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, seen, status=202, body={"status": "updated"})
+    client = TestClient(_app(_settings()))
+    r = client.put(
+        "/api/v1/credentials/repositories/base?scope=cluster",
+        json={"role": "apps", "type": "oci", "url": "oci://r.example/apps", "confirm": "base"},
+        headers={"Authorization": "Bearer person"},
+    )
+    assert r.status_code == 202
+    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/repositories/base"
+    assert seen["json"]["confirm"] == "base"
+
+    r = client.delete(
+        "/api/v1/credentials/repositories/theirs?tenant=acme&confirm=theirs",
+        headers={"Authorization": "Bearer person"},
+    )
+    assert r.status_code == 202
+    assert seen["method"] == "DELETE"
+    assert seen["url"] == "http://director.test:8080/v1/tenants/acme/repositories/theirs"
+    assert seen["params"] == {"confirm": "theirs"}
+
+
+def test_a_change_that_wants_the_name_retyped_reaches_the_danger_zone(monkeypatch):
+    """428 and its fields are the director's answer and arrive unchanged: the
+    screen reads confirmWith from it rather than deciding what is dangerous."""
+    seen: dict = {}
+    wanted = {
+        "error": "removing it stops every app it provides from reconciling",
+        "confirmField": "confirm",
+        "confirmWith": "mine",
+        "dangerous": True,
+        "requiresRetype": True,
+    }
+    _fake_client(monkeypatch, seen, status=428, body=wanted)
+    r = TestClient(_app(_settings())).delete(
+        "/api/v1/credentials/repositories/mine", headers={"Authorization": "Bearer person"}
+    )
+    assert r.status_code == 428
+    assert r.json() == wanted
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/repositories/mine"
+    assert seen["params"] is None
+
+
+def test_a_name_that_is_not_one_is_not_put_in_a_path(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, seen)
+    r = TestClient(_app(_settings())).put(
+        "/api/v1/credentials/repositories/Not_A_Name",
+        json={"role": "apps", "type": "git", "url": "https://x"},
+        headers={"Authorization": "Bearer person"},
+    )
+    assert r.status_code == 400
+    assert not seen
+
+
+def test_a_repositorys_password_is_a_credential_at_the_custodian(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, seen, body={"stored": True})
+    r = TestClient(_app(_settings())).put(
+        "/api/v1/credentials/repository-mine",
+        json={"fields": {"password": "s3cret"}},
+        headers={"Authorization": "Bearer person"},
+    )
+    assert r.status_code == 200
+    assert seen["url"] == "http://credentials.test:9444/v1/credentials/repository-mine"
+
+
+def test_declaring_needs_no_custodian_and_never_falls_back_to_it(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, seen)
+    r = TestClient(_app(_settings(DIRECTOR_URL=None))).put(
+        "/api/v1/credentials/repositories/mine",
+        json={"role": "apps", "type": "git", "url": "https://x"},
+        headers={"Authorization": "Bearer person"},
+    )
+    assert r.status_code == 503
+    assert "director is not configured" in r.json()["detail"]
+    assert not seen

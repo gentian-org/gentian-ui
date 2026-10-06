@@ -83,6 +83,21 @@ async def admin_context(
     )
 
 
+@router.get("/apps/status")
+async def app_states(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What the cluster holds of this tenant's components, from the operator
+    through the usher: whether each is Ready and why not. The console reads
+    it for one thing today -- whether the Operations Console is installed, so
+    the Export tab can link to it or promote it."""
+    return await director.read(
+        settings, f"/v1/tenants/{settings.tenant_id}/apps/status", bearer_of(credentials)
+    )
+
+
 # Every route a not-yet-mapped screen calls, and the screen it belongs to.
 # Method and path prefix, matched in order. This is the worklist of the
 # re-pointing, kept where the code is so it cannot drift from what the
@@ -117,6 +132,8 @@ def screen_for(method: str, path: str) -> str | None:
     return None
 
 
+# The catch-all, and so the LAST route of this router: routes are matched in
+# the order they are declared, and one declared below this is never reached.
 @router.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def not_yet_mapped(
     rest: str, request: Request, _user: dict = Depends(get_current_user)
@@ -129,19 +146,4 @@ async def not_yet_mapped(
         status_code=501,
         detail=f"The {screen} screen is not yet a client of the director. "
         "It is being re-pointed from the desktop's backend, and until its director endpoints exist it cannot show anything.",
-    )
-
-
-@router.get("/apps/status")
-async def app_states(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    """What the cluster holds of this tenant's components, from the operator
-    through the director: whether each is Ready and why not. The console reads
-    it for one thing today -- whether the Operations Console is installed, so
-    the Export tab can link to it or promote it."""
-    return await director.forward(
-        settings, "GET", f"/v1/tenants/{settings.tenant_id}/apps/status", bearer_of(credentials)
     )

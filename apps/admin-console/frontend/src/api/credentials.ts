@@ -40,7 +40,7 @@ export type RepositoryView = {
 };
 
 /**
- * The 428 body from the custodian. The API decides what is dangerous
+ * The 428 body from the director. The API decides what is dangerous
  * and what has to be retyped; this type is only the shape of that answer.
  * Deciding it again here would be a second copy of the rules, and the two would
  * eventually disagree.
@@ -96,11 +96,36 @@ export type RepositoryInput = {
 };
 
 /**
+ * What declaring or removing a repository answers: a commit to the
+ * deployments repository, which the cluster applies on its next sync. So the
+ * list, which is read from the cluster, does not change at once, and
+ * `message` is the director's own sentence saying so.
+ */
+export type RepositoryChange = {
+  status?: string;
+  credentialName?: string;
+  commit?: string;
+  message?: string;
+};
+
+/**
+ * Whose repository a change is about. One already listed is changed where it
+ * is declared: its tenant's, or the cluster's own when it names none. A new
+ * one is this console's tenant's, which is the backend's default.
+ */
+function ownerQuery(existing?: RepositoryView): URLSearchParams {
+  const query = new URLSearchParams();
+  if (existing?.tenant) query.set("tenant", existing.tenant);
+  else if (existing) query.set("scope", "cluster");
+  return query;
+}
+
+/**
  * apiFetch throws a plain Error on any non-2xx, which would turn "please
  * confirm" into "something went wrong". So the confirmation case is read from
  * the raw response before that happens.
  */
-async function repositoryRequest(path: string, init: RequestInit): Promise<void> {
+async function repositoryRequest(path: string, init: RequestInit): Promise<RepositoryChange> {
   const { getAccessToken } = await import("@/auth/oidc");
   const token = getAccessToken();
   const response = await fetch(`/api/v1${path}`, {
@@ -123,18 +148,40 @@ async function repositoryRequest(path: string, init: RequestInit): Promise<void>
     }
     throw new Error(detail || `Request failed: ${response.status}`);
   }
+  try {
+    return (await response.json()) as RepositoryChange;
+  } catch {
+    return {};
+  }
 }
 
-export async function saveRepository(name: string, input: RepositoryInput): Promise<void> {
-  await repositoryRequest(`/credentials/repositories/${encodeURIComponent(name)}`, {
-    method: "PUT",
-    body: JSON.stringify(input),
-  });
+/**
+ * Declares the address, and nothing secret: the repository's password is the
+ * credential `repository-<name>`, set like any other on this screen once the
+ * declaration has reached the cluster.
+ */
+export async function saveRepository(
+  name: string,
+  input: RepositoryInput,
+  existing?: RepositoryView,
+): Promise<RepositoryChange> {
+  const query = ownerQuery(existing).toString();
+  return repositoryRequest(
+    `/credentials/repositories/${encodeURIComponent(name)}${query ? `?${query}` : ""}`,
+    { method: "PUT", body: JSON.stringify(input) },
+  );
 }
 
-export async function deleteRepository(name: string, confirm?: string): Promise<void> {
-  const query = confirm ? `?confirm=${encodeURIComponent(confirm)}` : "";
-  await repositoryRequest(`/credentials/repositories/${encodeURIComponent(name)}${query}`, {
-    method: "DELETE",
-  });
+export async function deleteRepository(
+  name: string,
+  confirm?: string,
+  existing?: RepositoryView,
+): Promise<RepositoryChange> {
+  const query = ownerQuery(existing);
+  if (confirm) query.set("confirm", confirm);
+  const qs = query.toString();
+  return repositoryRequest(
+    `/credentials/repositories/${encodeURIComponent(name)}${qs ? `?${qs}` : ""}`,
+    { method: "DELETE" },
+  );
 }

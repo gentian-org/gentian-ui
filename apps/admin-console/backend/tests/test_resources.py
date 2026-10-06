@@ -34,6 +34,7 @@ def _settings() -> Settings:
         KERNEL_DOMAIN="desk.gentian.org",
         TENANT_ID="platform",
         DIRECTOR_URL="http://director.test:8080",
+        USHER_URL="http://usher.test:8090",
         GENTIAN_CLUSTER_ID="demo",
     )
 
@@ -74,7 +75,7 @@ def test_the_state_is_the_directors_answer_for_the_consoles_own_tenant(monkeypat
     )
     assert r.status_code == 200
     assert r.json()["plan"] == "nodes-2"
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/resources"
+    assert seen["url"] == "http://usher.test:8090/v1/tenants/platform/resources"
     assert seen["auth"] == "Bearer person"
 
 
@@ -85,7 +86,7 @@ def test_a_platform_operator_asks_about_any_tenant_and_the_director_decides(monk
         "/api/v1/admin/resources?tenant=acme", headers={"Authorization": "Bearer person"}
     )
     assert r.status_code == 200
-    assert seen["url"] == "http://director.test:8080/v1/tenants/acme/resources"
+    assert seen["url"] == "http://usher.test:8090/v1/tenants/acme/resources"
 
 
 def test_the_plans_arrive_as_the_bare_list_the_screen_reads(monkeypatch):
@@ -130,6 +131,8 @@ def test_choosing_a_plan_is_a_commit(monkeypatch):
     assert r.status_code == 202
     assert r.json()["previousPlan"] == "nodes-2"
     assert seen["method"] == "PUT"
+    # The one write of this screen: a commit, so the director's, not the usher's.
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/resources"
     assert seen["json"] == {"plan": "nodes-4", "force": False}
     assert seen["auth"] == "Bearer t"
 
@@ -154,7 +157,7 @@ def test_history_queries_travel_with_the_request(monkeypatch):
         headers={"Authorization": "Bearer t"},
     )
     assert r.status_code == 200
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/resources/usage"
+    assert seen["url"] == "http://usher.test:8090/v1/tenants/platform/resources/usage"
     assert seen["params"] == {"from": "2026-09-01T00:00:00Z", "stepSeconds": "3600"}
 
     _fake_client(monkeypatch, _answer(200, {"tenant": "acme", "intervals": []}), seen)
@@ -163,7 +166,7 @@ def test_history_queries_travel_with_the_request(monkeypatch):
         headers={"Authorization": "Bearer t"},
     )
     assert r.status_code == 200
-    assert seen["url"] == "http://director.test:8080/v1/tenants/acme/resources/report"
+    assert seen["url"] == "http://usher.test:8090/v1/tenants/acme/resources/report"
     assert seen["params"] == {"to": "2026-10-01T00:00:00Z"}
 
 
@@ -178,7 +181,7 @@ def test_the_clusters_view_is_every_tenants_state(monkeypatch):
     )
     assert r.status_code == 200
     assert r.json() == states
-    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/resources"
+    assert seen["url"] == "http://usher.test:8090/v1/clusters/demo/resources"
 
 
 def test_resources_is_no_longer_a_screen_the_console_cannot_show():
@@ -190,3 +193,21 @@ def test_resources_is_no_longer_a_screen_the_console_cannot_show():
 def test_no_token_is_refused_before_anything_is_forwarded():
     r = TestClient(_app(_settings())).get("/api/v1/admin/resources")
     assert r.status_code == 401
+
+
+def test_without_an_usher_the_reads_say_so_and_ask_nobody(monkeypatch):
+    """The director answers 404 on these now and is not asked instead."""
+    seen: dict = {}
+    _fake_client(monkeypatch, _answer(200, {}), seen)
+    settings = Settings(
+        AUTH_DISABLED="true",
+        TENANT_ID="platform",
+        DIRECTOR_URL="http://director.test:8080",
+        GENTIAN_CLUSTER_ID="demo",
+    )
+    client = TestClient(_app(settings))
+    for path in ("", "/plans", "/usage", "/report", "/tenants"):
+        r = client.get(f"/api/v1/admin/resources{path}", headers={"Authorization": "Bearer t"})
+        assert r.status_code == 503, path
+        assert "USHER_URL" in r.json()["detail"]
+    assert not seen

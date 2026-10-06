@@ -12,6 +12,11 @@ and the director decides, per relation, what that person may read or write.
 It names no app and knows no catalogue. What it does add is a closed list --
 the store can reach exactly the routes below and nothing else of the director,
 however it phrases the request.
+
+Two of them are reads of live state -- how the installed apps are doing, and
+what the tenant has used of its plan -- and those are the usher's to answer,
+with the same token, on the same paths. The director answers 404 on them and
+is not asked instead.
 """
 
 import re
@@ -47,6 +52,17 @@ def _base_url(settings: Settings) -> str:
     return url.rstrip("/")
 
 
+def _usher_url(settings: Settings) -> str:
+    url = getattr(settings, "usher_url", None)
+    if not url:
+        raise HTTPException(
+            status_code=503,
+            detail="The usher is not configured for this cluster: USHER_URL "
+            "(the chart value usher.url) is not set.",
+        )
+    return url.rstrip("/")
+
+
 def _tenant(settings: Settings) -> str:
     name = getattr(settings, "gentian_tenant", None)
     if not name:
@@ -77,9 +93,13 @@ async def _ask(
     *,
     params: dict[str, str] | None = None,
     body: Any = None,
+    live: bool = False,
 ) -> httpx.Response:
-    """One request to the director, as the caller."""
-    url = f"{_base_url(settings)}/v1/tenants/{_tenant(settings)}{path}"
+    """One request to the director, as the caller -- or, for a read of live
+    state, to the usher."""
+    base = _usher_url(settings) if live else _base_url(settings)
+    service = "usher" if live else "director"
+    url = f"{base}/v1/tenants/{_tenant(settings)}{path}"
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             return await client.request(
@@ -92,12 +112,12 @@ async def _ask(
     except httpx.RequestError as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"The director is unreachable: {exc}",
+            detail=f"The {service} is unreachable: {exc}",
         ) from exc
 
 
 def _relay(upstream: httpx.Response) -> Response:
-    """The director's answer, unchanged: its status is the answer too."""
+    """The answer, unchanged: its status is the answer too."""
     return Response(
         content=upstream.content,
         status_code=upstream.status_code,
@@ -172,7 +192,7 @@ async def apps_status(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """What the cluster has made of it: installing, ready or failing."""
-    return _relay(await _ask(settings, credentials, "GET", "/apps/status"))
+    return _relay(await _ask(settings, credentials, "GET", "/apps/status", live=True))
 
 
 @router.post("/apps/{profile}")
@@ -296,7 +316,7 @@ async def resources(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """The tenant's plan and what it has used of it."""
-    return _relay(await _ask(settings, credentials, "GET", "/resources"))
+    return _relay(await _ask(settings, credentials, "GET", "/resources", live=True))
 
 
 @router.get("/catalogues")

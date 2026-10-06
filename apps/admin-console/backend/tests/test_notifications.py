@@ -28,6 +28,7 @@ def _settings() -> Settings:
         KERNEL_DOMAIN="desk.gentian.org",
         TENANT_ID="platform",
         DIRECTOR_URL="http://director.test:8080",
+        USHER_URL="http://usher.test:8090",
         GENTIAN_CLUSTER_ID="demo",
     )
 
@@ -59,7 +60,7 @@ def test_the_notices_arrive_as_the_bare_list_the_screen_reads(monkeypatch):
     )
     assert r.status_code == 200
     assert r.json() == rows
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/notifications"
+    assert seen["url"] == "http://usher.test:8090/v1/tenants/platform/notifications"
 
 
 def test_publishing_is_an_action(monkeypatch):

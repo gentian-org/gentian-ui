@@ -30,6 +30,7 @@ def _settings(**over) -> Settings:
         AUTH_DISABLED="true",
         KERNEL_DOMAIN="desk.gentian.org",
         DIRECTOR_URL=over.pop("director_url", "http://director.test:8080"),
+        USHER_URL=over.pop("usher_url", "http://usher.test:8090"),
         GENTIAN_CLUSTER_ID=over.pop("cluster_id", "demo"),
         GENTIAN_TENANT=over.pop("tenant", "acme"),
     )
@@ -244,3 +245,47 @@ def test_a_purge_refused_because_the_app_is_still_there_says_so(monkeypatch):
     r = TestClient(_app(_settings())).post("/api/v1/store/apps/xwiki-ce/purge", headers=AUTH)
     assert r.status_code == 409
     assert r.json() == {"error": "the app is still installed"}
+
+
+@pytest.mark.parametrize("path", ["/apps/status", "/resources"])
+def test_live_state_is_asked_of_the_usher(monkeypatch, path):
+    """How the apps are doing and what the plan has left are what the cluster
+    holds right now. The usher answers that; the director answers 404."""
+    seen = _director(monkeypatch, {f"GET {path}": (200, {"tenant": "acme"})})
+    r = TestClient(_app(_settings())).get(f"/api/v1/store{path}", headers=AUTH)
+
+    assert r.status_code == 200
+    assert r.json() == {"tenant": "acme"}
+    assert [s["url"] for s in seen] == [f"http://usher.test:8090/v1/tenants/acme{path}"]
+    assert seen[0]["auth"] == "Bearer person-token"
+
+
+@pytest.mark.parametrize("path", ["/apps/status", "/resources"])
+def test_without_an_usher_live_state_says_so_and_asks_nobody(monkeypatch, path):
+    """The director is not a fallback: a desktop that asked it anyway would
+    show a tenant with nothing installed."""
+    seen = _director(monkeypatch, {f"GET {path}": (200, {})})
+    r = TestClient(_app(_settings(usher_url=None))).get(f"/api/v1/store{path}", headers=AUTH)
+
+    assert r.status_code == 503
+    assert "USHER_URL" in r.json()["detail"]
+    assert not seen
+
+
+@pytest.mark.parametrize(
+    "body", [{"error": "the operator's API did not answer"}, {"detail": "no such tenant"}]
+)
+def test_the_ushers_error_comes_back_in_the_shape_it_was_given(monkeypatch, body):
+    _director(monkeypatch, {"GET /apps/status": (502, body)})
+    r = TestClient(_app(_settings())).get("/api/v1/store/apps/status", headers=AUTH)
+
+    assert r.status_code == 502
+    assert r.json() == body
+
+
+def test_what_git_says_is_installed_is_still_the_directors(monkeypatch):
+    seen = _director(monkeypatch, {"GET /apps": (200, {"tenant": "acme", "apps": []})})
+    r = TestClient(_app(_settings(usher_url=None))).get("/api/v1/store/apps", headers=AUTH)
+
+    assert r.status_code == 200
+    assert seen[0]["url"] == "http://director.test:8080/v1/tenants/acme/apps"

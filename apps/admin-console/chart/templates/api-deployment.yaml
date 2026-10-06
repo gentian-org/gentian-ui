@@ -79,6 +79,10 @@ spec:
             - name: REGISTRAR_URL
               value: {{ .Values.registrar.url | quote }}
             {{- end }}
+            {{- if and .Values.usher .Values.usher.url (not (hasKey (default dict .Values.api.env) "USHER_URL")) }}
+            - name: USHER_URL
+              value: {{ .Values.usher.url | quote }}
+            {{- end }}
             {{- if and .Values.director.cluster (not (hasKey (default dict .Values.api.env) "GENTIAN_CLUSTER_ID")) }}
             - name: GENTIAN_CLUSTER_ID
               value: {{ .Values.director.cluster | quote }}

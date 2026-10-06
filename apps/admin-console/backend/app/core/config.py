@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     # those routes answering 503 and naming this setting; the director is
     # not asked instead.
     registrar_url: str | None = Field(default=None, alias="REGISTRAR_URL")
+    # Where reads of live cluster state are asked: app states, resources,
+    # backups, integrations, notices, and the cluster's own. Unset leaves
+    # those routes answering 503 and naming this setting; the director is
+    # not asked instead.
+    usher_url: str | None = Field(default=None, alias="USHER_URL")
 
     auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
 

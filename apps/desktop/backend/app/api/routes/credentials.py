@@ -18,7 +18,15 @@ which is the arrangement the service was designed to avoid.
 
 So the only thing added here is transport. Status codes pass through unchanged,
 including 428, which the console reads to render its danger zone.
+
+Repositories are listed here and declared elsewhere. Which exist, and whether
+each has its credential, is the custodian's list. Where one points is
+configuration, so declaring or removing one is a commit the director makes --
+the custodian has no route for it -- and those two routes relay there, for
+this desktop's own tenant, with the same token.
 """
+
+import re
 
 from typing import Any
 
@@ -48,6 +56,38 @@ def _base_url(settings: Settings) -> str:
     return url.rstrip("/")
 
 
+# A repository's name as the director accepts it. Checked here because it
+# lands in a URL path.
+_NAME = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
+
+# What a declaration may say. The director refuses a body with any other
+# field, so only these travel.
+_DECLARATION = ("role", "type", "url", "branch", "writable", "confirm")
+
+
+def _repository_url(settings: Settings, name: str) -> str:
+    """The director's route for one repository of this desktop's tenant."""
+    if not _NAME.match(name):
+        raise HTTPException(
+            status_code=400,
+            detail="A repository's name is lower-case letters, digits and hyphens.",
+        )
+    director = getattr(settings, "director_url", None)
+    if not director:
+        raise HTTPException(
+            status_code=503,
+            detail="The director is not configured for this cluster: DIRECTOR_URL "
+            "(the chart value director.url) is not set.",
+        )
+    tenant = getattr(settings, "gentian_tenant", None)
+    if not tenant:
+        raise HTTPException(
+            status_code=503,
+            detail="This desktop does not know which tenant it belongs to.",
+        )
+    return f"{director.rstrip('/')}/v1/tenants/{tenant}/repositories/{name}"
+
+
 async def _forward(
     request: Request,
     method: str,
@@ -55,8 +95,12 @@ async def _forward(
     token: str,
     settings: Settings,
     json_body: Any = None,
+    *,
+    url: str | None = None,
+    service: str = "custodian",
 ) -> Response:
-    url = f"{_base_url(settings)}{path}"
+    """One request to the custodian at path, or to another service at url."""
+    url = url or f"{_base_url(settings)}{path}"
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             upstream = await client.request(
@@ -69,7 +113,7 @@ async def _forward(
     except httpx.RequestError as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"The custodian is unreachable: {exc}",
+            detail=f"The {service} is unreachable: {exc}",
         ) from exc
 
     # Pass the status through untouched. 428 in particular carries the retype
@@ -177,9 +221,20 @@ async def set_repository(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
+    """A commit at the director: 202, or 428 when the name must be retyped."""
     body = await request.json()
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="The body is a repository declaration.")
+    declaration = {k: body[k] for k in _DECLARATION if body.get(k) not in (None, "")}
     return await _forward(
-        request, "PUT", f"/v1/repositories/{name}", _token(credentials), settings, body
+        request,
+        "PUT",
+        "",
+        _token(credentials),
+        settings,
+        declaration,
+        url=_repository_url(settings, name),
+        service="director",
     )
 
 
@@ -191,6 +246,13 @@ async def delete_repository(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
+    """Also a commit at the director; ?confirm= travels with the request."""
     return await _forward(
-        request, "DELETE", f"/v1/repositories/{name}", _token(credentials), settings
+        request,
+        "DELETE",
+        "",
+        _token(credentials),
+        settings,
+        url=_repository_url(settings, name),
+        service="director",
     )

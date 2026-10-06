@@ -4,11 +4,11 @@ Read on the desktop, which owns the table they live in — `admin_notifications`
 in the tenant's own database. The console keeps no copy: two stores would mean
 a notice that exists in one and not the other. The operator writes into the
 desktop's table, because it already resolves that database for the usage
-history, and relays through the director like everything else here.
+history.
 
-Reading is a read of state. Publishing is an ACTION: it happens once, nothing
-reconciles it, and the answer says what was published rather than what was
-committed, because nothing was.
+Reading is a read of state, asked of the usher. Publishing is an ACTION,
+asked of the director: it happens once, nothing reconciles it, and the answer
+says what was published rather than what was committed, because nothing was.
 """
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -35,9 +35,8 @@ async def notifications(
     the desktop has started, and nothing is broken. An empty list would have
     read as "nothing was ever said", which is a different thing.
     """
-    answer = await director.forward(
+    answer = await director.read(
         settings,
-        "GET",
         f"/v1/tenants/{tenant or settings.tenant_id}/notifications",
         bearer_of(credentials),
     )

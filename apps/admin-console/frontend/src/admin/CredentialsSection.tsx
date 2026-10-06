@@ -318,6 +318,10 @@ function RepositoriesPanel({
   } | null>(null);
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // What the director said it did. A change is a commit the cluster applies
+  // on its next sync, so the list below does not move at once; without this
+  // sentence an accepted change looks like one that did nothing.
+  const [notice, setNotice] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<{ name: string } & RepositoryInput>({
     name: "",
@@ -333,12 +337,15 @@ function RepositoriesPanel({
 
   const run = async (name: string, input?: RepositoryInput, confirm?: string) => {
     setError(null);
+    setNotice(null);
+    // One already listed is changed where it is declared -- its tenant's, or
+    // the cluster's own -- rather than wherever this console happens to run.
+    const existing = repositories.find((repo) => repo.name === name);
     try {
-      if (input) {
-        await saveRepository(name, { ...input, confirm });
-      } else {
-        await deleteRepository(name, confirm);
-      }
+      const change = input
+        ? await saveRepository(name, { ...input, confirm }, existing)
+        : await deleteRepository(name, confirm, existing);
+      setNotice(change.message ?? null);
       setPending(null);
       setTyped("");
       setAdding(false);
@@ -361,6 +368,7 @@ function RepositoriesPanel({
         {t("credentials.whereYourAppsComeFrom")}</p>
 
       {error ? <p className="admin-console__error">{error}</p> : null}
+      {notice ? <p className="admin-console__hint" role="status">{notice}</p> : null}
 
       {/* Adding a repository. The API already accepted this — saveRepository has
           existed since the panel did — but nothing ever called it with an input,
