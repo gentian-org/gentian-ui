@@ -98,11 +98,6 @@
       "text": "The add-ons of {{subject}} in {{tenant}} will be changed.",
       "confirm": "Change"
     },
-    "grant": {
-      "title": "Record this entitlement?",
-      "text": "{{tenant}} will be entitled to {{subject}}.",
-      "confirm": "Record"
-    },
     "title": "App Store",
     "purge": {
       "title": "Purge this app's data?",

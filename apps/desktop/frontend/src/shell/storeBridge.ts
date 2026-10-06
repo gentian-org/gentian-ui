@@ -17,10 +17,10 @@
  *     cannot phrase a request that reaches another route.
  *   - Names are names. A profile or a catalogue lands in a URL path, so it
  *     is matched against what a name may be before anything is sent.
- *   - Writes are confirmed here. Installing, removing, changing add-ons and
- *     recording a grant each wait for the person to say yes in a dialog the
- *     DESKTOP draws, on the cluster's own origin -- a page in a frame can ask
- *     for an install but cannot press the button.
+ *   - Writes are confirmed here. Installing, removing and changing add-ons
+ *     each wait for the person to say yes in a dialog the DESKTOP draws, on
+ *     the cluster's own origin -- a page in a frame can ask for an install
+ *     but cannot press the button.
  */
 
 import { getAccessToken } from "@/auth/oidc";
@@ -52,7 +52,7 @@ export type BridgeReply =
   | { ok: false; status: number; error: string };
 
 /** What a write is, in the words the confirmation uses. */
-export type WriteKind = "install" | "uninstall" | "purge" | "provision" | "addons" | "grant";
+export type WriteKind = "install" | "uninstall" | "purge" | "provision" | "addons";
 
 type Call = {
   method: "GET" | "POST" | "PUT" | "DELETE";
@@ -108,8 +108,6 @@ export function plan(req: BridgeRequest): Planned | { kind: "refused"; error: st
       return { kind: "read", call: { method: "GET", path: "/apps/status" } };
     case "resources.get":
       return { kind: "read", call: { method: "GET", path: "/resources" } };
-    case "entitlements.list":
-      return { kind: "read", call: { method: "GET", path: "/entitlements" } };
     case "catalogues.list":
       return { kind: "read", call: { method: "GET", path: "/catalogues" } };
     case "catalogues.entries": {
@@ -189,23 +187,6 @@ export function plan(req: BridgeRequest): Planned | { kind: "refused"; error: st
         write: "addons",
         subject: profile,
         call: { method: "PUT", path: `/apps/${profile}/addons`, body: { addons } },
-      };
-    }
-    case "entitlements.deliver": {
-      if (typeof a.grant !== "string" || a.grant.length === 0 || a.grant.length > 16384) {
-        return { kind: "refused", error: "grant is the signed statement" };
-      }
-      // What the person is asked about is the entry, which the statement
-      // names and the store repeats beside it. It is a label for the dialog
-      // and nothing more: the director reads the statement, not this.
-      const subject = typeof a.coordinate === "string" && COORDINATE.test(a.coordinate)
-        ? a.coordinate
-        : "";
-      return {
-        kind: "write",
-        write: "grant",
-        subject,
-        call: { method: "POST", path: "/entitlements", body: { grant: a.grant } },
       };
     }
     default:

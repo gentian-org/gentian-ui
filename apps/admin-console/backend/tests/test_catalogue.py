@@ -63,8 +63,8 @@ def test_the_sources_screen_asks_the_director_and_carries_the_store(monkeypatch)
             "tenant": "demo",
             "storeUrl": "https://store.gentian.org",
             "catalogues": [
-                {"name": "main", "access": "entitled", "open": False},
-                {"name": "in-house", "access": "open", "open": True},
+                {"name": "main", "open": False},
+                {"name": "in-house", "open": True},
             ],
         },
         seen,

@@ -85,7 +85,7 @@ def test_the_directors_refusal_comes_back_as_it_was_given(monkeypatch):
     """A 403 is the answer, not a failure of the desktop to be papered over."""
     _director(
         monkeypatch,
-        {"POST /apps/nextcloud-base-ce": (403, {"error": "tenant is not entitled"})},
+        {"POST /apps/nextcloud-base-ce": (403, {"error": "you may not install apps in this tenant"})},
     )
     r = TestClient(_app(_settings())).post(
         "/api/v1/store/apps/nextcloud-base-ce",
@@ -93,7 +93,7 @@ def test_the_directors_refusal_comes_back_as_it_was_given(monkeypatch):
         headers=AUTH,
     )
     assert r.status_code == 403
-    assert r.json() == {"error": "tenant is not entitled"}
+    assert r.json() == {"error": "you may not install apps in this tenant"}
 
 
 def test_an_install_carries_the_coordinate_and_nothing_else(monkeypatch):
@@ -152,17 +152,6 @@ def test_addons_are_names_too(monkeypatch):
     )
     assert r.status_code == 400
     assert seen == []
-
-
-def test_a_grant_is_delivered_opaque(monkeypatch):
-    seen = _director(monkeypatch, {"POST /entitlements": (202, {"status": "recorded"})})
-    r = TestClient(_app(_settings())).post(
-        "/api/v1/store/entitlements",
-        json={"grant": "eyJ.signed.statement", "coordinate": "ignored"},
-        headers=AUTH,
-    )
-    assert r.status_code == 202
-    assert seen[0]["json"] == {"grant": "eyJ.signed.statement"}
 
 
 def test_the_context_names_the_store_this_cluster_listens_to(monkeypatch):

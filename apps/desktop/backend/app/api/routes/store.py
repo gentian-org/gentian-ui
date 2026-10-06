@@ -184,11 +184,13 @@ async def install(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     # The coordinate and the digest go on, and nothing else. The coordinate is
-    # what the entitlement is about; the digest is which bytes the entry IS,
+    # which catalogue entry is meant; the digest is which bytes the entry IS,
     # as the store stated it over its own TLS, and the director admits the
-    # bundle it fetches only because it hashes to that (AD-3). A body passed
-    # through whole would be a way to reach a field the director grows later
-    # without anybody deciding the store may set it.
+    # bundle it fetches only because it hashes to that (AD-3). Whether this
+    # person may install apps in the tenant is the director's question, and
+    # the only one it asks. A body passed through whole would be a way to
+    # reach a field the director grows later without anybody deciding the
+    # store may set it.
     payload = {"coordinate": str(body.get("coordinate") or "")}
     digest = str(body.get("digest") or "")
     if digest:
@@ -295,34 +297,6 @@ async def resources(
 ) -> Response:
     """The tenant's plan and what it has used of it."""
     return _relay(await _ask(settings, credentials, "GET", "/resources"))
-
-
-@router.get("/entitlements")
-async def entitlements(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    return _relay(await _ask(settings, credentials, "GET", "/entitlements"))
-
-
-@router.post("/entitlements")
-async def deliver(
-    body: dict[str, Any] = Body(default_factory=dict),
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    """Hand the director a statement the store signed.
-
-    The statement is opaque here. Whether it is the store's, for this cluster
-    and this tenant, and newer than what is recorded, are the director's
-    questions and it answers them from the keys on the Cluster claim.
-    """
-    grant = body.get("grant")
-    if not isinstance(grant, str) or not grant:
-        raise HTTPException(status_code=400, detail="grant is the signed statement.")
-    return _relay(await _ask(settings, credentials, "POST", "/entitlements", body={"grant": grant}))
 
 
 @router.get("/catalogues")

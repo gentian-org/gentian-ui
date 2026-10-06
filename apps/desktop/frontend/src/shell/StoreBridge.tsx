@@ -111,7 +111,7 @@ export function StoreBridge({ enabled }: { enabled: boolean }) {
   async function confirm() {
     setBusy(true);
     const reply = await perform(current.write.call);
-    if (reply.ok && current.write.write !== "grant") {
+    if (reply.ok) {
       // What is installed decides which tiles there are.
       void queryClient.invalidateQueries({ queryKey: ["me"] });
       void queryClient.invalidateQueries({ queryKey: ["cluster-tiles"] });

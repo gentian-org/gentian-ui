@@ -98,11 +98,6 @@
       "text": "Die Add-ons von {{subject}} in {{tenant}} werden geändert.",
       "confirm": "Ändern"
     },
-    "grant": {
-      "title": "Diese Berechtigung eintragen?",
-      "text": "{{tenant}} wird für {{subject}} berechtigt.",
-      "confirm": "Eintragen"
-    },
     "title": "App Store",
     "purge": {
       "title": "Daten dieser App endgültig löschen?",

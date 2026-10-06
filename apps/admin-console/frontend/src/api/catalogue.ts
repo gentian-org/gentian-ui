@@ -12,8 +12,6 @@ import { apiFetch } from "@/api/client";
 
 export type CatalogueSource = {
   name: string;
-  /** "entitled" — the store decides — or "open": this operator's own repository. */
-  access: string;
   /** Open to THIS tenant. Nothing is open by default. */
   open: boolean;
 };
@@ -32,12 +30,8 @@ export type CatalogueEntry = {
   /** ce, pe, me or ee — but only ce and pe are ever listed here. */
   edition: string;
   trustTier?: string;
-  /**
-   * Present only for an open source. For the store's catalogue the digest
-   * that governs is the one the store states over its own TLS, so the
-   * director drops the source's own number before it reaches anybody.
-   */
-  digest?: string;
+  /** Which bytes the entry is, as its source states it. */
+  digest: string;
   /** Installable from here and now, with nobody else asked. */
   installable: boolean;
 };
