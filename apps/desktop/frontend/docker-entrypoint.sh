@@ -1,6 +1,6 @@
 #!/bin/sh
-# SPDX-FileCopyrightText: 2026 Gentian Organization
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-FileCopyrightText: The Gentian UI Authors
+# SPDX-License-Identifier: MPL-2.0
 #
 # Assemble the served document root at container start, injecting runtime
 # configuration that must not be baked into the image.
