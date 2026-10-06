@@ -62,7 +62,7 @@ async def forward(
     """Pass one request to the director as the caller and hand back its answer verbatim.
 
     `timeout` is for the few requests the director itself waits on -- a purge
-    waits for the app's teardown -- where the ordinary one would give up
+    is answered only when it is over -- where the ordinary one would give up
     before the answer and report a service that is merely still working as
     unreachable.
     """

@@ -174,36 +174,171 @@ def test_an_uninstall_refused_comes_back_as_the_director_gave_it(monkeypatch):
 
 def test_a_purge_is_the_directors_action_for_the_named_app(monkeypatch):
     seen: dict = {}
-    body = {"status": "purged", "tenant": "platform", "profile": "timesheets", "purged": True}
-    _fake_client(monkeypatch, body, seen)
+    body = {
+        "status": "purged",
+        "tenant": "platform",
+        "profile": "timesheets",
+        "purged": True,
+        "complete": True,
+        "destroyed": ["database", "files", "credentials", "accessGroup", "provisioningRecords"],
+    }
+    # The director answers an action it relayed with 202.
+    _fake_client(monkeypatch, body, seen, status=202)
     answer = _client().post(
         "/api/v1/admin/apps/purge", json={"profile": "timesheets"}, headers=_person
     )
-    assert answer.status_code == 200
+    assert answer.status_code == 202
     assert answer.json() == body
     # An action under /actions/, not the uninstall route and not a DELETE.
     assert (seen["method"], seen["url"]) == ("POST", f"{_base}/actions/purge-app")
     assert seen["json"] == {"profile": "timesheets"}
     assert seen["auth"] == "Bearer person-token"
-    # It waits for the teardown, so it is given longer than an ordinary relay.
-    assert seen["timeout"].read == 60.0
+
+
+def test_a_purge_is_waited_for_longer_than_the_director_waits(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "purged", "complete": True}, seen, status=202)
+    _client().post("/api/v1/admin/apps/purge", json={"profile": "timesheets"}, headers=_person)
+    # The director waits five minutes for a purge. A relay that gave up
+    # sooner would report a purge that is still destroying things as a
+    # service that cannot be reached.
+    assert apps.PURGE_TIMEOUT_SECONDS == 330.0
+    assert seen["timeout"].read == 330.0
+    assert seen["timeout"].read > 300.0
+    # Reaching the director at all is not given that long.
+    assert seen["timeout"].connect == 15.0
+
+
+def test_only_a_purge_is_given_that_long(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "uninstalled"}, seen, status=202)
+    _client().delete("/api/v1/admin/apps/timesheets", headers=_person)
+    assert seen["timeout"].read == 15.0
 
 
 @pytest.mark.parametrize(
-    "message",
+    ("status", "body"),
     [
-        "the app is still installed: uninstall timesheets before purging it",
-        "the app is still being removed: timesheets in platform; purge it once it is gone",
+        (200, {"status": "purged", "purged": True, "complete": True}),
+        (202, {"status": "purged", "purged": True, "complete": True}),
+        # A purge of an app whose profile is gone: success-shaped, not complete.
+        (
+            202,
+            {
+                "status": "partially-purged",
+                "purged": True,
+                "complete": False,
+                "destroyed": ["database", "files"],
+                "notExamined": ["objectStorage", "cache", "database.mariadb"],
+            },
+        ),
+        (400, {"error": "not an app: shell names stores the platform keeps for the tenant itself"}),
+        (409, {"error": "the app is still installed: uninstall timesheets before purging it"}),
+        (
+            409,
+            {
+                "error": "the app is still being removed: timesheets in platform; "
+                "nothing was destroyed — purge it once it is gone"
+            },
+        ),
+        (409, {"error": "another operation on this app is running: timesheets in platform"}),
+        (
+            500,
+            {
+                "error": "the purge of timesheets in platform did not complete: destroying its "
+                "files failed: volume claims still present. Already destroyed: database. "
+                "Not attempted: stored credentials, access group, provisioning records. "
+                "Nothing is rolled back. Retry the purge: every step is safe to repeat, "
+                "and it continues with what is left."
+            },
+        ),
+        (
+            504,
+            {
+                "error": "the operator had not answered purge-app when the director stopped "
+                "waiting; what it did before then is not known here. Ask again: the action "
+                "is safe to repeat"
+            },
+        ),
     ],
 )
-def test_a_purge_refused_says_why_in_the_clusters_words(monkeypatch, message):
+def test_a_purges_answer_comes_back_as_the_director_gave_it(monkeypatch, status, body):
     seen: dict = {}
-    _fake_client(monkeypatch, {"error": message}, seen, status=409)
+    _fake_client(monkeypatch, body, seen, status=status)
     answer = _client().post(
         "/api/v1/admin/apps/purge", json={"profile": "timesheets"}, headers=_person
     )
-    assert answer.status_code == 409
-    assert answer.json() == {"error": message}
+    assert answer.status_code == status
+    assert answer.json() == body
+
+
+# -- what uninstalled apps still hold ----------------------------------------
+
+
+def _usher_settings() -> Settings:
+    return Settings(
+        AUTH_DISABLED="true",
+        TENANT_ID="platform",
+        DIRECTOR_URL="http://director.test:8080",
+        USHER_URL="http://usher.test:8080",
+    )
+
+
+def test_the_retained_apps_are_the_ushers_answer_untouched(monkeypatch):
+    seen: dict = {}
+    body = {
+        "tenant": "platform",
+        "apps": [
+            {
+                "profile": "timesheets",
+                "state": "retained",
+                "profileAvailable": True,
+                "kinds": {
+                    "database": "present",
+                    "files": "present",
+                    "credentials": "present",
+                    "accessGroup": "present",
+                    "objectStorage": "unknown",
+                    "cache": "absent",
+                },
+                "volumes": ["timesheets-release-data"],
+            }
+        ],
+        "unknown": {"objectStorage": "can only be asked of the object store"},
+    }
+    _fake_client(monkeypatch, body, seen)
+    answer = TestClient(_app(_usher_settings())).get("/api/v1/admin/apps/retained", headers=_person)
+    assert answer.status_code == 200
+    assert answer.json() == body
+    # The usher's read for this console's tenant -- not the director, and not
+    # an app called "retained".
+    assert (seen["method"], seen["url"]) == (
+        "GET",
+        "http://usher.test:8080/v1/tenants/platform/apps/retained",
+    )
+    assert seen["auth"] == "Bearer person-token"
+    assert seen["timeout"].read == 15.0
+
+
+@pytest.mark.parametrize(
+    ("status", "body"),
+    [(403, {"error": "forbidden"}), (400, {"detail": "tenant not found"})],
+)
+def test_the_retained_read_refused_comes_back_as_it_was(monkeypatch, status, body):
+    seen: dict = {}
+    _fake_client(monkeypatch, body, seen, status=status)
+    answer = TestClient(_app(_usher_settings())).get("/api/v1/admin/apps/retained", headers=_person)
+    assert answer.status_code == status
+    assert answer.json() == body
+
+
+def test_the_retained_read_without_an_usher_says_so(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"apps": []}, seen)
+    # The director is not asked instead: it does not serve this read.
+    answer = _client().get("/api/v1/admin/apps/retained", headers=_person)
+    assert answer.status_code == 503
+    assert seen == {}
 
 
 # -- what never reaches the director ----------------------------------------
@@ -234,6 +369,7 @@ def test_none_of_them_is_relayed_without_a_token(monkeypatch):
     client = _client()
     assert client.get("/api/v1/admin/apps").status_code == 401
     assert client.get("/api/v1/admin/apps/privileges").status_code == 401
+    assert client.get("/api/v1/admin/apps/retained").status_code == 401
     assert client.put("/api/v1/admin/apps/a/access", json={"everyone": True}).status_code == 401
     assert client.delete("/api/v1/admin/apps/a").status_code == 401
     assert client.post("/api/v1/admin/apps/purge", json={"profile": "a"}).status_code == 401
@@ -263,6 +399,13 @@ def test_the_whole_app_reaches_these_routes_before_the_catch_all(monkeypatch):
         assert seen["url"] == f"{_base}/privileges"
         assert client.get("/api/v1/admin/apps/status", headers=_person).status_code == 200
         assert seen["url"] == "http://usher.test:8080/v1/tenants/platform/apps/status"
+        assert client.get("/api/v1/admin/apps/retained", headers=_person).status_code == 200
+        assert seen["url"] == "http://usher.test:8080/v1/tenants/platform/apps/retained"
+        purge = client.post(
+            "/api/v1/admin/apps/purge", json={"profile": "timesheets"}, headers=_person
+        )
+        assert purge.status_code == 200
+        assert (seen["method"], seen["url"]) == ("POST", f"{_base}/actions/purge-app")
         assert client.delete("/api/v1/admin/apps/timesheets", headers=_person).status_code == 200
         assert (seen["method"], seen["url"]) == ("DELETE", f"{_base}/apps/timesheets")
     finally:

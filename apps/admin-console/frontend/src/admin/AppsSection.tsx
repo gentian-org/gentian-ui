@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
 import {
   fetchAppStates,
@@ -10,6 +11,7 @@ import {
 } from "@/api/admin";
 import {
   fetchDeclaredApps,
+  fetchRetainedApps,
   fetchTenantPrivileges,
   purgeAppData,
   setAppForEveryone,
@@ -17,7 +19,9 @@ import {
   type AppPurgeResult,
   type AppWriteResult,
   type DeclaredApp,
+  type RetainedApp,
 } from "@/api/apps";
+import { ApiError } from "@/api/client";
 import { GroupMembers } from "./GroupMembers";
 import { describeGroups } from "./groupLabels";
 import "./admin.css";
@@ -164,7 +168,7 @@ export function AppsSection({
         </div>
       )}
 
-      <PurgeCard tenant={tenant} declared={declaredQuery.data?.apps} />
+      <RetainedSection tenant={tenant} declared={declaredQuery.data?.apps} />
     </section>
   );
 }
@@ -672,9 +676,11 @@ function PrivilegesPart({ row }: { row: AppRow }) {
 /**
  * Uninstall: removes the app and keeps its data.
  *
- * A commit, like the install was. Destroying the data is a different act with
- * a different name, offered elsewhere on this screen and only once the app is
- * gone -- so taking an app away never takes its data with it by accident.
+ * A commit, like the install was. The app and its sign-in client go; its
+ * files, database, object storage, stored credentials and access group stay.
+ * Destroying those is a different act with a different name, offered
+ * elsewhere on this screen and only once the app is gone -- so taking an app
+ * away never takes its data with it by accident.
  */
 function UninstallPart({
   row,
@@ -775,99 +781,375 @@ function OutcomeNotice({ outcome }: { outcome: Outcome }) {
   );
 }
 
+/** The kinds of data an uninstalled app can still hold, in the order shown. */
+const RETAINED_KINDS = ["files", "database", "objectStorage", "credentials", "accessGroup", "cache"] as const;
+
+/** How a purge ended, for the one notice that says so. */
+type PurgeOutcome =
+  | { app: string; result: AppPurgeResult }
+  | { app: string; refused: boolean; message: string };
+
 /**
- * Purge: permanently destroys the data an uninstalled app left behind.
+ * Uninstalled apps with retained data, and purging one.
  *
- * It stands apart from the list because its subject is not in the list: a
- * purge is only for an app the tenant no longer has. No service reports which
- * uninstalled apps still hold data, so the app is named by hand, and the
- * cluster refuses the request for one that is still installed or still being
- * taken down.
+ * Uninstalling keeps what an app stored, and this list is the only place that
+ * says so afterwards: the apps the tenant no longer has that still hold data,
+ * and which kinds each one holds. It is the cluster's answer and it is built
+ * on the matching a purge uses, so what a row shows is what purging that app
+ * destroys.
+ *
+ * A purge is one request that is answered when it is over, which can take
+ * minutes. Nothing here gives up before the answer; while it runs the dialog
+ * stays open and nothing else can be started. What comes back is shown as the
+ * cluster said it, and only an answer that says it is complete is called done.
+ *
+ * Naming an app by hand is offered only when the list could not be read.
  */
-function PurgeCard({ tenant, declared }: { tenant: string; declared?: DeclaredApp[] }) {
+function RetainedSection({ tenant, declared }: { tenant: string; declared?: DeclaredApp[] }) {
   const { t } = useTranslation();
-  const [name, setName] = useState("");
-  const [asking, setAsking] = useState<string | null>(null);
-  const [done, setDone] = useState<{ app: string; result: AppPurgeResult } | null>(null);
+  const queryClient = useQueryClient();
+  // The app the dialog is about, and whether its purge has been confirmed:
+  // from then on the dialog only says that it is running.
+  const [asking, setAsking] = useState<{ app: string; confirmed: boolean } | null>(null);
+  const [outcome, setOutcome] = useState<PurgeOutcome | null>(null);
+
+  const retainedQuery = useQuery({
+    queryKey: ["admin", "apps", "retained"],
+    queryFn: () => fetchRetainedApps(),
+  });
 
   const purge = useMutation({
     mutationFn: (app: string) => purgeAppData(app),
-    onSuccess: (result, app) => {
+    onSuccess: (result, app) => setOutcome({ app, result }),
+    onError: (err, app) => {
+      const status = err instanceof ApiError ? err.status : undefined;
+      setOutcome({
+        app,
+        // A 4xx is the cluster declining to start. Anything else -- a purge
+        // that stopped half-way, a relay that stopped waiting, no answer at
+        // all -- may have destroyed something, and asking again is safe.
+        refused: status !== undefined && status >= 400 && status < 500,
+        message: (err instanceof ApiError && err.detail) || messageOf(err),
+      });
+    },
+    onSettled: () => {
       setAsking(null);
-      setName("");
-      setDone({ app, result });
+      // Whatever the answer, what is held may have changed.
+      void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "retained"] });
     },
   });
 
+  function run(app: string) {
+    if (purge.isPending) return;
+    setOutcome(null);
+    setAsking({ app, confirmed: true });
+    purge.mutate(app);
+  }
+
+  function ask(app: string) {
+    if (purge.isPending) return;
+    setOutcome(null);
+    setAsking({ app, confirmed: false });
+  }
+
+  const apps = retainedQuery.data?.apps ?? [];
+  const reasons = retainedQuery.data?.unknown ?? {};
+  // A reason is shown for a kind only where some listed app has it unknown.
+  const unknownKinds = RETAINED_KINDS.filter(
+    (kind) => reasons[kind] && apps.some((app) => app.kinds?.[kind] === "unknown"),
+  );
+
+  return (
+    <div className="admin-console__subsection">
+      <h3 className="admin-console__subsection-title">{t("apps.retainedTitle")}</h3>
+      <p className="admin-console__lead">{t("apps.retainedLead")}</p>
+
+      {outcome ? (
+        <PurgeOutcomeNotice outcome={outcome} busy={purge.isPending} onRetry={() => run(outcome.app)} />
+      ) : null}
+
+      {retainedQuery.isLoading ? (
+        <p className="admin-console__hint">{t("apps.retainedReading")}</p>
+      ) : retainedQuery.isError ? (
+        <>
+          <p className="admin-console__error">
+            {t("apps.retainedUnavailable")} {messageOf(retainedQuery.error)}
+          </p>
+          <details>
+            <summary className="admin-console__hint">{t("apps.purgeByName")}</summary>
+            <PurgeByName declared={declared} busy={purge.isPending} onAsk={ask} />
+          </details>
+        </>
+      ) : apps.length === 0 ? (
+        <p className="admin-console__empty">{t("apps.retainedNone")}</p>
+      ) : (
+        <>
+          <div className="admin-console__table-wrap">
+            <table className="admin-console__table">
+              <thead>
+                <tr>
+                  <th>{t("apps.app")}</th>
+                  {RETAINED_KINDS.map((kind) => (
+                    <th key={kind}>{kindWord(t, kind)}</th>
+                  ))}
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {apps.map((app) => (
+                  <RetainedRow key={app.profile} app={app} busy={purge.isPending} onAsk={ask} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {unknownKinds.map((kind) => (
+            <p key={kind} className="admin-console__hint">
+              {t("apps.retainedUnknownWhy", { kind: kindWord(t, kind), why: reasons[kind] })}
+            </p>
+          ))}
+        </>
+      )}
+
+      {asking ? (
+        <PurgeDialog
+          app={asking.app}
+          tenant={tenant}
+          pending={asking.confirmed}
+          onConfirm={() => run(asking.app)}
+          onClose={() => setAsking(null)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** A kind of data, in the reader's words; one the screen has no word for is shown as it came. */
+function kindWord(t: TFunction, kind: string): string {
+  switch (kind) {
+    case "files":
+      return t("apps.kindFiles");
+    case "database":
+      return t("apps.kindDatabase");
+    case "objectStorage":
+      return t("apps.kindObjectStorage");
+    case "credentials":
+      return t("apps.kindCredentials");
+    case "accessGroup":
+      return t("apps.kindAccessGroup");
+    case "cache":
+      return t("apps.kindCache");
+    case "provisioningRecords":
+      return t("apps.kindProvisioningRecords");
+    case "database.mariadb":
+      return t("apps.kindMariaDB");
+    case "credentials.extensions":
+      return t("apps.kindExtensionCredentials");
+    case "accessGroup.extensions":
+      return t("apps.kindExtensionGroups");
+    case "files.chartNamed":
+      return t("apps.kindChartNamedFiles");
+    default:
+      return kind;
+  }
+}
+
+/** Whether one kind of data is there, as the cluster said it. */
+function KindState({ state }: { state?: string }) {
+  const { t } = useTranslation();
+  if (state === "present") {
+    return <span className="admin-console__badge admin-console__badge--info">{t("apps.kindPresent")}</span>;
+  }
+  if (state === "absent") {
+    return <span className="admin-console__badge">{t("apps.kindAbsent")}</span>;
+  }
+  if (state === "unknown") {
+    return <span className="admin-console__badge admin-console__badge--warn">{t("apps.kindUnknown")}</span>;
+  }
+  return state ? <span className="admin-console__badge admin-console__mono">{state}</span> : <>—</>;
+}
+
+function RetainedRow({
+  app,
+  busy,
+  onAsk,
+}: {
+  app: RetainedApp;
+  busy: boolean;
+  onAsk: (app: string) => void;
+}) {
+  const { t } = useTranslation();
+  const volumes = app.volumes ?? [];
+  return (
+    <tr>
+      <td className="admin-console__mono">{app.profile}</td>
+      {RETAINED_KINDS.map((kind) => (
+        <td key={kind}>
+          <KindState state={app.kinds?.[kind]} />
+          {kind === "files"
+            ? volumes.map((volume) => (
+                <div key={volume} className="admin-console__mono">
+                  {volume}
+                </div>
+              ))
+            : null}
+        </td>
+      ))}
+      <td>
+        <button
+          type="button"
+          className="admin-console__btn admin-console__btn--danger"
+          disabled={busy || !app.profileAvailable}
+          onClick={() => onAsk(app.profile)}
+        >
+          {t("apps.purge")}
+        </button>
+        {app.profileAvailable ? null : <div className="admin-console__hint">{t("apps.purgeNeedsProfile")}</div>}
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * How the purge ended, in the cluster's words.
+ *
+ * Done is said only for an answer that says it is complete. An answer that
+ * looks like success and does not say so is incomplete, with what was not
+ * examined. A refusal is shown as the reason it gave; a purge that did not
+ * finish is shown whole -- it names the step that failed, what was already
+ * destroyed and what was not attempted -- with the way to ask again.
+ */
+function PurgeOutcomeNotice({
+  outcome,
+  busy,
+  onRetry,
+}: {
+  outcome: PurgeOutcome;
+  busy: boolean;
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation();
+  const { app } = outcome;
+  if ("result" in outcome) {
+    const { result } = outcome;
+    if (result.complete === true) {
+      return (
+        <p className="admin-console__success" role="status">
+          <Trans i18nKey="apps.purgeComplete" values={{ app }} components={mono} />
+        </p>
+      );
+    }
+    const notExamined = result.notExamined ?? [];
+    return (
+      <div className="admin-console__warning" role="alert">
+        <p>
+          <strong>
+            <Trans i18nKey="apps.purgeIncomplete" values={{ app }} components={mono} />
+          </strong>
+        </p>
+        {notExamined.length > 0 ? (
+          <>
+            <p>{t("apps.purgeNotExamined")}</p>
+            <ul>
+              {notExamined.map((kind) => (
+                <li key={kind}>{kindWord(t, kind)}</li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+        <p>
+          <Trans i18nKey="apps.purgeClusterAnswered" values={{ status: result.status }} components={mono} />
+        </p>
+        {result.message ? <p>{result.message}</p> : null}
+      </div>
+    );
+  }
+  if (outcome.refused) {
+    return (
+      <div className="admin-console__error" role="alert">
+        <p>
+          <strong>
+            <Trans i18nKey="apps.purgeRefused" values={{ app }} components={mono} />
+          </strong>
+        </p>
+        <p>{outcome.message}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="admin-console__error" role="alert">
+      <p>
+        <strong>
+          <Trans i18nKey="apps.purgeFailed" values={{ app }} components={mono} />
+        </strong>
+      </p>
+      <p>{outcome.message}</p>
+      <p>{t("apps.purgeRetryHint")}</p>
+      <div className="admin-console__actions">
+        <button type="button" className="admin-console__btn admin-console__btn--danger" disabled={busy} onClick={onRetry}>
+          {t("apps.purgeRetry")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Naming the app by hand, for when the list of retained apps could not be
+ * read. The cluster still refuses the request for an app that is installed or
+ * still being taken down.
+ */
+function PurgeByName({
+  declared,
+  busy,
+  onAsk,
+}: {
+  declared?: DeclaredApp[];
+  busy: boolean;
+  onAsk: (app: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [name, setName] = useState("");
   const app = name.trim();
   const valid = APP_NAME.test(app);
   const stillInstalled = (declared ?? []).some((d) => d.profile === app);
 
   return (
-    <div className="admin-console__subsection">
-      <h3 className="admin-console__subsection-title">{t("apps.purgeTitle")}</h3>
-      <p className="admin-console__lead">{t("apps.purgeLead")}</p>
-      <p className="admin-console__hint">{t("apps.purgeNoList")}</p>
-      <form
-        className="admin-console__form-grid"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (valid && !stillInstalled) {
-            purge.reset();
-            setDone(null);
-            setAsking(app);
-          }
-        }}
-      >
-        <div className="admin-console__field-row">
-          <div className="admin-console__field">
-            <label htmlFor="purge-app-name">{t("apps.purgeName")}</label>
-            <input
-              id="purge-app-name"
-              value={name}
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <div className="admin-console__field" />
-        </div>
-        {app && !valid ? <p className="admin-console__hint">{t("apps.purgeNameInvalid")}</p> : null}
-        {stillInstalled ? (
-          <p className="admin-console__hint">
-            <Trans i18nKey="apps.purgeStillInstalled" values={{ app }} components={mono} />
-          </p>
-        ) : null}
-        <div className="admin-console__form-footer">
-          <button
-            type="submit"
-            className="admin-console__btn admin-console__btn--danger"
-            disabled={!valid || stillInstalled}
-          >
-            {t("apps.purgeOpen")}
-          </button>
-        </div>
-      </form>
-      {done ? (
-        <p className="admin-console__success">
-          <Trans
-            i18nKey="apps.purgeOutcome"
-            values={{ app: done.app, status: done.result.status }}
-            components={mono}
+    <form
+      className="admin-console__form-grid"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (valid && !stillInstalled && !busy) onAsk(app);
+      }}
+    >
+      <div className="admin-console__field-row">
+        <div className="admin-console__field">
+          <label htmlFor="purge-app-name">{t("apps.purgeName")}</label>
+          <input
+            id="purge-app-name"
+            value={name}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(e) => setName(e.target.value)}
           />
+        </div>
+        <div className="admin-console__field" />
+      </div>
+      {app && !valid ? <p className="admin-console__hint">{t("apps.purgeNameInvalid")}</p> : null}
+      {stillInstalled ? (
+        <p className="admin-console__hint">
+          <Trans i18nKey="apps.purgeStillInstalled" values={{ app }} components={mono} />
         </p>
       ) : null}
-      {asking ? (
-        <PurgeDialog
-          app={asking}
-          tenant={tenant}
-          pending={purge.isPending}
-          error={purge.isError ? messageOf(purge.error) : undefined}
-          onConfirm={() => purge.mutate(asking)}
-          onClose={() => setAsking(null)}
-        />
-      ) : null}
-    </div>
+      <div className="admin-console__form-footer">
+        <button
+          type="submit"
+          className="admin-console__btn admin-console__btn--danger"
+          disabled={!valid || stillInstalled || busy}
+        >
+          {t("apps.purgeOpen")}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -876,19 +1158,22 @@ function PurgeCard({ tenant, declared }: { tenant: string; declared?: DeclaredAp
  *
  * Typing the name is the confirmation because this is the one act on this
  * screen nothing brings back, and a click is too easy to make.
+ *
+ * Once confirmed the dialog stays, saying the purge is running, until the
+ * answer is there: it cannot be dismissed and offers nothing to press, so a
+ * purge is not asked for twice and the answer is not walked away from. It
+ * sets no time limit of its own.
  */
 function PurgeDialog({
   app,
   tenant,
   pending,
-  error,
   onConfirm,
   onClose,
 }: {
   app: string;
   tenant: string;
   pending: boolean;
-  error?: string;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -914,46 +1199,60 @@ function PurgeDialog({
         if (!pending) onClose();
       }}
     >
-      <form
-        className="admin-console__dialog-body"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (confirmed && !pending) onConfirm();
-        }}
-      >
-        <h3 id="purge-app-title" className="admin-console__dialog-title">
-          <Trans i18nKey="apps.purgeDialogTitle" values={{ app }} components={mono} />
-        </h3>
-        <p className="admin-console__lead">
-          <Trans i18nKey="apps.purgeDialogBody" values={{ app, tenant }} components={mono} />
-        </p>
-
-        <label className="admin-console__label" htmlFor="purge-app-confirm">
-          <span className="admin-console__label-text">
-            <Trans i18nKey="apps.purgeTypeToConfirm" values={{ app }} components={mono} />
-          </span>
-          <input
-            id="purge-app-confirm"
-            type="text"
-            value={typed}
-            autoComplete="off"
-            spellCheck={false}
-            autoFocus
-            onChange={(e) => setTyped(e.target.value)}
-          />
-        </label>
-
-        {error ? <p className="admin-console__error">{error}</p> : null}
-
-        <div className="admin-console__dialog-footer">
-          <button type="button" className="admin-console__btn admin-console__btn--quiet" disabled={pending} onClick={onClose}>
-            {t("apps.cancel")}
-          </button>
-          <button type="submit" className="admin-console__btn admin-console__btn--danger-solid" disabled={!confirmed || pending}>
-            {pending ? t("apps.purging") : t("apps.purgeConfirm")}
-          </button>
+      {pending ? (
+        <div className="admin-console__dialog-body" role="status" aria-live="polite">
+          <h3 id="purge-app-title" className="admin-console__dialog-title">
+            <Trans i18nKey="apps.purgeRunningTitle" values={{ app }} components={mono} />
+          </h3>
+          <p className="admin-console__lead">{t("apps.purgeRunningBody")}</p>
+          <div className="admin-console__dialog-footer">
+            <button type="button" className="admin-console__btn admin-console__btn--danger-solid" disabled>
+              {t("apps.purging")}
+            </button>
+          </div>
         </div>
-      </form>
+      ) : (
+        <form
+          className="admin-console__dialog-body"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (confirmed) onConfirm();
+          }}
+        >
+          <h3 id="purge-app-title" className="admin-console__dialog-title">
+            <Trans i18nKey="apps.purgeDialogTitle" values={{ app }} components={mono} />
+          </h3>
+          <p className="admin-console__lead">
+            <Trans i18nKey="apps.purgeDialogBody" values={{ app, tenant }} components={mono} />
+          </p>
+          <p className="admin-console__lead">{t("apps.purgeDialogKept")}</p>
+          <p className="admin-console__lead">{t("apps.purgeDialogFinal")}</p>
+
+          <label className="admin-console__label" htmlFor="purge-app-confirm">
+            <span className="admin-console__label-text">
+              <Trans i18nKey="apps.purgeTypeToConfirm" values={{ app }} components={mono} />
+            </span>
+            <input
+              id="purge-app-confirm"
+              type="text"
+              value={typed}
+              autoComplete="off"
+              spellCheck={false}
+              autoFocus
+              onChange={(e) => setTyped(e.target.value)}
+            />
+          </label>
+
+          <div className="admin-console__dialog-footer">
+            <button type="button" className="admin-console__btn admin-console__btn--quiet" onClick={onClose}>
+              {t("apps.cancel")}
+            </button>
+            <button type="submit" className="admin-console__btn admin-console__btn--danger-solid" disabled={!confirmed}>
+              {t("apps.purgeConfirm")}
+            </button>
+          </div>
+        </form>
+      )}
     </dialog>
   );
 }

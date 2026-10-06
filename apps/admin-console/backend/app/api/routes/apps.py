@@ -34,9 +34,12 @@ _bearer = HTTPBearer(auto_error=False)
 # director than the one written below. Not an authorisation check.
 _NAME = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 
-# A purge waits for the app's teardown to finish before it deletes anything,
-# which takes longer than the relay's ordinary patience.
-_PURGE_TIMEOUT = httpx.Timeout(60.0)
+# A purge is one request, answered when it is over: the operator gives itself
+# four and a half minutes and the director waits five for it. This relay waits
+# longer than both, so what arrives is always the director's own answer -- done,
+# stopped and saying where, or its 504 -- and never this relay giving up first.
+PURGE_TIMEOUT_SECONDS = 330.0
+_PURGE_TIMEOUT = httpx.Timeout(15.0, read=PURGE_TIMEOUT_SECONDS)
 
 
 def _name(value: str) -> str:
@@ -68,6 +71,20 @@ async def privileges(
     posture, by whom and why. A read; approving is not done from here."""
     return await director.forward(
         settings, "GET", f"/v1/tenants/{settings.tenant_id}/privileges", bearer_of(credentials)
+    )
+
+
+@router.get("/retained")
+async def retained(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """The apps this tenant no longer has installed that still hold data, and
+    which kinds of data each one holds. The cluster's answer, through the
+    usher; it is what a purge of each app would destroy."""
+    return await director.read(
+        settings, f"/v1/tenants/{settings.tenant_id}/apps/retained", bearer_of(credentials)
     )
 
 
@@ -115,8 +132,9 @@ async def uninstall(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Take one app out of this console's tenant. A commit; the app's data is
-    kept, and a later install finds it again."""
+    """Take one app out of this console's tenant. A commit: the app and its
+    sign-in client go; its files, database, object storage, stored credentials
+    and access group are kept, and a later install finds them again."""
     return await director.forward(
         settings,
         "DELETE",
@@ -136,12 +154,16 @@ async def purge(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Destroy what an uninstalled app left behind: its databases, its files,
-    its secrets. An action, not a commit, and not undone.
+    """Destroy what an uninstalled app left behind: its files, its database,
+    its object storage, its stored credentials and its access group. An
+    action, not a commit, and not undone.
 
-    The cluster refuses it while the tenant still has the app (409), and
-    answers 409 as well while the app is still being taken down -- the same
-    request succeeds a little later. Both arrive as they are.
+    One request, answered when the purge is over. The cluster refuses it,
+    having destroyed nothing, while the tenant still has the app, while the
+    app is still being taken down or while another purge of it runs (409). A
+    purge that began and did not finish is a 500 that names the step that
+    failed, what was already destroyed and what was not attempted; asking
+    again is safe. Every answer arrives as it is.
     """
     return await director.forward(
         settings,

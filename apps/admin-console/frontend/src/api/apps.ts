@@ -49,22 +49,63 @@ export function setAppForEveryone(profile: string, everyone: boolean) {
   });
 }
 
-/** Remove an app. Its data is kept, and a later install finds it again. */
+/**
+ * Remove an app. The app and its sign-in client go; its files, database,
+ * object storage, stored credentials and access group are kept, and a later
+ * install finds them again.
+ */
 export function uninstallApp(profile: string) {
   return apiFetch<AppWriteResult>(`/admin/apps/${encodeURIComponent(profile)}`, {
     method: "DELETE",
   });
 }
 
-/** What the cluster answered to a purge. */
+/** One uninstalled app that still holds data, as the cluster reports it. */
+export type RetainedApp = {
+  profile: string;
+  state: string;
+  /**
+   * Whether the app's profile is still on the cluster. Without it nothing
+   * says which stores the app had, and a purge of it is refused.
+   */
+  profileAvailable: boolean;
+  /** Per kind of data: `present`, `absent` or `unknown`. */
+  kinds: Record<string, string>;
+  /** The volume claims counted as the app's files. */
+  volumes?: string[];
+};
+
+/** The uninstalled apps that still hold data: what a purge of each would destroy. */
+export type RetainedApps = {
+  tenant: string;
+  apps: RetainedApp[];
+  /** Per kind, why the read reports it as unknown. */
+  unknown?: Record<string, string>;
+};
+
+export function fetchRetainedApps() {
+  return apiFetch<RetainedApps>("/admin/apps/retained");
+}
+
+/**
+ * What the cluster answered to a purge that was not refused and did not fail.
+ * Only `complete: true` means everything the app could hold was destroyed.
+ */
 export type AppPurgeResult = {
   status: string;
   message?: string;
+  complete?: boolean;
+  /** The kinds of data that are now gone. */
+  destroyed?: string[];
+  /** The kinds the purge did not look at, and which may still be there. */
+  notExamined?: string[];
 };
 
 /**
- * Destroy the data an uninstalled app left behind. Not undone. The cluster
- * refuses it for an app the tenant still has.
+ * Destroy the data an uninstalled app left behind. Not undone. One request,
+ * answered when the purge is over, which can take several minutes; nothing
+ * here gives up before the answer. The cluster refuses it for an app the
+ * tenant still has, and a purge that did not finish says where it stopped.
  */
 export function purgeAppData(profile: string) {
   return apiFetch<AppPurgeResult>("/admin/apps/purge", {

@@ -20,10 +20,16 @@ export type FieldError = {
  */
 export class ApiError extends Error {
   readonly fields?: FieldError[];
-  constructor(message: string, fields?: FieldError[]) {
+  /** The HTTP status of the answer, when there was an answer. */
+  readonly status?: number;
+  /** What the upstream said, as it said it, when the body carried a reason. */
+  readonly detail?: string;
+  constructor(message: string, fields?: FieldError[], status?: number, detail?: string) {
     super(message);
     this.name = "ApiError";
     this.fields = fields;
+    this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -93,7 +99,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     if (response.status === 401 && (token || isEdgeSession())) {
       redirectToLoginForExpiredSession();
     }
-    throw new ApiError(`API ${path} failed: ${response.status}${detail}`, fields);
+    throw new ApiError(
+      `API ${path} failed: ${response.status}${detail}`,
+      fields,
+      response.status,
+      detail ? detail.slice(2) : undefined,
+    );
   }
   if (response.status === 204) {
     return undefined as T;
