@@ -124,9 +124,17 @@ export function StoreBridge({ enabled }: { enabled: boolean }) {
   }
 
   const subject = current.write.subject;
-  // An install for everyone is its own question: it gives access to every
-  // member of the tenant, and the person confirming has to be told.
-  const wording = current.write.forEveryone ? "installEveryone" : current.write.write;
+  // An install that names the "for everyone" setting is its own question,
+  // either way: one gives access to every member of the tenant, the other
+  // takes that default away, and the person confirming has to be told which.
+  // An install that does not name it asks the plain question.
+  const access = current.write.access;
+  const wording =
+    access === "everyone"
+      ? "installEveryone"
+      : access === "perPerson"
+        ? "installPerPerson"
+        : current.write.write;
   const tenant = context?.tenant ?? "";
 
   return (

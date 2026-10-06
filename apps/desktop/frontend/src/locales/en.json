@@ -93,6 +93,11 @@
       "text": "{{subject}} will be installed for {{tenant}}, and every member of {{tenant}} gets access to it. People invited later get it pre-selected.",
       "confirm": "Install for everyone"
     },
+    "installPerPerson": {
+      "title": "Install this app with access per person?",
+      "text": "Access to this app is given per person, under Members. If it was installed for everyone before, that default is removed: people who already have access keep it, and people invited later no longer get it automatically.",
+      "confirm": "Install"
+    },
     "uninstall": {
       "title": "Remove this app?",
       "text": "{{subject}} will be removed from {{tenant}}. Its data is kept until it is purged.",

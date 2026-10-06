@@ -69,11 +69,14 @@ export type Planned =
       subject: string;
       call: Call;
       /**
-       * An install that asks for the app to be given to every member of the
-       * tenant. The confirmation has to say so: the person pressing the
-       * button is the one granting that access.
+       * What an install does to the app's "for everyone" setting, when it
+       * names one. `everyone` gives the app to every member of the tenant;
+       * `perPerson` takes that default away. Absent, the install leaves the
+       * setting alone. The confirmation says which: the person pressing the
+       * button is the one granting that access, or ending it for whoever
+       * joins later.
        */
-      forEveryone?: boolean;
+      access?: "everyone" | "perPerson";
     };
 
 const NAME = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
@@ -153,13 +156,16 @@ export function plan(req: BridgeRequest): Planned | { kind: "refused"; error: st
       const body: { coordinate: string; digest?: string; defaultGrant?: boolean } = { coordinate };
       if (digest) body.digest = digest;
       if (a.defaultGrant !== undefined) body.defaultGrant = a.defaultGrant;
-      return {
-        kind: "write",
-        write: "install",
+      const install = {
+        kind: "write" as const,
+        write: "install" as const,
         subject: profile,
-        call: { method: "POST", path: `/apps/${profile}`, body },
-        forEveryone: a.defaultGrant === true,
+        call: { method: "POST" as const, path: `/apps/${profile}`, body },
       };
+      // Three requests, three questions: true, false and absent are not two.
+      if (a.defaultGrant === true) return { ...install, access: "everyone" };
+      if (a.defaultGrant === false) return { ...install, access: "perPerson" };
+      return install;
     }
     case "apps.uninstall": {
       const profile = name(a.profile);

@@ -93,6 +93,11 @@
       "text": "{{subject}} wird für {{tenant}} installiert, und alle Mitglieder von {{tenant}} erhalten Zugriff darauf. Bei später eingeladenen Personen ist der Zugriff vorausgewählt.",
       "confirm": "Für alle installieren"
     },
+    "installPerPerson": {
+      "title": "Diese App mit Zugriff pro Person installieren?",
+      "text": "Der Zugriff auf diese App wird pro Person vergeben, unter Mitglieder. Falls sie zuvor für alle installiert war, entfällt diese Voreinstellung: Wer bereits Zugriff hat, behält ihn, und später eingeladene Personen erhalten ihn nicht mehr automatisch.",
+      "confirm": "Installieren"
+    },
     "uninstall": {
       "title": "Diese App entfernen?",
       "text": "{{subject}} wird aus {{tenant}} entfernt. Die Daten bleiben erhalten, bis sie endgültig gelöscht werden.",
