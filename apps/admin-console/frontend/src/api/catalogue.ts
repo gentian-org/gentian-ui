@@ -57,3 +57,42 @@ export function fetchCatalogueEntries(source: string, tenant?: string) {
     `/catalogue/sources/${encodeURIComponent(source)}/entries${query}`,
   );
 }
+
+/**
+ * The director's answer to an install or an uninstall. Both are commits:
+ * `commit` is there when git changed and absent when the tenant already was
+ * as asked (`already_installed`, `not_installed`).
+ */
+export type AppWriteResult = {
+  status: string;
+  commit?: string;
+};
+
+/**
+ * Install one listed entry into the console's tenant: the entry's own
+ * coordinate and digest, handed back as the listing gave them. The digest is
+ * what pins the build; the director refuses a source that serves other bytes.
+ */
+export function installCatalogueEntry(entry: Pick<CatalogueEntry, "name" | "coordinate" | "digest">) {
+  return apiFetch<AppWriteResult>(`/catalogue/apps/${encodeURIComponent(entry.name)}`, {
+    method: "POST",
+    body: JSON.stringify({ coordinate: entry.coordinate, digest: entry.digest }),
+  });
+}
+
+export function uninstallApp(profile: string) {
+  return apiFetch<AppWriteResult>(`/catalogue/apps/${encodeURIComponent(profile)}`, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * Put every current member of the tenant into the app's group. Done by the
+ * cluster at once, and refused until the cluster has the app.
+ */
+export function provisionApp(profile: string) {
+  return apiFetch<{ status: string }>("/catalogue/actions/provision-app", {
+    method: "POST",
+    body: JSON.stringify({ profile }),
+  });
+}
