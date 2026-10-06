@@ -88,6 +88,11 @@
       "text": "{{subject}} will be installed for {{tenant}}.",
       "confirm": "Install"
     },
+    "installEveryone": {
+      "title": "Install this app for everyone?",
+      "text": "{{subject}} will be installed for {{tenant}}, and every member of {{tenant}} gets access to it. People invited later get it pre-selected.",
+      "confirm": "Install for everyone"
+    },
     "uninstall": {
       "title": "Remove this app?",
       "text": "{{subject}} will be removed from {{tenant}}. Its data is kept until it is purged.",

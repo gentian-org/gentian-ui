@@ -65,8 +65,8 @@ def test_the_sources_screen_asks_the_director_and_carries_the_store(monkeypatch)
             "tenant": "demo",
             "storeUrl": "https://store.gentian.org",
             "catalogues": [
-                {"name": "main", "open": False},
-                {"name": "in-house", "open": True},
+                {"name": "main"},
+                {"name": "in-house"},
             ],
         },
         seen,
@@ -85,7 +85,6 @@ def test_entries_are_relayed_untouched(monkeypatch):
     body = {
         "tenant": "demo",
         "catalogue": "in-house",
-        "open": True,
         "storeOnly": 7,
         "entries": [
             {
@@ -225,36 +224,47 @@ def test_an_uninstall_refused_comes_back_as_the_director_gave_it(monkeypatch):
     assert answer.json() == {"error": "forbidden"}
 
 
-def test_granting_an_app_to_everybody_goes_to_the_director_as_the_person(monkeypatch):
+def test_an_install_for_everyone_says_so_to_the_director(monkeypatch):
     seen: dict = {}
-    body = {"status": "provisioned", "tenant": "platform", "profile": "timesheets"}
+    body = {"status": "installed", "commit": "0123abcd"}
     _fake_client(monkeypatch, body, seen, status=202)
     client = TestClient(_app(_settings()))
+    entry = {"coordinate": "in-house/timesheets", "digest": "sha256:" + "a" * 64}
     answer = client.post(
-        "/api/v1/catalogue/actions/provision-app",
-        json={"profile": "timesheets", "tenant": "somebody-elses"},
+        "/api/v1/catalogue/apps/timesheets",
+        json={**entry, "defaultGrant": True},
         headers=_person,
     )
     assert answer.status_code == 202
-    assert answer.json() == body
-    assert seen["method"] == "POST"
-    assert seen["url"] == ("http://director.test:8080/v1/tenants/platform/actions/provision-app")
-    # The profile and nothing beside it: the director's decoder refuses a
-    # field it does not know.
-    assert seen["json"] == {"profile": "timesheets"}
-    assert seen["auth"] == "Bearer person-token"
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/apps/timesheets"
+    assert seen["json"] == {**entry, "defaultGrant": True}
+
+    # False is a statement too -- access is given per person -- and travels.
+    client.post(
+        "/api/v1/catalogue/apps/timesheets", json={**entry, "defaultGrant": False}, headers=_person
+    )
+    assert seen["json"] == {**entry, "defaultGrant": False}
+
+    # Unstated, or null, is not sent at all: absent leaves the entry as it is.
+    client.post("/api/v1/catalogue/apps/timesheets", json=entry, headers=_person)
+    assert seen["json"] == entry
+    client.post(
+        "/api/v1/catalogue/apps/timesheets", json={**entry, "defaultGrant": None}, headers=_person
+    )
+    assert seen["json"] == entry
 
 
-def test_a_grant_refused_comes_back_with_its_reason(monkeypatch):
-    # What the cluster answers between an install's commit and its sync.
+def test_an_install_for_everyone_refused_names_the_right_it_lacks(monkeypatch):
     seen: dict = {}
-    body = {"error": "timesheets is not installed in platform", "request_id": "r1"}
-    _fake_client(monkeypatch, body, seen, status=400)
+    body = {"error": "installing an app for everyone needs can_grant on the tenant"}
+    _fake_client(monkeypatch, body, seen, status=403)
     client = TestClient(_app(_settings()))
     answer = client.post(
-        "/api/v1/catalogue/actions/provision-app", json={"profile": "timesheets"}, headers=_person
+        "/api/v1/catalogue/apps/timesheets",
+        json={"coordinate": "in-house/timesheets", "defaultGrant": True},
+        headers=_person,
     )
-    assert answer.status_code == 400
+    assert answer.status_code == 403
     assert answer.json() == body
 
 
@@ -267,8 +277,4 @@ def test_none_of_them_is_relayed_without_a_token(monkeypatch):
     client = TestClient(_app(_settings()))
     assert client.post("/api/v1/catalogue/apps/timesheets", json={}).status_code == 401
     assert client.delete("/api/v1/catalogue/apps/timesheets").status_code == 401
-    assert (
-        client.post("/api/v1/catalogue/actions/provision-app", json={"profile": "x"}).status_code
-        == 401
-    )
     assert seen == {}

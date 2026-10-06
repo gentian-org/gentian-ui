@@ -69,14 +69,6 @@ class Settings(BaseSettings):
     # through the backend keeps the service off the public network.
     custodian_url: str | None = Field(default=None, alias="CUSTODIAN_URL")
 
-    # The gentian-os app lifecycle API, in-cluster. The Resources tab proxies to
-    # it rather than reasoning about quotas here: the plan catalogue, the
-    # downgrade guard and the write to the deployments repository all live in
-    # the operator, and `kubectl gentian resources` calls the same endpoints.
-    # Unset means the Resources tab reports itself unavailable rather than
-    # showing an empty catalogue that looks like a cluster with no plans.
-    app_lifecycle_url: str | None = Field(default=None, alias="APP_LIFECYCLE_URL")
-
     # Keycloak's in-cluster base URL, NOT an administrator credential.
     #
     # It is used to reach the realm's public endpoints -- JWKS, and the account

@@ -75,10 +75,10 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            {{- /* api.env wins when it names the same variable. Both of these
+            {{- /* api.env wins when it names the same variable. These
                  also exist as dedicated values because the operator chart
-                 shares the cluster values file (custodian/appLifecycle
-                 carry operator-side keys too), and gentian-os _base.yaml sets
+                 shares the cluster values file (custodian carries
+                 operator-side keys too), and gentian-os _base.yaml sets
                  them through api.env for every cluster. Rendering both halves
                  produced a duplicate env name — harmless under client-side
                  apply (last one won), fatal under server-side apply, which
@@ -99,10 +99,6 @@ spec:
             {{- if .Values.director.cluster }}
             - name: GENTIAN_CLUSTER_ID
               value: {{ .Values.director.cluster | quote }}
-            {{- end }}
-            {{- if and .Values.appLifecycle.url (not (hasKey (default dict .Values.api.env) "APP_LIFECYCLE_URL")) }}
-            - name: APP_LIFECYCLE_URL
-              value: {{ .Values.appLifecycle.url | quote }}
             {{- end }}
             {{- if .Values.openfga.apiUrl }}
             - name: OPENFGA_API_URL

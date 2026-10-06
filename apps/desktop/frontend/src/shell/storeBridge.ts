@@ -63,7 +63,18 @@ type Call = {
 export type Planned =
   | { kind: "context" }
   | { kind: "read"; call: Call }
-  | { kind: "write"; write: WriteKind; subject: string; call: Call };
+  | {
+      kind: "write";
+      write: WriteKind;
+      subject: string;
+      call: Call;
+      /**
+       * An install that asks for the app to be given to every member of the
+       * tenant. The confirmation has to say so: the person pressing the
+       * button is the one granting that access.
+       */
+      forEveryone?: boolean;
+    };
 
 const NAME = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
@@ -133,15 +144,21 @@ export function plan(req: BridgeRequest): Planned | { kind: "refused"; error: st
       if (digest && !DIGEST.test(digest)) {
         return { kind: "refused", error: "digest is sha256:<64 hex>" };
       }
+      // Whether the app is installed for everyone. A boolean or absent, and
+      // nothing shaped like one: this is what the confirmation reads, and a
+      // "true" the director took for a yes would be one nobody was shown.
+      if (a.defaultGrant !== undefined && typeof a.defaultGrant !== "boolean") {
+        return { kind: "refused", error: "defaultGrant is true or false" };
+      }
+      const body: { coordinate: string; digest?: string; defaultGrant?: boolean } = { coordinate };
+      if (digest) body.digest = digest;
+      if (a.defaultGrant !== undefined) body.defaultGrant = a.defaultGrant;
       return {
         kind: "write",
         write: "install",
         subject: profile,
-        call: {
-          method: "POST",
-          path: `/apps/${profile}`,
-          body: digest ? { coordinate, digest } : { coordinate },
-        },
+        call: { method: "POST", path: `/apps/${profile}`, body },
+        forEveryone: a.defaultGrant === true,
       };
     }
     case "apps.uninstall": {

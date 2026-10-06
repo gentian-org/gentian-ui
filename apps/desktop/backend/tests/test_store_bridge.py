@@ -132,6 +132,41 @@ def test_the_digest_travels_with_the_install_and_is_a_digest(monkeypatch):
     assert len(seen) == 1
 
 
+def test_for_everyone_travels_with_the_install_and_is_a_boolean(monkeypatch):
+    """It gives every member access, so it goes on only as the boolean it is."""
+    seen = _director(monkeypatch, {"POST /apps/xwiki-ce": (202, {"status": "installed"})})
+    client = TestClient(_app(_settings()))
+    for stated in (True, False):
+        r = client.post(
+            "/api/v1/store/apps/xwiki-ce",
+            json={"coordinate": "main/xwiki-ce", "defaultGrant": stated},
+            headers=AUTH,
+        )
+        assert r.status_code == 202
+        assert seen[-1]["json"] == {"coordinate": "main/xwiki-ce", "defaultGrant": stated}
+
+    for bad in ("true", 1, 0, None, [True], {"value": True}):
+        r = client.post(
+            "/api/v1/store/apps/xwiki-ce",
+            json={"coordinate": "main/xwiki-ce", "defaultGrant": bad},
+            headers=AUTH,
+        )
+        assert r.status_code == 400
+    assert len(seen) == 2
+
+
+def test_a_refusal_to_install_for_everyone_comes_back_as_given(monkeypatch):
+    refusal = {"error": "installing an app for everyone needs can_grant on the tenant"}
+    _director(monkeypatch, {"POST /apps/xwiki-ce": (403, refusal)})
+    r = TestClient(_app(_settings())).post(
+        "/api/v1/store/apps/xwiki-ce",
+        json={"coordinate": "main/xwiki-ce", "defaultGrant": True},
+        headers=AUTH,
+    )
+    assert r.status_code == 403
+    assert r.json() == refusal
+
+
 @pytest.mark.parametrize(
     "profile",
     ["..", "a/b", "Nextcloud", "-leading", "trailing-", "a" * 64, "a.b"],

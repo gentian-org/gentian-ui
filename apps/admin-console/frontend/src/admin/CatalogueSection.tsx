@@ -5,7 +5,6 @@ import {
   fetchCatalogueEntries,
   fetchCatalogueSources,
   installCatalogueEntry,
-  provisionApp,
   uninstallApp,
   type AppWriteResult,
   type CatalogueEntry,
@@ -13,17 +12,8 @@ import {
 import "./admin.css";
 import { Trans, useTranslation } from "react-i18next";
 
-/** How long a ticked "give everyone access" waits for the cluster to have the app. */
-const ACCESS_WAIT_LIMIT_MS = 10 * 60 * 1000;
-const ACCESS_POLL_MS = 5000;
-
 /** What the last install or uninstall came to, in the director's own terms. */
-type Outcome = { app: string; result: AppWriteResult };
-
-/** Where "give every member access" stands for the app just installed. */
-type Access =
-  | { app: string; kind: "waiting" | "granted" }
-  | { app: string; kind: "refused"; message: string };
+type Outcome = { app: string; result: AppWriteResult; everyone?: boolean };
 
 const mono = { mono: <span className="admin-console__mono" /> };
 
@@ -50,8 +40,8 @@ const messageOf = (err: unknown) => (err instanceof Error ? err.message : String
  * second, worse shop would pull people away from the one that is maintained,
  * and every field it could add here is a field that would go stale. What it
  * shows is what a cluster can actually vouch for on its own: what is in its
- * catalogues, at which version, in which edition, and whether this tenant may
- * install it without asking anybody.
+ * catalogues, at which version, in which edition, and whether it can be
+ * installed from here.
  *
  * Where it may, the row installs it: the entry's coordinate and digest go back
  * to the director exactly as its listing gave them, and the director decides
@@ -69,76 +59,31 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
 
   const [confirming, setConfirming] = useState<CatalogueEntry | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
-  const [access, setAccess] = useState<Access | null>(null);
-  // An app whose install was committed with access for everyone asked for,
-  // and which the cluster did not have yet when the grant was first tried.
-  const [awaiting, setAwaiting] = useState<{ app: string; since: number } | null>(null);
-  const granting = useRef(false);
 
   // What the cluster holds of this tenant's apps: the same answer the Export
-  // tab reads, and what "installed" means on this screen. Asked again every
-  // few seconds only while a grant is waiting for an app to arrive.
+  // tab reads, and what "installed" means on this screen.
   const statesQuery = useQuery({
     queryKey: ["admin", "apps", "status"],
     queryFn: () => fetchAppStates(),
-    refetchInterval: awaiting ? ACCESS_POLL_MS : false,
   });
   const installed = new Set((statesQuery.data?.apps ?? []).map((a) => a.profile));
 
-  // Granting is done by the cluster, now, and it refuses an app it does not
-  // have. Straight after an install's commit that is the ordinary case, so a
-  // refusal then is not an answer yet: it is tried once more when the app
-  // has arrived, and that answer is shown whatever it is.
-  async function grant(app: string, clusterHasIt: boolean) {
-    if (granting.current) return;
-    granting.current = true;
-    try {
-      await provisionApp(app);
-      setAwaiting(null);
-      setAccess({ app, kind: "granted" });
-    } catch (err) {
-      if (clusterHasIt) {
-        setAwaiting(null);
-        setAccess({ app, kind: "refused", message: messageOf(err) });
-      } else {
-        setAwaiting((current) => current ?? { app, since: Date.now() });
-        setAccess({ app, kind: "waiting" });
-      }
-    } finally {
-      granting.current = false;
-    }
-  }
-
-  const awaitedArrived = awaiting ? installed.has(awaiting.app) : false;
-  useEffect(() => {
-    if (!awaiting) return;
-    if (awaitedArrived) {
-      void grant(awaiting.app, true);
-    } else if (Date.now() - awaiting.since > ACCESS_WAIT_LIMIT_MS) {
-      setAwaiting(null);
-      setAccess({ app: awaiting.app, kind: "refused", message: t("catalogue.accessGaveUp") });
-    }
-    // Re-run on every poll, not only when the list changes: the limit is a
-    // matter of time passing.
-  }, [awaiting, awaitedArrived, statesQuery.dataUpdatedAt]);
-
+  // "For everyone" is part of the install itself: the director records it
+  // with the app, and the cluster gives every member access once the app is
+  // ready. Nothing is left for this page to do afterwards.
   const installMutation = useMutation({
-    mutationFn: ({ entry }: { entry: CatalogueEntry; everyone: boolean }) => installCatalogueEntry(entry),
+    mutationFn: ({ entry, everyone }: { entry: CatalogueEntry; everyone: boolean }) =>
+      installCatalogueEntry(entry, everyone),
     onSuccess: (result, { entry, everyone }) => {
       setConfirming(null);
-      setOutcome({ app: entry.name, result });
-      setAccess(null);
-      setAwaiting(null);
+      setOutcome({ app: entry.name, result, everyone });
       void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "status"] });
-      if (everyone) void grant(entry.name, installed.has(entry.name));
     },
   });
   const uninstallMutation = useMutation({
     mutationFn: (entry: CatalogueEntry) => uninstallApp(entry.name),
     onSuccess: (result, entry) => {
       setOutcome({ app: entry.name, result });
-      setAccess(null);
-      setAwaiting(null);
       void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "status"] });
     },
   });
@@ -227,28 +172,10 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
                 onClick={() => setSelected(source.name)}
               >
                 {source.name}
-                {source.open ? " (open)" : ""}
               </button>
             ))}
           </p>
           {outcome ? <OutcomeNotice outcome={outcome} /> : null}
-          {access?.kind === "granted" ? (
-            <p className="admin-console__success">
-              <Trans i18nKey="catalogue.accessGranted" values={{ app: access.app }} components={mono} />
-            </p>
-          ) : access?.kind === "waiting" ? (
-            <p className="admin-console__hint">
-              <Trans i18nKey="catalogue.accessWaiting" values={{ app: access.app }} components={mono} />
-            </p>
-          ) : access?.kind === "refused" ? (
-            <p className="admin-console__error">
-              <Trans
-                i18nKey="catalogue.accessRefused"
-                values={{ app: access.app, message: access.message }}
-                components={mono}
-              />
-            </p>
-          ) : null}
           {uninstallMutation.isError ? (
             <p className="admin-console__error">{messageOf(uninstallMutation.error)}</p>
           ) : null}
@@ -257,7 +184,6 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
             loading={entriesQuery.isLoading}
             error={entriesQuery.isError}
             entries={entriesQuery.data?.entries ?? []}
-            sourceOpen={entriesQuery.data?.open ?? false}
             storeOnly={entriesQuery.data?.storeOnly ?? 0}
             installed={installed}
             busy={installMutation.isPending || uninstallMutation.isPending}
@@ -287,12 +213,14 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
  * stands in for it meanwhile. Without one, the tenant already was as asked.
  */
 function OutcomeNotice({ outcome }: { outcome: Outcome }) {
-  const { app, result } = outcome;
+  const { t } = useTranslation();
+  const { app, result, everyone } = outcome;
   const commit = (result.commit ?? "").slice(0, 8);
   if (result.status === "installed" && result.commit) {
     return (
       <p className="admin-console__success">
         <Trans i18nKey="catalogue.outcomeInstalled" values={{ app, commit }} components={mono} />
+        {everyone ? <> {t("catalogue.outcomeEveryone")}</> : null}
       </p>
     );
   }
@@ -338,9 +266,9 @@ function OutcomeNotice({ outcome }: { outcome: Outcome }) {
  * called.
  *
  * One choice rides along. Installing makes an app exist in the tenant; who
- * may open it is a separate matter, and by default the answer is nobody.
- * Ticking the box asks the cluster to put every current member into the
- * app's group once the install is accepted.
+ * may open it is a separate matter. Plain "Install" leaves that to Members,
+ * person by person; "Install for everyone" states it in the install itself,
+ * and the cluster gives every member access once the app is ready.
  */
 function InstallDialog({
   entry,
@@ -393,13 +321,34 @@ function InstallDialog({
           />
         </p>
 
-        <label className="admin-console__choice">
-          <input type="checkbox" checked={everyone} onChange={(e) => setEveryone(e.target.checked)} />
-          <span>
-            <span className="admin-console__choice-title">{t("catalogue.everyone")}</span>
-            <span className="admin-console__choice-desc">{t("catalogue.everyoneBody")}</span>
-          </span>
-        </label>
+        <div className="admin-console__choices" role="radiogroup" aria-labelledby="install-title">
+          <label className={`admin-console__choice${everyone ? "" : " admin-console__choice--selected"}`}>
+            <input
+              type="radio"
+              name="install-access"
+              checked={!everyone}
+              disabled={pending}
+              onChange={() => setEveryone(false)}
+            />
+            <span>
+              <span className="admin-console__choice-title">{t("catalogue.installPlain")}</span>
+              <span className="admin-console__choice-desc">{t("catalogue.installPlainBody")}</span>
+            </span>
+          </label>
+          <label className={`admin-console__choice${everyone ? " admin-console__choice--selected" : ""}`}>
+            <input
+              type="radio"
+              name="install-access"
+              checked={everyone}
+              disabled={pending}
+              onChange={() => setEveryone(true)}
+            />
+            <span>
+              <span className="admin-console__choice-title">{t("catalogue.installEveryone")}</span>
+              <span className="admin-console__choice-desc">{t("catalogue.installEveryoneBody")}</span>
+            </span>
+          </label>
+        </div>
 
         {error ? <p className="admin-console__error">{error}</p> : null}
 
@@ -408,7 +357,7 @@ function InstallDialog({
             {t("catalogue.cancel")}
           </button>
           <button type="submit" className="admin-console__btn admin-console__btn--primary" disabled={pending}>
-            {t("catalogue.installAction")}
+            {everyone ? t("catalogue.installEveryone") : t("catalogue.installAction")}
           </button>
         </div>
       </form>
@@ -418,7 +367,6 @@ function InstallDialog({
 
 function CatalogueTable({
   entries,
-  sourceOpen,
   storeOnly,
   storeUrl,
   loading,
@@ -429,8 +377,6 @@ function CatalogueTable({
   onUninstall,
 }: {
   entries: CatalogueEntry[];
-  /** Whether the Cluster claim opens this source to the tenant. */
-  sourceOpen: boolean;
   storeOnly: number;
   storeUrl: string;
   loading: boolean;
@@ -497,8 +443,8 @@ function CatalogueTable({
                         </button>
                       </>
                     ) : entry.installable ? (
-                      // The cluster offers this entry to this tenant, so the
-                      // row installs it: the entry's coordinate and digest go
+                      // The listing calls this entry installable, so the row
+                      // installs it: the entry's coordinate and digest go
                       // to the director, which decides whether this person
                       // may. Nothing is decided here, the button included --
                       // it is shown for what the listing says, not for who
@@ -512,16 +458,10 @@ function CatalogueTable({
                         {t("catalogue.installAction")}
                       </button>
                     ) : (
-                      // Not offered from here, and the listing implies why:
-                      // an entry is installable when its source is open to
-                      // the tenant and the entry states its digest.
-                      <span>
-                        {!sourceOpen
-                          ? t("catalogue.sourceNotOpen")
-                          : !entry.digest
-                            ? t("catalogue.noDigest")
-                            : t("catalogue.viaTheAppStore")}
-                      </span>
+                      // Not offered from here, and the listing says why: an
+                      // entry is installable when its source states the
+                      // digest of it.
+                      <span>{t("catalogue.noDigest")}</span>
                     )}
                   </td>
                 </tr>

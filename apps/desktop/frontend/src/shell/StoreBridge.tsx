@@ -124,6 +124,9 @@ export function StoreBridge({ enabled }: { enabled: boolean }) {
   }
 
   const subject = current.write.subject;
+  // An install for everyone is its own question: it gives access to every
+  // member of the tenant, and the person confirming has to be told.
+  const wording = current.write.forEveryone ? "installEveryone" : current.write.write;
   const tenant = context?.tenant ?? "";
 
   return (
@@ -137,12 +140,12 @@ export function StoreBridge({ enabled }: { enabled: boolean }) {
       >
         <header className="customize-modal-header">
           <h2 className="customize-modal-title" id="store-bridge-title">
-            {t(`store.${current.write.write}.title`)}
+            {t(`store.${wording}.title`)}
           </h2>
         </header>
         <div className="customize-modal-form">
           <p id="store-bridge-text">
-            {t(`store.${current.write.write}.text`, { subject, tenant })}
+            {t(`store.${wording}.text`, { subject, tenant })}
           </p>
           <p className="customize-modal-hint">{t("store.asked", { origin: context?.storeOrigin })}</p>
           <div className="customize-modal-footer">
@@ -161,7 +164,7 @@ export function StoreBridge({ enabled }: { enabled: boolean }) {
               disabled={busy}
               autoFocus
             >
-              {busy ? t("store.working") : t(`store.${current.write.write}.confirm`)}
+              {busy ? t("store.working") : t(`store.${wording}.confirm`)}
             </button>
           </div>
         </div>

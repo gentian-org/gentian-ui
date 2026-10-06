@@ -203,20 +203,28 @@ async def install(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    # The coordinate and the digest go on, and nothing else. The coordinate is
-    # which catalogue entry is meant; the digest is which bytes the entry IS,
-    # as the store stated it over its own TLS, and the director admits the
-    # bundle it fetches only because it hashes to that (AD-3). Whether this
-    # person may install apps in the tenant is the director's question, and
-    # the only one it asks. A body passed through whole would be a way to
-    # reach a field the director grows later without anybody deciding the
-    # store may set it.
-    payload = {"coordinate": str(body.get("coordinate") or "")}
+    # The coordinate, the digest and defaultGrant go on, and nothing else. The
+    # coordinate is which catalogue entry is meant; the digest is which bytes
+    # the entry IS, as the store stated it over its own TLS, and the director
+    # admits the bundle it fetches only because it hashes to that (AD-3).
+    # defaultGrant is whether the app is installed for everyone: true gives
+    # every member of the tenant access once the app is ready, and the
+    # director asks can_grant for it beside can_install_app. Whether this
+    # person may is the director's question. A body passed through whole would
+    # be a way to reach a field the director grows later without anybody
+    # deciding the store may set it.
+    payload: dict[str, Any] = {"coordinate": str(body.get("coordinate") or "")}
     digest = str(body.get("digest") or "")
     if digest:
         if not _DIGEST.match(digest):
             raise HTTPException(status_code=400, detail="digest is sha256:<64 hex>.")
         payload["digest"] = digest
+    if "defaultGrant" in body:
+        # A boolean and nothing shaped like one: "true" or 1 would be read by
+        # somebody as a yes that the person confirming was never shown.
+        if not isinstance(body["defaultGrant"], bool):
+            raise HTTPException(status_code=400, detail="defaultGrant is true or false.")
+        payload["defaultGrant"] = body["defaultGrant"]
     return _relay(
         await _ask(
             settings, credentials, "POST", f"/apps/{_name(profile, 'profile')}", body=payload

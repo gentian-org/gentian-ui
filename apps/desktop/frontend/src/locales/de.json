@@ -88,6 +88,11 @@
       "text": "{{subject}} wird für {{tenant}} installiert.",
       "confirm": "Installieren"
     },
+    "installEveryone": {
+      "title": "Diese App für alle installieren?",
+      "text": "{{subject}} wird für {{tenant}} installiert, und alle Mitglieder von {{tenant}} erhalten Zugriff darauf. Bei später eingeladenen Personen ist der Zugriff vorausgewählt.",
+      "confirm": "Für alle installieren"
+    },
     "uninstall": {
       "title": "Diese App entfernen?",
       "text": "{{subject}} wird aus {{tenant}} entfernt. Die Daten bleiben erhalten, bis sie endgültig gelöscht werden.",

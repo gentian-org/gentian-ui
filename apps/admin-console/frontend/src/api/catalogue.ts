@@ -12,8 +12,6 @@ import { apiFetch } from "@/api/client";
 
 export type CatalogueSource = {
   name: string;
-  /** Open to THIS tenant. Nothing is open by default. */
-  open: boolean;
 };
 
 export type CatalogueSourcesResponse = {
@@ -32,14 +30,13 @@ export type CatalogueEntry = {
   trustTier?: string;
   /** Which bytes the entry is, as its source states it. */
   digest: string;
-  /** Installable from here and now, with nobody else asked. */
+  /** Installable from here: the source states a digest for the entry. */
   installable: boolean;
 };
 
 export type CatalogueEntriesResponse = {
   tenant: string;
   catalogue: string;
-  open: boolean;
   storeUrl: string;
   entries: CatalogueEntry[];
   /** How many entries are maintained or licensed, and so the store's. */
@@ -72,27 +69,28 @@ export type AppWriteResult = {
  * Install one listed entry into the console's tenant: the entry's own
  * coordinate and digest, handed back as the listing gave them. The digest is
  * what pins the build; the director refuses a source that serves other bytes.
+ *
+ * `everyone` installs it for everyone: `defaultGrant: true` travels with the
+ * install, and the cluster gives every member access once the app is ready.
+ * Without it nothing is said about access, which is then given per person.
  */
-export function installCatalogueEntry(entry: Pick<CatalogueEntry, "name" | "coordinate" | "digest">) {
+export function installCatalogueEntry(
+  entry: Pick<CatalogueEntry, "name" | "coordinate" | "digest">,
+  everyone = false,
+) {
+  const body: { coordinate: string; digest: string; defaultGrant?: true } = {
+    coordinate: entry.coordinate,
+    digest: entry.digest,
+  };
+  if (everyone) body.defaultGrant = true;
   return apiFetch<AppWriteResult>(`/catalogue/apps/${encodeURIComponent(entry.name)}`, {
     method: "POST",
-    body: JSON.stringify({ coordinate: entry.coordinate, digest: entry.digest }),
+    body: JSON.stringify(body),
   });
 }
 
 export function uninstallApp(profile: string) {
   return apiFetch<AppWriteResult>(`/catalogue/apps/${encodeURIComponent(profile)}`, {
     method: "DELETE",
-  });
-}
-
-/**
- * Put every current member of the tenant into the app's group. Done by the
- * cluster at once, and refused until the cluster has the app.
- */
-export function provisionApp(profile: string) {
-  return apiFetch<{ status: string }>("/catalogue/actions/provision-app", {
-    method: "POST",
-    body: JSON.stringify({ profile }),
   });
 }
