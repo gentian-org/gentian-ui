@@ -156,7 +156,7 @@ def unwrapped(answer: Response, key: str) -> Response:
     )
 
 
-def credential_manager_url(settings: Settings) -> str:
+def custodian_url(settings: Settings) -> str:
     """Where credential writes go.
 
     A separate service from the director and a separate question: the
@@ -165,12 +165,12 @@ def credential_manager_url(settings: Settings) -> str:
     the secret. Neither holds authority of its own, and this component holds
     neither of theirs.
     """
-    if not settings.credential_manager_url:
+    if not settings.custodian_url:
         raise HTTPException(
             status_code=503,
-            detail="The credential manager is not configured for this component.",
+            detail="The custodian is not configured for this component.",
         )
-    return settings.credential_manager_url.rstrip("/")
+    return settings.custodian_url.rstrip("/")
 
 
 async def forward_to(

@@ -38,7 +38,7 @@ export function useBackupKeyStatus(tenant: string) {
     let live = true;
     fetchBackupKeyStatus().then(
       (s) => live && setStatus(s),
-      // A workspace with no key, or a credential manager that is not reachable,
+      // A workspace with no key, or a custodian that is not reachable,
       // both mean "cannot offer the existing key" — not an error worth showing
       // in front of a backup form.
       () => live && setStatus({ exists: false, recipient: "", setBy: "", updatedAt: "" }),

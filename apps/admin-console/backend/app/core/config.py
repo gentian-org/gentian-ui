@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # Where a person's own credential writes are relayed. Unset leaves the
     # Credentials screen answering that it is not configured, rather than
     # guessing at a host.
-    credential_manager_url: str | None = Field(default=None, alias="CREDENTIAL_MANAGER_URL")
+    custodian_url: str | None = Field(default=None, alias="CUSTODIAN_URL")
 
     auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
 

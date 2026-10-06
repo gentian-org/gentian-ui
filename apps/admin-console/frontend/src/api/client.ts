@@ -6,7 +6,7 @@ const API_BASE = "/api/v1";
 /**
  * One entry of a failed request's per-field validation detail, when the
  * upstream attributes the failure to a specific field rather than the
- * request as a whole. Mirrors the credential manager's FieldError.
+ * request as a whole. Mirrors the custodian's FieldError.
  */
 export type FieldError = {
   field: string;
@@ -31,7 +31,7 @@ export class ApiError extends Error {
  * Paths whose 401 means "the upstream refused this token", not "your portal
  * session expired".
  *
- * The credential manager exchanges the caller's token with OpenBao and answers
+ * The custodian exchanges the caller's token with OpenBao and answers
  * 401 when that exchange fails — a wrong audience, a group matching no role, an
  * auth backend that does not exist yet. Treating that as an expired session
  * logged the operator out mid-click and destroyed the one message that said
@@ -68,7 +68,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       if (typeof body.detail === "string" && body.detail) {
         detail = `: ${body.detail}`;
       } else if (typeof body.error === "string" && body.error) {
-        // The credential manager's shape, forwarded verbatim by the BFF proxy
+        // The custodian's shape, forwarded verbatim by the BFF proxy
         // rather than translated into FastAPI's own {"detail": ...}. Reading
         // only .detail missed this every time: a validation failure showed as
         // a bare status code with the actual reason sitting beside it under
@@ -87,8 +87,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       // and told operators to check a group membership that was correct through
       // three separate causes, none of which was the group.
       throw new ApiError(
-        `Not authorised by the credential manager${detail}. Your portal session is fine — ` +
-          `OpenBao refused the token; the credential manager's log has OpenBao's own words.`,
+        `Not authorised by the custodian${detail}. Your portal session is fine — ` +
+          `OpenBao refused the token; the custodian's log has OpenBao's own words.`,
       );
     }
     if (response.status === 401 && (token || isEdgeSession())) {

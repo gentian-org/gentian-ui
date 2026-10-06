@@ -40,7 +40,7 @@ export type RepositoryView = {
 };
 
 /**
- * The 428 body from the Credential Manager. The API decides what is dangerous
+ * The 428 body from the custodian. The API decides what is dangerous
  * and what has to be retyped; this type is only the shape of that answer.
  * Deciding it again here would be a second copy of the rules, and the two would
  * eventually disagree.

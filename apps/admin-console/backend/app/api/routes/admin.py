@@ -94,7 +94,7 @@ NOT_YET_MAPPED: list[tuple[str, str, str]] = [
     # Minting a backup key would have this console generate an age private
     # key and hand it over. It holds nothing by design, and a key that passes
     # through it is a key it held. It belongs in the browser, or in the
-    # credential manager beside the escrow that already exists.
+    # custodian beside the escrow that already exists.
     ("POST", "/admin/backup-keys", "Backup"),
     # Sign-ins, refused requests and reads of data leave no commit. They need
     # stores that do not exist yet -- see gentian-os docs/roadmap.md 1.12,

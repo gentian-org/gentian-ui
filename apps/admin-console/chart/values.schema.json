@@ -65,7 +65,7 @@
         "defaultLanguage": { "type": "string", "description": "The tenant's first declared language: what the console renders before a person has chosen one. The profile maps it; without it here the operator's install was refused outright, since this object admits no unknown key." }
       }
     },
-    "credentialManager": {
+    "custodian": {
       "type": "object",
       "additionalProperties": false,
       "description": "Where a person's own credential writes are relayed. Empty leaves the Credentials screen saying it is not configured.",

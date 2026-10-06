@@ -1,12 +1,12 @@
-"""A person's own credentials, relayed to the credential manager.
+"""A person's own credentials, relayed to the custodian.
 
-The credential manager holds no authority of its own: every write takes the
+The custodian holds no authority of its own: every write takes the
 caller's token and exchanges it for one OpenBao will accept, so what a person
 may store is decided by their own identity rather than by a service acting for
 them. This console holds neither its token nor OpenBao's — it passes the
 person through, exactly as it does to the director.
 
-Unset `CREDENTIAL_MANAGER_URL` answers 503 saying so, rather than guessing at
+Unset `CUSTODIAN_URL` answers 503 saying so, rather than guessing at
 a host: a component that has not been told where something is has not been
 told, and inventing an address would turn a configuration mistake into a
 connection error somewhere else.
@@ -22,7 +22,7 @@ from app.core.config import Settings, get_settings
 router = APIRouter(prefix="/credentials", tags=["credentials"])
 _bearer = HTTPBearer(auto_error=False)
 
-# What the screen calls, and what the credential manager calls it. The console
+# What the screen calls, and what the custodian calls it. The console
 # keeps the paths its screen already uses; the service keeps its own. A map
 # rather than a prefix rewrite, so a path this console does not serve is a 404
 # here instead of an unexpected request there.
@@ -35,7 +35,7 @@ _PATHS: dict[tuple[str, str], str] = {
 
 
 def _upstream(method: str, rest: str) -> str | None:
-    """The credential manager's path for one of the screen's."""
+    """The custodian's path for one of the screen's."""
     if mapped := _PATHS.get((method, rest)):
         return mapped
     # The per-credential and per-repository routes are named by the thing
@@ -71,7 +71,7 @@ async def credentials(
 
             body = json.loads(raw)
     return await director.forward_to(
-        director.credential_manager_url(settings),
+        director.custodian_url(settings),
         request.method,
         path,
         bearer_of(credentials),

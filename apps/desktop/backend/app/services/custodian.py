@@ -2,7 +2,7 @@
 
 The gentian-os installer holds a bootstrap credential that can write every
 secret in the cluster, and its last step destroys it. After that the only way
-to write one is the credential manager, which holds no token of its own: it
+to write one is the custodian, which holds no token of its own: it
 exchanges the caller's Keycloak token for a short-lived OpenBao token.
 
 That exchange has conditions nothing else exercises — the OpenBao role's bound
@@ -42,7 +42,7 @@ async def prove_write_path(token: str, settings: Settings) -> bool:
     Nothing is written, and no credential value is read: this is the cheapest
     authenticated call the service offers.
     """
-    base = getattr(settings, "credential_manager_url", None)
+    base = getattr(settings, "custodian_url", None)
     if not base or not token:
         return False
     try:
@@ -53,6 +53,6 @@ async def prove_write_path(token: str, settings: Settings) -> bool:
             )
     except Exception:
         # Unreachable, slow, or refusing connections. A login must not fail
-        # because the credential manager is having a bad day.
+        # because the custodian is having a bad day.
         return False
     return response.status_code == 200

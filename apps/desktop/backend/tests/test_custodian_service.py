@@ -2,7 +2,7 @@
 
 It exists so that signing in IS the proof gentian-os waits for before it
 destroys the installer's bootstrap credential. Everything here is about it
-failing quietly: a login must not break because the credential manager is
+failing quietly: a login must not break because the custodian is
 unreachable, misconfigured, or refusing the caller.
 """
 
@@ -10,7 +10,7 @@ import httpx
 import pytest
 
 from app.core.config import Settings
-from app.services.credential_manager import prove_write_path
+from app.services.custodian import prove_write_path
 
 
 class _Transport(httpx.AsyncBaseTransport):
@@ -41,7 +41,7 @@ def patched(monkeypatch):
 
 def _settings() -> Settings:
     s = Settings()
-    object.__setattr__(s, "credential_manager_url", "http://credmgr.gentian-system.svc:9444")
+    object.__setattr__(s, "custodian_url", "http://custodian.gentian-system.svc:9444")
     return s
 
 
@@ -65,7 +65,7 @@ async def test_a_refused_caller_is_not_proof(patched):
 
 
 @pytest.mark.asyncio
-async def test_an_unreachable_credential_manager_is_not_an_exception(patched, monkeypatch):
+async def test_an_unreachable_custodian_is_not_an_exception(patched, monkeypatch):
     """The login path calls this. It must never raise."""
 
     class _Broken(httpx.AsyncBaseTransport):

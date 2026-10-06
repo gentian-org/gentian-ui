@@ -560,7 +560,7 @@ export type BackupTarget = {
   bucket?: string;
   region?: string;
   /**
-   * managed reuses the credential the Credential Manager already holds for
+   * managed reuses the credential the custodian already holds for
    * this workspace. transient takes keys entered on the form, which are kept
    * for the length of the export and then removed.
    */
@@ -723,7 +723,7 @@ export type MintedKey = { identity: string; recipient: string };
 
 /** Keep a copy of a minted key in the vault, so losing the download is not fatal.
  *
- * Written by the credential manager with the caller's own OpenBao token, into
+ * Written by the custodian with the caller's own OpenBao token, into
  * the caller's own workspace subtree. It is denied to External Secrets, so the
  * key can be read by a workspace administrator and not by the cluster.
  */

@@ -1,8 +1,8 @@
-"""Proxy to the gentian-os Credential Manager.
+"""Proxy to the gentian-os Custodian.
 
 Why a proxy rather than calling it from the browser
 ---------------------------------------------------
-The Credential Manager serves no CORS headers, so a browser cannot reach it
+The custodian serves no CORS headers, so a browser cannot reach it
 directly. That is convenient rather than limiting: routing through here keeps the
 service on the cluster network, gives the console one origin, and means the
 browser never holds a second audience's session.
@@ -10,7 +10,7 @@ browser never holds a second audience's session.
 What this deliberately does NOT do
 ----------------------------------
 It holds no credential of its own and makes no authorisation decision. Every
-request forwards the CALLER's bearer token, and the Credential Manager exchanges
+request forwards the CALLER's bearer token, and the custodian exchanges
 it with OpenBao — which decides what the caller may see and write, and records
 the human in the audit device. A proxy that authenticated on its own behalf
 would put a component with every permission between the user and the store,
@@ -39,11 +39,11 @@ _TIMEOUT = httpx.Timeout(30.0)
 
 
 def _base_url(settings: Settings) -> str:
-    url = getattr(settings, "credential_manager_url", None)
+    url = getattr(settings, "custodian_url", None)
     if not url:
         raise HTTPException(
             status_code=503,
-            detail="The credential manager is not configured for this cluster.",
+            detail="The custodian is not configured for this cluster.",
         )
     return url.rstrip("/")
 
@@ -69,7 +69,7 @@ async def _forward(
     except httpx.RequestError as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"The credential manager is unreachable: {exc}",
+            detail=f"The custodian is unreachable: {exc}",
         ) from exc
 
     # Pass the status through untouched. 428 in particular carries the retype
@@ -130,7 +130,7 @@ async def escrow_backup_identity(
     """Keep a copy of a workspace's backup key, so a lost download is not fatal.
 
     Forwarded rather than written here, for the same reason every other write on
-    this router is: this service holds no OpenBao token. The credential manager
+    this router is: this service holds no OpenBao token. The custodian
     exchanges the caller's own, and the path it writes is derived from the tenant
     in the verified claim — so a workspace administrator can escrow into their
     own subtree and nowhere else, and that is a property of OpenBao's policy

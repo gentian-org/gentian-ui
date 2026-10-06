@@ -1,6 +1,6 @@
-"""Credentials are relayed to the credential manager, as the caller.
+"""Credentials are relayed to the custodian, as the caller.
 
-The credential manager exchanges the person's own token for one OpenBao will
+The custodian exchanges the person's own token for one OpenBao will
 accept, so what may be stored is decided by their identity rather than by a
 service acting for them. This console holds neither token.
 """
@@ -29,7 +29,7 @@ def _settings(**over) -> Settings:
         "TENANT_ID": "platform",
         "DIRECTOR_URL": "http://director.test:8080",
         "GENTIAN_CLUSTER_ID": "demo",
-        "CREDENTIAL_MANAGER_URL": "http://credentials.test:9444",
+        "CUSTODIAN_URL": "http://credentials.test:9444",
     }
     base.update(over)
     return Settings(**base)
@@ -108,14 +108,14 @@ def test_the_refusal_is_passed_through_unchanged(monkeypatch, status):
     assert r.status_code == status
 
 
-def test_without_a_credential_manager_it_says_so(monkeypatch):
+def test_without_a_custodian_it_says_so(monkeypatch):
     """Rather than guessing at a host: a component that has not been told
     where something is has not been told."""
-    r = TestClient(_app(_settings(CREDENTIAL_MANAGER_URL=None))).get(
+    r = TestClient(_app(_settings(CUSTODIAN_URL=None))).get(
         "/api/v1/credentials", headers={"Authorization": "Bearer t"}
     )
     assert r.status_code == 503
-    assert "credential manager is not configured" in r.json()["detail"]
+    assert "custodian is not configured" in r.json()["detail"]
 
 
 def test_no_token_is_refused_before_anything_is_forwarded():

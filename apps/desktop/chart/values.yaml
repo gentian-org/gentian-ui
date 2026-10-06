@@ -140,13 +140,13 @@ llm:
   # different questions.
   enabled: false
 
-# The gentian-os Credential Manager. The console proxies to it rather than the
+# The gentian-os Custodian. The console proxies to it rather than the
 # browser calling it directly: it serves no CORS headers, and proxying keeps it
 # on the cluster network with one origin for the console.
 #
 # Unset disables the Credentials section rather than breaking it — the API
 # answers 503 and the section says the manager is unavailable.
-credentialManager:
+custodian:
   url: ""
 
 # The gentian-os app lifecycle API. The Resources tab reads a tenant's plan,
