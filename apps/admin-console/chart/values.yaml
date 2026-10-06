@@ -119,6 +119,13 @@ platform:
 custodian:
   url: ""
 
+# Where everything about people goes: people, groups, the realm's settings
+# and a tenant administrator's activation. The registrar takes the caller's
+# own token, as the director does. Empty leaves those screens answering that
+# it is not configured; the director is not asked instead.
+registrar:
+  url: ""
+
 director:
   url: ""
   cluster: ""

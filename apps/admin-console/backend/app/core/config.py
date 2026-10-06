@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     # Credentials screen answering that it is not configured, rather than
     # guessing at a host.
     custodian_url: str | None = Field(default=None, alias="CUSTODIAN_URL")
+    # Where people, groups and the realm's settings are asked. Unset leaves
+    # those routes answering 503 and naming this setting; the director is
+    # not asked instead.
+    registrar_url: str | None = Field(default=None, alias="REGISTRAR_URL")
 
     auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
 

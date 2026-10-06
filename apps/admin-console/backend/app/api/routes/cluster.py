@@ -194,15 +194,15 @@ async def activate_tenant_admin(
 ) -> Response:
     """Hand a tenant's administrator account to its holder.
 
-    The account has no password. The director issues a single-use link that
+    The account has no password. The registrar issues a single-use link that
     sets one (and a second factor unless the tenant opts out): mailed to the
     recovery address when one is given, otherwise returned to show once.
     """
     payload = {}
     if body and body.get("recoveryEmail"):
         payload["recoveryEmail"] = body["recoveryEmail"]
-    return await director.forward(
-        settings,
+    return await director.forward_to(
+        director.registrar_url(settings),
         "POST",
         _cluster_path(settings, f"/tenants/{tenant}/actions/activate-admin"),
         bearer_of(credentials),

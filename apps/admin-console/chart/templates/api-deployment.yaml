@@ -75,6 +75,10 @@ spec:
             - name: CUSTODIAN_URL
               value: {{ .Values.custodian.url | quote }}
             {{- end }}
+            {{- if and .Values.registrar .Values.registrar.url (not (hasKey (default dict .Values.api.env) "REGISTRAR_URL")) }}
+            - name: REGISTRAR_URL
+              value: {{ .Values.registrar.url | quote }}
+            {{- end }}
             {{- if and .Values.director.cluster (not (hasKey (default dict .Values.api.env) "GENTIAN_CLUSTER_ID")) }}
             - name: GENTIAN_CLUSTER_ID
               value: {{ .Values.director.cluster | quote }}

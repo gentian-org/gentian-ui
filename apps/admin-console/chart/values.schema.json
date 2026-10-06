@@ -71,6 +71,12 @@
       "description": "Where a person's own credential writes are relayed. Empty leaves the Credentials screen saying it is not configured.",
       "properties": { "url": { "type": "string" } }
     },
+    "registrar": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where people, groups and the realm's settings are relayed. Empty leaves those screens saying it is not configured.",
+      "properties": { "url": { "type": "string" } }
+    },
     "director": {
       "type": "object",
       "additionalProperties": false,

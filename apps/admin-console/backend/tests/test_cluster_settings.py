@@ -35,6 +35,7 @@ def _settings(**over) -> Settings:
         KERNEL_DOMAIN="desk.gentian.org",
         TENANT_ID="platform",
         DIRECTOR_URL=over.pop("director_url", "http://director.test:8080"),
+        REGISTRAR_URL=over.pop("registrar_url", "http://registrar.test:8080"),
         GENTIAN_CLUSTER_ID=over.pop("cluster_id", "demo"),
     )
 
@@ -197,7 +198,11 @@ def test_activating_an_administrator_relays_only_the_recovery_address(monkeypatc
         headers={"Authorization": "Bearer person-token"},
     )
     assert r.status_code == 200
-    assert seen["url"].endswith("/v1/clusters/demo/tenants/acme/actions/activate-admin")
+    # The registrar's, not the director's: the account is a person.
+    assert (
+        seen["url"]
+        == "http://registrar.test:8080/v1/clusters/demo/tenants/acme/actions/activate-admin"
+    )
     assert seen["json"] == {"recoveryEmail": "owner@example.org"}
 
     r = client.post(
@@ -206,6 +211,18 @@ def test_activating_an_administrator_relays_only_the_recovery_address(monkeypatc
     )
     assert r.status_code == 200
     assert seen["json"] == {}
+
+
+def test_activating_without_a_registrar_says_so_and_asks_nobody(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, lambda m, url: httpx.Response(200, json={}), seen)
+    r = TestClient(_app(_settings(registrar_url=None))).post(
+        "/api/v1/cluster/tenants/acme/activate-admin",
+        headers={"Authorization": "Bearer person-token"},
+    )
+    assert r.status_code == 503
+    assert "REGISTRAR_URL" in r.json()["detail"]
+    assert seen == {}
 
 
 def test_purging_a_tenant_is_the_directors_purge_action(monkeypatch):

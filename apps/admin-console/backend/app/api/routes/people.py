@@ -1,9 +1,9 @@
 """People, groups and the realm's password policy.
 
-Every one of these is relayed to the director with the caller's own token.
-This component holds no Keycloak credential and never has: the director holds
+Every one of these is relayed to the registrar with the caller's own token.
+This component holds no Keycloak credential and never has: the registrar holds
 one per realm, and what a caller may do with it is decided by OpenFGA against
-their token before the director touches anything.
+their token before the registrar touches anything.
 
 That is the reversal S7A.17 makes, and it is worth stating plainly because the
 screen it replaces said the opposite. People used to be managed in Keycloak's
@@ -15,7 +15,7 @@ realm engineers.
 
 The writes are ACTIONS, not commits. Inviting somebody happens once and leaves
 no declared state; people do not belong in an append-only history, which is the
-whole reason they are not in git. The director spells that in the route
+whole reason they are not in git. The registrar spells that in the route
 (`/actions/...`) and this module keeps the distinction visible rather than
 flattening it into a REST-shaped PUT.
 """
@@ -44,6 +44,26 @@ def _fields(payload: dict, names: tuple[str, ...]) -> dict:
     return {k: payload[k] for k in names if k in payload}
 
 
+async def _relay(
+    settings: Settings,
+    method: str,
+    path: str,
+    token: str,
+    *,
+    params: dict[str, str] | None = None,
+    json_body: object | None = None,
+) -> Response:
+    """One request to the registrar, as the caller, answered verbatim."""
+    return await director.forward_to(
+        director.registrar_url(settings),
+        method,
+        path,
+        token,
+        params=params,
+        json_body=json_body,
+    )
+
+
 async def _action(
     settings: Settings,
     tenant: str | None,
@@ -51,7 +71,7 @@ async def _action(
     action: str,
     body: dict,
 ) -> Response:
-    return await director.forward(
+    return await _relay(
         settings,
         "POST",
         f"/v1/tenants/{_tenant(settings, tenant)}/actions/{action}",
@@ -81,7 +101,7 @@ async def people(
         params["search"] = search
     if limit:
         params["limit"] = str(limit)
-    return await director.forward(
+    return await _relay(
         settings,
         "GET",
         f"/v1/tenants/{_tenant(settings, tenant)}/people",
@@ -99,7 +119,7 @@ async def person(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """One person and the groups they hold, within this tenant's scope."""
-    return await director.forward(
+    return await _relay(
         settings,
         "GET",
         f"/v1/tenants/{_tenant(settings, tenant)}/people/{person_id}",
@@ -117,10 +137,10 @@ async def groups(
     """The groups this tenant may put somebody in.
 
     A tenant with its own realm sees its realm's groups. A tenant that shares
-    the kernel realm sees only its own subtree — the director filters, because
+    the kernel realm sees only its own subtree — the registrar filters, because
     in a shared realm the credential is no longer the boundary.
     """
-    return await director.forward(
+    return await _relay(
         settings,
         "GET",
         f"/v1/tenants/{_tenant(settings, tenant)}/groups",
@@ -141,7 +161,7 @@ async def identity_settings(
     unparsed: the platform does not interpret it, and a parse here would have
     to be kept in step with a vocabulary Keycloak extends.
     """
-    return await director.forward(
+    return await _relay(
         settings,
         "GET",
         f"/v1/tenants/{_tenant(settings, tenant)}/identity",
@@ -164,7 +184,7 @@ async def invite(
     re-send, not to invite again, and the answer says so rather than reading
     as a failure that left nothing behind.
     """
-    return await director.forward(
+    return await _relay(
         settings,
         "POST",
         f"/v1/tenants/{_tenant(settings, tenant)}/actions/invite-person",
@@ -198,7 +218,7 @@ async def set_membership(
     way is ambiguous, and choosing for the caller is a change nobody asked
     for.
     """
-    return await director.forward(
+    return await _relay(
         settings,
         "POST",
         f"/v1/tenants/{_tenant(settings, tenant)}/actions/set-membership",
@@ -223,9 +243,9 @@ async def set_password_policy(
 
     A different relation from the rest of this module: can_set_policy rather
     than can_manage_users, because this is a statement about the tenant rather
-    than about a person. The director decides that; this only relays.
+    than about a person. The registrar decides that; this only relays.
     """
-    return await director.forward(
+    return await _relay(
         settings,
         "POST",
         f"/v1/tenants/{_tenant(settings, tenant)}/actions/set-password-policy",
@@ -235,7 +255,7 @@ async def set_password_policy(
 
 
 # Editing somebody, and the groups and templates the member screens use. Each
-# is the director's action of the same name; the fields relayed are listed so
+# is the registrar's action of the same name; the fields relayed are listed so
 # nothing else a caller sends travels on.
 
 
@@ -265,7 +285,7 @@ async def remove_person(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Remove somebody. The director refuses it for the caller themselves."""
+    """Remove somebody. The registrar refuses it for the caller themselves."""
     return await _action(
         settings, tenant, credentials, "remove-person", _fields(payload, ("person",))
     )
@@ -321,7 +341,7 @@ async def create_group(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Make a custom group; the director places it in the tenant's subtree."""
+    """Make a custom group; the registrar places it in the tenant's subtree."""
     return await _action(settings, tenant, credentials, "create-group", _fields(payload, ("name",)))
 
 
@@ -362,7 +382,7 @@ async def group_members(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """Who is in one group."""
-    return await director.forward(
+    return await _relay(
         settings,
         "GET",
         f"/v1/tenants/{_tenant(settings, tenant)}/group-members",
@@ -379,7 +399,7 @@ async def templates(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """The desktop's settings templates an invitation may apply."""
-    return await director.forward(
+    return await _relay(
         settings,
         "GET",
         f"/v1/tenants/{_tenant(settings, tenant)}/templates",

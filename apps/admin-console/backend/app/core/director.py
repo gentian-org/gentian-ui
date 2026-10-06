@@ -173,6 +173,24 @@ def custodian_url(settings: Settings) -> str:
     return settings.custodian_url.rstrip("/")
 
 
+def registrar_url(settings: Settings) -> str:
+    """Where everything about people goes.
+
+    The registrar holds the per-realm Keycloak credential and answers for
+    people, groups and the realm's settings; the director answers 404 on all
+    of them. Unset is a 503 that names the setting, never a fall back to the
+    director: a console quietly asking the wrong service would read as an
+    empty tenant.
+    """
+    if not settings.registrar_url:
+        raise HTTPException(
+            status_code=503,
+            detail="The registrar is not configured for this component: REGISTRAR_URL "
+            "(the chart value registrar.url) is not set.",
+        )
+    return settings.registrar_url.rstrip("/")
+
+
 async def forward_to(
     base: str,
     method: str,

@@ -1,7 +1,7 @@
-"""People, groups and the realm's password policy, relayed to the director.
+"""People, groups and the realm's password policy, relayed to the registrar.
 
 What these assert is the relay's shape rather than Keycloak's behaviour: the
-director is the one that holds a credential and decides, and a test here that
+registrar is the one that holds a credential and decides, and a test here that
 pretended otherwise would be testing a second implementation of a decision
 that has one home.
 """
@@ -23,14 +23,17 @@ def _app(settings: Settings) -> FastAPI:
     return app
 
 
-def _settings() -> Settings:
-    return Settings(
-        AUTH_DISABLED="true",
-        KERNEL_DOMAIN="desk.gentian.org",
-        TENANT_ID="platform",
-        DIRECTOR_URL="http://director.test:8080",
-        GENTIAN_CLUSTER_ID="demo",
-    )
+def _settings(**over) -> Settings:
+    base = {
+        "AUTH_DISABLED": "true",
+        "KERNEL_DOMAIN": "desk.gentian.org",
+        "TENANT_ID": "platform",
+        "DIRECTOR_URL": "http://director.test:8080",
+        "REGISTRAR_URL": "http://registrar.test:8080",
+        "GENTIAN_CLUSTER_ID": "demo",
+    }
+    base.update(over)
+    return Settings(**base)
 
 
 def _fake_client(monkeypatch, body, seen: dict, status: int = 200):
@@ -66,7 +69,7 @@ def test_people_are_asked_of_the_tenant(monkeypatch):
         "/api/v1/admin/people", headers={"Authorization": "Bearer t"}
     )
     assert r.status_code == 200
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/people"
+    assert seen["url"] == "http://registrar.test:8080/v1/tenants/platform/people"
     # pending survives the relay: somebody invited who has not finished is not
     # the same as somebody who can sign in, and a list that flattened the two
     # would make a failed invitation invisible.
@@ -97,9 +100,9 @@ def test_inviting_is_an_action_not_a_commit(monkeypatch):
     )
     assert r.status_code == 202
     assert seen["method"] == "POST"
-    # /actions/ is the director's way of saying this happens once and leaves
+    # /actions/ is the registrar's way of saying this happens once and leaves
     # no commit. A PUT here would be declaring a person as state.
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/actions/invite-person"
+    assert seen["url"] == "http://registrar.test:8080/v1/tenants/platform/actions/invite-person"
     assert seen["json"] == {
         "email": "ada@example.com",
         "groups": ["gentian:tenant:platform:members"],
@@ -137,7 +140,7 @@ def test_membership_says_which_way(monkeypatch):
         json={"person": "u1", "group": "gentian:tenant:platform:members", "member": False},
         headers={"Authorization": "Bearer t"},
     )
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/actions/set-membership"
+    assert seen["url"] == "http://registrar.test:8080/v1/tenants/platform/actions/set-membership"
     assert seen["json"]["member"] is False
 
 
@@ -148,7 +151,7 @@ def test_the_password_policy_is_read_and_written(monkeypatch):
 
     r = client.get("/api/v1/admin/identity", headers={"Authorization": "Bearer t"})
     assert r.json()["passwordPolicy"] == "length(8)"
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/identity"
+    assert seen["url"] == "http://registrar.test:8080/v1/tenants/platform/identity"
 
     client.post(
         "/api/v1/admin/identity/password-policy",
@@ -156,7 +159,7 @@ def test_the_password_policy_is_read_and_written(monkeypatch):
         headers={"Authorization": "Bearer t"},
     )
     assert (
-        seen["url"] == "http://director.test:8080/v1/tenants/platform/actions/set-password-policy"
+        seen["url"] == "http://registrar.test:8080/v1/tenants/platform/actions/set-password-policy"
     )
     assert seen["json"] == {"passwordPolicy": "length(12)"}
 
@@ -173,7 +176,7 @@ def test_groups_are_served_rather_than_refused(monkeypatch):
         "/api/v1/admin/groups", headers={"Authorization": "Bearer t"}
     )
     assert r.status_code == 200
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/groups"
+    assert seen["url"] == "http://registrar.test:8080/v1/tenants/platform/groups"
 
 
 def test_a_realm_with_no_credential_is_relayed_as_the_platforms_problem(monkeypatch):
@@ -186,7 +189,7 @@ def test_a_realm_with_no_credential_is_relayed_as_the_platforms_problem(monkeypa
     seen: dict = {}
     _fake_client(
         monkeypatch,
-        {"error": "this director holds no credential for the realm demo"},
+        {"error": "this registrar holds no credential for that realm"},
         seen,
         status=503,
     )
@@ -194,7 +197,7 @@ def test_a_realm_with_no_credential_is_relayed_as_the_platforms_problem(monkeypa
         "/api/v1/admin/people?tenant=demo", headers={"Authorization": "Bearer t"}
     )
     assert r.status_code == 503
-    assert "demo" in r.json()["error"]
+    assert "no credential" in r.json()["error"]
 
 
 def test_an_invitation_relays_the_whole_form(monkeypatch):
@@ -242,7 +245,7 @@ def test_an_edit_relays_only_what_it_names(monkeypatch):
     assert seen["json"] == {"person": "u1", "enabled": False}
 
 
-def test_member_actions_reach_their_director_actions(monkeypatch):
+def test_member_actions_reach_their_registrar_actions(monkeypatch):
     client = TestClient(_app(_settings()))
     for path, action, body in [
         ("/api/v1/admin/people/remove", "remove-person", {"person": "u1"}),
@@ -262,5 +265,68 @@ def test_member_actions_reach_their_director_actions(monkeypatch):
         assert (
             client.post(path, json=body, headers={"Authorization": "Bearer t"}).status_code == 200
         ), path
-        assert seen["url"].endswith(f"/actions/{action}"), (path, seen["url"])
+        assert seen["url"] == f"http://registrar.test:8080/v1/tenants/platform/actions/{action}", (
+            path,
+            seen["url"],
+        )
         assert seen["json"] == body
+
+
+def test_one_person_a_groups_members_and_the_templates_are_the_registrars(monkeypatch):
+    client = TestClient(_app(_settings()))
+    for path, upstream, params in [
+        ("/api/v1/admin/people/u1", "people/u1", None),
+        ("/api/v1/admin/groups/members?group=g", "group-members", {"group": "g"}),
+        ("/api/v1/admin/templates", "templates", None),
+    ]:
+        seen: dict = {}
+        _fake_client(monkeypatch, {}, seen)
+        assert client.get(path, headers={"Authorization": "Bearer t"}).status_code == 200, path
+        assert seen["url"] == f"http://registrar.test:8080/v1/tenants/platform/{upstream}"
+        assert seen["params"] == params
+
+
+def test_without_a_registrar_it_says_so_and_asks_nobody(monkeypatch):
+    """503 naming the setting, on a read and on a write alike.
+
+    The director is configured here and is not asked instead: it answers 404
+    on every one of these, and a console that fell back to it would show an
+    unconfigured registrar as a tenant with nobody in it.
+    """
+    seen: dict = {}
+    _fake_client(monkeypatch, {}, seen)
+    client = TestClient(_app(_settings(REGISTRAR_URL=None)))
+    for r in (
+        client.get("/api/v1/admin/people", headers={"Authorization": "Bearer t"}),
+        client.get("/api/v1/admin/groups", headers={"Authorization": "Bearer t"}),
+        client.post(
+            "/api/v1/admin/people/remove",
+            json={"person": "u1"},
+            headers={"Authorization": "Bearer t"},
+        ),
+    ):
+        assert r.status_code == 503
+        assert "registrar is not configured" in r.json()["detail"]
+        assert "REGISTRAR_URL" in r.json()["detail"]
+    assert seen == {}
+
+
+def test_a_refused_change_to_a_platform_administrator_arrives_as_it_was_said(monkeypatch):
+    """403 with the registrar's own sentence, under the key it used.
+
+    The screen prints `error` beside the status; replacing it here with this
+    API's wording would lose the one line that says why.
+    """
+    seen: dict = {}
+    said = (
+        "refused: ada is a platform administrator. "
+        "Who administers the platform is not changed through the registrar."
+    )
+    _fake_client(monkeypatch, {"error": said, "request_id": "r1"}, seen, status=403)
+    r = TestClient(_app(_settings())).post(
+        "/api/v1/admin/people/remove",
+        json={"person": "u1"},
+        headers={"Authorization": "Bearer t"},
+    )
+    assert r.status_code == 403
+    assert r.json()["error"] == said
