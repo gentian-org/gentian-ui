@@ -20,4 +20,17 @@ that installs them. See [AGENTS.md](AGENTS.md) for conventions.
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE). Permissive on purpose: the desktop and the consoles are what an organisation is most likely to change for itself.
+MPL-2.0 — see [LICENSE](LICENSE). The notice of the license's Exhibit A is
+given here for every file in the repository instead of in each one:
+
+> This Source Code Form is subject to the terms of the Mozilla Public License,
+> v. 2.0. If a copy of the MPL was not distributed with this file, You can
+> obtain one at https://mozilla.org/MPL/2.0/.
+
+An organisation may change the desktop and the consoles for itself. Whoever
+distributes a changed version — and serving its browser code to users is
+distributing it — publishes the files they changed; files they add are theirs.
+A brand and extensions are configuration and new files, not changes.
+
+The design system (`apps/*/frontend/design-system/`) is Apache-2.0, with its
+own `LICENSE`, so that any app may carry the same look.
