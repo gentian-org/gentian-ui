@@ -61,8 +61,7 @@ export function AppLauncher({ apps, onSelect, onClose, loadFailed, onReload }: A
               <button
                 key={app.id}
                 type="button"
-                className={`app-launcher__tile${app.unavailable ? " app-launcher__tile--unavailable" : ""}`}
-                title={app.unavailable}
+                className="app-launcher__tile"
                 draggable
                 onDragStart={(e) => {
                   const payload = JSON.stringify({ type: "app", id: app.id });

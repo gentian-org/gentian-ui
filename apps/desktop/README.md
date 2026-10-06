@@ -6,6 +6,17 @@ console is the other (`../admin-console`). Canonical scaffold for Gentian-built 
 [gentian-app-template](https://github.com/gentian-org/gentian-app-template)
 (catalogue apps and kernel shell).
 
+## What it does, and what it does not
+
+The desktop is a relay for tiles. It shows what the signed-in person may open
+— the tiles the usher answers for them — and opens it, and it keeps that
+person's own preferences. It installs nothing, removes nothing, grants
+nothing and reads no catalogue: administering apps is the administration
+console's (its Apps tab), and nothing an ordinary member could interfere with
+is reachable from here. An App Store, on a cluster that has one, is an app of
+its own and arrives as a tile like any other; the desktop has no special
+handling for it.
+
 ## Quick start
 
 ```bash
@@ -45,7 +56,7 @@ desktop and the console sit side by side in the same shape and either could
 move to a repository of its own as a move of files and nothing else:
 
 ```
-backend/          FastAPI — a router in front of the director, plus preferences
+backend/          FastAPI — who is signed in, their tiles (from the usher), their preferences
 frontend/         React SPA — Vite, TanStack Router/Query, Zustand, Tailwind
 chart/            Helm — api + web Deployments, no RBAC, no mounted token
 docs/             SECURITY.md, FRONTEND-STACK.md, architecture.md, ai-widget.md

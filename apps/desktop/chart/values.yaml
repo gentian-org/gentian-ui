@@ -140,39 +140,16 @@ llm:
   # different questions.
   enabled: false
 
-# The gentian-os Custodian. The console proxies to it rather than the
-# browser calling it directly: it serves no CORS headers, and proxying keeps it
-# on the cluster network with one origin for the console.
-#
-# Unset disables the Credentials section rather than breaking it — the API
-# answers 503 and the section says the manager is unavailable.
-custodian:
-  url: ""
-
-# The gentian-os app lifecycle API. The Resources tab reads a tenant's plan,
-# ceiling and usage history from it, and posts plan changes to it — which the
-# operator turns into a commit in the deployments repository, the same path an
-# App Store install takes.
-#
-# Unset disables the Resources tab rather than breaking it: the tab says the
-# resources API is not configured, instead of showing a cluster that appears to
-# have no plans.
-#
-#   http://gentian-os-lifecycle.gentian-system.svc.cluster.local:8082
-# The director: what the console asks for the cluster's own consoles, and for
-# anything else only it can decide. It answers about the caller, from their
-# relations to the cluster, so the console forwards the caller's token and adds
-# nothing of its own.
+# The director: asked what the signed-in person holds on this desktop's
+# tenant, with that person's own token, and nothing else. The desktop relays
+# no write to it.
 director:
   url: ""
-  # Which cluster this console belongs to, as the director names it.
-  cluster: ""
 
-# The usher: what the desktop asks which tiles a person may open, and what
-# the App Store's window reads of the cluster's live state (how the installed
-# apps are doing, what the tenant has used of its plan). Read-only, on the
-# cluster network, answered with the caller's own token. Set by the operator;
-# with none those requests answer 503, and the director is not asked instead.
+# The usher: what the desktop asks which tiles a person may open. Read-only,
+# on the cluster network, answered with the caller's own token. Set by the
+# operator; with none the tiles request answers 503, and the director is not
+# asked instead.
 usher:
   url: ""
 

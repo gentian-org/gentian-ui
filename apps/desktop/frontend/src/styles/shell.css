@@ -431,10 +431,6 @@
     transform var(--gtn-dur-1) var(--gtn-ease-out);
 }
 
-.app-launcher__tile--unavailable {
-  opacity: 0.5;
-}
-
 .app-launcher__tile:hover {
   background: var(--gtn-50);
 }

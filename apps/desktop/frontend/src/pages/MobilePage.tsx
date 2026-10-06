@@ -4,8 +4,6 @@ import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { MobileAppLayer } from "@/shell/MobileAppLayer";
 import { useShellApps } from "@/shell/useShellApps";
-import { StoreBridge } from "@/shell/StoreBridge";
-import { UnavailableNotice } from "@/shell/UnavailableNotice";
 import { useShellBackgroundUrl } from "@/shell/useShellBackground";
 import { SettingsPanel } from "@/settings/SettingsPanel";
 import { useAppsStore } from "@/stores/apps";
@@ -16,8 +14,7 @@ type MobileOverlay = "account" | "settings" | null;
 
 export function MobilePage() {
   const { t } = useTranslation();
-  const { me, apps, loadFailed, reload, isAdminUser, storeOffered } = useShellApps();
-  const [unavailable, setUnavailable] = useState<{ title: string; text: string } | null>(null);
+  const { me, apps, loadFailed, reload } = useShellApps();
   const backgroundUrl = useShellBackgroundUrl();
 
   const activeAppId = useAppsStore((s) => s.activeAppId);
@@ -65,11 +62,6 @@ export function MobilePage() {
   }, [activeApp, me?.username, overlay]);
 
   function handleSelect(app: (typeof apps)[number]) {
-    // A tile that cannot be opened says why and opens nothing.
-    if (app.unavailable) {
-      setUnavailable({ title: app.title, text: app.unavailable });
-      return;
-    }
     setActiveAppId(app.id);
     // Embedded OIDC apps (Odoo) used to need a popup here to bootstrap a
     // first-party Keycloak cookie, because portal sign-in was a password grant
@@ -94,8 +86,6 @@ export function MobilePage() {
   return (
     <div className="gentian-shell shell-surface relative min-h-full">
       <Background imageUrl={backgroundUrl} />
-      <StoreBridge enabled={isAdminUser && storeOffered} />
-      <UnavailableNotice notice={unavailable} onClose={() => setUnavailable(null)} />
       {overlay === "account" && (
         <div className="fixed inset-0 z-20 overflow-auto bg-[var(--gtn-paper-3)]">
           <AccountPanel />

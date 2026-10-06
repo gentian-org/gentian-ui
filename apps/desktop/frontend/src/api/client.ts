@@ -2,46 +2,12 @@ import { getAccessToken, isEdgeSession, redirectToLoginForExpiredSession } from 
 
 const API_BASE = "/api/v1";
 
-/**
- * One entry of a failed request's per-field validation detail, when the
- * upstream attributes the failure to a specific field rather than the
- * request as a whole. Mirrors the custodian's FieldError.
- */
-export type FieldError = {
-  field: string;
-  message: string;
-};
-
-/**
- * Thrown by apiFetch on any non-2xx response. fields is populated only when
- * the body carries one — most endpoints never do, and existing catch sites
- * that read only .message are unaffected.
- */
+/** Thrown by apiFetch on any non-2xx response. */
 export class ApiError extends Error {
-  readonly fields?: FieldError[];
-  constructor(message: string, fields?: FieldError[]) {
+  constructor(message: string) {
     super(message);
     this.name = "ApiError";
-    this.fields = fields;
   }
-}
-
-/**
- * Paths whose 401 means "the upstream refused this token", not "your portal
- * session expired".
- *
- * The custodian exchanges the caller's token with OpenBao and answers
- * 401 when that exchange fails — a wrong audience, a group matching no role, an
- * auth backend that does not exist yet. Treating that as an expired session
- * logged the operator out mid-click and destroyed the one message that said
- * what was actually wrong.
- */
-const UPSTREAM_AUTH_PATHS = ["/credentials"];
-
-function isUpstreamAuth(path: string): boolean {
-  return UPSTREAM_AUTH_PATHS.some(
-    (p) => path === p || path.startsWith(`${p}/`) || path.startsWith(`${p}?`),
-  );
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -61,38 +27,23 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   });
   if (!response.ok) {
     let detail = "";
-    let fields: FieldError[] | undefined;
     try {
-      const body = (await response.json()) as { detail?: unknown; error?: unknown; fields?: unknown };
+      const body = (await response.json()) as { detail?: unknown; error?: unknown };
       if (typeof body.detail === "string" && body.detail) {
         detail = `: ${body.detail}`;
       } else if (typeof body.error === "string" && body.error) {
-        // The custodian's shape, forwarded verbatim by the BFF proxy
-        // rather than translated into FastAPI's own {"detail": ...}. Reading
-        // only .detail missed this every time: a validation failure showed as
-        // a bare status code with the actual reason sitting beside it under
-        // the other key.
+        // A service's own answer, relayed verbatim rather than translated
+        // into FastAPI's {"detail": ...}: the usher writes its errors under
+        // this key.
         detail = `: ${body.error}`;
-      }
-      if (Array.isArray(body.fields)) {
-        fields = body.fields as FieldError[];
       }
     } catch {
       // Response body is not JSON.
     }
-    if (response.status === 401 && isUpstreamAuth(path)) {
-      // A 401 from the custodian is its verdict on the token itself: it could
-      // not be verified. What a person may see or set is the authorization
-      // store's answer and arrives as an empty list or a 403, not as this.
-      throw new ApiError(
-        `The custodian could not verify your session${detail}. Sign out and in again; ` +
-          `if it persists, the custodian's log says why.`,
-      );
-    }
     if (response.status === 401 && (token || isEdgeSession())) {
       redirectToLoginForExpiredSession();
     }
-    throw new ApiError(`API ${path} failed: ${response.status}${detail}`, fields);
+    throw new ApiError(`API ${path} failed: ${response.status}${detail}`);
   }
   if (response.status === 204) {
     return undefined as T;
@@ -132,11 +83,6 @@ export type ShellApp = {
   /** The app asks to be opened hidden at desktop mount; see gentianos.io/portal-preopen. */
   preopen?: boolean;
   builtin?: boolean;
-  /**
-   * Why this tile cannot be opened, in the person's language. A tile that
-   * carries it is shown and opens nothing: selecting it says this instead.
-   */
-  unavailable?: string;
 };
 
 /** A tile this person may open, as the usher answered for them. */
@@ -156,12 +102,6 @@ export type ClusterTile = {
 
 export type ClusterTilesResponse = {
   tiles: ClusterTile[];
-  /**
-   * Whether the App Store may be offered on this cluster at all. Optional in
-   * the type only because an usher that predates it does not send it; the
-   * desktop treats its absence as an answer it did not get, never as a yes.
-   */
-  appStore?: { available: boolean; reason?: string };
 };
 
 export type AppsResponse = {

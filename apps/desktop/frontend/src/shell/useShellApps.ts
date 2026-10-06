@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useTranslation } from "react-i18next";
 import {
   apiFetch,
   type ClusterTilesResponse,
@@ -10,7 +9,6 @@ import {
 import { useAuth } from "@/auth/AuthProvider";
 import { localisedLabel } from "@/lib/locale";
 import { getAccessToken, isEdgeSession } from "@/auth/oidc";
-import type { StoreContext } from "@/shell/storeBridge";
 
 /** The usher's tiles, in the shape the desktop renders. */
 function kernelConsoleApps(data: ClusterTilesResponse | undefined): ShellApp[] {
@@ -33,98 +31,6 @@ function kernelConsoleApps(data: ClusterTilesResponse | undefined): ShellApp[] {
   }));
 }
 
-/** Whether the store is offered here, as far as the usher has said. */
-type StoreOffer =
-  | { state: "pending" }
-  | { state: "offered" }
-  | { state: "withheld"; why: string };
-
-const LICENCE_REPORT_DISABLED = "licence-report-disabled";
-
-/**
- * What the usher said about the App Store, beside the tiles.
- *
- * Only an explicit yes offers the store. An answer without the field -- an
- * usher that predates it -- and a tiles request that failed are both "the
- * desktop was not told", and are said as that rather than taken for a yes.
- */
-function storeOffer(
-  data: ClusterTilesResponse | undefined,
-  failed: boolean,
-  t: (key: string, options?: Record<string, unknown>) => string,
-): StoreOffer {
-  if (!data) {
-    return failed ? { state: "withheld", why: t("store.unavailable.unknown") } : { state: "pending" };
-  }
-  const answer = data.appStore;
-  if (!answer || typeof answer.available !== "boolean") {
-    return { state: "withheld", why: t("store.unavailable.unknown") };
-  }
-  if (answer.available) return { state: "offered" };
-  if (answer.reason === LICENCE_REPORT_DISABLED) {
-    return { state: "withheld", why: t("store.unavailable.licenceReport") };
-  }
-  return { state: "withheld", why: t("store.unavailable.other", { reason: answer.reason ?? "" }) };
-}
-
-/**
- * The App Store, for whoever may install.
- *
- * Not a component of the tenant's and not a profile: the store runs outside
- * the cluster (AD-3), so there is nothing here to install. The tile exists
- * when the Cluster claim names a store, and is shown to whoever holds
- * can_install_app on this tenant -- both of which the director answered, so
- * this decides nothing about who is an administrator.
- *
- * The address carries the tenant and the cluster so the page can say whose
- * store it is before the bridge has answered. They are labels: what the store
- * may do here is decided by the bridge, from the origin, not from a URL.
- */
-function storeApp(
-  context: StoreContext | undefined,
-  title: string,
-  offer: StoreOffer,
-): ShellApp[] {
-  if (!context?.storeUrl || !context.storeOrigin) return [];
-  if (!context.relations?.can_install_app) return [];
-  // Nothing to show until the usher has been asked: a tile that opened the
-  // store first and was withdrawn a moment later would have loaded the frame.
-  if (offer.state === "pending") return [];
-  if (offer.state === "withheld") {
-    // The entry stays, so that whoever expects the store is told why it is
-    // not there, and carries no address: there is nothing to load.
-    return [
-      {
-        id: "app-store",
-        title,
-        icon: "store",
-        launchUrl: null,
-        linkTarget: "embedded",
-        authMode: null,
-        preopen: false,
-        builtin: false,
-        unavailable: offer.why,
-      },
-    ];
-  }
-  const url = new URL(context.storeUrl);
-  url.searchParams.set("embedded", "1");
-  url.searchParams.set("tenant", context.tenant);
-  if (context.cluster) url.searchParams.set("cluster", context.cluster);
-  return [
-    {
-      id: "app-store",
-      title,
-      icon: "store",
-      launchUrl: url.toString(),
-      linkTarget: "embedded",
-      authMode: null,
-      preopen: false,
-      builtin: false,
-    },
-  ];
-}
-
 // No built-in administration console any more.
 //
 // It used to be a tile this file invented for anybody who looked like an
@@ -138,7 +44,6 @@ function shellAppsFromMe(me: MeResponse | undefined): ShellApp[] {
 }
 
 export function useShellApps() {
-  const { t } = useTranslation();
   const { isAuthenticated, isLoading: authLoading, authDisabled } = useAuth();
   const sessionReady = authDisabled || (!authLoading && isAuthenticated);
   const hasToken = authDisabled || isEdgeSession() || Boolean(getAccessToken());
@@ -178,37 +83,14 @@ export function useShellApps() {
     retry: false,
   });
 
-  // Which store this cluster listens to, and whether this person may install.
-  // The same answer the bridge pins its origin from, so the tile and the
-  // bridge cannot disagree about which store it is.
-  const { data: storeContext } = useQuery({
-    queryKey: ["store-context"],
-    queryFn: () => apiFetch<StoreContext>("/store/context"),
-    enabled: sessionReady && hasToken,
-    staleTime: 5 * 60_000,
-    retry: false,
-  });
-  const storeTitle = t("store.title");
-  const offer = storeOffer(clusterTiles, tilesFailed, t);
-  const offerState = offer.state;
-  const offerWhy = offer.state === "withheld" ? offer.why : "";
-
   const apps = useMemo(() => {
-    const list = [
-      ...storeApp(
-        storeContext,
-        storeTitle,
-        offerState === "withheld" ? { state: offerState, why: offerWhy } : { state: offerState },
-      ),
-      ...shellAppsFromMe(me),
-      ...kernelConsoleApps(clusterTiles),
-    ];
-    
+    const list = [...shellAppsFromMe(me), ...kernelConsoleApps(clusterTiles)];
+
     // The administration tiles first, in the order a platform administrator
     // works through them: the console that configures, the one that looks
     // after, then the three kernel consoles -- what the cluster runs, what git
-    // says it should, and who may sign in. The store and subscriptions follow,
-    // then every app.
+    // says it should, and who may sign in. Subscriptions follow, then every
+    // app.
     const ADMIN_ORDER = [
       "kernel-platform/admin-console/web",
       "kernel-platform/operations-console/web",
@@ -221,14 +103,13 @@ export function useShellApps() {
       const generic = id.replace(/^kernel-[^/]+\/(admin-console|operations-console)\//, "kernel-platform/$1/");
       const pinned = ADMIN_ORDER.indexOf(generic);
       if (pinned !== -1) return pinned;
-      if (id === "app-store" || id.startsWith("app-store-")) return ADMIN_ORDER.length;
       if (
         id === "subscriptions" ||
         id.startsWith("subscriptions-") ||
         id === "gentian-subscriptions" ||
         id.startsWith("gentian-subscriptions-")
       ) {
-        return ADMIN_ORDER.length + 1;
+        return ADMIN_ORDER.length;
       }
       return -1;
     };
@@ -239,7 +120,7 @@ export function useShellApps() {
     adminApps.sort((a, b) => getSortIndex(a.id) - getSortIndex(b.id));
 
     return [...adminApps, ...userApps];
-  }, [me, clusterTiles, storeContext, storeTitle, offerState, offerWhy]);
+  }, [me, clusterTiles]);
 
   const isAdminUser = Boolean(me?.isPlatformAdmin || me?.isTenantAdmin);
   // An administrator whose only tile is the administration console. Named by
@@ -253,9 +134,6 @@ export function useShellApps() {
     apps,
     isAdminUser,
     adminOnly,
-    // Whether the usher said the App Store is offered on this cluster. The
-    // bridge listens only then: a store that is not offered is not answered.
-    storeOffered: offerState === "offered",
     // The session request or the tiles request failed. Distinct from "this user has no apps": both
     // leave `apps` empty, and rendering them the same way turns any backend or
     // edge fault into a silent, plausible-looking empty desktop.

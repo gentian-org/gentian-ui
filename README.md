@@ -8,8 +8,8 @@ a ComponentProfile the gentian-os chart ships.
 
 | App | What it is | Images and chart |
 |-----|------------|------------------|
-| [`apps/desktop`](apps/desktop/README.md) | The desktop: sign-in, launcher, window host — what every person sees | `gentian-portal-{api,web}`, chart `gentian-portal` (`.github/workflows/desktop.yaml`) |
-| [`apps/admin-console`](apps/admin-console/README.md) | The administration console, a client of the director, shown as a tile to administrators | `admin-console-{api,web}`, chart `admin-console` (`.github/workflows/admin-console.yaml`) |
+| [`apps/desktop`](apps/desktop/README.md) | The desktop: sign-in, launcher, window host — what every person sees. A relay for tiles: it administers nothing | `gentian-portal-{api,web}`, chart `gentian-portal` (`.github/workflows/desktop.yaml`) |
+| [`apps/admin-console`](apps/admin-console/README.md) | The administration console, a client of the director, shown as a tile to administrators. Where apps are administered (the Apps tab) | `admin-console-{api,web}`, chart `admin-console` (`.github/workflows/admin-console.yaml`) |
 | [`apps/concierge`](apps/concierge/README.md) | The concierge, on `id.<kernel>/sign-in/`: an e-mail address in, its workspace's console out. Not a component; gentian-os runs it beside the identity provider | `concierge-web`, no chart (`.github/workflows/concierge.yaml`) |
 
 Charts go to `oci://ghcr.io/gentian-org/charts` from `develop`, as

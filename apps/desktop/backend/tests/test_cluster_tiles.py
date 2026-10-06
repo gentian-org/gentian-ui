@@ -76,40 +76,6 @@ def test_the_callers_token_reaches_the_usher_for_this_desktops_tenant(monkeypatc
     assert r.json()["tiles"] == []
 
 
-@pytest.mark.parametrize(
-    "app_store",
-    [{"available": True}, {"available": False, "reason": "licence-report-disabled"}],
-)
-def test_what_the_usher_says_about_the_app_store_comes_through(monkeypatch, app_store):
-    """Whether the App Store is offered here rides beside the tiles. The
-    desktop's frontend withholds the store on it, so it must arrive as said."""
-    answer = {"tenant": "acme", "tiles": [], "appStore": app_store}
-
-    def respond(url, headers):
-        return httpx.Response(200, json=answer, request=httpx.Request("GET", url))
-
-    _fake(monkeypatch, respond)
-    client = TestClient(_app(_settings()))
-    r = client.get("/api/v1/cluster/tiles", headers={"Authorization": "Bearer t"})
-    assert r.status_code == 200
-    assert r.json() == answer
-
-
-def test_an_answer_without_the_app_store_is_not_given_one(monkeypatch):
-    """An usher that predates the field says nothing about the store, and the
-    relay does not say it for it: the frontend reads the absence as not told."""
-
-    def respond(url, headers):
-        return httpx.Response(
-            200, json={"tenant": "acme", "tiles": []}, request=httpx.Request("GET", url)
-        )
-
-    _fake(monkeypatch, respond)
-    client = TestClient(_app(_settings()))
-    r = client.get("/api/v1/cluster/tiles", headers={"Authorization": "Bearer t"})
-    assert "appStore" not in r.json()
-
-
 @pytest.mark.parametrize("status", [403, 503])
 def test_the_ushers_refusal_comes_back_as_it_is(monkeypatch, status):
     """A refusal or a failure is not turned into an empty desktop."""

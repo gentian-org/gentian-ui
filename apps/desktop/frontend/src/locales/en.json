@@ -78,52 +78,5 @@
   "language": {
     "en": "English",
     "de": "Deutsch"
-  },
-  "store": {
-    "asked": "Asked by the App Store at {{origin}}.",
-    "decline": "Cancel",
-    "working": "Working…",
-    "install": {
-      "title": "Install this app?",
-      "text": "{{subject}} will be installed for {{tenant}}.",
-      "confirm": "Install"
-    },
-    "installEveryone": {
-      "title": "Install this app for everyone?",
-      "text": "{{subject}} will be installed for {{tenant}}, and every member of {{tenant}} gets access to it. People invited later get it pre-selected.",
-      "confirm": "Install for everyone"
-    },
-    "installPerPerson": {
-      "title": "Install this app with access per person?",
-      "text": "Access to this app is given per person, under Members. If it was installed for everyone before, that default is removed: people who already have access keep it, and people invited later no longer get it automatically.",
-      "confirm": "Install"
-    },
-    "uninstall": {
-      "title": "Remove this app?",
-      "text": "{{subject}} will be removed from {{tenant}}. Its data is kept until it is purged.",
-      "confirm": "Remove"
-    },
-    "addons": {
-      "title": "Change the add-ons?",
-      "text": "The add-ons of {{subject}} in {{tenant}} will be changed.",
-      "confirm": "Change"
-    },
-    "title": "App Store",
-    "unavailable": {
-      "licenceReport": "The App Store needs licence reporting, which is turned off on this cluster.",
-      "other": "The App Store is not offered on this cluster ({{reason}}).",
-      "unknown": "The desktop could not find out whether the App Store is offered on this cluster, so it is not opened. This is a fault of the cluster, not a change to your access.",
-      "close": "Close"
-    },
-    "purge": {
-      "title": "Purge this app's data?",
-      "text": "Everything {{subject}} stored for {{tenant}} is deleted for good: databases, files and secrets. This cannot be undone.",
-      "confirm": "Purge"
-    },
-    "provision": {
-      "title": "Grant this app to everyone?",
-      "text": "Everybody who is a member of {{tenant}} now gets {{subject}}, and so does whoever joins later.",
-      "confirm": "Grant"
-    }
   }
 }

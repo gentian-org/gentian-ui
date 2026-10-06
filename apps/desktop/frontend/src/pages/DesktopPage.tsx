@@ -1,9 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { useShellApps } from "@/shell/useShellApps";
-import { StoreBridge } from "@/shell/StoreBridge";
-import { UnavailableNotice } from "@/shell/UnavailableNotice";
 import { useShellBackgroundUrl } from "@/shell/useShellBackground";
 import { useAppsStore } from "@/stores/apps";
 import { useWindowsStore } from "@/stores/windows";
@@ -24,8 +22,7 @@ function snapToGrid(x: number, y: number) {
 }
 
 export function DesktopPage() {
-  const { me, apps, loadFailed, reload, isAdminUser, storeOffered } = useShellApps();
-  const [unavailable, setUnavailable] = useState<{ title: string; text: string } | null>(null);
+  const { me, apps, loadFailed, reload } = useShellApps();
   const backgroundUrl = useShellBackgroundUrl();
 
   const activeAppId = useAppsStore((s) => s.activeAppId);
@@ -98,11 +95,6 @@ export function DesktopPage() {
     app: (typeof apps)[number],
     options?: { forceLogin?: boolean; forceNewWindow?: boolean },
   ) {
-    // A tile that cannot be opened says why and opens nothing.
-    if (app.unavailable) {
-      setUnavailable({ title: app.title, text: app.unavailable });
-      return;
-    }
     // Check if there is already an open window for this app, unless Ctrl+Click forces new tab
     if (!options?.forceNewWindow) {
       const existingWindow = windows.find((w) => w.appId === app.id);
@@ -291,8 +283,6 @@ export function DesktopPage() {
 
 
       <WindowManager />
-      <StoreBridge enabled={isAdminUser && storeOffered} />
-      <UnavailableNotice notice={unavailable} onClose={() => setUnavailable(null)} />
       <AppMenu
         apps={apps}
         loadFailed={loadFailed}

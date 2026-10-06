@@ -36,17 +36,15 @@ class Settings(BaseSettings):
     def capability_set(self) -> set[str]:
         return {c.strip() for c in self.capabilities.split(",") if c.strip()}
 
-    # The director, on the cluster network. It answers what only it can:
-    # which kernel consoles this person may open, decided from the cluster
-    # relations rather than from whether they are an administrator.
+    # The director, on the cluster network. Asked one thing: what the caller
+    # holds on this desktop's tenant (`/v1/tenants/{t}/me`), with the caller's
+    # own token.
     director_url: str | None = Field(default=None, alias="DIRECTOR_URL")
     # The usher, on the cluster network: the read-only service that answers
     # which tiles this person may open on this tenant's desktop. It holds no
     # authority; the tenant's own people are answered there, where the
     # director answers only those who hold a relation on the cluster.
     usher_url: str | None = Field(default=None, alias="USHER_URL")
-    # Which cluster this console belongs to, as the director names it.
-    cluster_id: str | None = Field(default=None, alias="GENTIAN_CLUSTER_ID")
 
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
     portal_shell_secrets_namespace: str = Field(
@@ -63,11 +61,6 @@ class Settings(BaseSettings):
     openfga_store_id: str | None = Field(default=None, alias="OPENFGA_STORE_ID")
     openfga_api_token: str | None = Field(default=None, alias="OPENFGA_API_TOKEN")
     openfga_authzen_enabled: bool = Field(default=False, alias="OPENFGA_AUTHZEN_ENABLED")
-
-    # The gentian-os Custodian, in-cluster. The console proxies to it
-    # rather than the browser calling it: it serves no CORS headers, and routing
-    # through the backend keeps the service off the public network.
-    custodian_url: str | None = Field(default=None, alias="CUSTODIAN_URL")
 
     # Keycloak's in-cluster base URL, NOT an administrator credential.
     #
