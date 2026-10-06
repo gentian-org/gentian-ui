@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { fetchAdminContext } from "@/api/admin";
+import { AppsSection } from "@/admin/AppsSection";
 import { AuditSection } from "@/admin/AuditSection";
 import { ExportSection } from "@/admin/ExportSection";
 import { OperationsPromo } from "@/admin/OperationsPromo";
@@ -25,6 +26,7 @@ type AdminTab =
   | "tenants"
   | "members"
   | "groups"
+  | "apps"
   | "resources"
   | "export"
   | "security"
@@ -53,13 +55,29 @@ type AdminTab =
  * none. Inviting somebody happens on Members, with the settings template the
  * desktop applies before they first sign in.
  */
-const TABS: { id: AdminTab; labelKey: string; platformOnly?: boolean }[] = [
+
+/**
+ * Whether the Catalogues tab is shown. It is not, for now.
+ *
+ * The cluster renders no catalogue of its own: apps are installed from the
+ * App Store, and where no store is available by command
+ * (`kubectl gentian apps install`). The screen, its routes and its tests are
+ * kept as they are, and with them the Install action that lives in it; this
+ * switch only takes the tab out of the strip. Set it to true to show it again.
+ */
+const SHOW_CATALOGUES = false;
+
+const TABS: { id: AdminTab; labelKey: string; platformOnly?: boolean; hidden?: boolean }[] = [
   // First, and platform-only, because bringing a customer on is what an MSP
   // employee opens this console to do. A tenant administrator sees their own
   // tenant's screens and has no business listing the others.
   { id: "tenants", labelKey: "tabTenants", platformOnly: true },
   { id: "members", labelKey: "tabMembers" },
   { id: "groups", labelKey: "tabGroups" },
+  // What the tenant has installed, and everything done to an app after it is
+  // installed: who may open it, what it exchanges with other apps, what it
+  // asked of the platform, taking it away. Nothing is installed from here.
+  { id: "apps", labelKey: "tabApps" },
   { id: "resources", labelKey: "tabResources" },
   { id: "export", labelKey: "tabExport" },
   { id: "security", labelKey: "tabSecurity" },
@@ -67,8 +85,8 @@ const TABS: { id: AdminTab; labelKey: string; platformOnly?: boolean }[] = [
   // Near the end on purpose. Apps come from the App Store; this tab is the
   // plain fallback for when the store is not the answer, and putting it where
   // a shop would go would make it look like a rival to the one that is
-  // maintained.
-  { id: "catalogue", labelKey: "tabCatalogues" },
+  // maintained. Hidden at present: see SHOW_CATALOGUES.
+  { id: "catalogue", labelKey: "tabCatalogues", hidden: !SHOW_CATALOGUES },
   { id: "credentials", labelKey: "tabCredentials" },
   { id: "notifications", labelKey: "tabNotifications" },
   { id: "audit", labelKey: "tabAudit" },
@@ -140,7 +158,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
         </header>
 
         <nav className="admin-console__tabs" aria-label={t("adminConsole.adminSections")}>
-          {TABS.filter((entry) => !entry.platformOnly || isPlatformAdmin).map((entry) => (
+          {TABS.filter((entry) => !entry.hidden && (!entry.platformOnly || isPlatformAdmin)).map((entry) => (
             <button
               key={entry.id}
               type="button"
@@ -162,6 +180,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <MembersSection tenant={tenant} />
           ) : tab === "groups" ? (
             <GroupsSection tenant={tenant} />
+          ) : tab === "apps" ? (
+            <AppsSection tenant={tenant} onOpenIntegrations={() => setTab("integrations")} />
           ) : tab === "security" ? (
             <SecurityPoliciesSection tenant={tenant} />
           ) : tab === "integrations" ? (

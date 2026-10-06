@@ -90,9 +90,9 @@ async def app_states(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """What the cluster holds of this tenant's components, from the operator
-    through the usher: whether each is Ready and why not. The console reads
-    it for one thing today -- whether the Operations Console is installed, so
-    the Export tab can link to it or promote it."""
+    through the usher: whether each is Ready and why not. The Apps screen
+    joins it with what git declares (routes/apps.py), and the Export tab reads
+    it to learn whether the Operations Console is installed."""
     return await director.read(
         settings, f"/v1/tenants/{settings.tenant_id}/apps/status", bearer_of(credentials)
     )

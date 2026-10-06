@@ -122,7 +122,7 @@ def test_without_a_tenant_the_component_asks_about_its_own(monkeypatch):
     assert seen["url"].endswith("/v1/tenants/platform/catalogues")
 
 
-# -- installing, uninstalling, granting ------------------------------------
+# -- installing, for one person or for everyone -----------------------------
 #
 # The person's token and nothing else decides these, so each test pins that
 # the token arrives upstream, which path it arrives on, and that the body is
@@ -202,28 +202,6 @@ def test_a_missing_digest_is_the_directors_to_refuse(monkeypatch):
     assert seen["json"] == {"coordinate": "in-house/timesheets"}
 
 
-def test_an_uninstall_goes_to_the_director_as_the_person(monkeypatch):
-    seen: dict = {}
-    _fake_client(monkeypatch, {"status": "uninstalled", "commit": "b2c3d4e5"}, seen, status=202)
-    client = TestClient(_app(_settings()))
-    answer = client.delete("/api/v1/catalogue/apps/timesheets", headers=_person)
-    assert answer.status_code == 202
-    assert answer.json() == {"status": "uninstalled", "commit": "b2c3d4e5"}
-    assert seen["method"] == "DELETE"
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/apps/timesheets"
-    assert seen["json"] is None
-    assert seen["auth"] == "Bearer person-token"
-
-
-def test_an_uninstall_refused_comes_back_as_the_director_gave_it(monkeypatch):
-    seen: dict = {}
-    _fake_client(monkeypatch, {"error": "forbidden"}, seen, status=403)
-    client = TestClient(_app(_settings()))
-    answer = client.delete("/api/v1/catalogue/apps/timesheets", headers=_person)
-    assert answer.status_code == 403
-    assert answer.json() == {"error": "forbidden"}
-
-
 def test_an_install_for_everyone_says_so_to_the_director(monkeypatch):
     seen: dict = {}
     body = {"status": "installed", "commit": "0123abcd"}
@@ -268,7 +246,7 @@ def test_an_install_for_everyone_refused_names_the_right_it_lacks(monkeypatch):
     assert answer.json() == body
 
 
-def test_none_of_them_is_relayed_without_a_token(monkeypatch):
+def test_an_install_is_not_relayed_without_a_token(monkeypatch):
     # Authentication is off in this suite (conftest), and the relay still
     # refuses: there is no token to decide by, so nothing reaches the
     # director at all.
@@ -276,5 +254,4 @@ def test_none_of_them_is_relayed_without_a_token(monkeypatch):
     _fake_client(monkeypatch, {"status": "installed"}, seen, status=202)
     client = TestClient(_app(_settings()))
     assert client.post("/api/v1/catalogue/apps/timesheets", json={}).status_code == 401
-    assert client.delete("/api/v1/catalogue/apps/timesheets").status_code == 401
     assert seen == {}

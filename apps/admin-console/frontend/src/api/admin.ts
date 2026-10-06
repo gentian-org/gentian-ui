@@ -1162,7 +1162,10 @@ export type AppState = {
   phase: string;
   message?: string;
   failure?: string;
+  /** Requests of the app's profile nobody has granted yet, as `<kind>/<name>`. */
   pendingPrivileges?: string[];
+  /** The component's own conditions, as the operator reports them. */
+  conditions?: { type: string; status: string; reason?: string; message?: string }[];
 };
 
 export function fetchAppStates() {

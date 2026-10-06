@@ -1,3 +1,4 @@
+import type { AppWriteResult } from "@/api/apps";
 import { apiFetch } from "@/api/client";
 
 /**
@@ -55,15 +56,6 @@ export function fetchCatalogueEntries(source: string, tenant?: string) {
   );
 }
 
-/**
- * The director's answer to an install or an uninstall. Both are commits:
- * `commit` is there when git changed and absent when the tenant already was
- * as asked (`already_installed`, `not_installed`).
- */
-export type AppWriteResult = {
-  status: string;
-  commit?: string;
-};
 
 /**
  * Install one listed entry into the console's tenant: the entry's own
@@ -86,11 +78,5 @@ export function installCatalogueEntry(
   return apiFetch<AppWriteResult>(`/catalogue/apps/${encodeURIComponent(entry.name)}`, {
     method: "POST",
     body: JSON.stringify(body),
-  });
-}
-
-export function uninstallApp(profile: string) {
-  return apiFetch<AppWriteResult>(`/catalogue/apps/${encodeURIComponent(profile)}`, {
-    method: "DELETE",
   });
 }

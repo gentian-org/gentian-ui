@@ -4,13 +4,10 @@ import { useTranslation } from "react-i18next";
 import {
   createCustomGroup,
   deleteCustomGroup,
-  fetchGroupMembers,
-  fetchPeople,
   fetchPersonGroups,
   renameCustomGroup,
-  setMembership,
 } from "@/api/admin";
-import { Checklist } from "./Checklist";
+import { GroupMembers } from "./GroupMembers";
 import { GROUP_KINDS, describeGroups, type DescribedGroup } from "./groupLabels";
 import "./admin.css";
 
@@ -190,24 +187,8 @@ function GroupEditor({
   onChanged: (renamedTo?: string | null) => void;
 }) {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
   const [label, setLabel] = useState(group.label);
 
-  const people = useQuery({ queryKey: ["admin", "people", ""], queryFn: () => fetchPeople() });
-  const members = useQuery({
-    queryKey: ["admin", "people", "group-members", group.path],
-    queryFn: () => fetchGroupMembers(group.path),
-  });
-  const memberIds = new Set((members.data?.people ?? []).map((p) => p.id));
-
-  const membership = useMutation({
-    mutationFn: (v: { person: string; member: boolean }) =>
-      setMembership({ person: v.person, group: group.path, member: v.member }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["admin", "people", "group-members", group.path] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "people", "detail"] });
-    },
-  });
   const rename = useMutation({
     mutationFn: () => renameCustomGroup(group.path, label.trim()),
     onSuccess: (renamed) => onChanged(renamed.path),
@@ -216,7 +197,7 @@ function GroupEditor({
     mutationFn: () => deleteCustomGroup(group.path),
     onSuccess: () => onChanged(null),
   });
-  const failure = [membership, rename, remove].find((m) => m.isError)?.error;
+  const failure = [rename, remove].find((m) => m.isError)?.error;
 
   return (
     <div className="admin-console__editor">
@@ -236,21 +217,7 @@ function GroupEditor({
 
       <div className="admin-console__field">
         <span>{t("groups.whoIsIn")}</span>
-        {people.isLoading || members.isLoading ? (
-          <p className="admin-console__hint">{t("groups.readingMembers")}</p>
-        ) : (
-          <Checklist
-            id={`g-members-${group.id}`}
-            items={(people.data?.people ?? []).map((p) => ({
-              key: p.id,
-              label: p.name || p.username,
-              detail: p.name ? p.username : undefined,
-            }))}
-            selected={memberIds}
-            disabled={membership.isPending}
-            onToggle={(person, member) => membership.mutate({ person, member })}
-          />
-        )}
+        <GroupMembers group={group} />
       </div>
 
       {failure && <p className="admin-console__error">{String(failure)}</p>}

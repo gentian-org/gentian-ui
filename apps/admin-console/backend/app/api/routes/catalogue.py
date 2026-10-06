@@ -13,11 +13,14 @@ private (pe) editions of the sources named on the Cluster claim and counts
 the rest as the store's (AD-14). None of that is decided here.
 
 An entry the listing calls installable can be installed from here -- for
-everyone, if the person says so -- and an installed app uninstalled. Those
-are relays too, for the tenant this console runs in: the person's own token
-goes to the director, which asks whether they may (can_install_app, and
-can_grant for an install for everyone), and its status and body come back as
-they are.
+everyone, if the person says so. That is a relay too, for the tenant this
+console runs in: the person's own token goes to the director, which asks
+whether they may (can_install_app, and can_grant for an install for
+everyone), and its status and body come back as they are. Taking an app out
+again is the Apps screen's (routes/apps.py).
+
+The screen is not shown at present (SHOW_CATALOGUES in the console's tab
+registry): the cluster renders no catalogue of its own. The routes stay.
 """
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -111,20 +114,4 @@ async def install(
         f"/v1/tenants/{settings.tenant_id}/apps/{profile}",
         bearer_of(credentials),
         json_body=body.model_dump(exclude_none=True),
-    )
-
-
-@router.delete("/apps/{profile}")
-async def uninstall(
-    profile: str,
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    """Take one app out of this console's tenant. A commit, like the install."""
-    return await director.forward(
-        settings,
-        "DELETE",
-        f"/v1/tenants/{settings.tenant_id}/apps/{profile}",
-        bearer_of(credentials),
     )

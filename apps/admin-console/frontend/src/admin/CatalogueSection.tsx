@@ -1,12 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { fetchAppStates } from "@/api/admin";
+import { uninstallApp, type AppWriteResult } from "@/api/apps";
 import {
   fetchCatalogueEntries,
   fetchCatalogueSources,
   installCatalogueEntry,
-  uninstallApp,
-  type AppWriteResult,
   type CatalogueEntry,
 } from "@/api/catalogue";
 import "./admin.css";

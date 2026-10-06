@@ -57,11 +57,18 @@ async def forward(
     *,
     params: dict[str, str] | None = None,
     json_body: object | None = None,
+    timeout: httpx.Timeout | None = None,
 ) -> Response:
-    """Pass one request to the director as the caller and hand back its answer verbatim."""
+    """Pass one request to the director as the caller and hand back its answer verbatim.
+
+    `timeout` is for the few requests the director itself waits on -- a purge
+    waits for the app's teardown -- where the ordinary one would give up
+    before the answer and report a service that is merely still working as
+    unreachable.
+    """
     url = f"{base_url(settings)}{path}"
     try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=timeout or _TIMEOUT) as client:
             upstream = await client.request(
                 method,
                 url,

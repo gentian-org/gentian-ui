@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from app.api.routes import (
     admin,
+    apps,
     audit,
     backups,
     catalogue,
@@ -47,6 +48,7 @@ app.include_router(backups.router, prefix=settings.api_v1_str)
 app.include_router(security.router, prefix=settings.api_v1_str)
 app.include_router(platform.router, prefix=settings.api_v1_str)
 app.include_router(catalogue.router, prefix=settings.api_v1_str)
+app.include_router(apps.router, prefix=settings.api_v1_str)
 app.include_router(people.router, prefix=settings.api_v1_str)
 app.include_router(notifications.router, prefix=settings.api_v1_str)
 app.include_router(admin.router, prefix=settings.api_v1_str)
