@@ -82,13 +82,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       // Response body is not JSON.
     }
     if (response.status === 401 && isUpstreamAuth(path)) {
-      // The detail carries which check failed — audience, claims, role or mount
-      // — because the API classifies the refusal now. This message used to guess,
-      // and told operators to check a group membership that was correct through
-      // three separate causes, none of which was the group.
+      // A 401 from the custodian is its verdict on the token itself: it could
+      // not be verified. What a person may see or set is the authorization
+      // store's answer and arrives as an empty list or a 403, not as this.
       throw new ApiError(
-        `Not authorised by the custodian${detail}. Your portal session is fine — ` +
-          `OpenBao refused the token; the custodian's log has OpenBao's own words.`,
+        `The custodian could not verify your session${detail}. Sign out and in again; ` +
+          `if it persists, the custodian's log says why.`,
       );
     }
     if (response.status === 401 && (token || isEdgeSession())) {
