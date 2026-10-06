@@ -1,4 +1,4 @@
-import { kernelDomainOf, routeAddress, withLoginHint, workspaceConsole } from "./route.js";
+import { kernelDomainOf, routeAddress, singleConsole, withLoginHint, workspaceConsole } from "./route.js";
 
 const kernelDomain = kernelDomainOf(window.location.hostname);
 const $ = (id) => document.getElementById(id);
@@ -44,21 +44,36 @@ async function applyConfig() {
   await forwardWhenSingle();
 }
 
-// A cluster with one tenant has one console, and nobody needs asking which.
-// The operator says so with one file in the lookup directory; where it is
-// absent this is a cluster of many workspaces and the form stays.
+// The operator's file from the lookup directory, or null. Same-origin only:
+// a lookup path that leads off this origin, or a redirect that does, fails.
+async function lookupFile(name) {
+  const res = await fetch(`${lookup}${name}`, { cache: "no-store", mode: "same-origin" });
+  if (!res.ok) return null;
+  const body = await res.json();
+  return body !== null && typeof body === "object" && !Array.isArray(body) ? body : null;
+}
+
+// A cluster with one user tenant has one console for its users, and nobody
+// needs asking which. The operator says so with one file in the lookup
+// directory; where it is absent this is a cluster of many workspaces and the
+// form stays. The administrators' console is never where this leads: they
+// sign in at console.<kernel> by name.
+//
+// Only ever a console of this cluster: console.<tenant>.<kernel>, or a custom
+// domain the operator published -- one whose own lookup file exists and names
+// that same console. Nothing here comes from the address bar or the form.
 async function forwardWhenSingle() {
   if (!lookup) return;
   try {
-    const res = await fetch(`${lookup}_single.json`, { cache: "no-store" });
-    if (!res.ok) return;
-    const { url } = await res.json();
-    if (typeof url !== "string") return;
-    const target = new URL(url);
-    // Only ever a console of this cluster.
-    if (target.protocol === "https:" && target.hostname === `console.${kernelDomain}`) {
-      window.location.replace(target.href);
+    const single = await lookupFile("_single.json");
+    const target = single && singleConsole(single.url, kernelDomain);
+    if (!target) return;
+    if (target.kind === "custom") {
+      const published = await lookupFile(`${await sha256Hex(target.domain)}.json`);
+      const named = published && singleConsole(published.url, kernelDomain);
+      if (!named || named.url !== target.url) return;
     }
+    window.location.replace(target.url);
   } catch {
     // The form stays.
   }

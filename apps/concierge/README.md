@@ -28,9 +28,20 @@ host.
 |---|---|
 | `lookup` | A same-origin directory the page asks about addresses it cannot place: `GET <lookup><sha256-hex of the domain>.json` answering `{"url": "https://..."}`, or 404. gentian-os sets `/sign-in/lookup/` and the operator fills it with the tenants' custom domains; hashing the name means a domain is found only by someone who already knows it. |
 
-On a cluster with one tenant the operator puts `_single.json` in the lookup
-directory, naming that tenant's console, and the page sends everybody there
-without asking.
+On a cluster with one user tenant the operator puts `_single.json` in the
+lookup directory, naming that tenant's console, and the page sends everybody
+there without asking. The page forwards only to a console of this cluster,
+written exactly as `https://console.<domain>/`:
+
+- `https://console.<tenant>.<kernel>/`, one label under the kernel domain; or
+- `https://console.<custom domain>/`, when the lookup directory also holds
+  that domain's own file (`<sha256-hex of the domain>.json`) naming the same
+  console, which is how the page knows the operator published the domain.
+
+Anything else in the file, and the form is shown as on any other cluster. The
+forward never leads to `https://console.<kernel>/`: that console is the
+administrators', not a user tenant's, and while the forward is on they sign
+in there by name, by opening `https://console.<kernel>/` themselves.
 
 ## The cluster's brand
 

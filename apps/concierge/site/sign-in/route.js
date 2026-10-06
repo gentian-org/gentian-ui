@@ -9,6 +9,7 @@
 // address.
 
 const LABEL = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+const DOMAIN = /^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 const ADDRESS = /^[^\s@]+@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/;
 
 /** The kernel domain this page is served on: the cluster's bare domain. */
@@ -54,6 +55,46 @@ export function routeAddress(input, kernelDomain) {
 export function workspaceConsole(name, kernelDomain) {
   const tenant = String(name || "").trim().toLowerCase();
   return LABEL.test(tenant) ? consoleOf(`${tenant}.${kernelDomain}`) : "";
+}
+
+/**
+ * The console the operator's _single.json names, or null when what it names
+ * is not something this page may send a browser to.
+ *
+ * The file is the operator's, but the page still decides for itself: only
+ * ever a user tenant's console of this cluster, written exactly as
+ * https://console.<domain>/ -- no credentials, no port, no path, query or
+ * fragment -- and never the kernel's own console, which is the
+ * administrators'.
+ *   {kind: "tenant", url, domain}   console.<tenant>.<kernel>: one label
+ *   {kind: "custom", url, domain}   console.<domain>: a custom domain, which
+ *                                   the caller must still find published in
+ *                                   the lookup directory before it forwards
+ * `url` is rebuilt from the host name, not copied from the input.
+ */
+export function singleConsole(input, kernelDomain) {
+  if (typeof input !== "string" || !kernelDomain) return null;
+  let target;
+  try {
+    target = new URL(input);
+  } catch {
+    return null;
+  }
+  if (target.protocol !== "https:") return null;
+  if (target.username || target.password || target.port) return null;
+  if (target.pathname !== "/" || target.search || target.hash) return null;
+  const prefix = "console.";
+  const host = target.hostname;
+  const url = `https://${host}/`;
+  // Also refuses an empty "?" or "#", which leave search and hash empty.
+  if (target.href !== url || !host.startsWith(prefix)) return null;
+  const domain = host.slice(prefix.length);
+  if (!DOMAIN.test(domain) || domain === kernelDomain) return null;
+  const suffix = "." + kernelDomain;
+  if (domain.endsWith(suffix) && LABEL.test(domain.slice(0, -suffix.length))) {
+    return { kind: "tenant", url, domain };
+  }
+  return { kind: "custom", url, domain };
 }
 
 /**
