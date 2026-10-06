@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 /** Who can read a backup — the one control shared by every form that makes one.
  *
  * Three answers, because there are three, and the earlier two-way version made

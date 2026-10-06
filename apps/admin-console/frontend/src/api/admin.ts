@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 import { apiFetch } from "@/api/client";
 import { getAccessToken } from "@/auth/oidc";
 

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 /** Saving a backup key, in the two forms that survive different disasters.
  *
  * A minted key is shown once and stored nowhere, so the moment it appears is

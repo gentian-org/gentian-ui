@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # The name every object derives from. Left empty it is <release>-<chart>; a
 # ComponentProfile pins it in extraValues so that the Services it routes to
 # have a name known before the release exists.

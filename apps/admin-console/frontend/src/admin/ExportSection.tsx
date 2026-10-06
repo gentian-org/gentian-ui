@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 /**
  * One export, now, to the cluster's own storage, encrypted to a key the
  * tenant chooses -- the sovereign half of backup (sovereignty-concept.md §3).

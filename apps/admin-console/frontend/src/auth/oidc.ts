@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: Apache-2.0 */
 /**
  * How this bundle knows who the person is.
  *

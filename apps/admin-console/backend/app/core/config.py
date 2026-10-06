@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 from functools import lru_cache
 
 from pydantic import Field, model_validator

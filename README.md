@@ -34,3 +34,11 @@ A brand and extensions are configuration and new files, not changes.
 
 The design system (`apps/*/frontend/design-system/`) is Apache-2.0, with its
 own `LICENSE`, so that any app may carry the same look.
+
+So is the **console kit**: the parts of the Admin Console another console is
+built from — its styles and shell, the director client, sign-in, translation
+loading, the export and backup-key screens, the backend's relay to the
+director, and the chart's two Deployments. Each of those files says so on its
+first line (`SPDX-License-Identifier: Apache-2.0`); the text is
+[LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt). A file without that line
+is MPL-2.0.

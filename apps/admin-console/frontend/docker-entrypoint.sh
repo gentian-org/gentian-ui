@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
 # Assemble the served document root at container start, injecting the runtime
 # configuration that must not be baked into the image.
 #
