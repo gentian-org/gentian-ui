@@ -14,6 +14,7 @@ from app.api.routes import (
 )
 from app.core.config import get_settings
 from app.core.logging_middleware import RedactingAccessLogMiddleware
+from app.core.origin_check import OriginCheckMiddleware
 from app.db.engine import init_portal_database
 
 settings = get_settings()
@@ -32,6 +33,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Added first, so it sits innermost: a refused request is still logged, and
+# the desktop's CORS answers are still written around it.
+app.add_middleware(
+    OriginCheckMiddleware,
+    trusted_origins=settings.csrf_trusted_origin_list,
+    https_only=settings.edge_session,
+)
 app.add_middleware(RedactingAccessLogMiddleware)
 app.add_middleware(
     CORSMiddleware,

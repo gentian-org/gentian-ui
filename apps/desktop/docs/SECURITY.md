@@ -14,6 +14,7 @@ to this repo and notes kernel-specific deployment differences.
 | M7 log redaction | `backend/app/core/logging_middleware.py` |
 | M8 health probes | `backend/app/api/routes/health.py` |
 | M9 CORS | `backend/app/core/config.py`, `chart/values.yaml` |
+| Origin check on POST/PUT/PATCH/DELETE (forged cross-site requests) | `backend/app/core/origin_check.py` — the rule and what it leaves open are in its docstring; `CSRF_TRUSTED_ORIGINS` allow-lists further origins, empty by default |
 | M11–M13 pod hardening | `chart/templates/_helpers.tpl` |
 | M16–M17 Gateway API | `chart/templates/httproute.yaml` |
 | M22 / S1 OpenFGA PEP | `backend/app/core/authz.py`, `openfga_client.py` |

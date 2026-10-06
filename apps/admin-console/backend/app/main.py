@@ -27,6 +27,7 @@ from app.api.routes import (
 )
 from app.core.config import get_settings
 from app.core.logging_middleware import RedactingAccessLogMiddleware
+from app.core.origin_check import OriginCheckMiddleware
 from app.extensions import loader
 
 settings = get_settings()
@@ -35,6 +36,13 @@ app = FastAPI(title=settings.project_name, openapi_url=f"{settings.api_v1_str}/o
 
 extension_registry = loader.discover(settings.app_id)
 
+# Added first, so it sits innermost: a refused request is still logged, and
+# the desktop's CORS answers are still written around it.
+app.add_middleware(
+    OriginCheckMiddleware,
+    trusted_origins=settings.csrf_trusted_origin_list,
+    https_only=settings.is_edge,
+)
 app.add_middleware(RedactingAccessLogMiddleware)
 
 app.include_router(health.router)

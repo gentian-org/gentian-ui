@@ -130,6 +130,7 @@ Until then, M1–M4 + M26 are the minimum authorization bar.
 | Log redaction (M7) | `backend/app/core/logging_middleware.py` |
 | Health probes (M8) | `backend/app/api/routes/health.py` |
 | CORS (M9) | `backend/app/core/config.py`, `chart/values.yaml` |
+| Origin check on POST/PUT/PATCH/DELETE (forged cross-site requests) | `backend/app/core/origin_check.py` — the rule and what it leaves open are in its docstring; `CSRF_TRUSTED_ORIGINS` allow-lists further origins, empty by default |
 | OpenFGA PEP stub (M22, S1) | `backend/app/core/authz.py`, `backend/app/core/openfga_client.py` |
 | Tenant DB scoping (M26) | `backend/app/db/session.py` |
 | Resource limits (M27) | `chart/values.yaml`, `chart/values-production.yaml.example` |

@@ -22,6 +22,9 @@ services:
       TENANT_ID: demo
       TENANT_NAMESPACE: tenant-demo
       BACKEND_CORS_ORIGINS: http://localhost:5173
+      # The Vite proxy rewrites Host to the API's, so the page's origin is
+      # named here for the origin check (backend/app/core/origin_check.py).
+      CSRF_TRUSTED_ORIGINS: http://localhost:5173
     ports:
       - "8000:8000"
     depends_on:

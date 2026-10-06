@@ -159,6 +159,18 @@ class Settings(BaseSettings):
     def oidc_expected_client_id(self) -> str | None:
         return self.oidc_audience or self.oidc_client_id
 
+    # Origins, besides this API's own, whose pages may send it state-changing
+    # requests (app/core/origin_check.py). Comma-separated, scheme://host[:port].
+    # Empty by default: behind the edge the bundle and the API share one
+    # origin and nothing else has any business here. Local development with
+    # the Vite proxy names http://localhost:5173, because the proxy rewrites
+    # Host to the API's own.
+    csrf_trusted_origins: str = Field(default="", alias="CSRF_TRUSTED_ORIGINS")
+
+    @property
+    def csrf_trusted_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.csrf_trusted_origins.split(",") if o.strip()]
+
     @property
     def cors_origin_list(self) -> list[str]:
         if self.cors_origins.strip() == "*":
