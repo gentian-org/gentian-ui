@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Relay to the gentian-os director, as the caller.
 
 Why a relay rather than calling the director from the browser

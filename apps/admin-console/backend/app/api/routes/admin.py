@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The console's own context, and an honest answer for every screen that is
 not yet a client of the director.
 

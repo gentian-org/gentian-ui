@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Who the caller is.
 
 The bearer on a request is verified here and nowhere else. Under edge it is

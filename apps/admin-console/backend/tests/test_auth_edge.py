@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Verifying the bearer the edge forwards.
 
 Under edge the platform's Gateway puts the zone's token on the request. That

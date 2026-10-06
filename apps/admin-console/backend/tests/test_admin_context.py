@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """The console's context comes from the director, not from the token.
 
 Which screens exist for a person is decided from two answers of the director:
