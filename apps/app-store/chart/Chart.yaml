@@ -1,0 +1,6 @@
+apiVersion: v2
+name: app-store
+description: The App Store app of Gentian OS, a component of the platform that renders a store's data and installs through the director and the custodian
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
