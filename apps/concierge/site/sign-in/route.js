@@ -1,15 +1,20 @@
 // Where an address signs in.
 //
 // The address says which workspace it belongs to: a tenant's people sign in
-// as <name>@<tenant>.<kernel>, the cluster's own as <name>@<kernel>. This
-// page reads the part after the @ and sends the browser to that workspace's
-// console, whose sign-in is the workspace's own. It asks nothing of the
-// server, so it can tell nobody whether an account exists: an address it
-// cannot place is answered by asking for the workspace's name, whatever the
-// address.
+// as <name>@<tenant>.<kernel>, the platform's administrators as
+// <name>@<kernel>. This page reads the part after the @ and sends the browser
+// to that workspace's desktop, whose sign-in is the workspace's own. It asks
+// nothing of the server, so it can tell nobody whether an account exists: an
+// address it cannot place is answered by asking for the workspace's name,
+// whatever the address.
+//
+// Every address built here is one of two and nothing else:
+// https://platform.<kernel>/, or https://console.<label>.<kernel>/ for one
+// DNS label.
 
 const LABEL = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
-const DOMAIN = /^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+// The platform tenant: its desktop is its zone's own name, not console. under it.
+const PLATFORM = "platform";
 const ADDRESS = /^[^\s@]+@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/;
 
 /** The kernel domain this page is served on: the cluster's bare domain. */
@@ -23,15 +28,18 @@ export function normaliseAddress(input) {
   return ADDRESS.test(address) ? address : "";
 }
 
-/** The console a workspace on this kernel signs in at. */
-export function consoleOf(zoneDomain) {
-  return `https://console.${zoneDomain}/`;
+/** The desktop the tenant with this name signs in at: `tenant` is one label. */
+function desktopOf(tenant, kernelDomain) {
+  return tenant === PLATFORM
+    ? `https://${PLATFORM}.${kernelDomain}/`
+    : `https://console.${tenant}.${kernelDomain}/`;
 }
 
 /**
  * Routes an address.
  *   {kind: "invalid"}                 not an address
- *   {kind: "console", url, address}   a workspace on this kernel
+ *   {kind: "console", url, address}   a workspace on this kernel: the
+ *                                     platform's for the kernel's own domain
  *   {kind: "unknown", address}        on no workspace this page can place
  */
 export function routeAddress(input, kernelDomain) {
@@ -39,62 +47,22 @@ export function routeAddress(input, kernelDomain) {
   if (!address) return { kind: "invalid" };
   const domain = address.slice(address.lastIndexOf("@") + 1);
   if (domain === kernelDomain) {
-    return { kind: "console", url: consoleOf(kernelDomain), address };
+    return { kind: "console", url: desktopOf(PLATFORM, kernelDomain), address };
   }
   const suffix = "." + kernelDomain;
   if (domain.endsWith(suffix)) {
     const tenant = domain.slice(0, -suffix.length);
     if (LABEL.test(tenant)) {
-      return { kind: "console", url: consoleOf(domain), address };
+      return { kind: "console", url: desktopOf(tenant, kernelDomain), address };
     }
   }
   return { kind: "unknown", address };
 }
 
-/** The console of a workspace named by hand, or "" when the name is not one. */
+/** The desktop of a workspace named by hand, or "" when the name is not one. */
 export function workspaceConsole(name, kernelDomain) {
   const tenant = String(name || "").trim().toLowerCase();
-  return LABEL.test(tenant) ? consoleOf(`${tenant}.${kernelDomain}`) : "";
-}
-
-/**
- * The console the operator's _single.json names, or null when what it names
- * is not something this page may send a browser to.
- *
- * The file is the operator's, but the page still decides for itself: only
- * ever a user tenant's console of this cluster, written exactly as
- * https://console.<domain>/ -- no credentials, no port, no path, query or
- * fragment -- and never the kernel's own console, which is the
- * administrators'.
- *   {kind: "tenant", url, domain}   console.<tenant>.<kernel>: one label
- *   {kind: "custom", url, domain}   console.<domain>: a custom domain, which
- *                                   the caller must still find published in
- *                                   the lookup directory before it forwards
- * `url` is rebuilt from the host name, not copied from the input.
- */
-export function singleConsole(input, kernelDomain) {
-  if (typeof input !== "string" || !kernelDomain) return null;
-  let target;
-  try {
-    target = new URL(input);
-  } catch {
-    return null;
-  }
-  if (target.protocol !== "https:") return null;
-  if (target.username || target.password || target.port) return null;
-  if (target.pathname !== "/" || target.search || target.hash) return null;
-  const prefix = "console.";
-  const host = target.hostname;
-  const url = `https://${host}/`;
-  // Also refuses an empty "?" or "#", which leave search and hash empty.
-  if (target.href !== url || !host.startsWith(prefix)) return null;
-  const domain = host.slice(prefix.length);
-  if (!DOMAIN.test(domain) || domain === kernelDomain) return null;
-  const suffix = "." + kernelDomain;
-  if (domain.endsWith(suffix) && LABEL.test(domain.slice(0, -suffix.length))) {
-    return { kind: "tenant", url, domain };
-  }
-  return { kind: "custom", url, domain };
+  return LABEL.test(tenant) ? desktopOf(tenant, kernelDomain) : "";
 }
 
 /**
