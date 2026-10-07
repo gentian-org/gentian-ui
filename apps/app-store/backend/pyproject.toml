@@ -1,0 +1,34 @@
+[project]
+name = "gentian-app-store-backend"
+version = "0.1.0"
+description = "The App Store app of Gentian OS: renders a store's data and installs through the director and the custodian"
+requires-python = ">=3.12,<4.0"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic-settings>=2.6.0",
+    "httpx>=0.28.0",
+    "pyjwt[crypto]>=2.10.0",
+]
+
+[project.optional-dependencies]
+# pyyaml and jsonschema are for the contract tests only: the fake store the
+# suite runs against is itself validated against the store API's definition.
+dev = ["pytest>=8.0.0", "ruff>=0.16,<0.17", "pyyaml>=6.0", "jsonschema>=4.23.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+# Depends(...) in a parameter default is FastAPI's own idiom for declaring a
+# dependency, and bugbear's B008 cannot tell it from a mutable default. Naming
+# the calls as immutable keeps the rule for everything else.
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Header", "fastapi.Path", "fastapi.Body"]
