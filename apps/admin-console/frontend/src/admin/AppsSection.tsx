@@ -803,7 +803,12 @@ type PurgeOutcome =
  * stays open and nothing else can be started. What comes back is shown as the
  * cluster said it, and only an answer that says it is complete is called done.
  *
- * Naming an app by hand is offered only when the list could not be read.
+ * The answer also names the kinds of data the cluster could not check, and
+ * why. Whenever it names any, the list may be missing apps, and that is said
+ * above it; an empty list is then not called empty.
+ *
+ * Naming an app by hand is offered when the list could not be read, and when
+ * it came back empty without everything having been checked.
  */
 function RetainedSection({ tenant, declared }: { tenant: string; declared?: DeclaredApp[] }) {
   const { t } = useTranslation();
@@ -854,9 +859,19 @@ function RetainedSection({ tenant, declared }: { tenant: string; declared?: Decl
 
   const apps = retainedQuery.data?.apps ?? [];
   const reasons = retainedQuery.data?.unknown ?? {};
-  // A reason is shown for a kind only where some listed app has it unknown.
-  const unknownKinds = RETAINED_KINDS.filter(
-    (kind) => reasons[kind] && apps.some((app) => app.kinds?.[kind] === "unknown"),
+  // Every kind the cluster could not check, the known ones first in the order
+  // the table shows them: an app that holds only such data is not listed.
+  const known: readonly string[] = RETAINED_KINDS;
+  const uncheckedKinds = [
+    ...known.filter((kind) => kind in reasons),
+    ...Object.keys(reasons).filter((kind) => !known.includes(kind)),
+  ];
+  const incomplete = uncheckedKinds.length > 0;
+  const byName = (
+    <details>
+      <summary className="admin-console__hint">{t("apps.purgeByName")}</summary>
+      <PurgeByName declared={declared} busy={purge.isPending} onAsk={ask} />
+    </details>
   );
 
   return (
@@ -875,38 +890,49 @@ function RetainedSection({ tenant, declared }: { tenant: string; declared?: Decl
           <p className="admin-console__error">
             {t("apps.retainedUnavailable")} {messageOf(retainedQuery.error)}
           </p>
-          <details>
-            <summary className="admin-console__hint">{t("apps.purgeByName")}</summary>
-            <PurgeByName declared={declared} busy={purge.isPending} onAsk={ask} />
-          </details>
+          {byName}
         </>
-      ) : apps.length === 0 ? (
-        <p className="admin-console__empty">{t("apps.retainedNone")}</p>
       ) : (
         <>
-          <div className="admin-console__table-wrap">
-            <table className="admin-console__table">
-              <thead>
-                <tr>
-                  <th>{t("apps.app")}</th>
-                  {RETAINED_KINDS.map((kind) => (
-                    <th key={kind}>{kindWord(t, kind)}</th>
+          {incomplete ? (
+            <div className="admin-console__warning" role="status">
+              <p>
+                <strong>{t("apps.retainedIncomplete")}</strong>
+              </p>
+              {uncheckedKinds.map((kind) => (
+                <p key={kind}>{t("apps.retainedUncheckedWhy", { kind: kindWord(t, kind), why: reasons[kind] })}</p>
+              ))}
+            </div>
+          ) : null}
+          {apps.length === 0 ? (
+            incomplete ? (
+              <>
+                <p className="admin-console__empty">{t("apps.retainedNoneChecked")}</p>
+                {byName}
+              </>
+            ) : (
+              <p className="admin-console__empty">{t("apps.retainedNone")}</p>
+            )
+          ) : (
+            <div className="admin-console__table-wrap">
+              <table className="admin-console__table">
+                <thead>
+                  <tr>
+                    <th>{t("apps.app")}</th>
+                    {RETAINED_KINDS.map((kind) => (
+                      <th key={kind}>{kindWord(t, kind)}</th>
+                    ))}
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {apps.map((app) => (
+                    <RetainedRow key={app.profile} app={app} busy={purge.isPending} onAsk={ask} />
                   ))}
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {apps.map((app) => (
-                  <RetainedRow key={app.profile} app={app} busy={purge.isPending} onAsk={ask} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {unknownKinds.map((kind) => (
-            <p key={kind} className="admin-console__hint">
-              {t("apps.retainedUnknownWhy", { kind: kindWord(t, kind), why: reasons[kind] })}
-            </p>
-          ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>
       )}
 
@@ -1095,7 +1121,7 @@ function PurgeOutcomeNotice({
 
 /**
  * Naming the app by hand, for when the list of retained apps could not be
- * read. The cluster still refuses the request for an app that is installed or
+ * read, or is empty without everything having been checked. The cluster still refuses the request for an app that is installed or
  * still being taken down.
  */
 function PurgeByName({
