@@ -4,8 +4,10 @@
 
 `gentian-ui` holds the platform's own UIs as apps in the gentian-apps layout:
 `apps/desktop/` (login hub, desktop/mobile bases, app launcher, iframe window host)
-and `apps/admin-console/` (the administration console, a director client; its own
-conventions are in `apps/admin-console/docs/AGENTS.md`). Both dogfood
+`apps/admin-console/` (the administration console, a director client; its own
+conventions are in `apps/admin-console/docs/AGENTS.md`) and `apps/app-store/` (the App
+Store app: a store's interface on the cluster; see `apps/app-store/README.md` and
+`apps/app-store/docs/SECURITY.md`). All dogfood
 [gentian-app-template](https://github.com/gentian-org/gentian-app-template) — same
 backend/frontend/chart layout and security modules. This repo is the **kernel shell**
 instance; see template `docs/AGENTS.md` for catalogue-app specifics (`profile/`, AppProfile
@@ -16,7 +18,8 @@ publish flow). See [README.md](README.md) for scope and layout.
 * CI builds each app from its own workflow on pushes to `develop`: the desktop's
   `gentian-portal-api`/`gentian-portal-web` images and chart via
   `.github/workflows/desktop.yaml`, the console's `admin-console-*` via
-  `.github/workflows/admin-console.yaml`. Cluster rollout is automatic
+  `.github/workflows/admin-console.yaml`, the App Store app's `app-store-*` via
+  `.github/workflows/app-store.yaml`. Cluster rollout is automatic
   via Argo CD Image Updater on the `gentian-portal` Application in `gentian-deployments`.
 * **Do not build/push images or deploy/patch the cluster yourself** — let CI and Argo CD
   reconcile. Deleting a stuck resource to speed up reconciliation is fine; hand-patching a
