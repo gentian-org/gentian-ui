@@ -1,0 +1,504 @@
+/* =========================================================================
+   App Store — what this app adds over the console kit (console.css).
+
+   The shell, the buttons, the dialogs, the tables and the notices are the
+   Admin Console's own classes, so the two look like one platform. What is
+   here is what a shop has and a console does not: cards of apps, an app's
+   page, a store's text, the steps of an install.
+
+   Every colour, radius, font and easing resolves to a token from
+   frontend/design-system/gentian-theme.css, as in the kit.
+   ========================================================================= */
+
+/* A link styled as a tab, where the console has buttons. */
+a.admin-console__tab,
+a.admin-console__btn {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.store-plain {
+  max-width: 44rem;
+}
+
+.store-plain .admin-console__lead {
+  margin-top: 0.75rem;
+}
+
+.store-header__session {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.store-standing {
+  margin-bottom: 1.25rem;
+}
+
+.store-notice {
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--gtn-r1);
+  border-left: 3px solid var(--gtn-iris);
+  background: var(--gtn-iris-bg);
+  color: var(--gtn-ink-2);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.store-notice__title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.store-notice__text {
+  margin: 0.25rem 0 0;
+}
+
+.store-problem__lead {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* What a store or a cluster service said, as it said it. Kept apart from
+   this app's own words, and never more than text. */
+.store-problem__said {
+  margin: 0.25rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.store-signin {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-0);
+}
+
+.store-signin .admin-console__lead {
+  margin-top: 0;
+}
+
+.store-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--gtn-border);
+  font-size: 0.8125rem;
+  color: var(--gtn-ink-4);
+}
+
+.store-admin-note {
+  margin-top: 1.5rem;
+}
+
+/* ── Browsing ────────────────────────────────────────────────────────────── */
+
+.store-filters {
+  display: grid;
+  grid-template-columns: minmax(12rem, 2fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 720px) {
+  .store-filters {
+    grid-template-columns: 1fr;
+  }
+}
+
+.store-input {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--gtn-border-strong);
+  border-radius: var(--gtn-r1);
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--gtn-ink-1);
+  background: var(--gtn-paper-3);
+}
+
+.store-input:focus-visible {
+  outline: none;
+  border-color: var(--gtn-400);
+  box-shadow: var(--gtn-focus-ring);
+}
+
+.store-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.store-card {
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-3);
+  transition: border-color var(--gtn-dur-1) var(--gtn-ease-out),
+              box-shadow var(--gtn-dur-1) var(--gtn-ease-out);
+}
+
+.store-card:hover {
+  border-color: var(--gtn-border-strong);
+  box-shadow: var(--gtn-shadow-1);
+}
+
+.store-card__link {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  gap: 0.875rem;
+  height: 100%;
+  padding: 0.875rem 1rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.store-card__link:focus-visible {
+  outline: none;
+  border-radius: var(--gtn-r2);
+  box-shadow: var(--gtn-focus-ring);
+}
+
+.store-card__icon,
+.store-app__icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--gtn-r2);
+  object-fit: contain;
+  background: var(--gtn-paper-1);
+}
+
+.store-app__icon {
+  width: 4.5rem;
+  height: 4.5rem;
+}
+
+/* No picture to show: none was named, or the one named is not on an origin
+   the store lists, or it is not a PNG, JPEG or WebP. */
+.store-picture--none {
+  display: block;
+  border: 1px dashed var(--gtn-border-strong);
+  background: var(--gtn-paper-1);
+}
+
+.store-card__main {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.store-card__name {
+  font-weight: 600;
+  color: var(--gtn-ink-1);
+}
+
+.store-card__publisher {
+  font-size: 0.75rem;
+  color: var(--gtn-ink-4);
+}
+
+.store-card__summary {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--gtn-ink-3);
+}
+
+.store-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--gtn-ink-3);
+}
+
+.store-card__price {
+  font-weight: 600;
+  color: var(--gtn-ink-2);
+}
+
+.store-card__rating {
+  color: var(--gtn-ink-4);
+}
+
+.store-chip--after {
+  margin-left: 0.4rem;
+}
+
+/* ── An app's page ───────────────────────────────────────────────────────── */
+
+.store-app__head {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: 1.25rem;
+  margin: 0.75rem 0 1.5rem;
+}
+
+.store-app__edition {
+  margin-right: 0.6rem;
+}
+
+.store-app__columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .store-app__columns {
+    grid-template-columns: 1fr;
+  }
+
+  .store-app__side {
+    order: -1;
+  }
+}
+
+.store-app__side {
+  display: grid;
+  gap: 1rem;
+}
+
+.store-install {
+  padding: 1rem;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-0);
+}
+
+.store-install .admin-console__lead {
+  margin-top: 0;
+}
+
+.store-install__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.store-links {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+}
+
+.store-shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.store-shot__image {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  object-fit: contain;
+  background: var(--gtn-paper-1);
+}
+
+.store-versions {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.store-version {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-3);
+}
+
+.store-version__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.store-version__head .admin-console__meta {
+  margin: 0;
+}
+
+.store-version__number {
+  font-family: var(--gtn-font-mono);
+  font-weight: 600;
+}
+
+.store-version__digest {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--gtn-ink-4);
+}
+
+.store-review__text {
+  white-space: pre-wrap;
+}
+
+.store-dialog__notes {
+  max-height: 14rem;
+  margin-top: 0.75rem;
+  overflow: auto;
+}
+
+.store-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+/* ── A store's Markdown ──────────────────────────────────────────────────── */
+
+/* The subset and nothing else: paragraphs, emphasis, code, two levels of
+   list, two levels of heading, links. There is no rule here for an element
+   the renderer cannot produce. */
+.store-markdown {
+  max-width: 72ch;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--gtn-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.store-markdown p {
+  margin: 0 0 0.75rem;
+}
+
+.store-markdown h3 {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--gtn-ink-1);
+}
+
+.store-markdown h4 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--gtn-ink-1);
+}
+
+.store-markdown ul,
+.store-markdown ol {
+  margin: 0 0 0.75rem;
+  padding-left: 1.5rem;
+}
+
+.store-markdown ul {
+  list-style: disc;
+}
+
+.store-markdown ol {
+  list-style: decimal;
+}
+
+.store-markdown li > p {
+  margin-bottom: 0.25rem;
+}
+
+.store-markdown pre {
+  margin: 0 0 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-paper-1);
+  overflow-x: auto;
+  font-family: var(--gtn-font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.store-markdown pre code {
+  padding: 0;
+  background: none;
+}
+
+.store-markdown a {
+  color: var(--gtn-600);
+  text-decoration: underline;
+}
+
+.store-markdown a:focus-visible {
+  outline: none;
+  border-radius: var(--gtn-r1);
+  box-shadow: var(--gtn-focus-ring);
+}
+
+/* ── The steps of an install ─────────────────────────────────────────────── */
+
+.store-progress .admin-console__lead {
+  margin-top: 0.75rem;
+}
+
+.store-steps {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  font-size: 0.8125rem;
+  color: var(--gtn-ink-4);
+}
+
+.store-steps__step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  counter-increment: step;
+}
+
+.store-steps__step::before {
+  content: counter(step);
+  display: inline-grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 1px solid var(--gtn-border-strong);
+  border-radius: var(--gtn-r-pill);
+  font-family: var(--gtn-font-mono);
+  font-size: 0.6875rem;
+}
+
+.store-steps__step--done {
+  color: var(--gtn-moss);
+}
+
+.store-steps__step--done::before {
+  content: "✓";
+  border-color: var(--gtn-moss);
+  background: var(--gtn-moss-bg);
+}
+
+.store-steps__step--current {
+  color: var(--gtn-ink-1);
+  font-weight: 600;
+}
+
+.store-steps__step--current::before {
+  border-color: var(--gtn-500);
+  background: var(--gtn-50);
+  color: var(--gtn-600);
+}
