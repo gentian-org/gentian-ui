@@ -1484,6 +1484,27 @@
   box-shadow: var(--gtn-shadow-2);
 }
 
+/* A panel that shows one thing whole -- an app's Details -- rather than
+   asking one question. Wide enough for the tables inside it. */
+.admin-console__dialog--wide {
+  width: min(64rem, calc(100vw - 2rem));
+}
+
+.admin-console__dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* Sections stacked in a panel are set apart by a rule, not by the margin a
+   section has on a page: the panel's own gap already spaces them. */
+.admin-console__dialog-body > .admin-console__subsection {
+  margin-top: 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--gtn-border);
+}
+
 .admin-console__dialog::backdrop {
   background: rgb(0 0 0 / 0.45);
 }

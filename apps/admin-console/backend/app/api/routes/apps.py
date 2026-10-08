@@ -88,6 +88,66 @@ async def retained(
     )
 
 
+@router.get("/{profile}/residue")
+async def residue(
+    profile: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What newer builds of one app left behind on the cluster: the pieces its
+    bundle, or an add-on's, brought once and brings no longer.
+
+    The cluster's answer, through the usher, for an app this console's tenant
+    has; it is not found for any other. The answer says who may remove the
+    pieces (`removableBy`), and the screen follows it: this module decides
+    nothing about that.
+    """
+    return await director.read(
+        settings,
+        f"/v1/tenants/{settings.tenant_id}/apps/{_name(profile)}/residue",
+        bearer_of(credentials),
+    )
+
+
+class ResidueRemoval(BaseModel):
+    """One piece, named. `confirm` is the name typed again; without it the
+    director answers 428 and says what to type, and that answer is passed on
+    like any other."""
+
+    kind: str
+    name: str
+    namespace: str | None = None
+    confirm: str | None = None
+
+
+@router.post("/{profile}/residue/remove")
+async def remove_residue(
+    profile: str,
+    body: ResidueRemoval,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Delete one piece a newer build of an app left on the cluster. An
+    action, not a commit, and not undone.
+
+    The director's action for this console's tenant and this app. It refuses
+    on a cluster that carries more than one user tenant (403: the pieces are
+    every tenant's), and the cluster deletes only a piece that is on its list
+    for this app at that moment (409 with the reason otherwise). Every answer
+    arrives as it is; only what was given travels, so an absent namespace or
+    confirmation stays absent.
+    """
+    return await director.forward(
+        settings,
+        "POST",
+        f"/v1/tenants/{settings.tenant_id}/apps/{_name(profile)}/actions/remove-residue",
+        bearer_of(credentials),
+        json_body=body.model_dump(exclude_none=True),
+    )
+
+
 class AccessBody(BaseModel):
     """Whether the app is for everyone. Required: a request that did not say
     which way is not one to guess at."""

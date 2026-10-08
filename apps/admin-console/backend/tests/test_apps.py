@@ -410,3 +410,209 @@ def test_the_whole_app_reaches_these_routes_before_the_catch_all(monkeypatch):
         assert (seen["method"], seen["url"]) == ("DELETE", f"{_base}/apps/timesheets")
     finally:
         whole.dependency_overrides.pop(get_settings, None)
+
+
+# -- what newer builds left behind -------------------------------------------
+
+_residue = {
+    "tenant": "platform",
+    "profile": "timesheets",
+    "profiles": ["timesheets", "timesheets-export"],
+    "residue": [
+        {
+            "kind": "OIDCPackCatalog",
+            "name": "timesheets-old-oidc",
+            "profile": "timesheets",
+            "class": "dropped",
+            "reason": "it carries the label gentianos.io/profile-name: timesheets, and the "
+            "bundle now materialised for timesheets does not bring it",
+            "created": "2026-08-14T09:00:00Z",
+            "removable": True,
+            "oidc": {"effective": "contested", "clients": [], "contested": ["timesheets"]},
+        }
+    ],
+    "removableBy": "platform",
+    "incomplete": [],
+    "oidcRule": "A client is configured from the first OIDCPackCatalog that holds it.",
+}
+
+
+def test_an_apps_leftovers_are_the_ushers_answer_untouched(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, _residue, seen)
+    answer = TestClient(_app(_usher_settings())).get(
+        "/api/v1/admin/apps/timesheets/residue", headers=_person
+    )
+    assert answer.status_code == 200
+    # Untouched: who may remove them is the server's word, not this relay's.
+    assert answer.json() == _residue
+    assert (seen["method"], seen["url"]) == (
+        "GET",
+        "http://usher.test:8080/v1/tenants/platform/apps/timesheets/residue",
+    )
+    assert seen["json"] is None
+    assert seen["auth"] == "Bearer person-token"
+
+
+@pytest.mark.parametrize(
+    ("status", "body"),
+    [
+        (403, {"error": "forbidden"}),
+        (404, {"detail": "not installed in this tenant: timesheets in platform"}),
+        (502, {"error": "the operator's API did not answer"}),
+    ],
+)
+def test_the_leftovers_read_refused_comes_back_as_it_was(monkeypatch, status, body):
+    seen: dict = {}
+    _fake_client(monkeypatch, body, seen, status=status)
+    answer = TestClient(_app(_usher_settings())).get(
+        "/api/v1/admin/apps/timesheets/residue", headers=_person
+    )
+    assert answer.status_code == status
+    assert answer.json() == body
+
+
+def test_the_leftovers_read_needs_the_usher(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, _residue, seen)
+    # No usher configured: said so, and the director is not asked instead.
+    answer = _client().get("/api/v1/admin/apps/timesheets/residue", headers=_person)
+    assert answer.status_code == 503
+    assert seen == {}
+
+
+def test_removing_a_leftover_is_the_directors_action_for_this_app(monkeypatch):
+    seen: dict = {}
+    body = {
+        "status": "deleted",
+        "deleted": {"kind": "ConfigMap", "name": "timesheets.old-page", "class": "dropped"},
+        "message": "the ConfigMap timesheets.old-page was deleted, asked for by uma@example.com",
+    }
+    _fake_client(monkeypatch, body, seen, status=202)
+    answer = _client().post(
+        "/api/v1/admin/apps/timesheets/residue/remove",
+        json={"kind": "ConfigMap", "name": "timesheets.old-page", "confirm": "timesheets.old-page"},
+        headers=_person,
+    )
+    assert answer.status_code == 202
+    assert answer.json() == body
+    # The tenant's action, for this console's tenant and this app -- never
+    # the cluster's removal, which lists and removes far more.
+    assert (seen["method"], seen["url"]) == (
+        "POST",
+        f"{_base}/apps/timesheets/actions/remove-residue",
+    )
+    # Only what was given: no namespace was, so none travels.
+    assert seen["json"] == {
+        "kind": "ConfigMap",
+        "name": "timesheets.old-page",
+        "confirm": "timesheets.old-page",
+    }
+    assert seen["auth"] == "Bearer person-token"
+    assert seen["timeout"].read == 15.0
+
+
+def test_a_removal_carries_the_namespace_and_no_confirmation_it_was_not_given(monkeypatch):
+    seen: dict = {}
+    needs = {
+        "error": "removing the ConfigMap timesheets.old-page deletes it from the cluster",
+        "confirmField": "confirm",
+        "confirmWith": "timesheets.old-page",
+        "dangerous": True,
+        "requiresRetype": True,
+    }
+    _fake_client(monkeypatch, needs, seen, status=428)
+    answer = _client().post(
+        "/api/v1/admin/apps/timesheets/residue/remove",
+        json={"kind": "ConfigMap", "name": "timesheets.old-page", "namespace": "kernel-provisioning"},
+        headers=_person,
+    )
+    # The director asks for the name again; this relay never supplies it.
+    assert answer.status_code == 428
+    assert answer.json() == needs
+    assert seen["json"] == {
+        "kind": "ConfigMap",
+        "name": "timesheets.old-page",
+        "namespace": "kernel-provisioning",
+    }
+
+
+@pytest.mark.parametrize(
+    ("status", "body"),
+    [
+        (202, {"status": "deleting", "deleted": {"kind": "Customization", "name": "t.old"}}),
+        (
+            403,
+            {
+                "error": "These pieces are shared by every tenant that uses this app. "
+                "Ask the platform admin to remove them.",
+                "reason": "shared",
+                "removableBy": "platform",
+            },
+        ),
+        (403, {"error": "forbidden"}),
+        (404, {"error": "not installed in this tenant: timesheets in platform"}),
+        (409, {"error": "Argo CD finds it declared. Nothing was deleted", "reason": "still-declared"}),
+        (409, {"error": "not something a newer build left behind", "reason": "not-residue"}),
+        (502, {"error": "the operator's API did not answer"}),
+    ],
+)
+def test_a_removals_answer_comes_back_as_the_director_gave_it(monkeypatch, status, body):
+    seen: dict = {}
+    _fake_client(monkeypatch, body, seen, status=status)
+    answer = _client().post(
+        "/api/v1/admin/apps/timesheets/residue/remove",
+        json={"kind": "ConfigMap", "name": "timesheets.old-page", "confirm": "timesheets.old-page"},
+        headers=_person,
+    )
+    assert answer.status_code == status
+    assert answer.json() == body
+
+
+def test_a_removal_that_names_no_piece_or_no_app_reaches_nobody(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "deleted"}, seen, status=202)
+    client = _client()
+    for body in ({}, {"kind": "ConfigMap"}, {"name": "timesheets.old-page"}):
+        answer = client.post(
+            "/api/v1/admin/apps/timesheets/residue/remove", json=body, headers=_person
+        )
+        assert answer.status_code == 422
+    # A name that would address another route of the director.
+    for profile in ("..", "Time Sheets", "a_b"):
+        answer = client.post(
+            f"/api/v1/admin/apps/{profile}/residue/remove",
+            json={"kind": "ConfigMap", "name": "x", "confirm": "x"},
+            headers=_person,
+        )
+        assert answer.status_code in (400, 404)
+        answer = TestClient(_app(_usher_settings())).get(
+            f"/api/v1/admin/apps/{profile}/residue", headers=_person
+        )
+        assert answer.status_code in (400, 404)
+    assert seen == {}
+
+
+def test_a_removal_from_another_origin_is_refused_before_anything_is_asked(monkeypatch):
+    """The real application: the origin check stands in front of this POST as
+    it does in front of every state-changing request."""
+    from app.main import app
+
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "deleted"}, seen, status=202)
+    app.dependency_overrides[get_settings] = _settings
+    try:
+        client = TestClient(app)
+        removal = {"kind": "ConfigMap", "name": "timesheets.old-page", "confirm": "timesheets.old-page"}
+        path = "/api/v1/admin/apps/timesheets/residue/remove"
+        refused = client.post(
+            path, json=removal, headers={**_person, "Origin": "https://evil.example.com"}
+        )
+        assert refused.status_code == 403
+        assert refused.json()["reason"] == "origin_mismatch"
+        assert seen == {}
+        own = client.post(path, json=removal, headers={**_person, "Origin": "http://testserver"})
+        assert own.status_code == 202
+        assert seen["url"] == f"{_base}/apps/timesheets/actions/remove-residue"
+    finally:
+        app.dependency_overrides.pop(get_settings, None)

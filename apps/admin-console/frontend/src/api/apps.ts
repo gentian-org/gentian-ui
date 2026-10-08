@@ -15,6 +15,8 @@ export type DeclaredApp = {
   /** The build the install is pinned to, when it was installed at one. */
   digest?: string;
   addons?: string[];
+  /** The build each pinned add-on was installed at; an add-on with no entry is not pinned. */
+  addonPins?: { name: string; digest: string; catalogue?: string }[];
   /** Installed for everyone: every member has access by default. */
   defaultGrant?: boolean;
   /**
@@ -128,4 +130,80 @@ export type PrivilegeGrant = {
 
 export function fetchTenantPrivileges() {
   return apiFetch<{ tenant: string; privileges: PrivilegeGrant[] }>("/admin/apps/privileges");
+}
+
+/** Whether a leftover sign-in configuration is still read. */
+export type ResidueOIDC = {
+  /** `yes`, `contested` or `no`. */
+  effective: string;
+  /** The client ids only this piece holds a configuration for. */
+  clients?: string[];
+  /** The client ids another piece holds a configuration for too. */
+  contested?: string[];
+  /** The installed app whose sign-in reads this piece by its label. */
+  composition?: string;
+};
+
+/** One piece a newer build left on the cluster, as the cluster lists it. */
+export type ResidueItem = {
+  kind: string;
+  name: string;
+  namespace?: string;
+  /** The app or add-on the piece names. */
+  profile?: string;
+  /** `dropped` or `orphaned`. */
+  class: string;
+  /** Why it is listed, in the cluster's words. */
+  reason: string;
+  /** When the piece was created; when it stopped being used is recorded nowhere. */
+  created?: string;
+  /** Whether the removal would take this piece at all, and why not. */
+  removable: boolean;
+  notRemovable?: string;
+  /** Only on a sign-in configuration piece. */
+  oidc?: ResidueOIDC;
+};
+
+/** What newer builds of one app, and of its active add-ons, left behind. */
+export type AppResidue = {
+  tenant: string;
+  profile: string;
+  profiles: string[];
+  residue: ResidueItem[];
+  /**
+   * Who may delete a piece: `tenant` where this tenant is the cluster's only
+   * one, `platform` everywhere else. The server's word; nothing here works
+   * it out.
+   */
+  removableBy: string;
+  /** What the cluster could not establish, and so what the list may be missing. */
+  incomplete?: string[];
+};
+
+export function fetchAppResidue(profile: string) {
+  return apiFetch<AppResidue>(`/admin/apps/${encodeURIComponent(profile)}/residue`);
+}
+
+/**
+ * The cluster's answer to a removal it did not refuse. `deleted` means the
+ * piece is gone; `deleting` means the cluster took the deletion and still
+ * holds the piece. Nothing else is success.
+ */
+export type ResidueRemoval = {
+  status: string;
+  message?: string;
+};
+
+/**
+ * Delete one leftover piece from the cluster. Not undone. `profile` is the
+ * app or add-on the piece names; `confirm` is its name typed again.
+ */
+export function removeAppResidue(
+  profile: string,
+  piece: { kind: string; name: string; namespace?: string; confirm: string },
+) {
+  return apiFetch<ResidueRemoval>(`/admin/apps/${encodeURIComponent(profile)}/residue/remove`, {
+    method: "POST",
+    body: JSON.stringify(piece),
+  });
 }

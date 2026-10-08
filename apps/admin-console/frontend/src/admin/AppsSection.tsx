@@ -22,6 +22,7 @@ import {
   type RetainedApp,
 } from "@/api/apps";
 import { ApiError } from "@/api/client";
+import { AppLeftovers } from "./AppLeftovers";
 import { GroupMembers } from "./GroupMembers";
 import { describeGroups } from "./groupLabels";
 import "./admin.css";
@@ -64,6 +65,10 @@ type Outcome = { kind: "access" | "uninstall"; app: string; everyone?: boolean; 
  * there: who may open one, what it exchanges with other apps, what it asked
  * of the platform, and taking it away again.
  *
+ * The list says which apps there are and how each stands. Everything about
+ * one app is in its Details, a panel that opens on top of the list: there is
+ * one place for it, and the list stays a list.
+ *
  * Every action goes to the service that owns it with the person's own token,
  * and what that service answers is shown as it said it, a refusal included.
  * This screen decides nothing about who may do what.
@@ -77,6 +82,9 @@ export function AppsSection({
   onOpenIntegrations: () => void;
 }) {
   const { t } = useTranslation();
+  // The app whose Details are open, by name: the row is looked up again on
+  // every render, so the panel shows the app as it is now and closes by
+  // itself when the app is gone from both answers.
   const [open, setOpen] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
 
@@ -109,6 +117,7 @@ export function AppsSection({
   // "not on the cluster" may only be said when the cluster was heard.
   const declaredKnown = declaredQuery.isSuccess;
   const statesKnown = statesQuery.isSuccess;
+  const opened = rows.find((row) => row.profile === open);
 
   return (
     <section>
@@ -143,30 +152,57 @@ export function AppsSection({
             <thead>
               <tr>
                 <th>{t("apps.app")}</th>
-                <th>{t("apps.build")}</th>
                 <th>{t("apps.state")}</th>
-                <th>{t("apps.forEveryone")}</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <AppListRow
-                  key={row.profile}
-                  row={row}
-                  tenant={tenant}
-                  declaredKnown={declaredKnown}
-                  statesKnown={statesKnown}
-                  open={open === row.profile}
-                  onToggle={() => setOpen(open === row.profile ? null : row.profile)}
-                  onOutcome={setOutcome}
-                  onOpenIntegrations={onOpenIntegrations}
-                />
+                <tr key={row.profile}>
+                  <td className="admin-console__mono">{row.profile}</td>
+                  <td>
+                    <Standing row={row} declaredKnown={declaredKnown} statesKnown={statesKnown} />
+                  </td>
+                  <td>
+                    <button
+                      className="admin-console__btn admin-console__btn--quiet"
+                      type="button"
+                      aria-haspopup="dialog"
+                      onClick={() => setOpen(row.profile)}
+                    >
+                      {t("apps.details")}
+                    </button>
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {opened ? (
+        <AppDetails
+          // A different app is a different panel: nothing typed or answered
+          // for one carries over to the next.
+          key={opened.profile}
+          row={opened}
+          tenant={tenant}
+          declaredKnown={declaredKnown}
+          statesKnown={statesKnown}
+          outcome={outcome?.app === opened.profile ? outcome : null}
+          onOutcome={(next) => {
+            setOutcome(next);
+            // An uninstall is answered on the list: the app is on its way
+            // out, and what the answer says next is below the list.
+            if (next.kind === "uninstall") setOpen(null);
+          }}
+          onOpenIntegrations={() => {
+            setOpen(null);
+            onOpenIntegrations();
+          }}
+          onClose={() => setOpen(null)}
+        />
+      ) : null}
 
       <RetainedSection tenant={tenant} declared={declaredQuery.data?.apps} />
     </section>
@@ -213,89 +249,98 @@ function Standing({
   return <span className="admin-console__badge admin-console__mono">{row.state.phase}</span>;
 }
 
-function AppListRow({
+/**
+ * One app's Details: a panel on top of the Apps list, with everything this
+ * console knows about the app and everything it can do to it.
+ *
+ * From the top: how the app stands, who has it, what it exchanges with other
+ * apps, what it asked of the platform, taking it away, and -- last -- what
+ * earlier builds of it left on the cluster.
+ *
+ * A native modal dialog, like the console's others: it holds focus, the page
+ * behind it is inert, Escape closes it, and so do the two Close buttons.
+ */
+function AppDetails({
   row,
   tenant,
   declaredKnown,
   statesKnown,
-  open,
-  onToggle,
+  outcome,
   onOutcome,
   onOpenIntegrations,
+  onClose,
 }: {
   row: AppRow;
   tenant: string;
   declaredKnown: boolean;
   statesKnown: boolean;
-  open: boolean;
-  onToggle: () => void;
+  /** What the director answered to the last write on this app, if any. */
+  outcome: Outcome | null;
   onOutcome: (outcome: Outcome) => void;
   onOpenIntegrations: () => void;
+  onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const ref = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => dialog?.close();
+  }, []);
+
   return (
-    <>
-      <tr className={open ? "admin-console__row--editing" : undefined}>
-        <td className="admin-console__mono">{row.profile}</td>
-        <td>
-          {row.declared?.digest ? (
-            <span className="admin-console__mono">{shortDigest(row.declared.digest)}</span>
-          ) : (
-            "—"
-          )}
-        </td>
-        <td>
-          <Standing row={row} declaredKnown={declaredKnown} statesKnown={statesKnown} />
-        </td>
-        <td>{row.declared ? (row.declared.defaultGrant ? t("apps.yes") : t("apps.no")) : "—"}</td>
-        <td>
-          <button className="admin-console__btn admin-console__btn--quiet" type="button" onClick={onToggle}>
-            {open ? t("apps.close") : t("apps.open")}
+    <dialog
+      ref={ref}
+      className="admin-console__dialog admin-console__dialog--wide"
+      aria-labelledby="app-details-title"
+      onCancel={(e) => {
+        // A dialog opened from inside this one answers its own Escape.
+        if (e.target !== e.currentTarget) return;
+        e.preventDefault();
+        onClose();
+      }}
+    >
+      <div className="admin-console__dialog-body">
+        <div className="admin-console__dialog-head">
+          <h3 id="app-details-title" className="admin-console__dialog-title">
+            <Trans i18nKey="apps.detailsTitle" values={{ app: row.profile }} components={mono} />
+          </h3>
+          <button type="button" className="admin-console__btn admin-console__btn--quiet" onClick={onClose}>
+            {t("apps.close")}
           </button>
-        </td>
-      </tr>
-      {open && (
-        <tr>
-          <td colSpan={5}>
-            <AppDetail
-              row={row}
-              tenant={tenant}
-              declaredKnown={declaredKnown}
-              statesKnown={statesKnown}
-              onOutcome={onOutcome}
-              onOpenIntegrations={onOpenIntegrations}
-            />
-          </td>
-        </tr>
-      )}
-    </>
+        </div>
+        {outcome ? <OutcomeNotice outcome={outcome} /> : null}
+        <StatePart row={row} declaredKnown={declaredKnown} statesKnown={statesKnown} />
+        <AccessPart row={row} tenant={tenant} onOutcome={onOutcome} />
+        <IntegrationsPart row={row} tenant={tenant} onOpenIntegrations={onOpenIntegrations} />
+        <PrivilegesPart row={row} />
+        <UninstallPart row={row} tenant={tenant} declaredKnown={declaredKnown} onOutcome={onOutcome} />
+        <AppLeftovers app={row.profile} />
+        <div className="admin-console__dialog-footer">
+          <button type="button" className="admin-console__btn" onClick={onClose}>
+            {t("apps.close")}
+          </button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 
-/** One app, opened: its state, who has it, what it exchanges, what it asked for, and removing it. */
-function AppDetail({
-  row,
-  tenant,
-  declaredKnown,
-  statesKnown,
-  onOutcome,
-  onOpenIntegrations,
-}: {
-  row: AppRow;
-  tenant: string;
-  declaredKnown: boolean;
-  statesKnown: boolean;
-  onOutcome: (outcome: Outcome) => void;
-  onOpenIntegrations: () => void;
-}) {
+/** A value too long to read, with the way to take all of it. */
+function CopyValue({ value }: { value: string }) {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState(false);
   return (
-    <div className="admin-console__editor">
-      <StatePart row={row} declaredKnown={declaredKnown} statesKnown={statesKnown} />
-      <AccessPart row={row} tenant={tenant} onOutcome={onOutcome} />
-      <IntegrationsPart row={row} tenant={tenant} onOpenIntegrations={onOpenIntegrations} />
-      <PrivilegesPart row={row} />
-      <UninstallPart row={row} tenant={tenant} declaredKnown={declaredKnown} onOutcome={onOutcome} />
-    </div>
+    <button
+      type="button"
+      className="admin-console__btn admin-console__btn--quiet"
+      onClick={() => {
+        void navigator.clipboard?.writeText(value).then(() => setCopied(true));
+      }}
+    >
+      {copied ? t("apps.copied") : t("apps.copyFull")}
+    </button>
   );
 }
 
@@ -310,7 +355,9 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /**
- * State: which build git pins, and what the cluster has made of it.
+ * Status: the app at a glance -- how it stands on the cluster and why, which
+ * build git pins, where that build came from, what is switched on inside it,
+ * and whether it is for everyone.
  *
  * The cluster's own words are shown as they came -- the message, the failure,
  * every condition -- because "why is it not running" is answered there and
@@ -328,30 +375,14 @@ function StatePart({
   const { t } = useTranslation();
   const { declared, state } = row;
   const addons = declared?.addons ?? [];
+  const pins = new Map((declared?.addonPins ?? []).map((pin) => [pin.name, pin]));
   const conditions = state?.conditions ?? [];
   return (
     <div className="admin-console__subsection">
       <h3 className="admin-console__subsection-title">{t("apps.stateTitle")}</h3>
       <div className="admin-console__edit-panel">
-        <Fact label={t("apps.build")}>
-          {declared?.digest ? (
-            <span className="admin-console__mono">{declared.digest}</span>
-          ) : declared ? (
-            t("apps.notPinned")
-          ) : (
-            "—"
-          )}
-        </Fact>
-        <Fact label={t("apps.version")}>{t("apps.notAvailableYet")}</Fact>
-        <Fact label={t("apps.catalogue")}>
-          {declared?.catalogue ? (
-            <span className="admin-console__mono">{declared.catalogue}</span>
-          ) : (
-            t("apps.notAvailableYet")
-          )}
-        </Fact>
-        <Fact label={t("apps.inGit")}>
-          {declared ? t("apps.declaredYes") : declaredKnown ? t("apps.declaredNo") : t("apps.unknown")}
+        <Fact label={t("apps.app")}>
+          <span className="admin-console__mono">{row.profile}</span>
         </Fact>
         <Fact label={t("apps.onCluster")}>
           {state ? (
@@ -368,14 +399,60 @@ function StatePart({
             t("apps.unknown")
           )}
         </Fact>
+        <Fact label={t("apps.inGit")}>
+          {declared ? t("apps.declaredYes") : declaredKnown ? t("apps.declaredNo") : t("apps.unknown")}
+        </Fact>
+        <Fact label={t("apps.build")}>
+          {declared?.digest ? (
+            <>
+              <span className="admin-console__mono" title={declared.digest}>
+                {shortDigest(declared.digest)}
+              </span>{" "}
+              <CopyValue value={declared.digest} />
+            </>
+          ) : declared ? (
+            t("apps.notPinned")
+          ) : (
+            "—"
+          )}
+        </Fact>
+        <Fact label={t("apps.version")}>{t("apps.notAvailableYet")}</Fact>
+        <Fact label={t("apps.catalogue")}>
+          {declared?.catalogue ? (
+            <span className="admin-console__mono">{declared.catalogue}</span>
+          ) : (
+            t("apps.notAvailableYet")
+          )}
+        </Fact>
         <Fact label={t("apps.addons")}>
           {addons.length === 0
             ? t("apps.addonsNone")
-            : addons.map((addon) => (
-                <span key={addon} className="admin-console__chip">
-                  {addon}
-                </span>
-              ))}
+            : addons.map((addon) => {
+                const pin = pins.get(addon);
+                return (
+                  <div key={addon}>
+                    <span className="admin-console__chip">{addon}</span>{" "}
+                    {pin ? (
+                      <>
+                        <span className="admin-console__mono" title={pin.digest}>
+                          {shortDigest(pin.digest)}
+                        </span>
+                        {pin.catalogue ? (
+                          <>
+                            {" "}
+                            <Trans i18nKey="apps.addonFrom" values={{ catalogue: pin.catalogue }} components={mono} />
+                          </>
+                        ) : null}
+                      </>
+                    ) : (
+                      t("apps.notPinned")
+                    )}
+                  </div>
+                );
+              })}
+        </Fact>
+        <Fact label={t("apps.forEveryone")}>
+          {declared ? (declared.defaultGrant ? t("apps.yes") : t("apps.no")) : "—"}
         </Fact>
       </div>
       {conditions.length > 0 ? (
