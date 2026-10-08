@@ -695,7 +695,7 @@
     "lead": "Ein Export erfasst diesen Arbeitsbereich -- Datenbanken, Dateien und Volumes der Apps sowie die Mitglieder -- in einem verschlüsselten Bundle im Speicher des Clusters. Die Apps werden dabei nacheinander kurz angehalten.",
     "start": "Jetzt exportieren",
     "opsTitle": "Geplante Backups, extern aufbewahrt, mit einem Klick wiederhergestellt",
-    "opsLead": "Exportieren können Sie jederzeit selbst. Die Betriebskonsole übernimmt es für Sie -- eine App von Gentian Corp, kostenlos für Organisationen unter fünfzig Benutzern.",
+    "opsLead": "Exportieren können Sie jederzeit selbst. Die Betriebskonsole übernimmt es für Sie -- eine App von Aluvian, kostenlos für Organisationen unter fünfzig Benutzern.",
     "opsScheduled": "Backups nach Zeitplan, dedupliziert, mit Aufbewahrung nach Ihrer Wahl",
     "opsRemote": "Kopien an einem eigenen Ziel, unveränderbar gegen Ransomware",
     "opsRecovery": "Wiederherstellung und Übungen, je ein Klick",

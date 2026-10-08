@@ -8,7 +8,7 @@ import "./admin.css";
  * The Operations Console, promoted or linked.
  *
  * Export is this console's; scheduled backups, external destinations,
- * recovery on a click and drills are the Operations Console's, a Gentian Corp
+ * recovery on a click and drills are the Operations Console's, an Aluvian
  * app installed from the store and free under fifty users. When it is
  * installed this card is the way there; when it is not, it says what it would
  * give this tenant. The free path above it always works on its own.

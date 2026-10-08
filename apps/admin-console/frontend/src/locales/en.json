@@ -695,7 +695,7 @@
     "lead": "An export captures this workspace -- its apps' databases, files, volumes and its members -- into one encrypted bundle, staged in the cluster's own storage. Apps are paused one at a time while it runs.",
     "start": "Export now",
     "opsTitle": "Scheduled backups, kept off-site, restored in one click",
-    "opsLead": "Export is yours whenever you want it. The Operations Console looks after it for you -- a Gentian Corp app, free for organisations under fifty users.",
+    "opsLead": "Export is yours whenever you want it. The Operations Console looks after it for you -- an Aluvian app, free for organisations under fifty users.",
     "opsScheduled": "Backups on a schedule, deduplicated, with retention you set",
     "opsRemote": "Copies at a destination of your own, immutable against ransomware",
     "opsRecovery": "Recovery and restore drills, one click each",
