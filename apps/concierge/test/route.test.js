@@ -5,7 +5,7 @@ import {
   kernelDomainOf,
   routeAddress,
   withLoginHint,
-  workspaceConsole,
+  workspaceDesktop,
 } from "../site/sign-in/route.js";
 
 const KERNEL = "gentian-os.org";
@@ -15,17 +15,17 @@ test("the page knows the kernel from the identity provider's host", () => {
   assert.equal(kernelDomainOf("Gentian-OS.org"), KERNEL);
 });
 
-test("a tenant's address goes to that tenant's console", () => {
+test("a tenant's address goes to that tenant's desktop", () => {
   assert.deepEqual(routeAddress(" Admin@Test.Gentian-OS.org ", KERNEL), {
-    kind: "console",
-    url: "https://console.test.gentian-os.org/",
+    kind: "desktop",
+    url: "https://desktop.test.gentian-os.org/",
     address: "admin@test.gentian-os.org",
   });
 });
 
 test("an address on the kernel domain is a platform administrator's", () => {
   assert.deepEqual(routeAddress("Admin@Gentian-OS.org", KERNEL), {
-    kind: "console",
+    kind: "desktop",
     url: "https://platform.gentian-os.org/",
     address: "admin@gentian-os.org",
   });
@@ -33,18 +33,18 @@ test("an address on the kernel domain is a platform administrator's", () => {
 
 test("the platform tenant's desktop is its zone's own name", () => {
   assert.equal(routeAddress("admin@platform.gentian-os.org", KERNEL).url, "https://platform.gentian-os.org/");
-  assert.equal(workspaceConsole(" Platform ", KERNEL), "https://platform.gentian-os.org/");
+  assert.equal(workspaceDesktop(" Platform ", KERNEL), "https://platform.gentian-os.org/");
   // Only the name itself: anything else is a tenant like any other.
-  assert.equal(workspaceConsole("platform-x", KERNEL), "https://console.platform-x.gentian-os.org/");
+  assert.equal(workspaceDesktop("platform-x", KERNEL), "https://desktop.platform-x.gentian-os.org/");
 });
 
-test("nothing leads anywhere but the platform's desktop or one tenant's console", () => {
-  const allowed = /^https:\/\/(platform|console\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)\.gentian-os\.org\/$/;
+test("nothing leads anywhere but the platform's desktop or one tenant's desktop", () => {
+  const allowed = /^https:\/\/(platform|desktop\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)\.gentian-os\.org\/$/;
   for (const address of [
     "a@gentian-os.org",
     "a@platform.gentian-os.org",
     "a@acme.gentian-os.org",
-    "a@console.gentian-os.org",
+    "a@desktop.gentian-os.org",
     "a@b.c.gentian-os.org",
     "a@evil.com",
     "a@gentian-os.org.evil.com",
@@ -53,11 +53,11 @@ test("nothing leads anywhere but the platform's desktop or one tenant's console"
     "a@evil.com#.gentian-os.org",
   ]) {
     const routed = routeAddress(address, KERNEL);
-    if (routed.kind === "console") assert.match(routed.url, allowed, address);
+    if (routed.kind === "desktop") assert.match(routed.url, allowed, address);
     else assert.equal(routed.url, undefined, address);
   }
   for (const name of ["platform", "acme", "a.b", "evil.com/", "evil.com#", "@evil.com", "a/b", "a:b", "-a", ""]) {
-    const url = workspaceConsole(name, KERNEL);
+    const url = workspaceDesktop(name, KERNEL);
     if (url) assert.match(url, allowed, name);
   }
 });
@@ -75,16 +75,16 @@ test("what is not an address is refused before anything else", () => {
 });
 
 test("a workspace named by hand is a tenant on this kernel, or nothing", () => {
-  assert.equal(workspaceConsole(" Acme ", KERNEL), "https://console.acme.gentian-os.org/");
-  assert.equal(workspaceConsole("acme.evil.com", KERNEL), "");
-  assert.equal(workspaceConsole("-acme", KERNEL), "");
-  assert.equal(workspaceConsole("", KERNEL), "");
+  assert.equal(workspaceDesktop(" Acme ", KERNEL), "https://desktop.acme.gentian-os.org/");
+  assert.equal(workspaceDesktop("acme.evil.com", KERNEL), "");
+  assert.equal(workspaceDesktop("-acme", KERNEL), "");
+  assert.equal(workspaceDesktop("", KERNEL), "");
 });
 
-test("the address travels to the console as login_hint, and nowhere else", () => {
+test("the address travels to the desktop as login_hint, and nowhere else", () => {
   assert.equal(
-    withLoginHint("https://console.test.gentian-os.org/", "admin@test.gentian-os.org"),
-    "https://console.test.gentian-os.org/?login_hint=admin%40test.gentian-os.org",
+    withLoginHint("https://desktop.test.gentian-os.org/", "admin@test.gentian-os.org"),
+    "https://desktop.test.gentian-os.org/?login_hint=admin%40test.gentian-os.org",
   );
-  assert.equal(withLoginHint("https://console.test.gentian-os.org/", ""), "https://console.test.gentian-os.org/");
+  assert.equal(withLoginHint("https://desktop.test.gentian-os.org/", ""), "https://desktop.test.gentian-os.org/");
 });

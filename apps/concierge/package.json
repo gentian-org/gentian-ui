@@ -2,7 +2,7 @@
   "name": "concierge",
   "private": true,
   "type": "module",
-  "description": "Where an address signs in: routes an e-mail address to its workspace's console.",
+  "description": "Where an address signs in: routes an e-mail address to its workspace's desktop.",
   "scripts": {
     "test": "node --test test/*.test.js"
   }

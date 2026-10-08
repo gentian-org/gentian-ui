@@ -8,20 +8,20 @@ desktop of the workspace the address belongs to:
 
 | Address | Goes to |
 |---|---|
-| `<name>@<tenant>.<kernel>` | `https://console.<tenant>.<kernel>/` |
+| `<name>@<tenant>.<kernel>` | `https://desktop.<tenant>.<kernel>/` |
 | `<name>@<kernel>`, `<name>@platform.<kernel>` | `https://platform.<kernel>/`, the platform administrators' desktop |
 | a custom domain the operator published (see `lookup`) | the address its lookup file names |
-| anything else | asks for the workspace's name: `platform` is the platform's, any other `<tenant>` is `https://console.<tenant>.<kernel>/` |
+| anything else | asks for the workspace's name: `platform` is the platform's, any other `<tenant>` is `https://desktop.<tenant>.<kernel>/` |
 
 That is the whole of where this page sends a browser: to
-`https://platform.<kernel>/`, to `https://console.<label>.<kernel>/` for one
+`https://platform.<kernel>/`, to `https://desktop.<label>.<kernel>/` for one
 DNS label, or to a custom domain's address taken from the lookup file the
 operator wrote for that domain. Nothing else is ever derived from what was
 typed, and nothing is forwarded without the person's input.
 
 The page asks the server nothing, so it cannot reveal whether an account
-exists. It hands the address on as `?login_hint=` on the console's address:
-the edge in front of the console starts the sign-in and passes the address it
+exists. It hands the address on as `?login_hint=` on the desktop's address:
+the edge in front of the desktop starts the sign-in and passes the address it
 was asked for to the identity provider inside the request's `state`, and the
 login theme in gentian-os reads the hint from there and fills the username.
 No cookie is set and nothing of this page's lives on the identity provider's

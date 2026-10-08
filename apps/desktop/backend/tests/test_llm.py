@@ -19,7 +19,7 @@ from app.core.config import get_settings
 
 KEY = "sk-this-desktops-own-key-0123456789"
 BASE = "http://litellm-proxy.system-llm.svc.cluster.local:4000/v1"
-HOST = "console.acme.example.org"
+HOST = "desktop.acme.example.org"
 
 
 class Gateway:

@@ -1,4 +1,4 @@
-import { kernelDomainOf, routeAddress, withLoginHint, workspaceConsole } from "./route.js";
+import { kernelDomainOf, routeAddress, withLoginHint, workspaceDesktop } from "./route.js";
 
 const kernelDomain = kernelDomainOf(window.location.hostname);
 const $ = (id) => document.getElementById(id);
@@ -88,7 +88,7 @@ $("address-form").addEventListener("submit", async (event) => {
     showError("address-error", "Enter your e-mail address.");
     return;
   }
-  if (routed.kind === "console") {
+  if (routed.kind === "desktop") {
     go(routed.url, routed.address);
     return;
   }
@@ -106,7 +106,7 @@ $("address-form").addEventListener("submit", async (event) => {
 $("workspace-form").addEventListener("submit", (event) => {
   event.preventDefault();
   showError("workspace-error", "");
-  const url = workspaceConsole($("workspace").value, kernelDomain);
+  const url = workspaceDesktop($("workspace").value, kernelDomain);
   if (!url) {
     showError("workspace-error", "A workspace name is lower-case letters, digits and hyphens.");
     return;

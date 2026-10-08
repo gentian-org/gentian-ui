@@ -9,11 +9,11 @@
 // whatever the address.
 //
 // Every address built here is one of two and nothing else:
-// https://platform.<kernel>/, or https://console.<label>.<kernel>/ for one
+// https://platform.<kernel>/, or https://desktop.<label>.<kernel>/ for one
 // DNS label.
 
 const LABEL = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
-// The platform tenant: its desktop is its zone's own name, not console. under it.
+// The platform tenant: its desktop is its zone's own name, not desktop. under it.
 const PLATFORM = "platform";
 const ADDRESS = /^[^\s@]+@([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/;
 
@@ -32,13 +32,13 @@ export function normaliseAddress(input) {
 function desktopOf(tenant, kernelDomain) {
   return tenant === PLATFORM
     ? `https://${PLATFORM}.${kernelDomain}/`
-    : `https://console.${tenant}.${kernelDomain}/`;
+    : `https://desktop.${tenant}.${kernelDomain}/`;
 }
 
 /**
  * Routes an address.
  *   {kind: "invalid"}                 not an address
- *   {kind: "console", url, address}   a workspace on this kernel: the
+ *   {kind: "desktop", url, address}   a workspace on this kernel: the
  *                                     platform's for the kernel's own domain
  *   {kind: "unknown", address}        on no workspace this page can place
  */
@@ -47,35 +47,35 @@ export function routeAddress(input, kernelDomain) {
   if (!address) return { kind: "invalid" };
   const domain = address.slice(address.lastIndexOf("@") + 1);
   if (domain === kernelDomain) {
-    return { kind: "console", url: desktopOf(PLATFORM, kernelDomain), address };
+    return { kind: "desktop", url: desktopOf(PLATFORM, kernelDomain), address };
   }
   const suffix = "." + kernelDomain;
   if (domain.endsWith(suffix)) {
     const tenant = domain.slice(0, -suffix.length);
     if (LABEL.test(tenant)) {
-      return { kind: "console", url: desktopOf(tenant, kernelDomain), address };
+      return { kind: "desktop", url: desktopOf(tenant, kernelDomain), address };
     }
   }
   return { kind: "unknown", address };
 }
 
 /** The desktop of a workspace named by hand, or "" when the name is not one. */
-export function workspaceConsole(name, kernelDomain) {
+export function workspaceDesktop(name, kernelDomain) {
   const tenant = String(name || "").trim().toLowerCase();
   return LABEL.test(tenant) ? desktopOf(tenant, kernelDomain) : "";
 }
 
 /**
- * The console address with the person's address on it, as login_hint.
+ * The desktop's address with the person's address on it, as login_hint.
  *
- * The console is behind the edge, which starts the sign-in and hands the
+ * The desktop is behind the edge, which starts the sign-in and hands the
  * identity provider the address it was asked for inside the request's
  * `state`. The identity provider's sign-in form reads the hint from there
  * and fills the username. Nothing is stored anywhere to make that work: no
  * cookie, and nothing on the identity provider's host.
  */
-export function withLoginHint(consoleUrl, address) {
-  const url = new URL(consoleUrl);
+export function withLoginHint(desktopUrl, address) {
+  const url = new URL(desktopUrl);
   if (address) url.searchParams.set("login_hint", address);
   return url.toString();
 }
