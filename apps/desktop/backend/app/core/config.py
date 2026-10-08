@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -45,6 +45,27 @@ class Settings(BaseSettings):
     # authority; the tenant's own people are answered there, where the
     # director answers only those who hold a relation on the cluster.
     usher_url: str | None = Field(default=None, alias="USHER_URL")
+
+    # The model gateway, for the assistant on the desktop (docs/ai-widget.md).
+    #
+    # The platform hands each tenant's desktop a key of its own at the gateway
+    # and says so: LLM_AVAILABLE is true only when it delivered one. The
+    # address is the gateway's OpenAI-compatible base (it ends in /v1). The
+    # key is read from the file the chart mounts the platform's Secret at, on
+    # every request, so a key the platform replaces is picked up without a
+    # restart; LLM_API_KEY is for running outside a cluster. Neither is ever
+    # logged or sent to the browser. With any of the three missing the
+    # assistant answers 503 and the rest of the desktop is unaffected.
+    llm_available: bool = Field(default=False, alias="LLM_AVAILABLE")
+    llm_base_url: str | None = Field(default=None, alias="LLM_BASE_URL")
+    llm_api_key_file: str | None = Field(default=None, alias="LLM_API_KEY_FILE")
+    llm_api_key: SecretStr | None = Field(default=None, alias="LLM_API_KEY")
+    # What one request to the assistant may cost, decided here and not by the
+    # browser: the size of the request body, how many messages it carries,
+    # and the most tokens an answer may run to.
+    llm_max_request_bytes: int = Field(default=65536, alias="LLM_MAX_REQUEST_BYTES")
+    llm_max_messages: int = Field(default=40, alias="LLM_MAX_MESSAGES")
+    llm_max_tokens: int = Field(default=1024, alias="LLM_MAX_TOKENS")
 
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
     portal_shell_secrets_namespace: str = Field(

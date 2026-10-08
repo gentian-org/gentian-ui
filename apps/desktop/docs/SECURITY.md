@@ -35,6 +35,25 @@ to this repo and notes kernel-specific deployment differences.
 | RBAC | Optional namespace Role | ClusterRole for catalogue APIs (`rbac.create: true`) |
 | No `profile/` | — | Correct — not a catalogue app |
 
+## The assistant and the model gateway
+
+The desktop's API relays a signed-in person's chat to the platform's model
+gateway (`backend/app/api/routes/llm.py`, described in
+[ai-widget.md](./ai-widget.md)).
+
+- **The credential is this tenant's desktop's own key**, generated and
+  registered by the platform and mounted from the Secret
+  `llm-credentials-desktop`. The desktop does not hold the gateway's
+  administrator key, another app's key, or any Kubernetes authority to read
+  one.
+- **Every member who can open the desktop can use it.** The key cannot tell
+  them apart, so the API sends the person's subject as the request's end user,
+  builds the upstream request from an allow-list, calls two fixed paths, caps
+  the request size, the conversation length and `max_tokens`, and forwards
+  none of the browser's headers.
+- **Neither the key nor the gateway's address reaches the browser or a log.**
+- **Left open:** no limit or budget per person, and none on the key itself.
+
 ## Local dev
 
 Copy `backend/.env.example` → `backend/.env` and `frontend/.env.example` →

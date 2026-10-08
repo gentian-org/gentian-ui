@@ -73,7 +73,11 @@
   },
   "ai": {
     "placeholder": "Ask anything…",
-    "expand": "Expand to full app"
+    "expand": "Expand to full app",
+    "unavailable": "The assistant is not available here.",
+    "failed": "No answer came back. Try again.",
+    "thinking": "…",
+    "collapse": "Close"
   },
   "language": {
     "en": "English",

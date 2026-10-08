@@ -139,6 +139,23 @@ llm:
   # profile being available to install and a tile being worth showing are
   # different questions.
   enabled: false
+  # The assistant on the desktop (docs/ai-widget.md). Set by the platform for
+  # a desktop whose profile declares the model gateway, never by hand:
+  #
+  #   available          true once this desktop's own key is registered at
+  #                      the gateway and delivered; false where the cluster
+  #                      serves no models
+  #   baseUrl            the gateway's OpenAI-compatible address (ends in /v1)
+  #   apiKeySecretName   the Secret in this namespace holding this desktop's
+  #                      key. The key itself is never a value.
+  #   apiKeySecretKey    the key of that Secret the key is under
+  #
+  # With any of the first three unset the API is told nothing, mounts
+  # nothing, and the assistant says it is not available.
+  available: false
+  baseUrl: ""
+  apiKeySecretName: ""
+  apiKeySecretKey: OPENAI_API_KEY
 
 # The director: asked what the signed-in person holds on this desktop's
 # tenant, with that person's own token, and nothing else. The desktop relays

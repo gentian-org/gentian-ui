@@ -89,6 +89,19 @@ spec:
             - name: USHER_URL
               value: {{ .Values.usher.url | quote }}
             {{- end }}
+            {{- /* The assistant on the desktop (docs/ai-widget.md). Told only
+                   when the platform delivered all three: that there is a
+                   gateway for this desktop, where it is, and which Secret
+                   holds this desktop's key. Otherwise nothing is set and the
+                   assistant answers that it is not available. */}}
+            {{- if include "gentian-portal.llmDelivered" . }}
+            - name: LLM_AVAILABLE
+              value: "true"
+            - name: LLM_BASE_URL
+              value: {{ .Values.llm.baseUrl | quote }}
+            - name: LLM_API_KEY_FILE
+              value: /var/run/gentian/llm/api-key
+            {{- end }}
             {{- if .Values.openfga.apiUrl }}
             - name: OPENFGA_API_URL
               value: {{ .Values.openfga.apiUrl | quote }}
@@ -104,12 +117,14 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ .Values.existingSecret.name }}
-            - secretRef:
-                name: llm-credentials-open-webui
-                optional: true
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if include "gentian-portal.llmDelivered" . }}
+            - name: llm-credentials
+              mountPath: /var/run/gentian/llm
+              readOnly: true
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -123,3 +138,18 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if include "gentian-portal.llmDelivered" . }}
+        {{- /* This desktop's own key at the model gateway, from the Secret the
+               platform wrote for it. One key of that Secret and no other; a
+               file rather than an environment variable, so a key the platform
+               replaces is read without a restart; optional, so the desktop
+               starts if the Secret is taken away again. */}}
+        - name: llm-credentials
+          secret:
+            secretName: {{ .Values.llm.apiKeySecretName | quote }}
+            optional: true
+            defaultMode: 0440
+            items:
+              - key: {{ .Values.llm.apiKeySecretKey | default "OPENAI_API_KEY" | quote }}
+                path: api-key
+        {{- end }}

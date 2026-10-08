@@ -31,3 +31,16 @@ capabilities:
   drop:
     - ALL
 {{- end }}
+
+{{/*
+Whether the platform delivered this desktop a model gateway: it says there is
+one, where, and in which Secret this desktop's key is. Non-empty when all
+three are there. Tolerant of values that are missing altogether, as they are
+when an older platform installs this chart.
+*/}}
+{{- define "gentian-portal.llmDelivered" -}}
+{{- $llm := default dict .Values.llm -}}
+{{- if and (eq (toString $llm.available) "true") $llm.baseUrl $llm.apiKeySecretName -}}
+true
+{{- end -}}
+{{- end -}}

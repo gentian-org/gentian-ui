@@ -73,7 +73,11 @@
   },
   "ai": {
     "placeholder": "Fragen Sie etwas…",
-    "expand": "Als volle App öffnen"
+    "expand": "Als volle App öffnen",
+    "unavailable": "Der Assistent ist hier nicht verfügbar.",
+    "failed": "Es kam keine Antwort. Bitte erneut versuchen.",
+    "thinking": "…",
+    "collapse": "Schließen"
   },
   "language": {
     "en": "English",
