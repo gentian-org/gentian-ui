@@ -574,7 +574,11 @@ def test_a_removal_carries_the_namespace_and_no_confirmation_it_was_not_given(mo
     _fake_client(monkeypatch, needs, seen, status=428)
     answer = _client().post(
         "/api/v1/admin/apps/timesheets/residue/remove",
-        json={"kind": "ConfigMap", "name": "timesheets.old-page", "namespace": "kernel-provisioning"},
+        json={
+            "kind": "ConfigMap",
+            "name": "timesheets.old-page",
+            "namespace": "kernel-provisioning",
+        },
         headers=_person,
     )
     # The director asks for the name again; this relay never supplies it.
@@ -602,7 +606,10 @@ def test_a_removal_carries_the_namespace_and_no_confirmation_it_was_not_given(mo
         ),
         (403, {"error": "forbidden"}),
         (404, {"error": "not installed in this tenant: timesheets in platform"}),
-        (409, {"error": "Argo CD finds it declared. Nothing was deleted", "reason": "still-declared"}),
+        (
+            409,
+            {"error": "Argo CD finds it declared. Nothing was deleted", "reason": "still-declared"},
+        ),
         (409, {"error": "not something a newer build left behind", "reason": "not-residue"}),
         (502, {"error": "the operator's API did not answer"}),
     ],
@@ -653,7 +660,11 @@ def test_a_removal_from_another_origin_is_refused_before_anything_is_asked(monke
     app.dependency_overrides[get_settings] = _settings
     try:
         client = TestClient(app)
-        removal = {"kind": "ConfigMap", "name": "timesheets.old-page", "confirm": "timesheets.old-page"}
+        removal = {
+            "kind": "ConfigMap",
+            "name": "timesheets.old-page",
+            "confirm": "timesheets.old-page",
+        }
         path = "/api/v1/admin/apps/timesheets/residue/remove"
         refused = client.post(
             path, json=removal, headers={**_person, "Origin": "https://evil.example.com"}

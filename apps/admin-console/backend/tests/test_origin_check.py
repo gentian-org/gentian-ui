@@ -107,8 +107,12 @@ def test_forwarding_headers_from_the_client_change_nothing():
 
 def test_allow_listed_origin_is_accepted():
     client = _client(https_only=True, trusted_origins=["http://localhost:5173/", "rubbish"])
-    assert client.post("/api/v1/thing", headers={"Origin": "http://localhost:5173"}).status_code == 200
-    assert client.post("/api/v1/thing", headers={"Origin": "http://localhost:5174"}).status_code == 403
+    assert (
+        client.post("/api/v1/thing", headers={"Origin": "http://localhost:5173"}).status_code == 200
+    )
+    assert (
+        client.post("/api/v1/thing", headers={"Origin": "http://localhost:5174"}).status_code == 403
+    )
 
 
 @pytest.mark.parametrize("site", ["cross-site", "same-site", "none"])
@@ -150,9 +154,7 @@ def test_the_application_has_the_check():
 
     client = TestClient(app)
     assert client.get("/healthz", headers={"Origin": "https://evil.example.com"}).status_code == 200
-    refused = client.post(
-        "/no-such-route", headers={"Origin": "https://evil.example.com"}
-    )
+    refused = client.post("/no-such-route", headers={"Origin": "https://evil.example.com"})
     assert refused.status_code == 403
     assert refused.json()["reason"] == "origin_mismatch"
     # Not refused by the check; what the router then says is its own business.
