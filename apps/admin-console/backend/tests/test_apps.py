@@ -180,9 +180,32 @@ def test_the_main_address_travels_only_as_the_person_sent_it(monkeypatch):
     assert seen["json"] == {"apex": True, "acknowledgeMainAddressRule": False}
 
 
+@pytest.mark.parametrize("kind", ["public", "publicAppCredential", "signInAppAuthorization"])
+def test_the_kind_the_dialog_showed_travels_with_the_approval(monkeypatch, kind):
+    """What the person was shown is what they approve: the director refuses
+    the approval if the entry has come to declare another kind."""
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "a1b2c3d4"}, seen, status=202)
+    assert _client().put(_entry, json={"kind": kind}, headers=_person).status_code == 202
+    assert seen["json"] == {"kind": kind}
+
+
+def test_a_refusal_for_another_kind_is_the_directors(monkeypatch):
+    seen: dict = {}
+    refusal = {"error": "the request approves entry shares of cloud as \"public\". Nothing was changed"}
+    _fake_client(monkeypatch, refusal, seen, status=409)
+    answer = _client().put(_entry, json={"kind": "public"}, headers=_person)
+    assert answer.status_code == 409
+    assert answer.json() == refusal
+
+
 @pytest.mark.parametrize(
     "body",
     [
+        # A kind there is not, or one that is not a word.
+        {"kind": "everything"},
+        {"kind": ""},
+        {"kind": True},
         # Fields the director's approval reads and the console's dialog does
         # not offer, the review date among them.
         {"reviewAt": "2036-01-01T00:00:00Z"},

@@ -16,6 +16,7 @@ The two are joined on the screen, and where they disagree the screen says so.
 """
 
 import re
+from typing import Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -91,8 +92,8 @@ async def exposures(
 class ExposureApproval(BaseModel):
     """What an approval of one entry may say, and nothing else.
 
-    The four fields the director's approval reads that a person decides in the
-    console's dialog. A field this does not name is refused here rather than
+    The fields the director's approval reads that a person decides in the
+    console's dialog, and the kind of entry the dialog showed them. A field this does not name is refused here rather than
     dropped, so nothing reaches the director that the dialog did not show --
     its review date among them, which stays the director's default. The types
     are strict: a word that merely looks like a yes is not the acknowledgement
@@ -101,6 +102,10 @@ class ExposureApproval(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    # The kind of entry the dialog showed, as the director's read named it.
+    # The director refuses the approval if the entry declares another, so
+    # what is approved is what was shown; it records the kind itself.
+    kind: Literal["public", "publicAppCredential", "signInAppAuthorization"] | None = None
     # When the entry is taken down again, RFC 3339. Absent: it stays until
     # somebody withdraws it.
     expiresAt: StrictStr | None = None
@@ -123,7 +128,9 @@ async def approve_exposure(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """Approve one entry an app declares for the internet, or review one that
-    is approved. A commit: the platform then publishes the entry.
+    is approved. A commit: the platform then publishes the entry. The same
+    for an entry behind sign-in that asks to keep the app's own Authorization
+    header, for which nothing is published.
 
     The director's approval for this console's tenant, as the person. Whether
     they may is the director's (can_expose), and so is everything else about
@@ -149,8 +156,9 @@ async def withdraw_exposure(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Take one entry off the internet. A commit: the registry's entry goes,
-    and the platform stops publishing it.
+    """Take one entry off the internet, or take back what else was approved
+    for it. A commit: the registry's entry goes, and the platform stops
+    publishing it, or removes the app's own Authorization header again.
 
     The director's withdrawal for this console's tenant, as the person, with
     no body. Whether they may is the director's, and its answer arrives as it

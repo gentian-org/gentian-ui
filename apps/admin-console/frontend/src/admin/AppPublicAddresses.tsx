@@ -24,6 +24,14 @@ const refusalOf = (err: unknown) => (err instanceof ApiError && err.detail ? err
 
 const day = (value?: string) => (value ? new Date(value).toLocaleDateString() : "");
 
+/**
+ * Whether approving the entry publishes something. An entry behind sign-in
+ * that asks to keep the app's own Authorization header is listed here too and
+ * publishes nothing; a director older than that names no kinds, and
+ * everything it lists is a public address.
+ */
+const isPublic = (entry: ExposureEntry) => entry.publicAddress !== false;
+
 /** An entry as the command names it: `<app instance>/<entry>`. */
 const nameOf = (entry: ExposureEntry) => `${entry.install}/${entry.exposureName}`;
 
@@ -53,11 +61,15 @@ function offeredFor(entry: ExposureEntry): {
 }
 
 /** What the director answered to the last approval or withdrawal here. */
-type Done = { kind: "approved" | "reviewed" | "withdrawn"; name: string; result: AppWriteResult };
+type Done = { kind: "approved" | "reviewed" | "withdrawn"; name: string; result: AppWriteResult; publicAddress: boolean };
 
 /**
- * Public addresses: what this app, and the add-ons switched on inside it,
- * ask to have on the internet, and whether that was approved.
+ * Public addresses and requests: what this app, and the add-ons switched on
+ * inside it, ask to have on the internet, and whether that was approved --
+ * and, in the same list, an entry behind sign-in that asks to keep the app's
+ * own Authorization header, which the same person approves and which
+ * publishes nothing. What each kind means is the director's text, shown as
+ * it came.
  *
  * The director's answer, read from the app's profile and the tenant's
  * registry in git: for each entry the address it is published at, its paths,
@@ -100,7 +112,7 @@ export function AppPublicAddresses({ app, addons }: { app: string; addons: strin
       approveExposure(entry.install, entry.exposureName, body),
     onSuccess: (result, { entry }) => {
       const reviewed = entry.state === "approved" || entry.state === "reviewDue";
-      setDone({ kind: reviewed ? "reviewed" : "approved", name: nameOf(entry), result });
+      setDone({ kind: reviewed ? "reviewed" : "approved", name: nameOf(entry), result, publicAddress: isPublic(entry) });
       setAsking(null);
       void refresh();
     },
@@ -108,7 +120,7 @@ export function AppPublicAddresses({ app, addons }: { app: string; addons: strin
   const withdraw = useMutation({
     mutationFn: (entry: ExposureEntry) => withdrawExposure(entry.install, entry.exposureName),
     onSuccess: (result, entry) => {
-      setDone({ kind: "withdrawn", name: nameOf(entry), result });
+      setDone({ kind: "withdrawn", name: nameOf(entry), result, publicAddress: isPublic(entry) });
       void refresh();
     },
     onError: (err, entry) => setFailed({ name: nameOf(entry), message: refusalOf(err) }),
@@ -125,7 +137,9 @@ export function AppPublicAddresses({ app, addons }: { app: string; addons: strin
     const question =
       entry.state === "unmatched"
         ? t("apps.publicWithdrawConfirmUnmatched", values)
-        : entry.host
+        : !isPublic(entry)
+          ? t("apps.publicWithdrawConfirmSignIn", values)
+          : entry.host
           ? t("apps.publicWithdrawConfirm", values)
           : t("apps.publicWithdrawConfirmNoAddress", values);
     if (!window.confirm(question)) return;
@@ -215,7 +229,7 @@ export function AppPublicAddresses({ app, addons }: { app: string; addons: strin
 
 /** What the director answered, said once. With a commit, git has the change and the cluster does not yet. */
 function DoneNotice({ done }: { done: Done }) {
-  const { kind, name, result } = done;
+  const { kind, name, result, publicAddress } = done;
   const values = { name, commit: (result.commit ?? "").slice(0, 8), status: result.status };
   if (!result.commit) {
     return (
@@ -231,11 +245,17 @@ function DoneNotice({ done }: { done: Done }) {
   return (
     <p className="admin-console__success" role="status">
       {kind === "approved" ? (
-        <Trans i18nKey="apps.publicOutcomeApproved" values={values} components={mono} />
+        publicAddress ? (
+          <Trans i18nKey="apps.publicOutcomeApproved" values={values} components={mono} />
+        ) : (
+          <Trans i18nKey="apps.publicOutcomeApprovedSignIn" values={values} components={mono} />
+        )
       ) : kind === "reviewed" ? (
         <Trans i18nKey="apps.publicOutcomeReviewed" values={values} components={mono} />
-      ) : (
+      ) : publicAddress ? (
         <Trans i18nKey="apps.publicOutcomeWithdrawn" values={values} components={mono} />
+      ) : (
+        <Trans i18nKey="apps.publicOutcomeWithdrawnSignIn" values={values} components={mono} />
       )}
     </p>
   );
@@ -293,10 +313,12 @@ function ActionsCell({
  * Approving one entry, or reviewing an approved one, behind its name typed
  * out.
  *
- * It shows what the command shows before it sends anything: the address, the
- * paths and that nothing else at the address is published, the paths never
- * published, who can reach it in the director's sentence, and what the
- * approval so far says. Typing the entry is the confirmation, as for the
+ * It shows what the command shows before it sends anything: the kind of
+ * entry in the director's words, the address, the paths and that nothing
+ * else at the address is published, the paths never published, who can reach
+ * it and what approving allows in the director's sentences, the limit that
+ * applies, and what the approval so far says. For an entry behind sign-in it
+ * says first that nothing is put on the internet. Typing the entry is the confirmation, as for the
  * console's other acts that a click is too easy for: this one puts something
  * on the internet.
  *
@@ -336,6 +358,7 @@ function ApproveDialog({
   }, []);
 
   const name = nameOf(entry);
+  const publicAddress = isPublic(entry);
   const main = entry.mainAddress === true;
   const rule = entry.mainAddressRule ?? "";
   const review = entry.state === "approved" || entry.state === "reviewDue";
@@ -348,6 +371,9 @@ function ApproveDialog({
   const send = () => {
     if (!confirmed || pending) return;
     const body: ExposureApprovalRequest = {};
+    // The kind that is shown here, so the director refuses the approval if
+    // the app's entry has come to declare another one meanwhile.
+    if (entry.kind) body.kind = entry.kind;
     if (reason.trim()) body.reason = reason.trim();
     // A day is the end of that day, UTC, as the command reads it.
     if (expires) body.expiresAt = `${expires}T23:59:59Z`;
@@ -383,7 +409,13 @@ function ApproveDialog({
           )}
         </h3>
         <p className="admin-console__lead">
-          {review ? (
+          {!publicAddress ? (
+            review ? (
+              <Trans i18nKey="apps.publicReviewIntroSignIn" values={values} components={mono} />
+            ) : (
+              <Trans i18nKey="apps.publicApproveIntroSignIn" values={values} components={mono} />
+            )
+          ) : review ? (
             <Trans i18nKey="apps.publicReviewIntro" values={values} components={mono} />
           ) : entry.state === "expired" ? (
             <Trans
@@ -397,6 +429,13 @@ function ApproveDialog({
         </p>
 
         <div>
+          {entry.kindLabel ? (
+            <div className="admin-console__edit-row">
+              <div className="admin-console__edit-row-label">{t("apps.publicKind")}</div>
+              {/* The director's words for the kind of entry. */}
+              <div className="admin-console__edit-row-value">{entry.kindLabel}</div>
+            </div>
+          ) : null}
           <div className="admin-console__edit-row">
             <div className="admin-console__edit-row-label">{t("apps.publicAddress")}</div>
             <div className="admin-console__edit-row-value">
@@ -407,12 +446,14 @@ function ApproveDialog({
             <div className="admin-console__edit-row-label">{t("apps.publicPaths")}</div>
             <div className="admin-console__edit-row-value">
               <span className="admin-console__mono">{paths.join("  ")}</span>
-              <div className="admin-console__hint">
-                {paths.includes("/") ? t("apps.publicWholeAddress") : t("apps.publicOnlyThese")}
-              </div>
+              {publicAddress ? (
+                <div className="admin-console__hint">
+                  {paths.includes("/") ? t("apps.publicWholeAddress") : t("apps.publicOnlyThese")}
+                </div>
+              ) : null}
             </div>
           </div>
-          {denied.length > 0 ? (
+          {publicAddress && denied.length > 0 ? (
             <div className="admin-console__edit-row">
               <div className="admin-console__edit-row-label">{t("apps.publicRefused")}</div>
               <div className="admin-console__edit-row-value">
@@ -422,10 +463,19 @@ function ApproveDialog({
             </div>
           ) : null}
           <div className="admin-console__edit-row">
-            <div className="admin-console__edit-row-label">{t("apps.publicAccess")}</div>
-            {/* The director's sentence where it sent one. */}
+            <div className="admin-console__edit-row-label">
+              {publicAddress ? t("apps.publicAccess") : t("apps.publicWhatChanges")}
+            </div>
+            {/* The director's sentences where it sent them. */}
             <div className="admin-console__edit-row-value">{entry.access || signInOf(t, entry)}</div>
           </div>
+          {entry.rateLimit ? (
+            <div className="admin-console__edit-row">
+              <div className="admin-console__edit-row-label">{t("apps.publicLimit")}</div>
+              {/* The director's sentence for the limit. */}
+              <div className="admin-console__edit-row-value">{entry.rateLimit}</div>
+            </div>
+          ) : null}
           {entry.state !== "requested" && approval ? (
             <div className="admin-console__edit-row">
               <div className="admin-console__edit-row-label">{t("apps.publicSoFar")}</div>
@@ -528,7 +578,9 @@ function ApproveDialog({
               ? t("apps.publicSending")
               : review
                 ? t("apps.publicReviewConfirm")
-                : t("apps.publicApproveConfirm")}
+                : publicAddress
+                  ? t("apps.publicApproveConfirm")
+                  : t("apps.publicApproveConfirmSignIn")}
           </button>
         </div>
       </form>
@@ -561,10 +613,10 @@ function AddressCell({ entry, app }: { entry: ExposureEntry; app: string }) {
           />
         )}
       </div>
-      {/* Why it has no address: the director's own words. */}
-      {!entry.host && entry.note && entry.state !== "unmatched" ? (
-        <div className="admin-console__hint">{entry.note}</div>
-      ) : null}
+      {/* The kind of entry, in the director's own words. */}
+      {entry.kindLabel ? <div className="admin-console__hint">{entry.kindLabel}</div> : null}
+      {/* Why it has no address, or why an earlier approval does not cover it: the director's own words. */}
+      {entry.note && entry.state !== "unmatched" ? <div className="admin-console__hint">{entry.note}</div> : null}
     </>
   );
 }
@@ -575,13 +627,16 @@ function PathsCell({ entry }: { entry: ExposureEntry }) {
   const denied = entry.denyPaths ?? [];
   if (paths.length === 0) return <span>{t("apps.publicNotKnown")}</span>;
   const whole = paths.includes("/");
+  const publicAddress = isPublic(entry);
   return (
     <>
       <span className="admin-console__mono">{paths.join("  ")}</span>
-      <div className="admin-console__hint">
-        {whole ? t("apps.publicWholeAddress") : t("apps.publicOnlyThese")}
-      </div>
-      {denied.length > 0 ? (
+      {publicAddress ? (
+        <div className="admin-console__hint">
+          {whole ? t("apps.publicWholeAddress") : t("apps.publicOnlyThese")}
+        </div>
+      ) : null}
+      {publicAddress && denied.length > 0 ? (
         <div className="admin-console__hint">
           <Trans i18nKey="apps.publicNeverPublished" values={{ paths: denied.join("  ") }} components={mono} />
         </div>
@@ -590,10 +645,15 @@ function PathsCell({ entry }: { entry: ExposureEntry }) {
   );
 }
 
-/** Who can reach the entry. The platform checks nobody at a public address. */
+/**
+ * Who can reach the entry. The platform checks nobody at a public address;
+ * behind sign-in the session is required whatever the entry keeps.
+ */
 function signInOf(t: TFunction, entry: ExposureEntry) {
   if (!entry.authMode) return t("apps.publicNotKnown");
+  if (!isPublic(entry)) return t("apps.publicSignInRequired");
   if (entry.anyoneWithoutSignIn) return t("apps.publicAnyone");
+  if (entry.passesCredential) return t("apps.publicCredentialToApp");
   return t("apps.publicCheckedByApp", { mode: entry.authMode });
 }
 
@@ -618,7 +678,7 @@ function StateCell({ entry }: { entry: ExposureEntry }) {
       return (
         <>
           <span className="admin-console__badge admin-console__badge--warn">{t("apps.publicRequested")}</span>
-          <div>{t("apps.publicRequestedDetail")}</div>
+          <div>{isPublic(entry) ? t("apps.publicRequestedDetail") : t("apps.publicRequestedDetailSignIn")}</div>
         </>
       );
     case "approved":

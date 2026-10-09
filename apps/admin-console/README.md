@@ -56,12 +56,17 @@ and whether it is for everyone, what it exchanges with other apps, what it
 asked of the platform and what was approved, and it uninstalls. Purging the
 data of an app that is no longer installed is a separate, typed-out act.
 For an app that declares entries for the internet, its Details also list them
-under "Public addresses": the address, the paths, whether anybody signs in,
-and whether the entry was approved. A person the director says may publish
+under "Public addresses and requests": the kind of entry, the address, the
+paths, whether anybody signs in, and whether the entry was approved. The
+same list carries an entry behind sign-in that asks to keep the app's own
+`Authorization` header, which is approved the same way and publishes
+nothing. What a kind means, who can reach an entry and the limit that
+applies are the director's sentences, shown as they came. A person the director says may publish
 for the tenant (`can_expose`) is offered Approve, Review and Withdraw there;
 the same is done with `kubectl gentian exposures`. An approval shows the
-address, the paths and who can reach it, and is confirmed by typing the
-entry's name. An entry for the cluster's main address also shows the
+kind, the address, the paths and who can reach it, and is confirmed by typing
+the entry's name; the kind shown is sent with it, so the director refuses the
+approval if the entry has come to declare another. An entry for the cluster's main address also shows the
 director's rule and needs its own tick. The backend relays the approval and
 the withdrawal to the director with the person's token, for this console's
 tenant only, and passes a refusal on as it came. An entry with no address is

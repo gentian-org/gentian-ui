@@ -153,14 +153,32 @@ export type ExposureEntry = {
   exposureName: string;
   /** `requested`, `approved`, `reviewDue`, `expired` or `unmatched`. */
   state: string;
-  /** The public address without scheme; absent when it is published nowhere. */
+  /**
+   * What approving the entry allows: `public`, `publicAppCredential` or
+   * `signInAppAuthorization`. Absent from a director older than kinds, where
+   * every entry is a public address. Sent back with an approval, so the
+   * director refuses it if the entry has come to declare another kind.
+   */
+  kind?: string;
+  /** The kind in the director's own few words. Shown as it came. */
+  kindLabel?: string;
+  /**
+   * False for an entry behind sign-in, which approving does not publish.
+   * Absent from an older director: a public address.
+   */
+  publicAddress?: boolean;
+  /** The caller's `Authorization` header reaches the app once approved. */
+  passesCredential?: boolean;
+  /** The limit per client address on a public address: the director's sentence. */
+  rateLimit?: string;
+  /** The address without scheme; absent when it is published nowhere. */
   host?: string;
   paths?: string[];
   denyPaths?: string[];
   authMode?: string;
   /** The profile declares that nobody signs in. */
   anyoneWithoutSignIn?: boolean;
-  /** Who can reach it, in the director's own sentence. */
+  /** Who can reach it, and what approving it allows, in the director's own sentences. */
   access?: string;
   /** The entry is for the cluster's bare domain. */
   mainAddress?: boolean;
@@ -169,7 +187,10 @@ export type ExposureEntry = {
    * the main address. Shown as it came; nothing here holds a copy.
    */
   mainAddressRule?: string;
-  /** Why it has no address, or why it matches nothing: the director's words. */
+  /**
+   * Why it has no address, why it matches nothing, or why an earlier approval
+   * does not cover it any more: the director's words.
+   */
   note?: string;
   approval?: ExposureApproval;
 };
@@ -188,6 +209,8 @@ export function fetchTenantExposures() {
  * console's backend refuses any other field.
  */
 export type ExposureApprovalRequest = {
+  /** The kind the dialog showed, as the read gave it. */
+  kind?: string;
   /** RFC 3339. Absent: the entry stays until it is withdrawn. */
   expiresAt?: string;
   reason?: string;
@@ -207,7 +230,7 @@ export function approveExposure(install: string, name: string, body: ExposureApp
   return apiFetch<AppWriteResult>(entryPath(install, name), { method: "PUT", body: JSON.stringify(body) });
 }
 
-/** Take one entry off the internet. A commit, like the approval. */
+/** Take one entry off the internet, or take back what else was approved for it. A commit, like the approval. */
 export function withdrawExposure(install: string, name: string) {
   return apiFetch<AppWriteResult>(entryPath(install, name), { method: "DELETE" });
 }
