@@ -192,7 +192,9 @@ def test_the_kind_the_dialog_showed_travels_with_the_approval(monkeypatch, kind)
 
 def test_a_refusal_for_another_kind_is_the_directors(monkeypatch):
     seen: dict = {}
-    refusal = {"error": "the request approves entry shares of cloud as \"public\". Nothing was changed"}
+    refusal = {
+        "error": 'the request approves entry shares of cloud as "public". Nothing was changed'
+    }
     _fake_client(monkeypatch, refusal, seen, status=409)
     answer = _client().put(_entry, json={"kind": "public"}, headers=_person)
     assert answer.status_code == 409
