@@ -57,9 +57,16 @@ asked of the platform and what was approved, and it uninstalls. Purging the
 data of an app that is no longer installed is a separate, typed-out act.
 For an app that declares entries for the internet, its Details also list them
 under "Public addresses": the address, the paths, whether anybody signs in,
-and whether the entry was approved. That list is read-only; an entry is
-approved by the tenant's perimeter approver with
-`kubectl gentian exposures approve`.
+and whether the entry was approved. A person the director says may publish
+for the tenant (`can_expose`) is offered Approve, Review and Withdraw there;
+the same is done with `kubectl gentian exposures`. An approval shows the
+address, the paths and who can reach it, and is confirmed by typing the
+entry's name. An entry for the cluster's main address also shows the
+director's rule and needs its own tick. The backend relays the approval and
+the withdrawal to the director with the person's token, for this console's
+tenant only, and passes a refusal on as it came. An entry with no address is
+not offered for approval, and one of a component the platform itself ships is
+left to the command.
 
 Nothing is installed from the console. Apps come from the App Store, or from
 `kubectl gentian apps install` where no store is available: the cluster renders

@@ -41,6 +41,11 @@ class AdminContextResponse(BaseModel):
     isTenantAdmin: bool
     availableTenants: list[str]
     kernelDomain: str
+    # The director's answer to whether this person may put something of this
+    # tenant on the internet or take it off (can_expose). It decides which
+    # buttons the Apps screen offers and nothing else: the director asks again
+    # on every approval and withdrawal.
+    canExpose: bool = False
     # Kept for the screens that read it. People are managed in Keycloak's own
     # console, which this component links to; it holds no store of its own.
     storeConfigured: bool = True
@@ -80,6 +85,7 @@ async def admin_context(
         isTenantAdmin=True,
         availableTenants=[tenant],
         kernelDomain=settings.kernel_domain or "",
+        canExpose=bool(tenant_rel.get("can_expose")),
     )
 
 

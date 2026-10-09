@@ -139,16 +139,178 @@ def test_a_refused_read_of_the_public_addresses_is_passed_on(monkeypatch):
     assert answer.status_code == 403
 
 
-@pytest.mark.parametrize("method", ["put", "post", "delete"])
-def test_nothing_is_approved_or_withdrawn_through_the_console(monkeypatch, method):
-    """The console shows what an app asks to publish. Publishing to the
-    internet is the perimeter approver's, by command: no relay carries the
-    director's approval or withdrawal of an entry."""
+# -- approving and withdrawing a public address -----------------------------
+
+_entry = "/api/v1/admin/apps/exposures/cloud/shares"
+
+
+def test_an_approval_is_the_directors_for_this_tenant_as_the_person(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "a1b2c3d4"}, seen, status=202)
+    sent = {"reason": "shared calendars", "expiresAt": "2027-03-31T23:59:59Z"}
+    answer = _client().put(_entry, json=sent, headers=_person)
+    assert answer.status_code == 202
+    assert answer.json() == {"status": "updated", "commit": "a1b2c3d4"}
+    assert (seen["method"], seen["url"]) == ("PUT", f"{_base}/exposures/cloud/shares")
+    # The person's own token, and exactly what they sent.
+    assert seen["auth"] == "Bearer person-token"
+    assert seen["json"] == sent
+
+
+def test_an_approval_with_nothing_said_sends_nothing_said(monkeypatch):
+    """No expiry, no reason, not the main address: an empty body, and no key
+    this relay made up -- an absent acknowledgement stays absent."""
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "a1b2c3d4"}, seen, status=202)
+    assert _client().put(_entry, json={}, headers=_person).status_code == 202
+    assert seen["json"] == {}
+
+
+def test_the_main_address_travels_only_as_the_person_sent_it(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "a1b2c3d4"}, seen, status=202)
+    client = _client()
+    client.put(_entry, json={"apex": True, "acknowledgeMainAddressRule": True}, headers=_person)
+    assert seen["json"] == {"apex": True, "acknowledgeMainAddressRule": True}
+    # Asked for without the acknowledgement: it goes as it is, and the
+    # director is the one that refuses it.
+    client.put(_entry, json={"apex": True}, headers=_person)
+    assert seen["json"] == {"apex": True}
+    client.put(_entry, json={"apex": True, "acknowledgeMainAddressRule": False}, headers=_person)
+    assert seen["json"] == {"apex": True, "acknowledgeMainAddressRule": False}
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # Fields the director's approval reads and the console's dialog does
+        # not offer, the review date among them.
+        {"reviewAt": "2036-01-01T00:00:00Z"},
+        {"reason": "x", "owner": "somebody-else"},
+        {"tenant": "other"},
+        {"install": "wiki", "exposureName": "api"},
+        {"apexAcknowledgedBy": "somebody-else"},
+        # Something merely shaped like a yes is not one.
+        {"apex": True, "acknowledgeMainAddressRule": "true"},
+        {"apex": True, "acknowledgeMainAddressRule": 1},
+        {"apex": "yes"},
+        {"reason": 7},
+        {"expiresAt": 20270331},
+    ],
+)
+def test_an_approval_saying_anything_else_reaches_nobody(monkeypatch, body):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated"}, seen, status=202)
+    assert _client().put(_entry, json=body, headers=_person).status_code == 422
+    assert seen == {}
+
+
+def test_a_withdrawal_is_the_directors_for_this_tenant_as_the_person(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "0f1e2d3c"}, seen, status=202)
+    answer = _client().delete(_entry, headers=_person)
+    assert answer.status_code == 202
+    assert answer.json() == {"status": "updated", "commit": "0f1e2d3c"}
+    assert (seen["method"], seen["url"]) == ("DELETE", f"{_base}/exposures/cloud/shares")
+    assert seen["auth"] == "Bearer person-token"
+    assert seen["json"] is None
+
+
+@pytest.mark.parametrize("method", ["put", "delete"])
+def test_the_tenant_is_never_the_callers_to_choose(monkeypatch, method):
+    """The tenant is the one this console runs in. Nothing in the path, the
+    query or a header moves the request to another."""
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "a1b2c3d4"}, seen, status=202)
+    client = _client()
+    kwargs = {"json": {}} if method == "put" else {}
+    answer = getattr(client, method)(
+        _entry + "?tenant=other&t=other",
+        headers={**_person, "X-Tenant": "other", "X-Gentian-Tenant": "other"},
+        **kwargs,
+    )
+    assert answer.status_code == 202
+    assert seen["url"] == f"{_base}/exposures/cloud/shares"
+    # A name that would climb out of the entry's path is not a name.
+    # (Encoded, so that it is this API that reads the dots and not the test's
+    # own client that folds them away.)
+    for install, name in (
+        ("%2e%2e", "shares"),
+        ("cloud", "%2e%2e"),
+        ("other%2Fexposures", "x"),
+        ("a.b", "shares"),
+        ("Cloud", "shares"),
+    ):
+        seen.clear()
+        refused = getattr(client, method)(
+            f"/api/v1/admin/apps/exposures/{install}/{name}", headers=_person, **kwargs
+        )
+        assert refused.status_code in (400, 404, 405)
+        assert seen == {}
+    # No route takes a tenant before the entry.
+    seen.clear()
+    longer = getattr(client, method)(
+        "/api/v1/admin/apps/exposures/other/cloud/shares", headers=_person, **kwargs
+    )
+    assert longer.status_code in (404, 405)
+    assert seen == {}
+
+
+@pytest.mark.parametrize(
+    ("status", "words"),
+    [
+        (403, "you may not publish for this tenant"),
+        (422, "the profile of website does not declare entry site. Nothing was changed"),
+        (409, "the main address is already held by website/site"),
+        (400, "a website on the cluster's main address needs your acknowledgement"),
+    ],
+)
+@pytest.mark.parametrize("method", ["put", "delete"])
+def test_a_refusal_arrives_with_the_directors_status_and_words(monkeypatch, method, status, words):
+    seen: dict = {}
+    refusal = {"error": words, "request_id": "r-1"}
+    _fake_client(monkeypatch, refusal, seen, status=status)
+    kwargs = {"json": {"reason": "x"}} if method == "put" else {}
+    answer = getattr(_client(), method)(_entry, headers=_person, **kwargs)
+    assert answer.status_code == status
+    assert answer.json() == refusal
+
+
+def test_an_entry_already_as_asked_is_the_directors_200(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "unchanged"}, seen, status=200)
+    answer = _client().put(_entry, json={}, headers=_person)
+    assert (answer.status_code, answer.json()) == (200, {"status": "unchanged"})
+
+
+@pytest.mark.parametrize("method", ["PUT", "DELETE"])
+def test_an_approval_from_a_page_on_another_origin_is_refused(monkeypatch, method):
+    """The real application: the origin check every state-changing route of
+    this API sits behind covers these two, and a refused request reaches
+    neither the route nor the director."""
+    from app.main import app
+
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "a1b2c3d4"}, seen, status=202)
+    client = TestClient(app)
+    kwargs = {"json": {"reason": "x"}} if method == "PUT" else {}
+    for headers in (
+        {"Origin": "https://evil.example.com"},
+        {"Origin": "null"},
+        {"Sec-Fetch-Site": "cross-site"},
+        {"Sec-Fetch-Site": "same-site"},
+    ):
+        refused = client.request(method, _entry, headers={**_person, **headers}, **kwargs)
+        assert refused.status_code == 403
+        assert refused.json()["reason"] in ("origin_mismatch", "cross_site_request")
+    assert seen == {}
+
+
+@pytest.mark.parametrize("method", ["post", "patch"])
+def test_an_entry_takes_an_approval_and_a_withdrawal_and_nothing_else(monkeypatch, method):
     seen: dict = {}
     _fake_client(monkeypatch, {"status": "updated"}, seen)
-    answer = getattr(_client(), method)(
-        "/api/v1/admin/apps/exposures/cloud/shares", headers=_person
-    )
+    answer = getattr(_client(), method)(_entry, json={}, headers=_person)
     assert answer.status_code in (404, 405)
     assert seen == {}
 

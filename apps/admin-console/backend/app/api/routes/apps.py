@@ -20,7 +20,7 @@ import re
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, StrictBool, StrictStr
 
 from app.core import director
 from app.core.auth import bearer_of, get_current_user
@@ -29,7 +29,7 @@ from app.core.config import Settings, get_settings
 router = APIRouter(prefix="/admin/apps", tags=["apps"])
 _bearer = HTTPBearer(auto_error=False)
 
-# An app's name as the director accepts it. Checked here because it lands in a
+# An app's name, or an entry's, as the director accepts it. Checked here because it lands in a
 # URL path: a name with a dot-dot in it would address a different route of the
 # director than the one written below. Not an authorisation check.
 _NAME = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
@@ -82,11 +82,85 @@ async def exposures(
 ) -> Response:
     """What this tenant's apps ask to have on the internet, and what of it was
     approved: each entry's address, its paths, whether anybody signs in, and
-    by whom and until when it was approved. A read, of what git declares;
-    approving and withdrawing are not done from here, and this module has no
-    route for either."""
+    by whom and until when it was approved. A read, of what git declares."""
     return await director.forward(
         settings, "GET", f"/v1/tenants/{settings.tenant_id}/exposures", bearer_of(credentials)
+    )
+
+
+class ExposureApproval(BaseModel):
+    """What an approval of one entry may say, and nothing else.
+
+    The four fields the director's approval reads that a person decides in the
+    console's dialog. A field this does not name is refused here rather than
+    dropped, so nothing reaches the director that the dialog did not show --
+    its review date among them, which stays the director's default. The types
+    are strict: a word that merely looks like a yes is not the acknowledgement
+    of the main address's rule.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # When the entry is taken down again, RFC 3339. Absent: it stays until
+    # somebody withdraws it.
+    expiresAt: StrictStr | None = None
+    # Why this is public, in the approver's words.
+    reason: StrictStr | None = None
+    # The entry is approved for the cluster's main address.
+    apex: StrictBool | None = None
+    # The approver says the director's rule for the main address is true of
+    # the site. Only what the person sent travels; nothing here sets it.
+    acknowledgeMainAddressRule: StrictBool | None = None
+
+
+@router.put("/exposures/{install}/{name}")
+async def approve_exposure(
+    install: str,
+    name: str,
+    body: ExposureApproval,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Approve one entry an app declares for the internet, or review one that
+    is approved. A commit: the platform then publishes the entry.
+
+    The director's approval for this console's tenant, as the person. Whether
+    they may is the director's (can_expose), and so is everything else about
+    it: that the app is installed and declares the entry, that the main
+    address is asked for exactly where the entry is for it, that its rule was
+    acknowledged. Every answer arrives as it is, a refusal with its status and
+    its words. Only what was given travels.
+    """
+    return await director.forward(
+        settings,
+        "PUT",
+        f"/v1/tenants/{settings.tenant_id}/exposures/{_name(install)}/{_name(name)}",
+        bearer_of(credentials),
+        json_body=body.model_dump(exclude_none=True),
+    )
+
+
+@router.delete("/exposures/{install}/{name}")
+async def withdraw_exposure(
+    install: str,
+    name: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Take one entry off the internet. A commit: the registry's entry goes,
+    and the platform stops publishing it.
+
+    The director's withdrawal for this console's tenant, as the person, with
+    no body. Whether they may is the director's, and its answer arrives as it
+    is.
+    """
+    return await director.forward(
+        settings,
+        "DELETE",
+        f"/v1/tenants/{settings.tenant_id}/exposures/{_name(install)}/{_name(name)}",
+        bearer_of(credentials),
     )
 
 

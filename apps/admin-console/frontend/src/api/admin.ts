@@ -15,6 +15,12 @@ export type AdminContext = {
    * so it cannot be inferred from window.location.hostname.
    */
   kernelDomain: string;
+  /**
+   * The director's answer to whether this person may put something of the
+   * tenant on the internet or take it off (can_expose). Absent from a
+   * backend older than this screen, which is a no.
+   */
+  canExpose?: boolean;
 };
 
 export type AdminMember = {

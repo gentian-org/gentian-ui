@@ -99,6 +99,28 @@ def test_a_tenant_administrator_sees_no_platform_screens(monkeypatch):
     assert r.json()["isPlatformAdmin"] is False
 
 
+def test_whether_the_person_may_publish_is_the_directors_answer(monkeypatch):
+    """The buttons that approve and withdraw a public address follow
+    can_expose as the director answers it for this tenant; absent is no."""
+    for relations, want in (
+        ({"can_administer": True, "can_expose": True}, True),
+        ({"can_administer": True, "can_expose": False}, False),
+        ({"can_administer": True}, False),
+    ):
+        _director(
+            monkeypatch,
+            {
+                "/v1/tenants/platform/me": {"relations": relations},
+                "/v1/clusters/demo/me": {"relations": {"can_configure": True}},
+            },
+        )
+        r = TestClient(_app(_settings())).get(
+            "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+        )
+        assert r.status_code == 200
+        assert r.json()["canExpose"] is want
+
+
 def test_someone_the_edge_let_in_but_who_may_not_administer_is_refused(monkeypatch):
     _director(
         monkeypatch,

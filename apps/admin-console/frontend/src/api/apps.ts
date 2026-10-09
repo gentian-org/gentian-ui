@@ -160,8 +160,15 @@ export type ExposureEntry = {
   authMode?: string;
   /** The profile declares that nobody signs in. */
   anyoneWithoutSignIn?: boolean;
+  /** Who can reach it, in the director's own sentence. */
+  access?: string;
   /** The entry is for the cluster's bare domain. */
   mainAddress?: boolean;
+  /**
+   * What the director says an approver must know before a website goes on
+   * the main address. Shown as it came; nothing here holds a copy.
+   */
+  mainAddressRule?: string;
   /** Why it has no address, or why it matches nothing: the director's words. */
   note?: string;
   approval?: ExposureApproval;
@@ -173,6 +180,36 @@ export type ExposureEntry = {
  */
 export function fetchTenantExposures() {
   return apiFetch<{ tenant: string; entries?: ExposureEntry[] }>("/admin/apps/exposures");
+}
+
+/**
+ * What an approval may say. `apex` and `acknowledgeMainAddressRule` are for
+ * an entry on the cluster's main address and travel only for one; the
+ * console's backend refuses any other field.
+ */
+export type ExposureApprovalRequest = {
+  /** RFC 3339. Absent: the entry stays until it is withdrawn. */
+  expiresAt?: string;
+  reason?: string;
+  apex?: boolean;
+  acknowledgeMainAddressRule?: boolean;
+};
+
+const entryPath = (install: string, name: string) =>
+  `/admin/apps/exposures/${encodeURIComponent(install)}/${encodeURIComponent(name)}`;
+
+/**
+ * Approve one entry, or review one that is approved. A commit: `commit` is
+ * there when git changed and absent when the entry already was as asked
+ * (`unchanged`). Whether the person may is the director's answer.
+ */
+export function approveExposure(install: string, name: string, body: ExposureApprovalRequest) {
+  return apiFetch<AppWriteResult>(entryPath(install, name), { method: "PUT", body: JSON.stringify(body) });
+}
+
+/** Take one entry off the internet. A commit, like the approval. */
+export function withdrawExposure(install: string, name: string) {
+  return apiFetch<AppWriteResult>(entryPath(install, name), { method: "DELETE" });
 }
 
 /** Whether a leftover sign-in configuration is still read. */
