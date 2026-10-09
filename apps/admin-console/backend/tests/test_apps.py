@@ -103,6 +103,56 @@ def test_the_approved_privileges_are_the_directors_answer_untouched(monkeypatch)
     assert seen["auth"] == "Bearer person-token"
 
 
+def test_the_public_addresses_are_the_directors_answer_untouched(monkeypatch):
+    seen: dict = {}
+    body = {
+        "tenant": "platform",
+        "live": [],
+        "expired": [],
+        "reviewDue": [],
+        "entries": [
+            {
+                "install": "cloud",
+                "exposureName": "shares",
+                "state": "requested",
+                "host": "share.demo.example",
+                "paths": ["/s/"],
+                "authMode": "none",
+                "anyoneWithoutSignIn": True,
+                "mainAddress": False,
+            }
+        ],
+    }
+    _fake_client(monkeypatch, body, seen)
+    answer = _client().get("/api/v1/admin/apps/exposures", headers=_person)
+    assert answer.status_code == 200
+    assert answer.json() == body
+    # A read of the tenant's entries -- not an app called "exposures".
+    assert (seen["method"], seen["url"]) == ("GET", f"{_base}/exposures")
+    assert seen["auth"] == "Bearer person-token"
+
+
+def test_a_refused_read_of_the_public_addresses_is_passed_on(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"error": "you may not see this tenant"}, seen, status=403)
+    answer = _client().get("/api/v1/admin/apps/exposures", headers=_person)
+    assert answer.status_code == 403
+
+
+@pytest.mark.parametrize("method", ["put", "post", "delete"])
+def test_nothing_is_approved_or_withdrawn_through_the_console(monkeypatch, method):
+    """The console shows what an app asks to publish. Publishing to the
+    internet is the perimeter approver's, by command: no relay carries the
+    director's approval or withdrawal of an entry."""
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated"}, seen)
+    answer = getattr(_client(), method)(
+        "/api/v1/admin/apps/exposures/cloud/shares", headers=_person
+    )
+    assert answer.status_code in (404, 405)
+    assert seen == {}
+
+
 # -- for everyone, or per person --------------------------------------------
 
 

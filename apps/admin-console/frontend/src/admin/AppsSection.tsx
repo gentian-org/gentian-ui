@@ -23,6 +23,7 @@ import {
 } from "@/api/apps";
 import { ApiError } from "@/api/client";
 import { AppLeftovers } from "./AppLeftovers";
+import { AppPublicAddresses } from "./AppPublicAddresses";
 import { GroupMembers } from "./GroupMembers";
 import { describeGroups } from "./groupLabels";
 import "./admin.css";
@@ -254,7 +255,8 @@ function Standing({
  * console knows about the app and everything it can do to it.
  *
  * From the top: how the app stands, who has it, what it exchanges with other
- * apps, what it asked of the platform, taking it away, and -- last -- what
+ * apps, what it asked of the platform, what it asks to have on the internet
+ * (shown only for an app that asks), taking it away, and -- last -- what
  * earlier builds of it left on the cluster.
  *
  * A native modal dialog, like the console's others: it holds focus, the page
@@ -315,6 +317,7 @@ function AppDetails({
         <AccessPart row={row} tenant={tenant} onOutcome={onOutcome} />
         <IntegrationsPart row={row} tenant={tenant} onOpenIntegrations={onOpenIntegrations} />
         <PrivilegesPart row={row} />
+        <AppPublicAddresses app={row.profile} addons={row.declared?.addons ?? []} />
         <UninstallPart row={row} tenant={tenant} declaredKnown={declaredKnown} onOutcome={onOutcome} />
         <AppLeftovers app={row.profile} />
         <div className="admin-console__dialog-footer">

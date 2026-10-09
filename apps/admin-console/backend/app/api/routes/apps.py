@@ -74,6 +74,22 @@ async def privileges(
     )
 
 
+@router.get("/exposures")
+async def exposures(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What this tenant's apps ask to have on the internet, and what of it was
+    approved: each entry's address, its paths, whether anybody signs in, and
+    by whom and until when it was approved. A read, of what git declares;
+    approving and withdrawing are not done from here, and this module has no
+    route for either."""
+    return await director.forward(
+        settings, "GET", f"/v1/tenants/{settings.tenant_id}/exposures", bearer_of(credentials)
+    )
+
+
 @router.get("/retained")
 async def retained(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),

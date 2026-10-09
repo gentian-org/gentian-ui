@@ -55,6 +55,11 @@ says so where they disagree. For one app it shows its state, who has access
 and whether it is for everyone, what it exchanges with other apps, what it
 asked of the platform and what was approved, and it uninstalls. Purging the
 data of an app that is no longer installed is a separate, typed-out act.
+For an app that declares entries for the internet, its Details also list them
+under "Public addresses": the address, the paths, whether anybody signs in,
+and whether the entry was approved. That list is read-only; an entry is
+approved by the tenant's perimeter approver with
+`kubectl gentian exposures approve`.
 
 Nothing is installed from the console. Apps come from the App Store, or from
 `kubectl gentian apps install` where no store is available: the cluster renders

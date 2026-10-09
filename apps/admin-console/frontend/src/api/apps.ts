@@ -132,6 +132,49 @@ export function fetchTenantPrivileges() {
   return apiFetch<{ tenant: string; privileges: PrivilegeGrant[] }>("/admin/apps/privileges");
 }
 
+/** The registry's record of an approved entry: by whom, when, until when, why. */
+export type ExposureApproval = {
+  owner: string;
+  publishedAt?: string;
+  reviewAt: string;
+  expiresAt?: string;
+  reason?: string;
+  lastReviewedBy?: string;
+  lastReviewedAt?: string;
+};
+
+/**
+ * One entry an app declares for the internet, as the director reads it from
+ * the app's profile, with what approving it publishes and whether it was.
+ */
+export type ExposureEntry = {
+  /** The app or add-on the entry belongs to. */
+  install: string;
+  exposureName: string;
+  /** `requested`, `approved`, `reviewDue`, `expired` or `unmatched`. */
+  state: string;
+  /** The public address without scheme; absent when it is published nowhere. */
+  host?: string;
+  paths?: string[];
+  denyPaths?: string[];
+  authMode?: string;
+  /** The profile declares that nobody signs in. */
+  anyoneWithoutSignIn?: boolean;
+  /** The entry is for the cluster's bare domain. */
+  mainAddress?: boolean;
+  /** Why it has no address, or why it matches nothing: the director's words. */
+  note?: string;
+  approval?: ExposureApproval;
+};
+
+/**
+ * What the tenant's apps ask to have on the internet and what was approved.
+ * `entries` is absent from a director older than this screen.
+ */
+export function fetchTenantExposures() {
+  return apiFetch<{ tenant: string; entries?: ExposureEntry[] }>("/admin/apps/exposures");
+}
+
 /** Whether a leftover sign-in configuration is still read. */
 export type ResidueOIDC = {
   /** `yes`, `contested` or `no`. */
