@@ -7,6 +7,12 @@ name: gentian-portal
 # Feature branches are tested but never published. The publish job is what
 # rolls a cluster over, via Argo CD Image Updater, so a branch that built an
 # image would deploy itself — which is the opposite of what a branch is for.
+#
+# Release tags (v*) publish too, as gentian-portal-*:<tag>. A production
+# cluster pins a release rather than following a branch, and until tags built
+# images there was no release image to pin: prod ran develop-<sha> images and a
+# tag named only the source. The paths filter below does not apply to tag
+# pushes, so every release gets its images.
 on:
   push:
     branches:
@@ -14,6 +20,8 @@ on:
       - "feat/**"
       - "fix/**"
       - "chore/**"
+    tags:
+      - "v*"
     paths:
       - "frontend/**"
       - "backend/**"
@@ -141,11 +149,13 @@ jobs:
           context: frontend
           file: frontend/Dockerfile
           # develop publishes, because that is what Argo CD Image Updater
-          # follows. Every other ref builds the image — which is the check —
-          # and pushes nothing.
+          # follows on a dev cluster; a v* tag publishes the release a prod
+          # cluster pins. Every other ref builds the image — which is the
+          # check — and pushes nothing.
           push: >-
             ${{ github.event_name != 'pull_request'
-            && github.ref == 'refs/heads/develop' }}
+            && (github.ref == 'refs/heads/develop'
+                || startsWith(github.ref, 'refs/tags/v')) }}
           # Without this the default builder produces an amd64-only image and
           # says nothing about it. The failure lands much later, as an
           # ImagePullBackOff on an arm64 node whose message never mentions
@@ -170,11 +180,13 @@ jobs:
           context: backend
           file: backend/Dockerfile
           # develop publishes, because that is what Argo CD Image Updater
-          # follows. Every other ref builds the image — which is the check —
-          # and pushes nothing.
+          # follows on a dev cluster; a v* tag publishes the release a prod
+          # cluster pins. Every other ref builds the image — which is the
+          # check — and pushes nothing.
           push: >-
             ${{ github.event_name != 'pull_request'
-            && github.ref == 'refs/heads/develop' }}
+            && (github.ref == 'refs/heads/develop'
+                || startsWith(github.ref, 'refs/tags/v')) }}
           # The backend has no build/runtime split to exploit: uv resolves and
           # installs into the target image, so the arm64 leg runs emulated. That
           # is acceptable while the dependencies ship arm64 wheels — a package
