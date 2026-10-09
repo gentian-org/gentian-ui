@@ -129,14 +129,13 @@ async def session_started(
 
     if not admin_store_configured(settings):
         return
-    realm = realm_from_issuer(str(user.get("iss") or ""))
-    username = user.get("preferred_username")
-    if not realm or not username:
-        return
-    try:
-        await store.restore_workspace_email_for_login(realm, username)
-    except Exception:
-        pass
+    # Nothing to fix up on the user's record any more.
+    #
+    # This used to set the email field back to the username on first login, which
+    # destroyed the recovery address stored there — the address a locked-out user
+    # needs their reset link sent to. The field is left alone now; applications
+    # read the workspace address from the email claim, which is mapped from the
+    # username, so they see what they always saw.
 
 
 @router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)

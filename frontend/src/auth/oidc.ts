@@ -10,6 +10,14 @@ export type OidcConfig = {
   redirectUri: string;
   scopes: string;
   authDisabled: boolean;
+  /**
+   * How a session comes to exist. "pkce": this bundle runs the code flow as a
+   * public client and keeps the token. "edge": the Gateway ran the code flow
+   * with the zone's one confidential client, keeps the session in its own
+   * cookie and forwards the token to the BFF on every request (AD-13); the
+   * bundle holds no token, runs no flow and asks the BFF who it is.
+   */
+  authMode: "pkce" | "edge";
 };
 
 const TOKEN_STORAGE_KEY = "gentian.access_token";
@@ -206,6 +214,7 @@ type RuntimeConfig = {
   oidcClientId?: string;
   oidcScopes?: string;
   authDisabled?: string;
+  authMode?: string;
   kernelDomain?: string;
 };
 
@@ -249,7 +258,50 @@ export function getOidcConfig(): OidcConfig {
     scopes: runtime.oidcScopes || import.meta.env.VITE_OIDC_SCOPES || "openid profile email",
     authDisabled:
       (runtime.authDisabled ?? import.meta.env.VITE_AUTH_DISABLED) === "true",
+    authMode: runtime.authMode === "edge" ? "edge" : "pkce",
   };
+}
+
+/** True when the Gateway holds the session (AD-13). */
+export function isEdgeSession(): boolean {
+  return getOidcConfig().authMode === "edge";
+}
+
+/** Where the edge ends its session: Envoy Gateway's logout path on this host. */
+export const EDGE_LOGOUT_PATH = "/oauth2/logout";
+
+/**
+ * Signing out behind the edge has to end two sessions, and the order matters.
+ *
+ * /oauth2/logout on its own only clears the Gateway's own cookies. Keycloak
+ * still holds the browser's SSO session, so the very next request is signed
+ * back in without a prompt and Sign out looks like a page reload — which is
+ * exactly what it did.
+ *
+ * So the browser goes to Keycloak first. Keycloak ends the SSO session, tells
+ * the director over the back channel that the session is gone, and then
+ * returns the browser to /oauth2/logout, where the Gateway drops its cookies.
+ * What is left is a console with no session at either layer, which is what
+ * signing out means.
+ *
+ * client_id with post_logout_redirect_uri and no id_token_hint is deliberate:
+ * this bundle holds no token to hint with, and Keycloak accepts the pair
+ * without showing the "do you want to log out?" confirmation. The URI must be
+ * registered on the client; the kernel realm bootstrap registers this origin.
+ */
+export function edgeLogoutUrl(): string {
+  const config = getOidcConfig();
+  if (!config.issuer || !config.clientId) {
+    // No issuer to end a session at. Clearing the edge's cookies is still
+    // better than doing nothing, even though Keycloak will sign the next
+    // request straight back in.
+    return EDGE_LOGOUT_PATH;
+  }
+  const params = new URLSearchParams({
+    client_id: config.clientId,
+    post_logout_redirect_uri: `${window.location.origin}${EDGE_LOGOUT_PATH}`,
+  });
+  return `${externalLogoutIssuer(config.issuer)}/protocol/openid-connect/logout?${params.toString()}`;
 }
 
 function randomUrlSafeString(length: number): string {
@@ -290,6 +342,11 @@ export function getAccessTokenExpiryMs(token: string): number | null {
 
 /** Clear portal tokens and send the user back to login (unless already there). */
 export function redirectToLoginForExpiredSession(): void {
+  if (isEdgeSession()) {
+    // The edge decides: a request with no live session is sent to sign in.
+    window.location.reload();
+    return;
+  }
   clearAccessToken();
   if (window.location.pathname.startsWith("/login")) {
     return;
@@ -301,7 +358,7 @@ export function redirectToLoginForExpiredSession(): void {
 /** Return a stored access token, clearing it when missing or expired. */
 export function getAccessToken(): string | null {
   const config = getOidcConfig();
-  if (config.authDisabled) {
+  if (config.authDisabled || config.authMode === "edge") {
     return null;
   }
   const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
@@ -358,6 +415,11 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
     typeof options === "string" ? { returnTo: options } : options;
   const returnTo = normalized.returnTo ?? "/desktop";
   const config = getOidcConfig();
+  if (config.authMode === "edge") {
+    // Any navigation without a session is the edge's to answer.
+    window.location.assign(returnTo);
+    return;
+  }
   if (config.authDisabled || !config.issuer || !config.clientId) {
     return;
   }
@@ -384,10 +446,43 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
     params.set("kc_idp_hint", normalized.idpHint);
   }
 
-  window.location.href = `${issuer}/protocol/openid-connect/auth?${params}`;
+  // Authenticate in the top-level window, never in a frame.
+  //
+  // The shell opens apps framed, and Keycloak is reachable framed on purpose —
+  // the tenant realm clears xFrameOptions so the portal can embed it. But a
+  // framed Keycloak is a third-party context, and its cookies are SameSite=None,
+  // which browsers accept first-party only. Chrome blocks them in private
+  // windows outright and is removing them elsewhere; Safari and Firefox already
+  // partition them.
+  //
+  // The cookie that goes missing first is AUTH_SESSION_ID, which Keycloak sets
+  // before the password is even entered and uses to correlate the form POST with
+  // the authentication session it started. Without it the flow restarts, so the
+  // password is accepted and asked for again — two or three times before a retry
+  // happens to land. Whatever finally succeeds leaves no KEYCLOAK_IDENTITY
+  // behind, so the session exists on the server and nowhere in the browser, and
+  // every app that authenticates through Keycloak prompts as if nobody had
+  // signed in. Apps reached through the portal's own ticket bridge are unaffected,
+  // which is what makes the failure look app-specific rather than systemic.
+  //
+  // window.top is same-origin when the shell frames its own pages, and cross-
+  // origin framing still permits top navigation for a non-sandboxed frame. The
+  // fallback covers the case where the assignment is refused; it is no worse
+  // than the previous behaviour.
+  const authorizeUrl = `${issuer}/protocol/openid-connect/auth?${params}`;
+  const topWindow = window.top ?? window;
+  try {
+    topWindow.location.href = authorizeUrl;
+  } catch {
+    window.location.href = authorizeUrl;
+  }
 }
 
 export async function logoutRedirect(): Promise<void> {
+  if (isEdgeSession()) {
+    window.location.assign(edgeLogoutUrl());
+    return;
+  }
   const accessToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
   const idToken = sessionStorage.getItem(ID_TOKEN_STORAGE_KEY);
   if (accessToken) {
@@ -413,13 +508,17 @@ export async function logoutRedirect(): Promise<void> {
 
 export function isAuthenticated(): boolean {
   const config = getOidcConfig();
-  if (config.authDisabled) {
+  if (config.authDisabled || config.authMode === "edge") {
+    // Behind the edge a request reaches this bundle only with a session.
     return true;
   }
   return getAccessToken() !== null;
 }
 
 export async function handleOAuthCallback(): Promise<boolean> {
+  if (isEdgeSession()) {
+    return false;
+  }
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
   if (!code) {

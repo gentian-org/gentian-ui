@@ -8,6 +8,7 @@ import {
   type Backup,
   type BackupCreateBody,
 } from "@/api/admin";
+import { BackupKeyChoice, type KeyChoice, type KeyDecision } from "@/admin/BackupKeyChoice";
 import "./admin.css";
 
 type BackupSectionProps = {
@@ -58,7 +59,20 @@ function phaseBadgeClass(phase: string): string {
 export function BackupSection({ tenant }: BackupSectionProps) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(defaultName);
-  const [mode, setMode] = useState<"recipient" | "passphrase">("recipient");
+  const [keyChoice, setKeyChoice] = useState<KeyChoice>("platform");
+  const [keyDecision, setKeyDecision] = useState<KeyDecision>({
+    choice: "platform",
+    recipients: [],
+    ready: true,
+  });
+  const mode: "recipient" | "passphrase" = keyChoice === "passphrase" ? "passphrase" : "recipient";
+  const [target, setTarget] = useState<"policy" | "platform" | "custom">("policy");
+  const [endpoint, setEndpoint] = useState("");
+  const [bucket, setBucket] = useState("");
+  const [region, setRegion] = useState("");
+  const [credentialSource, setCredentialSource] = useState<"managed" | "transient">("managed");
+  const [accessKey, setAccessKey] = useState("");
+  const [secretKey, setSecretKey] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [confirmPassphrase, setConfirmPassphrase] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +111,10 @@ export function BackupSection({ tenant }: BackupSectionProps) {
       );
       setPassphrase("");
       setConfirmPassphrase("");
+      // The keys were for one export. Leaving them in the form invites the
+      // next backup to reuse credentials the person meant to use once.
+      setAccessKey("");
+      setSecretKey("");
       setName(defaultName());
       await queryClient.invalidateQueries({ queryKey: ["admin", "backups", tenant] });
     },
@@ -157,10 +175,56 @@ export function BackupSection({ tenant }: BackupSectionProps) {
       }
     }
 
+    // A key choice that was started and not finished — "a new key" with nothing
+    // generated yet, or "a key I already have" with nothing pasted — would
+    // otherwise submit as the platform key, quietly giving the backup to
+    // exactly the reader the choice was made to exclude.
+    if (!keyDecision.ready) {
+      setError(
+        keyDecision.choice === "new"
+          ? "Generate the key first, and save it — the backup cannot be made without it."
+          : "Enter the public key to encrypt this backup to.",
+      );
+      return;
+    }
+
+    if (target === "custom") {
+      if (!endpoint.trim()) {
+        setError("Enter the S3 endpoint to write this backup to.");
+        return;
+      }
+      if (credentialSource === "transient" && (!accessKey.trim() || !secretKey.trim())) {
+        setError("Enter both an access key and a secret key, or use the stored credentials.");
+        return;
+      }
+    }
+
     createMutation.mutate({
       name,
       apps: [],
-      encryption: mode === "passphrase" ? { mode, passphrase } : { mode },
+      encryption:
+        mode === "passphrase"
+          ? { mode, passphrase }
+          : { mode, recipients: keyDecision.recipients },
+      // Omitted for the default. Sending {mode: "policy"} would say the same
+      // thing and leave a destination on the record that overrode nothing.
+      ...(target === "policy"
+        ? {}
+        : {
+            destination:
+              target === "platform"
+                ? { mode: "platform" as const }
+                : {
+                    mode: "custom" as const,
+                    endpoint: endpoint.trim(),
+                    bucket: bucket.trim(),
+                    region: region.trim(),
+                    credentialSource,
+                    ...(credentialSource === "transient"
+                      ? { accessKey: accessKey.trim(), secretKey: secretKey.trim() }
+                      : {}),
+                  },
+          }),
     });
   }
 
@@ -170,7 +234,7 @@ export function BackupSection({ tenant }: BackupSectionProps) {
         <div>
           <h2 className="admin-console__section-title">Backup</h2>
           <p className="admin-console__lead">
-            An export captures this workspace — app databases, files and member accounts — into
+            An export captures this tenant — app databases, files and member accounts — into
             one encrypted bundle. Apps are paused one at a time while each is captured, so every
             app&apos;s data is internally consistent; the rest keep running.
           </p>
@@ -201,79 +265,201 @@ export function BackupSection({ tenant }: BackupSectionProps) {
         </div>
 
         <fieldset className="admin-console__fieldset admin-console__fieldset--plain">
-          <legend>Encryption</legend>
+          <legend>Where it goes</legend>
 
           <div className="admin-console__choices">
             <label
               className={`admin-console__choice${
-                mode === "recipient" ? " admin-console__choice--selected" : ""
+                target === "policy" ? " admin-console__choice--selected" : ""
               }`}
             >
               <input
                 type="radio"
-                name="encryption-mode"
-                checked={mode === "recipient"}
-                onChange={() => setMode("recipient")}
+                name="backup-target"
+                checked={target === "policy"}
+                onChange={() => setTarget("policy")}
               />
               <span>
-                <span className="admin-console__choice-title">Platform key</span>
+                <span className="admin-console__choice-title">Where my backups normally go</span>
                 <span className="admin-console__choice-desc">
-                  Encrypted to the platform&apos;s backup key, so support can help you restore it.
-                  Use this for routine and scheduled backups.
+                  The destination this workspace is configured for — the same place the nightly backup writes.
                 </span>
               </span>
             </label>
-
             <label
               className={`admin-console__choice${
-                mode === "passphrase" ? " admin-console__choice--selected" : ""
+                target === "platform" ? " admin-console__choice--selected" : ""
               }`}
             >
               <input
                 type="radio"
-                name="encryption-mode"
-                checked={mode === "passphrase"}
-                onChange={() => setMode("passphrase")}
+                name="backup-target"
+                checked={target === "platform"}
+                onChange={() => setTarget("platform")}
               />
               <span>
-                <span className="admin-console__choice-title">My passphrase</span>
+                <span className="admin-console__choice-title">This platform's own storage</span>
                 <span className="admin-console__choice-desc">
-                  Encrypted so only you can open it — not the platform, not support. If the
-                  passphrase is lost, the bundle cannot be recovered by anyone.
+                  A copy kept close, for just before a risky change. It shares a home with the data it protects, so it is not what you want for disaster recovery.
+                </span>
+              </span>
+            </label>
+            <label
+              className={`admin-console__choice${
+                target === "custom" ? " admin-console__choice--selected" : ""
+              }`}
+            >
+              <input
+                type="radio"
+                name="backup-target"
+                checked={target === "custom"}
+                onChange={() => setTarget("custom")}
+              />
+              <span>
+                <span className="admin-console__choice-title">My own S3 storage</span>
+                <span className="admin-console__choice-desc">
+                  A bucket you name, on a provider you name. For handing a copy to someone, or keeping one somewhere this platform cannot reach.
                 </span>
               </span>
             </label>
 
             {/* Outside the radio label on purpose: a label nested in a label is
                 invalid, and clicking the input would re-trigger the radio. */}
-            {mode === "passphrase" && (
-              <div className="admin-console__stack admin-console__stack--indent">
+            {target === "custom" && (
+              <div className="admin-console__choice-detail">
                 <label className="admin-console__label">
-                  <span className="admin-console__label-text">Passphrase</span>
+                  <span className="admin-console__label-text">Endpoint</span>
                   <input
-                    type="password"
-                    value={passphrase}
-                    onChange={(event) => setPassphrase(event.target.value)}
-                    minLength={12}
-                    autoComplete="new-password"
+                    value={endpoint}
+                    onChange={(event) => setEndpoint(event.target.value)}
+                    placeholder="https://sos-ch-dk-2.exo.io"
                     required
                   />
                 </label>
                 <label className="admin-console__label">
-                  <span className="admin-console__label-text">Confirm passphrase</span>
+                  <span className="admin-console__label-text">Bucket</span>
                   <input
-                    type="password"
-                    value={confirmPassphrase}
-                    onChange={(event) => setConfirmPassphrase(event.target.value)}
-                    minLength={12}
-                    autoComplete="new-password"
-                    required
+                    value={bucket}
+                    onChange={(event) => setBucket(event.target.value)}
+                    placeholder="leave empty to keep this workspace's bucket name"
                   />
                 </label>
+                <label className="admin-console__label">
+                  <span className="admin-console__label-text">Region</span>
+                  <input
+                    value={region}
+                    onChange={(event) => setRegion(event.target.value)}
+                    placeholder="ch-dk-2 — some providers need one, MinIO does not"
+                  />
+                </label>
+
+                <div className="admin-console__choices">
+                  <label
+                    className={`admin-console__choice${
+                      credentialSource === "managed" ? " admin-console__choice--selected" : ""
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="backup-credential-source"
+                      checked={credentialSource === "managed"}
+                      onChange={() => setCredentialSource("managed")}
+                    />
+                    <span>
+                      <span className="admin-console__choice-title">Use my stored keys</span>
+                      <span className="admin-console__choice-desc">
+                        The credentials already held for this workspace — the ones the nightly
+                        backup uses. Nothing to type, and nothing new to keep safe.
+                      </span>
+                    </span>
+                  </label>
+
+                  <label
+                    className={`admin-console__choice${
+                      credentialSource === "transient" ? " admin-console__choice--selected" : ""
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="backup-credential-source"
+                      checked={credentialSource === "transient"}
+                      onChange={() => setCredentialSource("transient")}
+                    />
+                    <span>
+                      <span className="admin-console__choice-title">Enter keys for this backup</span>
+                      <span className="admin-console__choice-desc">
+                        Used for this backup only. They are kept while it runs and removed when it
+                        finishes — they are not stored for next time.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
+                {credentialSource === "transient" && (
+                  <div className="admin-console__choice-detail">
+                    <label className="admin-console__label">
+                      <span className="admin-console__label-text">Access key</span>
+                      <input
+                        value={accessKey}
+                        onChange={(event) => setAccessKey(event.target.value)}
+                        autoComplete="off"
+                        required
+                      />
+                    </label>
+                    <label className="admin-console__label">
+                      <span className="admin-console__label-text">Secret key</span>
+                      <input
+                        type="password"
+                        value={secretKey}
+                        onChange={(event) => setSecretKey(event.target.value)}
+                        autoComplete="new-password"
+                        required
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </fieldset>
+
+        <BackupKeyChoice
+          tenant={tenant}
+          idPrefix="manual-backup"
+          choice={keyChoice}
+          onChoiceChange={setKeyChoice}
+          onDecision={setKeyDecision}
+          passphrase={{
+            body: "Encrypted so only you can open it — not the platform, not support. If the passphrase is lost, the bundle cannot be recovered by anyone.",
+            ready: passphrase.length >= 12 && passphrase === confirmPassphrase,
+            fields: (
+              <>
+              <label className="admin-console__label">
+                <span className="admin-console__label-text">Passphrase</span>
+                <input
+                  type="password"
+                  value={passphrase}
+                  onChange={(event) => setPassphrase(event.target.value)}
+                  minLength={12}
+                  autoComplete="new-password"
+                  required
+                />
+              </label>
+              <label className="admin-console__label">
+                <span className="admin-console__label-text">Confirm passphrase</span>
+                <input
+                  type="password"
+                  value={confirmPassphrase}
+                  onChange={(event) => setConfirmPassphrase(event.target.value)}
+                  minLength={12}
+                  autoComplete="new-password"
+                  required
+                />
+              </label>
+              </>
+            ),
+          }}
+        />
 
         <div className="admin-console__submit">
           <button

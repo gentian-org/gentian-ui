@@ -2,6 +2,8 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from app.core.config import Settings
 from app.core.shell_apps import (
     app_launch_url,
@@ -9,6 +11,18 @@ from app.core.shell_apps import (
     shell_apps_for_user,
     user_can_see_portal_tile,
 )
+
+
+@pytest.fixture(autouse=True)
+def platform_profiles():
+    """Platform-app tiles come from the cluster's AppProfiles, which these tests
+    do not have -- unmocked, every shell_apps_for_user case died in the k8s
+    client. The tile sets under test are the tenant's own, so the platform list
+    is empty unless a test sets a return value on this fixture.
+    """
+    with patch("app.core.shell_apps.list_platform_app_profiles", return_value=[]) as listed:
+        yield listed
+
 
 APP_STORE_PROFILE = {
     "metadata": {"name": "app-store", "annotations": {"gentianos.io/platform-app": "true"}},
@@ -106,6 +120,37 @@ def test_app_launch_url_api_profile_without_tenant_binding():
     )
 
 
+ODOO_BASE_PROFILE = {
+    "metadata": {"name": "odoo-base-ce"},
+    "spec": {
+        "family": "odoo",
+        "ingress": {"subDomain": "erp"},
+        "portalTiles": [
+            {"name": "odoo-admin", "allowedGroup": "App Admins", "linkTarget": "embedded"}
+        ],
+    },
+}
+
+ODOO_CRM_PROFILE = {
+    "metadata": {
+        "name": "odoo-crm-ce",
+        "annotations": {"gentianos.io/deployment-role": "addon"},
+    },
+    "spec": {
+        "displayName": "Odoo CRM",
+        "family": "odoo",
+        "customization": {"addon": {"id": "crm", "of": "odoo-base-ce"}},
+        "portalTiles": [{"name": "crm", "allowedGroup": "App Users"}],
+    },
+}
+
+
+def _fake_odoo_profile(name: str):
+    return {
+        "odoo-base-ce": ODOO_BASE_PROFILE,
+        "odoo-crm-ce": ODOO_CRM_PROFILE,
+    }.get(name)
+
 def test_is_admin_portal_tile():
     assert is_admin_portal_tile("Tenant Admins")
     assert not is_admin_portal_tile("App Users")
@@ -144,7 +189,7 @@ def test_member_does_not_see_admin_app_tile():
     )
 
 
-async def test_shell_apps_for_tenant_admin_includes_admin_and_app_store_only():
+async def test_shell_apps_for_tenant_admin_includes_admin_and_app_store_only(platform_profiles):
     settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
     settings.auth_disabled = False
     user = {
@@ -160,16 +205,11 @@ async def test_shell_apps_for_tenant_admin_includes_admin_and_app_store_only():
             return APP_STORE_PROFILE
         return None
 
+    platform_profiles.return_value = ["app-store"]
+
     with (
         patch("app.core.shell_apps.list_installed_profiles", return_value=["element"]),
         patch("app.core.shell_apps.get_app_profile", side_effect=fake_profile),
-        patch(
-            "app.core.shell_apps.is_platform_app",
-            side_effect=lambda profile: profile.get("metadata", {})
-            .get("annotations", {})
-            .get("gentianos.io/platform-app")
-            == "true",
-        ),
     ):
         apps = await shell_apps_for_user(user, settings)
 
@@ -193,7 +233,6 @@ async def test_shell_apps_for_member_includes_entitled_app():
     with (
         patch("app.core.shell_apps.list_installed_profiles", return_value=["element"]),
         patch("app.core.shell_apps.get_app_profile", return_value=ELEMENT_PROFILE),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings)
     assert apps == [
@@ -204,6 +243,7 @@ async def test_shell_apps_for_member_includes_entitled_app():
             "launchUrl": "https://chat.demo.desk.gentian.org",
             "linkTarget": "embedded",
             "authMode": "matrix-bridge",
+            "preopen": False,
             "builtin": False,
         }
     ]
@@ -223,7 +263,6 @@ async def test_shell_apps_for_openproject_uses_bridge_auth_mode():
     with (
         patch("app.core.shell_apps.list_installed_profiles", return_value=["openproject"]),
         patch("app.core.shell_apps.get_app_profile", return_value=OPENPROJECT_PROFILE),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings)
     assert apps == [
@@ -234,6 +273,7 @@ async def test_shell_apps_for_openproject_uses_bridge_auth_mode():
             "launchUrl": "https://projects.demo.desk.gentian.org",
             "linkTarget": "embedded",
             "authMode": "openproject-bridge",
+            "preopen": False,
             "builtin": False,
         }
     ]
@@ -273,7 +313,6 @@ async def test_shell_apps_for_nextcloud_uses_bridge_auth_mode():
     with (
         patch("app.core.shell_apps.list_installed_profiles", return_value=["nextcloud-office"]),
         patch("app.core.shell_apps.get_app_profile", return_value=nextcloud_profile),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings)
     assert apps == [
@@ -284,6 +323,7 @@ async def test_shell_apps_for_nextcloud_uses_bridge_auth_mode():
             "launchUrl": "https://cloud.demo.desk.gentian.org",
             "linkTarget": "embedded",
             "authMode": "portal-bridge",
+            "preopen": False,
             "builtin": False,
         }
     ]
@@ -323,7 +363,6 @@ async def test_shell_apps_uses_annotated_portal_auth_mode():
     with (
         patch("app.core.shell_apps.list_installed_profiles", return_value=["some-app"]),
         patch("app.core.shell_apps.get_app_profile", return_value=custom_profile),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings)
     assert len(apps) == 1
@@ -354,75 +393,127 @@ async def test_shell_apps_for_member_without_entitlement_empty():
     with (
         patch("app.core.shell_apps.list_installed_profiles", return_value=["element"]),
         patch("app.core.shell_apps.get_app_profile", return_value=element_profile),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
     ):
         apps = await shell_apps_for_user(user, settings)
     assert apps == []
 
 
-async def test_shell_apps_for_odoo_module_visibility():
+async def test_addon_tile_needs_that_addons_own_group():
+    """Entitlement is the addon's own group -- tenant membership is not enough."""
+    settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    settings.auth_disabled = False
+
+    def user_with(*groups):
+        return {
+            "preferred_username": "john-doe@demo.desk.gentian.org",
+            "tenant": "demo",
+            "groups": list(groups),
+        }
+
+    with (
+        patch(
+            "app.core.shell_apps.list_installed_profiles",
+            return_value=["odoo-base-ce", "odoo-crm-ce"],
+        ),
+        patch("app.core.shell_apps.get_app_profile", side_effect=_fake_odoo_profile),
+    ):
+        entitled = await shell_apps_for_user(
+            user_with(
+                "gentian:tenant:demo:members",
+                "gentian:tenant:demo:app:odoo-base-ce",
+                "gentian:tenant:demo:app:odoo-crm-ce",
+            ),
+            settings,
+        )
+        member_only = await shell_apps_for_user(
+            user_with(
+                "gentian:tenant:demo:members",
+                "gentian:tenant:demo:app:odoo-base-ce",
+            ),
+            settings,
+        )
+
+    ids = [app["id"] for app in entitled]
+    assert "odoo-crm-ce-crm" in ids
+    crm = next(app for app in entitled if app["id"] == "odoo-crm-ce-crm")
+    assert crm["launchUrl"] == "https://erp.demo.desk.gentian.org"
+
+    # Holding the base and being a tenant member used to be enough for every
+    # addon tile in the family.
+    assert [app["id"] for app in member_only] == []
+
+
+async def test_base_tile_hidden_when_no_addon_is_entitled():
+    """A base with no entitled addon has nothing to offer, so it stays hidden."""
     settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
     settings.auth_disabled = False
     user = {
-        "preferred_username": "crm-user@demo.desk.gentian.org",
+        "preferred_username": "john-doe@demo.desk.gentian.org",
         "tenant": "demo",
-        "groups": ["/sales-team"],
+        "groups": [
+            "gentian:tenant:demo:members",
+            # entitled to the base itself, but to none of the addons in it
+            "gentian:tenant:demo:app:odoo-base-ce",
+        ],
     }
-    
-    crm_profile = {
-        "metadata": {
-            "name": "odoo-crm-ce",
-            "annotations": {"gentianos.io/deployment-role": "addon"},
-        },
-        "spec": {
-            "displayName": "Odoo CRM",
-            "family": "odoo",
-            # The gate reads the module's real Odoo name from here, not from the
-            # profile name.
-            "customization": {"addon": {"id": "crm", "of": "odoo-base-ce"}},
-            "portalTiles": [{"name": "crm", "allowedGroup": "App Users"}],
-        }
-    }
-    
-    base_profile = {
-        "metadata": {"name": "odoo-base-ce"},
-        "spec": {
-            "family": "odoo",
-            "ingress": {"subDomain": "erp"},
-        }
-    }
-    
-    def fake_profile(name: str):
-        if name == "odoo-crm-ce":
-            return crm_profile
-        if name == "odoo-base-ce":
-            return base_profile
-        return None
-    
-    # Mock AdminStore list_groups
-    from unittest.mock import AsyncMock
-    from app.services.admin_store import Group
-    
-    mock_store = AsyncMock()
-    mock_store.list_groups.return_value = [
-        Group(
-            id="g1",
-            name="sales-team",
-            path="/sales-team",
-            gentian_odoo_modules=["crm"],
-        )
-    ]
-    
     with (
-        patch("app.core.shell_apps.list_installed_profiles", return_value=["odoo-crm-ce"]),
-        patch("app.core.shell_apps.get_app_profile", side_effect=fake_profile),
-        patch("app.core.shell_apps.is_platform_app", return_value=False),
+        patch(
+            "app.core.shell_apps.list_installed_profiles",
+            return_value=["odoo-base-ce", "odoo-crm-ce"],
+        ),
+        patch("app.core.shell_apps.get_app_profile", side_effect=_fake_odoo_profile),
     ):
-        apps = await shell_apps_for_user(user, settings, store=mock_store)
-        
-    assert len(apps) == 1
-    assert apps[0]["id"] == "odoo-crm-ce-crm"
-    assert apps[0]["launchUrl"] == "https://erp.demo.desk.gentian.org"
+        apps = await shell_apps_for_user(user, settings)
+
+    assert [app["id"] for app in apps] == []
+
+
+async def test_base_tile_shown_once_one_addon_is_entitled():
+    settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    settings.auth_disabled = False
+    user = {
+        "preferred_username": "john-doe@demo.desk.gentian.org",
+        "tenant": "demo",
+        "groups": [
+            "gentian:tenant:demo:members",
+            "gentian:tenant:demo:app:odoo-base-ce",
+            "gentian:tenant:demo:app:odoo-crm-ce",
+        ],
+    }
+    with (
+        patch(
+            "app.core.shell_apps.list_installed_profiles",
+            return_value=["odoo-base-ce", "odoo-crm-ce"],
+        ),
+        patch("app.core.shell_apps.get_app_profile", side_effect=_fake_odoo_profile),
+    ):
+        apps = await shell_apps_for_user(user, settings)
+
+    assert "odoo-base-ce-odoo-admin" in [app["id"] for app in apps]
+
+
+async def test_base_without_activated_addons_is_not_hollow():
+    """A base the tenant activated nothing in is a plain app, not a hollow base."""
+    settings = Settings(auth_disabled=False, KERNEL_DOMAIN="desk.gentian.org")
+    settings.auth_disabled = False
+    user = {
+        "preferred_username": "john-doe@demo.desk.gentian.org",
+        "tenant": "demo",
+        "groups": [
+            "gentian:tenant:demo:members",
+            "gentian:tenant:demo:app:odoo-base-ce",
+        ],
+    }
+    with (
+        patch(
+            "app.core.shell_apps.list_installed_profiles",
+            return_value=["odoo-base-ce"],
+        ),
+        patch("app.core.shell_apps.get_app_profile", side_effect=_fake_odoo_profile),
+    ):
+        apps = await shell_apps_for_user(user, settings)
+
+    assert [app["id"] for app in apps] == ["odoo-base-ce-odoo-admin"]
 
 
 # --- capability-gated platform apps -----------------------------------------
@@ -487,3 +578,103 @@ def test_capability_set_parses_the_setting():
     assert Settings(GENTIAN_CAPABILITIES="").capability_set == set()
     assert Settings(GENTIAN_CAPABILITIES="llm").capability_set == {"llm"}
     assert Settings(GENTIAN_CAPABILITIES="llm, mail ,").capability_set == {"llm", "mail"}
+
+
+# --- kernel service consoles -------------------------------------------------
+#
+# The regression these cover: a platform administrator signed in at the kernel
+# domain got only the built-in Admin Console. tenant_shell_apps returns early
+# for a kernel-domain user and every other tile came from there, so the
+# cluster's own service consoles had no tile surface at all.
+#
+# AUTH_DISABLED is passed under its alias, not as auth_disabled=False. The field
+# is declared Field(alias="AUTH_DISABLED") with no populate_by_name, so the snake
+# case keyword does not bind and conftest's os.environ["AUTH_DISABLED"]="true"
+# wins -- which would make every user a platform administrator and pass these
+# tests for the wrong reason.
+
+
+def _kernel_settings(capabilities: str = "llm"):
+    return Settings(
+        AUTH_DISABLED="false",
+        KERNEL_DOMAIN="desk.gentian.org",
+        GENTIAN_CAPABILITIES=capabilities,
+    )
+
+
+def _platform_admin_user():
+    return {
+        "preferred_username": "administrator",
+        "tenant": "desk.gentian.org",
+        "groups": ["gentian:platform:admin"],
+    }
+
+
+@pytest.fixture
+def no_installed_profiles():
+    """These cases are about kernel tiles, not the tenant's own.
+
+    Unpatched, list_installed_profiles reads AppProfiles from whatever cluster
+    the developer's kubeconfig points at, so the assertions would depend on a
+    live cluster's tenant.
+    """
+    with patch("app.core.shell_apps.list_installed_profiles", return_value=[]):
+        yield
+
+
+@pytest.mark.asyncio
+async def test_platform_admin_gets_llm_gateway_tile_at_kernel_domain(no_installed_profiles):
+    apps = await shell_apps_for_user(_platform_admin_user(), _kernel_settings())
+    by_id = {a["id"]: a for a in apps}
+    assert "kernel-llm-gateway" in by_id, "no LLM Gateway tile for the cluster admin"
+    tile = by_id["kernel-llm-gateway"]
+    # The host the kernel HTTPRoute actually serves (kernel_gateway_routes.go),
+    # and the admin console on it. LiteLLM serves its API landing page at / and
+    # the dashboard at /ui/, so the bare host is the wrong page -- with the
+    # trailing slash, because /ui answers 307 to /ui/.
+    assert tile["launchUrl"] == "https://llm.desk.gentian.org/ui/"
+    assert tile["linkTarget"] == "newwindow"
+    # Decorating this URL with a login_hint would be wrong: LiteLLM authenticates
+    # through its own SSO path, not a query parameter on its root.
+    assert tile["authMode"] is None
+    # The built-in console is still there; this tile is in addition to it.
+    assert "admin" in by_id
+
+
+@pytest.mark.asyncio
+async def test_no_llm_gateway_tile_without_the_capability(no_installed_profiles):
+    """The cluster serves no LLM, so the tile would point at a dead host.
+
+    This is also the state every cluster was in while the portal Application
+    failed to pass llm.enabled through -- indistinguishable, from here, from a
+    cluster that genuinely has LLM off.
+    """
+    apps = await shell_apps_for_user(_platform_admin_user(), _kernel_settings(capabilities=""))
+    assert not [a for a in apps if a["id"] == "kernel-llm-gateway"]
+
+
+@pytest.mark.asyncio
+async def test_tenant_admin_does_not_get_kernel_consoles(no_installed_profiles):
+    """A tenant administrator administers a tenant.
+
+    LiteLLM's console holds the model routing and budgets that apply to every
+    tenant on the cluster, so it is not a tenant administrator's to open.
+    """
+    user = {
+        "preferred_username": "alice",
+        "tenant": "demo",
+        "groups": ["gentian:tenant:demo:admins"],
+    }
+    apps = await shell_apps_for_user(user, _kernel_settings())
+    assert not [a for a in apps if a["id"] == "kernel-llm-gateway"]
+
+
+@pytest.mark.asyncio
+async def test_member_does_not_get_kernel_consoles(no_installed_profiles):
+    user = {
+        "preferred_username": "bob",
+        "tenant": "demo",
+        "groups": ["gentian:tenant:demo:members"],
+    }
+    apps = await shell_apps_for_user(user, _kernel_settings())
+    assert not [a for a in apps if a["id"] == "kernel-llm-gateway"]

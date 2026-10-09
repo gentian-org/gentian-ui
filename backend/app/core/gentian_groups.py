@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-PLATFORM_SUPERADMIN = "gentian:platform:superadmin"
+PLATFORM_SUPERADMIN = "gentian:platform:admin"
 PLATFORM_OPERATOR = "gentian:platform:operator"
 PLATFORM_BREAK_GLASS = "gentian:platform:break-glass"
 ROLE_MEMBER = "gentian:role:member"
@@ -98,7 +98,7 @@ def _local_username(user: dict[str, Any]) -> str:
 
 
 def is_platform_bootstrap_admin(user: dict[str, Any]) -> bool:
-    """Stage 1 install creates `administrator` in gentian:platform:superadmin via bootstrap Job."""
+    """Stage 1 install creates `administrator` in gentian:platform:admin via bootstrap Job."""
     return _local_username(user) == PLATFORM_BOOTSTRAP_USERNAME
 
 
@@ -113,7 +113,19 @@ def is_bootstrap_tenant_admin(user: dict[str, Any], tenant: str | None = None) -
     return bool(inferred)
 
 
+PLATFORM_TENANT = "platform"
+
+
+def relations_of(user: dict[str, Any]) -> dict[str, bool] | None:
+    """The director's answer about this caller, when the edge session carries
+    one. None means the caller was not identified that way (v4 groups)."""
+    rel = user.get("relations")
+    return rel if isinstance(rel, dict) else None
+
+
 def user_is_tenant_admin(user: dict[str, Any], tenant: str | None = None) -> bool:
+    if (rel := relations_of(user)) is not None:
+        return bool(rel.get("can_administer")) and (tenant is None or tenant == user.get("tenant"))
     groups = normalize_groups(user)
     if is_tenant_admin(groups):
         return True
@@ -121,5 +133,9 @@ def user_is_tenant_admin(user: dict[str, Any], tenant: str | None = None) -> boo
 
 
 def user_is_platform_admin(user: dict[str, Any]) -> bool:
+    if (rel := relations_of(user)) is not None:
+        # The platform's administrators are the platform tenant's (AD-10):
+        # can_administer there derives from admin on the cluster.
+        return bool(rel.get("can_administer")) and user.get("tenant") == PLATFORM_TENANT
     groups = normalize_groups(user)
     return is_platform_superadmin(groups) or is_platform_bootstrap_admin(user)

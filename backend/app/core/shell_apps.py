@@ -10,12 +10,15 @@ from app.core.gentian_groups import (
     is_tenant_admin,
     normalize_groups,
     tenant_app_group,
-    tenant_members_group,
     user_is_platform_admin,
+    user_is_tenant_admin,
 )
 from app.core.tenant import extract_tenant_from_claims
-from app.services.admin_store import AdminStore
-from app.services.k8s_catalogue import get_app_profile, is_platform_app, list_installed_profiles, list_platform_app_profiles
+from app.services.k8s_catalogue import (
+    get_app_profile,
+    list_installed_profiles,
+    list_platform_app_profiles,
+)
 
 ADMIN_SHELL_APP = {
     "id": "admin",
@@ -24,6 +27,78 @@ ADMIN_SHELL_APP = {
     "launchUrl": None,
     "builtin": True,
 }
+
+# Kernel services with an operator-facing UI, as desktop tiles.
+#
+# These are not apps and cannot be modelled as AppProfiles. An AppProfile tile
+# reaches a desktop through tenant_shell_apps, which answers nothing at all for
+# a user whose tenant is the kernel domain -- a platform administrator signed in
+# to the kernel realm. So the cluster's own infrastructure had no tile surface:
+# LiteLLM's console is routed at llm.<kernelDomain> by the operator whenever the
+# claim enables LLM, and nothing in the portal ever offered a way in. The
+# litellm-me profile does declare a tile, but it is a tenant-scope platform app
+# and so lands in the same dead path.
+#
+# Kept as data rather than one more branch in shell_apps_for_user, because the
+# next kernel console (Argo CD is routed the same way, at argocd.<kernelDomain>)
+# should be a row here and not another if.
+#
+# subdomain is the host the kernel HTTPRoute serves, and capability gates the
+# tile on the cluster actually running the thing -- same rule as a platform
+# app's requires-capability, and for the same reason: a tile pointing at a host
+# that resolves to nothing is worse than no tile.
+KERNEL_SHELL_APPS = (
+    {
+        "id": "kernel-llm-gateway",
+        "title": "LLM Gateway",
+        "icon": "settings",
+        "subdomain": "llm",
+        # The console, not the API. LiteLLM serves its FastAPI landing page at
+        # /, and the Next.js admin dashboard -- models, virtual keys, team
+        # budgets, spend -- at /ui/. Linking to the host alone opened the
+        # former, which reads as "the tile is just a rendering of the API".
+        # Trailing slash included: /ui answers 307 to /ui/.
+        "path": "/ui/",
+        "capability": "llm",
+    },
+)
+
+
+def kernel_shell_apps(settings: Settings, *, is_platform_admin: bool) -> list[dict[str, Any]]:
+    """Kernel service consoles this cluster runs, for a platform administrator.
+
+    Platform administrators only, deliberately: a tenant administrator
+    administers a tenant, and these consoles configure the cluster underneath
+    every tenant -- LiteLLM's holds the model routing and the budgets that apply
+    to all of them.
+    """
+    if not is_platform_admin:
+        return []
+    domain = settings.kernel_domain.strip().lower()
+    if not domain:
+        return []
+    available = settings.capability_set
+    apps: list[dict[str, Any]] = []
+    for spec in KERNEL_SHELL_APPS:
+        capability = str(spec.get("capability") or "")
+        if capability and capability not in available:
+            continue
+        apps.append(
+            {
+                "id": str(spec["id"]),
+                "title": str(spec["title"]),
+                "icon": str(spec["icon"]),
+                "launchUrl": f"https://{spec['subdomain']}.{domain}{spec.get('path', '')}",
+                "linkTarget": "newwindow",
+                # Not "oidc": that tells the shell to decorate the URL with a
+                # login_hint, which these consoles do not read -- LiteLLM signs
+                # in through its own SSO flow at its own path.
+                "authMode": None,
+                "preopen": False,
+                "builtin": False,
+            }
+        )
+    return apps
 
 
 def tenant_host(tenant: str, kernel_domain: str) -> str:
@@ -104,6 +179,18 @@ def profile_auth_mode(profile: dict[str, Any], profile_name: str) -> str | None:
     return None
 
 
+def profile_preopen(profile: dict[str, Any]) -> bool:
+    """Whether the shell should open this app hidden at desktop mount.
+
+    Some apps need a live session before the user ever clicks their tile -- the
+    AI widget queries its backing app in the background, and a cold app answers
+    with a login redirect. The app declares that need itself; the shell must not
+    know which app it is.
+    """
+    annotations = profile.get("metadata", {}).get("annotations") or {}
+    return str(annotations.get("gentianos.io/portal-preopen", "")).lower() in {"true", "1", "yes"}
+
+
 def tile_icon(profile_spec: dict[str, Any], portal_tile: dict[str, Any]) -> str:
     tile_spec = portal_tile.get("tile") or {}
     if tile_spec.get("logo"):
@@ -133,19 +220,51 @@ def user_can_see_portal_tile(
 ) -> bool:
     normalized = (allowed_group or "Domain Users").strip()
 
+    # Administrators administer the tenant; they are not app users. They see the
+    # tiles that manage it and nothing else, and no member sees those.
     if is_admin:
         return is_admin_portal_tile(normalized)
 
     if is_admin_portal_tile(normalized):
         return False
 
-    if tenant_app_group(tenant, profile) in groups:
-        return True
-    if normalized in {"App Users", "Domain Users"}:
-        return tenant_members_group(tenant) in groups
-    if normalized.startswith("managed-by-attribute-"):
-        return tenant_app_group(tenant, profile) in groups
-    return tenant_members_group(tenant) in groups
+    # Entitlement is membership of the app's own group, and nothing else.
+    #
+    # allowedGroup used to widen this: "App Users" and "Domain Users" -- which is
+    # every profile in the catalogue and the CRD default -- fell through to plain
+    # tenant membership, so the group could grant a tile but never withhold one
+    # and every member saw every app. The value now only separates the tenant's
+    # administrative tiles from the rest, which is the distinction above.
+    return tenant_app_group(tenant, profile) in groups
+
+
+def _bases_without_entitled_addons(
+    installed: list[str], *, tenant: str, groups: list[str]
+) -> set[str]:
+    """Bases whose activated addons the user holds none of.
+
+    An addon declares its base in spec.customization.addon.of, so which profiles
+    are bases and which addons belong to them is read off the catalogue rather
+    than named here. A base the tenant activated no addons in is not hollow --
+    there is nothing it could have entitled the user to -- so only bases with at
+    least one activated addon can appear in the result.
+    """
+    activated: dict[str, list[str]] = {}
+    for name in installed:
+        profile = get_app_profile(name)
+        if profile is None:
+            continue
+        addon = ((profile.get("spec") or {}).get("customization") or {}).get("addon") or {}
+        base = addon.get("of")
+        if base:
+            activated.setdefault(str(base), []).append(name)
+
+    held = set(groups)
+    return {
+        base
+        for base, addons in activated.items()
+        if not any(tenant_app_group(tenant, addon) in held for addon in addons)
+    }
 
 
 def _profiles_for_shell_tiles(
@@ -165,7 +284,6 @@ def _profiles_for_shell_tiles(
 async def tenant_shell_apps(
     user: dict[str, Any],
     settings: Settings,
-    store: AdminStore | None = None,
     *,
     groups: list[str],
     is_admin: bool,
@@ -174,68 +292,35 @@ async def tenant_shell_apps(
     if not tenant or tenant == settings.kernel_domain:
         return []
 
+    installed = _profiles_for_shell_tiles(
+        tenant, is_admin=is_admin, capabilities=settings.capability_set
+    )
+    hollow_bases = _bases_without_entitled_addons(installed, tenant=tenant, groups=groups)
+
     apps: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for profile_name in _profiles_for_shell_tiles(
-        tenant, is_admin=is_admin, capabilities=settings.capability_set
-    ):
+    for profile_name in installed:
         profile = get_app_profile(profile_name)
         if profile is None:
+            continue
+        # A base is entered for the addons activated inside it. Someone entitled
+        # to none of them has nothing to do there, so the base's own tiles stay
+        # hidden rather than opening an app whose every feature is refused.
+        if profile_name in hollow_bases:
             continue
         spec = profile.get("spec") or {}
         portal_tiles = spec.get("portalTiles") or []
         if not portal_tiles:
             continue
         for portal_tile in portal_tiles:
-            # Odoo addons are gated per user: a member sees the tile only if one of
-            # their Keycloak groups grants that module via gentianOdooModules.
-            #
-            # This used to key on requires-profile == "odoo-cb-base" and strip an
-            # "odoo-cb-" prefix. Both were stale from the profile rename, so the whole
-            # gate had been silently inert — every member saw every Odoo tile. It now
-            # keys on the addon declaration, which is also where the module's real
-            # Odoo name lives (crm, account, hr), rather than being guessed from the
-            # profile name.
-            #
-            # Known debt: this is app-specific gating living in the portal. It belongs
-            # with the entitlement model, so that visibility is decided the same way
-            # for every app rather than once per family here.
-            addon_of = ((spec.get("customization") or {}).get("addon") or {})
-            is_odoo_addon = bool(addon_of.get("of")) and spec.get("family") == "odoo"
-            if is_odoo_addon and not is_admin:
-                module_name = addon_of.get("id") or profile_name
-                from app.services.keycloak_user_groups import realm_from_issuer
-                realm = realm_from_issuer(user.get("iss") or "") or f"tenant-{tenant}"
-                all_kc_groups = []
-                if store is not None:
-                    try:
-                        all_kc_groups = await store.list_groups(realm)
-                    except Exception:
-                        pass
-                
-                user_group_paths = {g.lstrip("/") for g in groups}
-                user_kc_groups = [
-                    g for g in all_kc_groups
-                    if g.path.lstrip("/") in user_group_paths or g.name in user_group_paths
-                ]
-                
-                has_grant = False
-                for g in user_kc_groups:
-                    if "*" in g.gentian_odoo_modules or module_name in g.gentian_odoo_modules:
-                        has_grant = True
-                        break
-                
-                if not has_grant:
-                    continue
-            else:
-                if not user_can_see_portal_tile(
-                    groups,
-                    tenant=tenant,
-                    profile=profile_name,
-                    allowed_group=str(portal_tile.get("allowedGroup") or ""),
-                    is_admin=is_admin,
-                ):
-                    continue
+            if not user_can_see_portal_tile(
+                groups,
+                tenant=tenant,
+                profile=profile_name,
+                allowed_group=str(portal_tile.get("allowedGroup") or ""),
+                is_admin=is_admin,
+            ):
+                continue
             tile_name = str(portal_tile.get("name") or profile_name)
             app_id = f"{profile_name}-{tile_name}"
             if app_id in seen:
@@ -277,6 +362,7 @@ async def tenant_shell_apps(
                     "launchUrl": launch_url,
                     "linkTarget": str(portal_tile.get("linkTarget") or "newwindow"),
                     "authMode": profile_auth_mode(auth_profile, auth_profile_name),
+                    "preopen": profile_preopen(auth_profile),
                     "builtin": False,
                 }
             )
@@ -286,8 +372,18 @@ async def tenant_shell_apps(
 async def shell_apps_for_user(
     user: dict[str, Any],
     settings: Settings,
-    store: AdminStore | None = None,
 ) -> list[dict[str, Any]]:
+    if settings.edge_session:
+        # This process reads no Tenant and no AppProfile behind the edge
+        # (ui-restructure.md §2): the kernel consoles are its own to name,
+        # the admin tile follows the director's answer, and the tenant's
+        # apps are the director's to serve -- which it does not yet, so
+        # none are listed here rather than read from Kubernetes.
+        apps = kernel_shell_apps(settings, is_platform_admin=user_is_platform_admin(user))
+        if user_is_tenant_admin(user):
+            apps.append(dict(ADMIN_SHELL_APP))
+        return apps
+
     groups = normalize_groups(user)
     if settings.auth_disabled:
         groups = groups or ["gentian:tenant:demo:admins", "gentian:tenant:demo:members"]
@@ -298,7 +394,16 @@ async def shell_apps_for_user(
         or is_bootstrap_tenant_admin(user)
     )
 
-    apps = await tenant_shell_apps(user, settings, store, groups=groups, is_admin=is_admin)
+    apps = await tenant_shell_apps(user, settings, groups=groups, is_admin=is_admin)
+    # Outside tenant_shell_apps on purpose: it returns early for a user whose
+    # tenant is the kernel domain, which is exactly the administrator these
+    # tiles are for.
+    apps.extend(
+        kernel_shell_apps(
+            settings,
+            is_platform_admin=settings.auth_disabled or user_is_platform_admin(user),
+        )
+    )
     if is_admin:
         apps.append(dict(ADMIN_SHELL_APP))
     return apps

@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { fetchAdminContext, fetchGroups } from "@/api/admin";
 import { AuditSection } from "@/admin/AuditSection";
+import { BackupPolicySection } from "@/admin/BackupPolicySection";
+import { BackupSchedulesSection } from "@/admin/BackupSchedulesSection";
 import { BackupSection } from "@/admin/BackupSection";
 import { CredentialsSection } from "@/admin/CredentialsSection";
 import { CustomizationDebtSection } from "@/admin/CustomizationDebtSection";
@@ -66,7 +68,13 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
     queryKey: ["admin", "context"],
     queryFn: () => fetchAdminContext(),
   });
-  const tenant = contextQuery.data?.tenant ?? "demo";
+  // No tenant literal as a fallback. Hooks must be declared before the early
+  // returns below, so this runs before the loading and error guards -- but the
+  // groups query is gated on the context having loaded, and every consumer of
+  // `tenant` sits after those guards, so the empty string is never used. It used
+  // to read `?? "demo"`, which would have queried a real, unrelated tenant the
+  // moment someone reordered any of that.
+  const tenant = contextQuery.data?.tenant ?? "";
 
   const groupsQuery = useQuery({
     queryKey: ["admin", "groups", tenant],
@@ -177,7 +185,11 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
           ) : tab === "notifications" ? (
             <NotificationsSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
           ) : tab === "backup" ? (
-            <BackupSection tenant={tenant} />
+            <>
+              <BackupSchedulesSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
+              <BackupPolicySection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
+              <BackupSection tenant={tenant} />
+            </>
           ) : (
             <AuditSection tenant={tenant} />
           )}

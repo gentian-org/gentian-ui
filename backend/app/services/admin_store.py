@@ -38,6 +38,10 @@ class Group:
     member_count: int = 0
     gentian_odoo_modules: list[str] = field(default_factory=list)
     gentian_odoo_group_roles: list[str] = field(default_factory=list)
+    # Set by the App Store when the tenant provisioned this app rather than only
+    # installing it. The console pre-selects such groups when adding a user, so a
+    # provisioned app is opt-out for new people and an installed one opt-in.
+    default_grant: bool = False
 
 
 @dataclass
@@ -135,7 +139,6 @@ class AdminStore(Protocol):
 
     async def send_password_reset_by_email(self, realm: str, email: str) -> bool: ...
 
-    async def restore_workspace_email_for_login(self, realm: str, keycloak_username: str) -> None: ...
 
 
 def admin_store_configured(settings: Settings) -> bool:

@@ -5,6 +5,17 @@ api:
   image:
     repository: ghcr.io/gentian-org/gentian-portal-api
     tag: "0.1.0"
+    # Always, not the IfNotPresent the templates fall back to. A cluster runs
+    # this chart with a moving tag (image.tag: develop), and a node that has
+    # already cached that tag never re-pulls it under IfNotPresent — so CI can
+    # publish for weeks while the node keeps serving the layer it downloaded
+    # once, through restarts and rollouts alike, with nothing reporting drift.
+    #
+    # Image Updater writing an immutable develop-<sha> tag makes each pull a
+    # fresh name and would settle it on its own, but the moving tag stays
+    # reachable — it is the chart default here and what a `docker pull` gets —
+    # so the policy covers it rather than assuming nobody uses it.
+    pullPolicy: Always
   replicaCount: 1
   resources:
     requests:
@@ -22,6 +33,17 @@ web:
   image:
     repository: ghcr.io/gentian-org/gentian-portal-web
     tag: "0.1.0"
+    # Always, not the IfNotPresent the templates fall back to. A cluster runs
+    # this chart with a moving tag (image.tag: develop), and a node that has
+    # already cached that tag never re-pulls it under IfNotPresent — so CI can
+    # publish for weeks while the node keeps serving the layer it downloaded
+    # once, through restarts and rollouts alike, with nothing reporting drift.
+    #
+    # Image Updater writing an immutable develop-<sha> tag makes each pull a
+    # fresh name and would settle it on its own, but the moving tag stays
+    # reachable — it is the chart default here and what a `docker pull` gets —
+    # so the policy covers it rather than assuming nobody uses it.
+    pullPolicy: Always
   replicaCount: 1
   port: 8080
   resources:
@@ -55,8 +77,22 @@ gateway:
 existingSecret:
   name: gentian-portal-secrets
 
+# The tenant this desktop is the desktop of. Behind the edge every relation
+# is asked on it; empty under pkce, where the token says.
+tenant: ""
+
 auth:
   disabled: false
+  # pkce: the bundle runs the code flow as a public client and keeps the
+  # token. edge: the Gateway holds the session with the zone's one
+  # confidential client and forwards the token (AD-13); the desktop holds no
+  # token, no client secret, no Keycloak credential and no Kubernetes RBAC --
+  # what the caller may do is the director's answer. The v5 platform runs
+  # every desktop this way.
+  mode: pkce
+  # The client whose tokens the API accepts: the bundle's own under pkce, the
+  # zone's under edge (gentian-edge-kernel for the platform desktop).
+  clientId: ""
   # OIDC public-client settings handed to the browser at RUNTIME (the web
   # container renders them into /config.js at start). Keep them out of build
   # args: Vite freezes import.meta.env.VITE_* into the bundle, and one image is
@@ -68,6 +104,9 @@ auth:
   # to /login in a loop that never reaches a password prompt. Add the scope to
   # the realm first, then list it here.
   scopes: openid profile email
+  # The issuer the forwarded token is verified against in edge mode: the
+  # zone's realm on the identity provider. The operator sets it.
+  issuer: ""
 
 openfga:
   apiUrl: ""
@@ -119,5 +158,22 @@ credentialManager:
 # have no plans.
 #
 #   http://gentian-os-lifecycle.gentian-system.svc.cluster.local:8082
+# The director: what the console asks for the cluster's own consoles, and for
+# anything else only it can decide. It answers about the caller, from their
+# relations to the cluster, so the console forwards the caller's token and adds
+# nothing of its own.
+director:
+  url: ""
+  # Which cluster this console belongs to, as the director names it.
+  cluster: ""
+
 appLifecycle:
   url: ""
+
+# The chart's objects are <release>-gentian-portal-<part> unless a name is
+# given here. The operator installs the desktop as a component whose Release
+# carries the namespace in its name, and names the objects after the
+# component instead, so that the profile's exposures can address the
+# Services.
+nameOverride: ""
+fullnameOverride: ""

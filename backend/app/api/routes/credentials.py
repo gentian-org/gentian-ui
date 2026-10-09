@@ -98,6 +98,53 @@ async def list_credentials(
     return await _forward(request, "GET", "/v1/credentials", _token(credentials), settings)
 
 
+# Declared before the "/{name}" catch-all below. FastAPI matches routes in
+# registration order, so with that one first "PUT /credentials/backup-identity"
+# was read as a credential named "backup-identity" and forwarded to
+# /v1/credentials/backup-identity, which is not a requirement -- a 404 that
+# looked like the endpoint was missing rather than shadowed.
+@router.get("/backup-identity")
+async def get_backup_identity(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Whether this workspace already has an escrowed backup key, and which one.
+
+    Metadata only. The upstream reads OpenBao's metadata endpoint, which does
+    not carry the stored value, so the private half cannot come back through
+    here. The public half can, and is what the form needs to offer "keep using
+    the key you already have".
+    """
+    return await _forward(request, "GET", "/v1/backup-identity", _token(credentials), settings)
+
+
+@router.put("/backup-identity")
+async def escrow_backup_identity(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Keep a copy of a workspace's backup key, so a lost download is not fatal.
+
+    Forwarded rather than written here, for the same reason every other write on
+    this router is: this service holds no OpenBao token. The credential manager
+    exchanges the caller's own, and the path it writes is derived from the tenant
+    in the verified claim — so a workspace administrator can escrow into their
+    own subtree and nowhere else, and that is a property of OpenBao's policy
+    engine rather than of a check in this file.
+
+    The key passes through this process in one request body and is not logged,
+    stored, or echoed back; the upstream response carries metadata only.
+    """
+    body = await request.json()
+    return await _forward(
+        request, "PUT", "/v1/backup-identity", _token(credentials), settings, body
+    )
+
+
 @router.put("/{name}")
 async def set_credential(
     name: str,

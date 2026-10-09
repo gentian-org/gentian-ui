@@ -36,7 +36,9 @@ CONFIG_PATH="${WWW_DIR}/config.js"
 # Fail loudly rather than serve a portal that cannot authenticate. An empty
 # issuer degrades into "auth is not configured" screens that look like a Keycloak
 # fault; refusing to start points at the actual cause.
-if [ -z "${OIDC_ISSUER:-}" ] && [ "${AUTH_DISABLED:-false}" != "true" ]; then
+# Under AUTH_MODE=edge the Gateway holds the session and forwards the token
+# (AD-13): the bundle runs no code flow and needs no issuer of its own.
+if [ -z "${OIDC_ISSUER:-}" ] && [ "${AUTH_DISABLED:-false}" != "true" ] && [ "${AUTH_MODE:-pkce}" != "edge" ]; then
     echo "FATAL: OIDC_ISSUER is unset and AUTH_DISABLED is not true." >&2
     echo "       Set OIDC_ISSUER to https://id.<kernel-domain>/auth/realms/<realm>" >&2
     echo "       on the web Deployment, or set AUTH_DISABLED=true for local dev." >&2
@@ -84,6 +86,7 @@ emit() {
     # a login loop.
     emit 'oidcScopes'   "${OIDC_SCOPES:-openid profile email}"
     emit 'authDisabled' "${AUTH_DISABLED:-false}"
+    emit 'authMode'     "${AUTH_MODE:-pkce}"
     emit 'kernelDomain' "${KERNEL_DOMAIN:-}"
     echo '};'
 } > "${CONFIG_PATH}" || {

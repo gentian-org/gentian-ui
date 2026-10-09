@@ -33,7 +33,7 @@ def test_tenant_admin_rejects_cross_tenant():
 
 
 def test_platform_admin_defaults_kernel_realm():
-    user = {"groups": ["gentian:platform:superadmin"]}
+    user = {"groups": ["gentian:platform:admin"]}
     tenant = resolve_admin_tenant(user, _settings(), None)
     assert tenant == "kernel"
 
@@ -45,7 +45,7 @@ def test_platform_bootstrap_administrator_defaults_kernel_realm():
 
 
 def test_platform_admin_can_target_tenant():
-    user = {"groups": ["gentian:platform:superadmin"]}
+    user = {"groups": ["gentian:platform:admin"]}
     tenant = resolve_admin_tenant(user, _settings(), "demo")
     assert tenant == "demo"
 

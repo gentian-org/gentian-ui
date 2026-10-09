@@ -4,16 +4,14 @@ from app.core.auth import get_current_user
 from app.core.authz import require_shell_launch
 from app.core.config import Settings, get_settings
 from app.core.shell_apps import shell_apps_for_user
-from app.services.admin_store import AdminStoreDep
 
 router = APIRouter(prefix="/apps", tags=["apps"])
 
 
 @router.get("/")
 async def list_apps(
-    store: AdminStoreDep,
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
     _authz: dict = Depends(require_shell_launch()),
 ) -> dict:
-    return {"apps": await shell_apps_for_user(user, settings, store=store)}
+    return {"apps": await shell_apps_for_user(user, settings)}

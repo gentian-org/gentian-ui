@@ -1,4 +1,6 @@
-{{- if .Values.rbac.create }}
+{{- /* Behind the edge the desktop holds no Kubernetes authority at all:
+     it talks to the director with the caller's token (AD-10). */ -}}
+{{- if and .Values.rbac.create (ne (.Values.auth.mode | default "pkce") "edge") }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -25,6 +27,24 @@ rules:
   - apiGroups: ["gentianos.io"]
     resources: ["tenantexports"]
     verbs: ["get", "list", "watch", "create", "delete"]
+  # Backup settings. Update and delete are both needed: a policy is edited in
+  # place, and deleting a tenant's returns it to inheriting the cluster's.
+  #
+  # These verbs are the console's, not any admin's. Every call reaches the API
+  # server as this service account — nothing here impersonates the signed-in
+  # user — so RBAC authorises the console and cannot tell a tenant admin from a
+  # platform one. That is true of every resource this role grants, and it is
+  # why the tenant boundary is enforced in the API layer: routes gate on
+  # isPlatformAdmin and reads filter on spec.tenant.
+  - apiGroups: ["gentianos.io"]
+    resources: ["backuppolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # The schedule overview lists across namespaces so a platform admin can see
+  # which tenants are actually backed up. No create: a schedule comes from the
+  # backup settings, and the operator owns the one it derives.
+  - apiGroups: ["gentianos.io"]
+    resources: ["tenantexportschedules"]
+    verbs: ["get", "list", "watch", "patch", "delete"]
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "list"]

@@ -13,6 +13,7 @@ from app.core.gentian_groups import (
     normalize_groups,
     tenant_admin_tenants,
     user_is_platform_admin,
+    user_is_tenant_admin,
 )
 from app.core.tenant import extract_tenant_from_claims
 
@@ -24,6 +25,22 @@ def resolve_admin_tenant(
 ) -> str:
     if settings.auth_disabled:
         return requested_tenant or str(user.get("tenant") or "demo")
+    if settings.edge_session:
+        # This desktop administers its own tenant, and only when the director
+        # says the caller may; a platform administrator's reach into other
+        # tenants goes through the director, never through this process.
+        own = str(user.get("tenant") or "")
+        if not user_is_tenant_admin(user, own):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tenant administrator privileges required",
+            )
+        if requested_tenant and requested_tenant != own:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cross-tenant access denied",
+            )
+        return own
 
     groups = normalize_groups(user)
     if user_is_platform_admin(user):

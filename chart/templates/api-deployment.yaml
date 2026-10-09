@@ -45,15 +45,49 @@ spec:
               value: {{ .Values.capabilities | default (ternary "llm" "" .Values.llm.enabled) | quote }}
             - name: AUTH_DISABLED
               value: {{ ternary "true" "false" .Values.auth.disabled | quote }}
+            - name: AUTH_MODE
+              value: {{ .Values.auth.mode | default "pkce" | quote }}
+            {{- if .Values.auth.clientId }}
+            - name: OIDC_CLIENT_ID
+              value: {{ .Values.auth.clientId | quote }}
+            {{- end }}
+            {{- /* Behind the edge the forwarded token is verified against the
+                 zone's issuer, which the platform supplies; without one the
+                 BFF verifies nothing. */}}
+            {{- if and .Values.auth.issuer (not (hasKey (default dict .Values.api.env) "OIDC_ISSUER")) }}
+            - name: OIDC_ISSUER
+              value: {{ .Values.auth.issuer | quote }}
+            {{- end }}
+            {{- if .Values.tenant }}
+            - name: GENTIAN_TENANT
+              value: {{ .Values.tenant | quote }}
+            {{- end }}
             {{- range $key, $value := .Values.api.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            {{- if .Values.credentialManager.url }}
+            {{- /* api.env wins when it names the same variable. Both of these
+                 also exist as dedicated values because the operator chart
+                 shares the cluster values file (credentialManager/appLifecycle
+                 carry operator-side keys too), and gentian-os _base.yaml sets
+                 them through api.env for every cluster. Rendering both halves
+                 produced a duplicate env name — harmless under client-side
+                 apply (last one won), fatal under server-side apply, which
+                 rejects the Deployment outright: the api never deployed, /api
+                 had no backend, and login failed with an empty 500. */}}
+            {{- if and .Values.credentialManager.url (not (hasKey (default dict .Values.api.env) "CREDENTIAL_MANAGER_URL")) }}
             - name: CREDENTIAL_MANAGER_URL
               value: {{ .Values.credentialManager.url | quote }}
             {{- end }}
-            {{- if .Values.appLifecycle.url }}
+            {{- if and .Values.director.url (not (hasKey (default dict .Values.api.env) "DIRECTOR_URL")) }}
+            - name: DIRECTOR_URL
+              value: {{ .Values.director.url | quote }}
+            {{- end }}
+            {{- if .Values.director.cluster }}
+            - name: GENTIAN_CLUSTER_ID
+              value: {{ .Values.director.cluster | quote }}
+            {{- end }}
+            {{- if and .Values.appLifecycle.url (not (hasKey (default dict .Values.api.env) "APP_LIFECYCLE_URL")) }}
             - name: APP_LIFECYCLE_URL
               value: {{ .Values.appLifecycle.url | quote }}
             {{- end }}

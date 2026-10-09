@@ -24,13 +24,13 @@ def test_platform_bootstrap_administrator_email():
 
 
 def test_platform_managed_group():
-    assert is_platform_managed_group("gentian:platform:superadmin")
+    assert is_platform_managed_group("gentian:platform:admin")
     assert not is_platform_managed_group("gentian:tenant:demo:app:mail")
 
 
 def test_kernel_scope_uses_platform_groups():
     assert is_admin_managed_group(
-        "gentian:platform:superadmin",
+        "gentian:platform:admin",
         "kernel",
         kernel_realm="kernel",
     )

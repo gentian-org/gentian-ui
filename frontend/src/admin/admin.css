@@ -167,8 +167,31 @@
   color: var(--gtn-ink-4);
 }
 
+/* Two sections in one tab read as one long form without a break. Sections are
+   bare <section> elements, so this matches on the element rather than a class
+   only one of them carries. */
+.admin-console__body > section + section {
+  margin-top: 2.5rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--gtn-border);
+}
+
 .admin-console__subsection {
-  margin-top: 2rem;
+  margin-top: 1.5rem;
+}
+
+/* Groups a few fields under a heading inside a subsection. The title carries
+   its own top margin because, unlike a subsection, there is no wrapper to
+   supply it. */
+.admin-console__group-title {
+  margin: 1.5rem 0 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--gtn-ink-2);
+}
+
+.admin-console__group-title:first-child {
+  margin-top: 0;
 }
 
 .admin-console__subsection > .admin-console__lead {
@@ -207,6 +230,14 @@
 .admin-console__body code {
   font-family: var(--gtn-font-mono);
   font-size: 0.8125rem;
+}
+
+/* A key shown once, on a screen of unknown width. It has to be readable in
+   full and selectable in one gesture: an age key broken across an ellipsis is
+   a key that gets half-copied and only fails months later, at a restore. */
+.admin-console__wrap {
+  overflow-wrap: anywhere;
+  user-select: all;
 }
 
 .admin-console__body code {
@@ -712,6 +743,15 @@
   box-shadow: var(--gtn-focus-ring);
 }
 
+/* The API's per-field validation message, attributed to the one input it
+   named rather than repeated as a form-level banner. */
+.admin-console__field-error {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--gtn-madder);
+}
+
 /* Radio cards — a choice with consequences deserves room to explain itself. */
 .admin-console__choice {
   display: grid;
@@ -770,6 +810,16 @@
   font-size: 0.8125rem;
 }
 
+/* A hint inside a field label explains the control above it, so it belongs on
+   its own line. Without this it is an inline span and renders on the same line
+   as the input it follows, which reads as a missing line break. Scoped to
+   labels rather than set on the class, because a hint beside a button is
+   deliberately inline. */
+.admin-console__label > .admin-console__hint {
+  display: block;
+  margin-top: 0.3rem;
+}
+
 .admin-console__error,
 .admin-console__success,
 .admin-console__warning {
@@ -797,6 +847,63 @@
   border-left-color: var(--gtn-ember);
   background: var(--gtn-ember-bg);
   color: var(--gtn-ember);
+}
+
+/* A key shown once, and the one screen in this console whose whole job is to be
+   acted on before it is dismissed. Given the weight of the warning treatment
+   because it is warning about something: closing this without saving loses the
+   key, and nothing later can say so. */
+.admin-console__keycard {
+  margin: 0 0 0.75rem;
+  padding: 0.75rem;
+  border-radius: var(--gtn-r1);
+  border-left: 3px solid var(--gtn-ember);
+  background: var(--gtn-ember-bg);
+  color: var(--gtn-ember);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.admin-console__keycard-lead {
+  margin: 0 0 0.75rem;
+}
+
+.admin-console__keycard-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+/* White plate under the symbol regardless of theme: a QR needs its quiet zone
+   light to scan, and the card behind it is not. */
+.admin-console__keycard-qr {
+  flex: 0 0 auto;
+  background: #fff;
+  padding: 0.4rem;
+  border-radius: var(--gtn-r1);
+  image-rendering: pixelated;
+}
+
+.admin-console__submit--stack {
+  flex: 1 1 12rem;
+}
+
+/* The secondary way through a step that already has a primary button. Reads as
+   prose so it does not compete with the action beside it. */
+.admin-console__btn-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gtn-ink-3);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.admin-console__btn-link:hover {
+  color: var(--gtn-ink-1);
 }
 
 .admin-console__error code {
