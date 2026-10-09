@@ -330,3 +330,74 @@ def test_a_refused_change_to_a_platform_administrator_arrives_as_it_was_said(mon
     )
     assert r.status_code == 403
     assert r.json()["error"] == said
+
+
+def test_the_choice_about_a_mailbox_travels_with_the_removal(monkeypatch):
+    """Archive or delete is the caller's answer and reaches the registrar as sent."""
+    client = TestClient(_app(_settings()))
+    for choice in ("archive", "delete"):
+        seen: dict = {}
+        _fake_client(monkeypatch, {"removed": True}, seen)
+        r = client.post(
+            "/api/v1/admin/people/remove",
+            json={"person": "u1", "mailbox": choice, "anythingElse": "x"},
+            headers={"Authorization": "Bearer t"},
+        )
+        assert r.status_code == 200
+        assert seen["url"] == "http://registrar.test:8080/v1/tenants/platform/actions/remove-person"
+        assert seen["json"] == {"person": "u1", "mailbox": choice}
+
+
+def test_no_choice_is_made_for_the_caller(monkeypatch):
+    """A removal that did not say is relayed without the field, and the refusal comes back.
+
+    The console has no default for a person's mail. The registrar refuses a
+    removal that needs the answer, and its sentence reaches the screen
+    unchanged.
+    """
+    seen: dict = {}
+    refusal = {"error": "this person has a mailbox, ada@example.com: say what becomes of it."}
+    _fake_client(monkeypatch, refusal, seen, status=400)
+    r = TestClient(_app(_settings())).post(
+        "/api/v1/admin/people/remove",
+        json={"person": "u1"},
+        headers={"Authorization": "Bearer t"},
+    )
+    assert seen["json"] == {"person": "u1"}
+    assert r.status_code == 400
+    assert r.json() == refusal
+
+
+def test_the_removed_mailboxes_are_asked_of_the_tenant(monkeypatch):
+    seen: dict = {}
+    body = {
+        "tenant": "platform",
+        "mailboxDomain": "example.com",
+        "mailboxes": [{"id": "platform-abc12", "address": "ada@example.com", "state": "archived"}],
+    }
+    _fake_client(monkeypatch, body, seen)
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/removed-mailboxes?tenant=acme", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 200
+    assert seen["method"] == "GET"
+    assert seen["url"] == "http://registrar.test:8080/v1/tenants/acme/removed-mailboxes"
+    assert r.json() == body
+
+
+def test_deleting_an_archived_mailbox_is_the_registrars_action(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"deletionRequested": True}, seen, status=202)
+    r = TestClient(_app(_settings())).post(
+        "/api/v1/admin/removed-mailboxes/delete",
+        json={"mailbox": "platform-abc12", "address": "somebody.else@example.com"},
+        headers={"Authorization": "Bearer t"},
+    )
+    assert r.status_code == 202
+    assert (
+        seen["url"]
+        == "http://registrar.test:8080/v1/tenants/platform/actions/delete-archived-mailbox"
+    )
+    # The id and nothing else: which mailbox it is, is the registrar's record's
+    # to say, not the request's.
+    assert seen["json"] == {"mailbox": "platform-abc12"}

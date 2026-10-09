@@ -1010,6 +1010,37 @@ export type Person = {
   pending: boolean;
   /** Group paths, without the leading slash. Filled only by the single read. */
   groups?: string[];
+  /**
+   * The address they have a mailbox under on the cluster's own mail server.
+   * Absent when they have none there. Removing somebody who has one comes
+   * with a question: is the mailbox archived, or deleted.
+   */
+  mailbox?: string;
+};
+
+/** What whoever removes a person decides about that person's mailbox. */
+export type MailboxChoice = "archive" | "delete";
+
+/** One removed person's mailbox: what was decided, and what became of it. */
+export type RemovedMailbox = {
+  /** Names the record, for the request that deletes an archived mailbox. */
+  id: string;
+  address: string;
+  choice: MailboxChoice;
+  /** `none`: the address never had a mailbox. */
+  state: "pending" | "archived" | "deleted" | "none" | "failed";
+  /** A sentence about the state: what is waited for, or why it failed. */
+  message?: string;
+  removedAt: string;
+  /** Who removed the person and made the choice. */
+  by?: string;
+  archivedAt?: string;
+  deletedAt?: string;
+  sizeBytes?: number;
+  messages?: number;
+  /** The archived mailbox was asked to be deleted and is not gone yet. */
+  deletionRequested?: boolean;
+  deletionBy?: string;
 };
 
 export type PersonGroup = {
@@ -1122,8 +1153,28 @@ export function updatePerson(
   return postAction<Person>("/admin/people/update", body, tenant);
 }
 
-export function removePerson(person: string, tenant?: string) {
-  return postAction<{ removed: boolean }>("/admin/people/remove", { person }, tenant);
+/**
+ * Remove somebody. `mailbox` is the answer about their mailbox, sent only
+ * when they have one and the person removing them chose: nothing here, and
+ * nothing behind it, chooses in their place.
+ */
+export function removePerson(person: string, mailbox?: MailboxChoice, tenant?: string) {
+  return postAction<{ removed: boolean; mailbox?: { address: string; choice: MailboxChoice; id: string } }>(
+    "/admin/people/remove",
+    mailbox ? { person, mailbox } : { person },
+    tenant,
+  );
+}
+
+export function fetchRemovedMailboxes(tenant?: string) {
+  return apiFetch<{ tenant: string; mailboxDomain?: string; mailboxes: RemovedMailbox[] }>(
+    `/admin/removed-mailboxes${tenantQuery(tenant)}`,
+  );
+}
+
+/** Delete one archived mailbox, by the id the list gives it. */
+export function deleteArchivedMailbox(mailbox: string, tenant?: string) {
+  return postAction<{ deletionRequested: boolean }>("/admin/removed-mailboxes/delete", { mailbox }, tenant);
 }
 
 export function sendPasswordReset(person: string, tenant?: string) {

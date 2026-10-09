@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  deleteArchivedMailbox,
   fetchIdentitySettings,
   fetchPeople,
   fetchPerson,
   fetchPersonGroups,
+  fetchRemovedMailboxes,
   fetchSettingsTemplates,
   invitePerson,
   removePerson,
@@ -14,7 +16,9 @@ import {
   sendPasswordReset,
   setMembership,
   updatePerson,
+  type MailboxChoice,
   type Person,
+  type RemovedMailbox,
 } from "@/api/admin";
 import { Checklist, type ChecklistItem } from "./Checklist";
 import { describeGroups, type DescribedGroup } from "./groupLabels";
@@ -134,6 +138,8 @@ export function MembersSection({ tenant }: { tenant: string }) {
             </table>
           </div>
         </div>
+
+        <RemovedMailboxesCard />
       </div>
     </section>
   );
@@ -481,9 +487,11 @@ function MemberEditor({
     mutationFn: () => removeTotp(person.id),
     onSuccess: () => after(t("members.totpRemoved")),
   });
+  const [removing, setRemoving] = useState(false);
   const remove = useMutation({
-    mutationFn: () => removePerson(person.id),
+    mutationFn: (mailbox?: MailboxChoice) => removePerson(person.id, mailbox),
     onSuccess: () => {
+      setRemoving(false);
       onRemoved();
       onChanged();
     },
@@ -599,7 +607,14 @@ function MemberEditor({
             type="button"
             disabled={remove.isPending}
             onClick={() => {
-              if (window.confirm(t("members.removeConfirm", { login: p.username }))) remove.mutate();
+              // Somebody with a mailbox is removed through the dialog, which
+              // asks what becomes of it. Nobody else has one to ask about.
+              if (p.mailbox) {
+                remove.reset();
+                setRemoving(true);
+              } else if (window.confirm(t("members.removeConfirm", { login: p.username }))) {
+                remove.mutate(undefined);
+              }
             }}
           >
             {t("members.remove")}
@@ -613,6 +628,230 @@ function MemberEditor({
             {save.isPending ? t("members.saving") : t("members.save")}
           </button>
         </div>
+
+        {removing && p.mailbox && (
+          <RemoveMemberDialog
+            login={p.username}
+            mailbox={p.mailbox}
+            pending={remove.isPending}
+            error={remove.isError ? String(remove.error) : undefined}
+            onConfirm={(choice) => remove.mutate(choice)}
+            onClose={() => setRemoving(false)}
+          />
+        )}
+    </div>
+  );
+}
+
+/**
+ * Removing somebody who has a mailbox: the question that comes with it.
+ *
+ * Archived or deleted, and nothing in between -- and no answer chosen for
+ * whoever is asked. Neither card is selected when the dialog opens and the
+ * button stays off until one is, because both keeping a person's mail and
+ * destroying it are things to do only because somebody said so. Deleting is
+ * confirmed a second time, the way every other destructive act of this
+ * screen is.
+ */
+function RemoveMemberDialog({
+  login,
+  mailbox,
+  pending,
+  error,
+  onConfirm,
+  onClose,
+}: {
+  login: string;
+  mailbox: string;
+  pending: boolean;
+  error?: string;
+  onConfirm: (choice: MailboxChoice) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLDialogElement>(null);
+  const [choice, setChoice] = useState<MailboxChoice | null>(null);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => dialog?.close();
+  }, []);
+
+  const card = (value: MailboxChoice, title: string, body: string) => (
+    <label className={`admin-console__choice${choice === value ? " admin-console__choice--selected" : ""}`}>
+      <input
+        type="radio"
+        name="mailbox-choice"
+        value={value}
+        checked={choice === value}
+        onChange={() => setChoice(value)}
+      />
+      <span>
+        <span className="admin-console__choice-title">{title}</span>
+        <span className="admin-console__choice-desc">{body}</span>
+      </span>
+    </label>
+  );
+
+  return (
+    <dialog
+      ref={ref}
+      className="admin-console__dialog"
+      aria-labelledby="remove-member-title"
+      onCancel={(e) => {
+        e.preventDefault();
+        if (!pending) onClose();
+      }}
+    >
+      <form
+        className="admin-console__dialog-body"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!choice || pending) return;
+          if (choice === "delete" && !window.confirm(t("members.mailboxDeleteConfirm", { mailbox }))) return;
+          onConfirm(choice);
+        }}
+      >
+        <h3 id="remove-member-title" className="admin-console__dialog-title">
+          {t("members.removeTitle", { login })}
+        </h3>
+        <p className="admin-console__card-desc">{t("members.removeLead")}</p>
+
+        <fieldset className="admin-console__choices">
+          <legend className="admin-console__label-text">{t("members.mailboxQuestion", { mailbox })}</legend>
+          {card("archive", t("members.mailboxArchive"), t("members.mailboxArchiveBody"))}
+          {card("delete", t("members.mailboxDelete"), t("members.mailboxDeleteBody"))}
+        </fieldset>
+
+        {error ? <p className="admin-console__error">{error}</p> : null}
+
+        <div className="admin-console__dialog-footer">
+          <button type="button" className="admin-console__btn admin-console__btn--quiet" disabled={pending} onClick={onClose}>
+            {t("members.cancel")}
+          </button>
+          <button type="submit" className="admin-console__btn admin-console__btn--danger-solid" disabled={!choice || pending}>
+            {choice === "archive"
+              ? t("members.removeAndArchive")
+              : choice === "delete"
+                ? t("members.removeAndDelete")
+                : t("members.removeChooseFirst")}
+          </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+/** A size a person reads: 2.1 MB, not 2202009. */
+function readableSize(bytes: number): string {
+  const units = ["B", "kB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${unit === 0 ? value : value.toFixed(1)} ${units[unit]}`;
+}
+
+/**
+ * What became of the mailboxes of the people removed from this tenant.
+ *
+ * Shown once there is something to show. An archived mailbox is listed with
+ * who archived it, when, and how large it is, and can be deleted from here on
+ * purpose; a deleted one stays on the list for a while as the record that it
+ * was deleted and who decided that.
+ */
+function RemovedMailboxesCard() {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: ["admin", "people", "removed-mailboxes"],
+    queryFn: () => fetchRemovedMailboxes(),
+    retry: false,
+    // The work is done by a job beside the mail server; while one is under
+    // way the list is read again until it says how it ended.
+    refetchInterval: (q) =>
+      (q.state.data?.mailboxes ?? []).some((m) => m.state === "pending" || m.deletionRequested) ? 10_000 : false,
+  });
+  const purge = useMutation({
+    mutationFn: (id: string) => deleteArchivedMailbox(id),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin", "people", "removed-mailboxes"] }),
+  });
+  const mailboxes = query.data?.mailboxes ?? [];
+  if (mailboxes.length === 0) return null;
+
+  const state = (m: RemovedMailbox) =>
+    m.deletionRequested ? (
+      <span className="admin-console__badge admin-console__badge--warn">{t("members.mailboxBeingDeleted")}</span>
+    ) : m.state === "archived" ? (
+      <span className="admin-console__badge admin-console__badge--ok">{t("members.mailboxArchived")}</span>
+    ) : m.state === "deleted" ? (
+      <span className="admin-console__badge">{t("members.mailboxDeleted")}</span>
+    ) : m.state === "none" ? (
+      <span className="admin-console__badge">{t("members.mailboxNone")}</span>
+    ) : m.state === "failed" ? (
+      <span className="admin-console__badge admin-console__badge--danger">{t("members.mailboxFailed")}</span>
+    ) : (
+      <span className="admin-console__badge admin-console__badge--warn">
+        {m.choice === "archive" ? t("members.mailboxArchiving") : t("members.mailboxDeleting")}
+      </span>
+    );
+
+  return (
+    <div className="admin-console__card">
+      <div className="admin-console__card-main">
+        <h3 className="admin-console__card-title">{t("members.removedMailboxesTitle")}</h3>
+        <p className="admin-console__card-desc">{t("members.removedMailboxesLead")}</p>
+        <table className="admin-console__table">
+          <thead>
+            <tr>
+              <th>{t("members.colAddress")}</th>
+              <th>{t("members.colRemoved")}</th>
+              <th>{t("members.colDecidedBy")}</th>
+              <th>{t("members.colState")}</th>
+              <th>{t("members.colSize")}</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {mailboxes.map((m) => (
+              <tr key={m.id}>
+                <td className="admin-console__mono">{m.address}</td>
+                <td>{new Date(m.removedAt).toLocaleDateString()}</td>
+                <td>{m.by || "—"}</td>
+                <td>
+                  {state(m)}
+                  {(m.state === "failed" || m.state === "pending") && m.message ? (
+                    <span className="admin-console__hint"> {m.message}</span>
+                  ) : null}
+                </td>
+                <td>
+                  {m.state === "archived" || m.state === "deleted"
+                    ? `${t("members.mailboxMessages", { count: m.messages ?? 0 })}, ${readableSize(m.sizeBytes ?? 0)}`
+                    : "—"}
+                </td>
+                <td>
+                  {m.state === "archived" && !m.deletionRequested && (
+                    <button
+                      className="admin-console__btn admin-console__btn--danger"
+                      type="button"
+                      disabled={purge.isPending}
+                      onClick={() => {
+                        if (window.confirm(t("members.deleteArchivedConfirm", { address: m.address }))) purge.mutate(m.id);
+                      }}
+                    >
+                      {t("members.deleteArchived")}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {purge.isError && <p className="admin-console__error">{String(purge.error)}</p>}
+      </div>
     </div>
   );
 }

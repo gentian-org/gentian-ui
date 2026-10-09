@@ -1540,3 +1540,17 @@
   font-size: 0.8rem;
   white-space: pre;
 }
+
+/* The same cards as a group with a question over them: a fieldset keeps the
+   radios one group for a screen reader, and loses the browser's frame. */
+fieldset.admin-console__choices {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+fieldset.admin-console__choices > legend {
+  padding: 0;
+  margin-bottom: 0.5rem;
+}

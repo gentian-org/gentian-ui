@@ -285,9 +285,59 @@ async def remove_person(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Remove somebody. The registrar refuses it for the caller themselves."""
+    """Remove somebody. The registrar refuses it for the caller themselves.
+
+    `mailbox` is what becomes of the person's mailbox, where they have one on
+    the cluster's own mail server: `archive` or `delete`. It is relayed only
+    when the caller sent it, and never defaulted here: the registrar refuses a
+    removal that needs the answer and has none, and choosing for the caller
+    would be this component deciding what happens to a person's mail.
+    """
     return await _action(
-        settings, tenant, credentials, "remove-person", _fields(payload, ("person",))
+        settings,
+        tenant,
+        credentials,
+        "remove-person",
+        _fields(payload, ("person", "mailbox")),
+    )
+
+
+@router.get("/removed-mailboxes")
+async def removed_mailboxes(
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What became of the mailboxes of the people removed from this tenant.
+
+    One entry per removal that came with a mailbox: the address, what was
+    chosen and by whom, and where it stands -- pending, archived, deleted,
+    failed with the reason.
+    """
+    return await _relay(
+        settings,
+        "GET",
+        f"/v1/tenants/{_tenant(settings, tenant)}/removed-mailboxes",
+        bearer_of(credentials),
+    )
+
+
+@router.post("/removed-mailboxes/delete")
+async def delete_archived_mailbox(
+    payload: dict = Body(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Delete one archived mailbox, named by the id the list gives it."""
+    return await _action(
+        settings,
+        tenant,
+        credentials,
+        "delete-archived-mailbox",
+        _fields(payload, ("mailbox",)),
     )
 
 
