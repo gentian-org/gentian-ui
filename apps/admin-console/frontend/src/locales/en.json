@@ -298,7 +298,7 @@
     "enabled": "This cluster serves language models",
     "enabledHint": "Off, the gateway offers no model at all.",
     "gatewayConsole": "Serve the gateway's own console at a public address",
-    "gatewayConsoleWarning": "Warning: this opens a public address, llm.<cluster domain>, for the gateway's own console and its whole API, behind the sign-in of the cluster's administrators. Switching it off removes the address at once. Switching it on takes full effect only with the installer's next run: until then the address exists and answers nothing.",
+    "gatewayConsoleWarning": "Warning: this opens a public address, llm.<cluster domain>, for the gateway's own console and its whole API, behind the sign-in of the cluster's administrators. Switching it on or off is a commit and needs no run of the installer: the address and the network rule that lets it reach the gateway both follow that commit, each at the cluster's next synchronisation. For the moment between the two, the address may exist and answer nothing.",
     "gpuAcceleration": "This cluster has GPUs to serve models on",
     "gpuAccelerationHint": "The models of this cluster below are read only when this is on.",
     "instanceName": "Instance name",

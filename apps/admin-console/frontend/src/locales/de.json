@@ -298,7 +298,7 @@
     "enabled": "Dieser Cluster stellt Sprachmodelle bereit",
     "enabledHint": "Ausgeschaltet bietet das Gateway kein einziges Modell an.",
     "gatewayConsole": "Die eigene Konsole des Gateways unter einer öffentlichen Adresse bereitstellen",
-    "gatewayConsoleWarning": "Warnung: Dies öffnet eine öffentliche Adresse, llm.<Cluster-Domain>, für die eigene Konsole des Gateways und seine gesamte API, hinter der Anmeldung der Cluster-Administratoren. Ausschalten entfernt die Adresse sofort. Einschalten wirkt erst mit dem nächsten Lauf des Installers vollständig: Bis dahin existiert die Adresse und beantwortet nichts.",
+    "gatewayConsoleWarning": "Warnung: Dies öffnet eine öffentliche Adresse, llm.<Cluster-Domain>, für die eigene Konsole des Gateways und seine gesamte API, hinter der Anmeldung der Cluster-Administratoren. Ein- und Ausschalten ist ein Commit und braucht keinen Lauf des Installers: Die Adresse und die Netzwerkregel, über die sie das Gateway erreicht, folgen beide diesem Commit, jeweils mit der nächsten Synchronisierung des Clusters. In der Zeit dazwischen kann die Adresse existieren und nichts beantworten.",
     "gpuAcceleration": "Dieser Cluster hat GPUs, auf denen Modelle laufen können",
     "gpuAccelerationHint": "Die Modelle dieses Clusters unten werden nur gelesen, wenn dies eingeschaltet ist.",
     "instanceName": "Name der Instanz",
