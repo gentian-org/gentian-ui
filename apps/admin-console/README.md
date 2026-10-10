@@ -62,6 +62,14 @@ credentials list (the custodian's) and flagged when its token is missing or
 there is no credential to enter it under. A token that is there is reported as
 supplied, not as working. No token is entered on this tab.
 
+The cluster declares the credential `llm-provider-<name>` for every provider on
+the claim, so a new provider's token can be entered on the Credentials tab once
+the cluster has applied the commit. A provider reads its own token only: the
+property is `<name>_api_key`, shown and not editable. The director refuses a
+provider address that is not a public https address. The tab also carries the
+switch for the gateway's own console, with a warning that it opens a public
+address.
+
 ## Apps
 
 The Apps tab is where a tenant's apps are administered; the desktop only shows

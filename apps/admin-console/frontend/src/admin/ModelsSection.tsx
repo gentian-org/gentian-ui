@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   fetchClusterModels,
+  providerKeyProperty,
   updateClusterModels,
   type GatewayModel,
   type ModelInstance,
@@ -34,9 +35,12 @@ import { Trans, useTranslation } from "react-i18next";
  * credential to enter it under, is flagged. A token that is there is reported
  * as supplied, not as working -- nobody probes it.
  *
- * Tokens. A provider's API token is never typed here. The provider names the
- * property of its credential that holds it, and the token is entered on the
- * Credentials screen.
+ * Tokens. A provider's API token is never typed here. It is entered on the
+ * Credentials screen, under a credential the cluster declares for every
+ * provider on the claim. Which property of it the gateway reads follows from
+ * the provider's name and is not a choice: a provider reads its own token and
+ * no other provider's, so the screen shows the property and sends it as it is
+ * computed.
  */
 
 type Verdict = { tone: "ok" | "danger" | "warn" | "info"; label: string; note?: string };
@@ -87,6 +91,7 @@ function cleaned(settings: ModelSettings): ModelSettings {
   return {
     enabled: settings.enabled,
     gpuAcceleration: settings.gpuAcceleration,
+    console: settings.console,
     instances: settings.instances.map((i) => ({
       ...i,
       name: i.name.trim(),
@@ -101,7 +106,7 @@ function cleaned(settings: ModelSettings): ModelSettings {
       name: p.name.trim(),
       displayName: text(p.displayName),
       apiBase: p.apiBase.trim(),
-      apiKeyProperty: p.apiKeyProperty.trim(),
+      apiKeyProperty: providerKeyProperty(p.name.trim()),
       models: p.models.map((m) => ({
         name: m.name.trim(),
         model: m.model.trim(),
@@ -266,6 +271,15 @@ export function ModelsSection() {
           <span>{t("models.gpuAcceleration")}</span>
         </label>
         <p className="admin-console__hint">{t("models.gpuAccelerationHint")}</p>
+        <label className="admin-console__checkbox">
+          <input
+            type="checkbox"
+            checked={settings.console?.enabled ?? false}
+            onChange={(e) => change({ ...settings, console: { enabled: e.target.checked } })}
+          />
+          <span>{t("models.gatewayConsole")}</span>
+        </label>
+        <p className="admin-console__warning">{t("models.gatewayConsoleWarning")}</p>
       </div>
 
       <div className="admin-console__subsection">
@@ -324,6 +338,7 @@ export function ModelsSection() {
                   <input
                     type="text"
                     value={provider.name}
+                    maxLength={40}
                     onChange={(e) => setProvider(at, { name: e.target.value })}
                   />
                 </label>
@@ -348,11 +363,7 @@ export function ModelsSection() {
                 </label>
                 <label>
                   {t("models.apiKeyProperty")}
-                  <input
-                    type="text"
-                    value={provider.apiKeyProperty}
-                    onChange={(e) => setProvider(at, { apiKeyProperty: e.target.value })}
-                  />
+                  <input type="text" value={provider.name ? providerKeyProperty(provider.name) : ""} readOnly />
                 </label>
               </div>
               <p className="admin-console__hint">

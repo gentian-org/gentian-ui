@@ -200,7 +200,11 @@ export type ModelProvider = {
   name: string;
   displayName?: string;
   apiBase: string;
-  /** Which property of the provider's credential holds its token. Never the token. */
+  /**
+   * Which property of the shared provider credential holds its token. Never
+   * the token. It is the provider's own and follows from its name
+   * (`providerKeyProperty`); the director refuses any other.
+   */
   apiKeyProperty: string;
   models: ProviderModel[];
 };
@@ -209,9 +213,19 @@ export type ModelProvider = {
 export type ModelSettings = {
   enabled: boolean;
   gpuAcceleration: boolean;
+  /**
+   * Whether the gateway's own console has a public address. Always present
+   * in what is read; left out of a write, the claim's setting stays.
+   */
+  console?: { enabled: boolean };
   instances: ModelInstance[];
   providers: ModelProvider[];
 };
+
+/** The one property a provider's token is kept under: its name with "_" for "-", and "_api_key". */
+export function providerKeyProperty(name: string): string {
+  return `${name.replace(/-/g, "_")}_api_key`;
+}
 
 /**
  * One model under the name the gateway gives it, with what the claim alone
