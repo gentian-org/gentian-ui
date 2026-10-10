@@ -66,6 +66,40 @@ async def set_cluster_settings(
     )
 
 
+@router.get("/models")
+async def cluster_models(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """The models the Cluster claim declares for the gateway, and what the
+    claim alone says about each: the director's answer, read from git. Neither
+    the gateway nor the vault is asked, here or there."""
+    return await director.forward(
+        settings, "GET", _cluster_path(settings, "/models"), bearer_of(credentials)
+    )
+
+
+@router.put("/models")
+async def set_cluster_models(
+    body: dict,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """The whole of the model settings, as one commit by the director. It
+    holds the body to the claim's schema and refuses any field the settings
+    have none of -- a provider's token among them, which is a credential and
+    is entered on the credentials screen."""
+    return await director.forward(
+        settings,
+        "PUT",
+        _cluster_path(settings, "/models"),
+        bearer_of(credentials),
+        json_body=body,
+    )
+
+
 @router.get("/tenants")
 async def cluster_tenants(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),

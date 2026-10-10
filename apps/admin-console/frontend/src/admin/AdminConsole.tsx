@@ -12,6 +12,7 @@ import { CustomizationDebtSection } from "@/admin/CustomizationDebtSection";
 import { ClusterSettingsSection } from "@/admin/ClusterSettingsSection";
 import { GroupsSection } from "@/admin/GroupsSection";
 import { MembersSection } from "@/admin/MembersSection";
+import { ModelsSection } from "@/admin/ModelsSection";
 import { IntegrationsSection } from "@/admin/IntegrationsSection";
 import { LicenceReportSection } from "@/admin/LicenceReportSection";
 import { NotificationsSection } from "@/admin/NotificationsSection";
@@ -36,6 +37,7 @@ type AdminTab =
   | "notifications"
   | "audit"
   | "settings"
+  | "models"
   | "platform"
   | "customization"
   | "licenceReport";
@@ -91,6 +93,11 @@ const TABS: { id: AdminTab; labelKey: string; platformOnly?: boolean; hidden?: b
   { id: "notifications", labelKey: "tabNotifications" },
   { id: "audit", labelKey: "tabAudit" },
   { id: "settings", labelKey: "tabClusterSettings", platformOnly: true },
+  // The models the gateway offers. They spend the cluster's GPUs or a
+  // provider's account for every tenant, so they are the cluster
+  // administrator's, beside the cluster's other settings; the director
+  // refuses anybody else whatever this strip shows.
+  { id: "models", labelKey: "tabModels", platformOnly: true },
   { id: "platform", labelKey: "tabPlatform", platformOnly: true },
   { id: "customization", labelKey: "tabCustomization", platformOnly: true },
   // What the cluster reports about itself. Read-only, and the usher decides
@@ -192,6 +199,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <ResourcesSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
           ) : tab === "settings" ? (
             <ClusterSettingsSection />
+          ) : tab === "models" ? (
+            <ModelsSection />
           ) : tab === "platform" ? (
             <PlatformSecuritySection />
           ) : tab === "customization" ? (

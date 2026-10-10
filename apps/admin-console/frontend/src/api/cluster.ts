@@ -175,3 +175,76 @@ export function importTenant(bundle: BundleRef, decryption: { passphrase?: strin
 export function fetchImportStatus(tenant: string) {
   return apiFetch<ImportStatus>(`/cluster/tenants/${encodeURIComponent(tenant)}/import`);
 }
+
+/** A model the cluster serves from its own weights: one entry of spec.llm.instances. */
+export type ModelInstance = {
+  name: string;
+  modelId: string;
+  /** Sizing the instance's own chart reads. Carried through as the claim has it. */
+  gpuMemoryUtilization?: string;
+  maxModelLen?: string;
+  modelCacheSize?: string;
+  imageTag?: string;
+  toolCallParser?: string;
+};
+
+export type ProviderModel = {
+  name: string;
+  model: string;
+  maxTokens?: number;
+  mode?: string;
+};
+
+/** An external, OpenAI-compatible provider: one entry of spec.llm.providers. */
+export type ModelProvider = {
+  name: string;
+  displayName?: string;
+  apiBase: string;
+  /** Which property of the provider's credential holds its token. Never the token. */
+  apiKeyProperty: string;
+  models: ProviderModel[];
+};
+
+/** The part of the Cluster claim that decides which models the gateway offers. */
+export type ModelSettings = {
+  enabled: boolean;
+  gpuAcceleration: boolean;
+  instances: ModelInstance[];
+  providers: ModelProvider[];
+};
+
+/**
+ * One model under the name the gateway gives it, with what the claim alone
+ * says about it. The director reads git and asks neither the gateway nor the
+ * vault: `not-served` is a model of the cluster's own that nothing starts a
+ * server for, `not-offered` one the gateway does not list, and `declared` a
+ * provider's model, whose token is the credential named here.
+ */
+export type GatewayModel = {
+  name: string;
+  kind: "instance" | "provider";
+  source: string;
+  credential?: string;
+  apiKeyProperty?: string;
+  state: "not-served" | "not-offered" | "declared";
+  reason?: string;
+};
+
+export type ClusterModelsResponse = {
+  cluster: string;
+  settings: ModelSettings;
+  models: GatewayModel[];
+};
+
+export function fetchClusterModels() {
+  return apiFetch<ClusterModelsResponse>("/cluster/models");
+}
+
+/** The whole of the settings: a model they do not name is removed from the claim. */
+export async function updateClusterModels(settings: ModelSettings): Promise<ClusterSettingsWriteResult> {
+  const body = await apiFetch<{ status: string; commit?: string }>("/cluster/models", {
+    method: "PUT",
+    body: JSON.stringify(settings),
+  });
+  return { ...body, changed: Boolean(body.commit) };
+}

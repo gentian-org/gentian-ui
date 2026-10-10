@@ -46,6 +46,22 @@ the list.
 Working today: Tenants, Cluster settings, and People, which is a link into
 Keycloak's own console. Everything else is on the list.
 
+## Models
+
+The Models tab is the cluster administrator's: the models the cluster's model
+gateway offers, which are the Cluster claim's (`spec.llm`). It reads and writes
+them through the director (`GET` / `PUT /v1/clusters/{c}/models`), which decides
+who may, holds a change to the claim's schema and commits it; the console
+reaches neither the gateway nor git. A model that is not on the screen when it
+is committed is removed from the gateway.
+
+Each model shows whether it can work, without asking the gateway: a model the
+cluster would serve itself is flagged as not served, because the director says
+the platform starts no server for it; a provider's model is checked against the
+credentials list (the custodian's) and flagged when its token is missing or
+there is no credential to enter it under. A token that is there is reported as
+supplied, not as working. No token is entered on this tab.
+
 ## Apps
 
 The Apps tab is where a tenant's apps are administered; the desktop only shows
