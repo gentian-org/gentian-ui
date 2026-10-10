@@ -1,28 +1,21 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /** Who can read a backup — the one control shared by every form that makes one.
  *
- * Three answers, because there are three, and the earlier two-way version made
- * the third look like a variant of "your own key" when it is the common case:
- * a workspace that already has a key wants that key again, not a new one every
- * time it takes a backup.
+ * The platform's key, a key the person holds, or a passphrase. This console
+ * makes no key: a key made here is a key it held, and it holds nothing. A
+ * person makes theirs on their own machine (`age-keygen`) and gives the public
+ * half, or uses again the one this workspace already has.
  *
  * The same radio-card pattern as the destination selector above it, so a form
  * asking two questions asks them the same way.
  */
 import { useEffect, useState, type ReactNode } from "react";
-import {
-  escrowBackupKey,
-  fetchBackupKeyStatus,
-  mintBackupKey,
-  type BackupKeyStatus,
-  type MintedKey,
-} from "@/api/admin";
-import { qrDataUrl, saveKeyFile, saveKeyQr } from "@/admin/backupKeyFile";
+import { fetchBackupKeyStatus, type BackupKeyStatus } from "@/api/admin";
 import { Trans, useTranslation } from "react-i18next";
 
 /** "passphrase" only appears where a human is present to type one — a schedule
  * has nobody at 03:00, so its form does not offer it. */
-export type KeyChoice = "platform" | "new" | "existing" | "passphrase";
+export type KeyChoice = "platform" | "existing" | "passphrase";
 
 /** What the caller needs to build a request: the recipients, and whether the
  * choice is finished enough to submit. */
@@ -72,27 +65,7 @@ export function BackupKeyChoice({
   const { t } = useTranslation();
 
   const status = useBackupKeyStatus(tenant);
-  const [minted, setMinted] = useState<MintedKey | null>(null);
-  const [minting, setMinting] = useState(false);
-  const [mintError, setMintError] = useState<string | null>(null);
-  const [keepInVault, setKeepInVault] = useState(true);
-  const [qr, setQr] = useState<string | null>(null);
   const [pasted, setPasted] = useState("");
-
-  useEffect(() => {
-    if (!minted) {
-      setQr(null);
-      return;
-    }
-    let live = true;
-    qrDataUrl(minted).then(
-      (u) => live && setQr(u),
-      () => live && setQr(null),
-    );
-    return () => {
-      live = false;
-    };
-  }, [minted]);
 
   // Everything the parent needs, derived in one place so a form cannot disagree
   // with the control about what was chosen.
@@ -105,37 +78,10 @@ export function BackupKeyChoice({
       onDecision({ choice, recipients: [], ready: passphrase?.ready ?? false });
       return;
     }
-    if (choice === "new") {
-      const r = minted ? [minted.recipient] : [];
-      onDecision({ choice, recipients: r, ready: r.length > 0 });
-      return;
-    }
     const typed = pasted.trim();
     const r = typed ? [typed] : status?.recipient ? [status.recipient] : [];
     onDecision({ choice, recipients: r, ready: r.length > 0 });
-  }, [choice, minted, pasted, status, passphrase?.ready, onDecision]);
-
-  const generate = async () => {
-    setMinting(true);
-    setMintError(null);
-    try {
-      const key = await mintBackupKey(tenant);
-      if (keepInVault) {
-        // A failed escrow is not a failed mint: the key exists either way, and
-        // the card says which of the two happened.
-        try {
-          await escrowBackupKey(key.identity, key.recipient);
-        } catch {
-          setMintError(t("backupKey.escrowFailed"));
-        }
-      }
-      setMinted(key);
-    } catch (err) {
-      setMintError((err as Error).message);
-    } finally {
-      setMinting(false);
-    }
-  };
+  }, [choice, pasted, status, passphrase?.ready, onDecision]);
 
   const card = (value: KeyChoice, title: string, body: string) => (
     <label
@@ -160,7 +106,6 @@ export function BackupKeyChoice({
 
       <div className="admin-console__choices">
         {card("platform", t("backupKey.platformKey"), t("backupKey.platformKeyBody"))}
-        {card("new", t("backupKey.newKey"), t("backupKey.newKeyBody"))}
         {status?.exists
           ? card(
               "existing",
@@ -175,69 +120,6 @@ export function BackupKeyChoice({
 
       {choice === "passphrase" && passphrase && (
         <div className="admin-console__stack admin-console__stack--indent">{passphrase.fields}</div>
-      )}
-
-      {choice === "new" && !minted && (
-        <div className="admin-console__stack">
-          <label className="admin-console__checkbox">
-            <input
-              type="checkbox"
-              checked={keepInVault}
-              onChange={(e) => setKeepInVault(e.target.checked)}
-            />
-            <span>
-              {t("backupKey.keepACopyInThe")}
-              {status?.exists ? t("backupKey.replacesEscrowed") : ""}
-            </span>
-          </label>
-          <p className="admin-console__hint">
-            {t(keepInVault ? "backupKey.vaultKept" : "backupKey.downloadOnly")}
-          </p>
-          <div className="admin-console__submit">
-            <button
-              type="button"
-              className="admin-console__btn admin-console__btn--primary"
-              disabled={minting}
-              onClick={generate}
-            >
-              {t(minting ? "backupKey.generating" : "backupKey.generateBackupKey")}
-            </button>
-          </div>
-          {mintError && <p className="admin-console__error">{mintError}</p>}
-        </div>
-      )}
-
-      {choice === "new" && minted && (
-        <div className="admin-console__keycard">
-          <p className="admin-console__keycard-lead">
-            <strong>{t("backupKey.saveThisNow")}</strong> {t("backupKey.itIsShownOnceWithout")}</p>
-          <div className="admin-console__keycard-body">
-            {qr && (
-              <img
-                className="admin-console__keycard-qr"
-                src={qr}
-                alt={t("backupKey.yourBackupKeyAsA")}
-                width={160}
-                height={160}
-              />
-            )}
-            <div className="admin-console__submit admin-console__submit--stack">
-              <button
-                type="button"
-                className="admin-console__btn admin-console__btn--primary"
-                onClick={() => saveKeyFile(minted, tenant)}
-              >
-                {t("backupKey.saveKeyFile")}</button>
-              <button
-                type="button"
-                className="admin-console__btn"
-                onClick={() => void saveKeyQr(minted, tenant)}
-              >
-                {t("backupKey.saveQrAsPng")}</button>
-            </div>
-          </div>
-          {mintError && <p className="admin-console__error">{mintError}</p>}
-        </div>
       )}
 
       {choice === "existing" && (

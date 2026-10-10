@@ -99,13 +99,14 @@ def test_deleting_a_backup_is_an_action_not_a_deletion_of_state(monkeypatch):
     assert seen["json"] == {"name": "nightly-1"}
 
 
-def test_minting_a_key_still_says_it_is_not_wired():
-    """A key minted here is a key this console held, and it is designed to
-    hold nothing."""
-    r = TestClient(_app(_settings())).post(
-        "/api/v1/admin/backup-keys/mint", json={}, headers={"Authorization": "Bearer t"}
-    )
-    assert r.status_code == 501 and "Backup" in r.json()["detail"]
+def test_this_console_has_no_route_that_makes_a_backup_key():
+    """A key made here is a key this console held, and it is designed to hold
+    nothing. A person makes their key on their own machine and gives this
+    console the public half."""
+    client = TestClient(_app(_settings()))
+    for path in ("/api/v1/admin/backup-keys/mint", "/api/v1/admin/backup-keys"):
+        r = client.post(path, json={}, headers={"Authorization": "Bearer t"})
+        assert r.status_code == 404, path
 
 
 def test_no_token_is_refused_before_anything_is_forwarded():

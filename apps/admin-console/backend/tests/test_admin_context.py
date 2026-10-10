@@ -157,7 +157,7 @@ def test_a_screen_not_yet_mapped_says_which_one():
     r = client.get("/api/v1/admin/audit-events", headers={"Authorization": "Bearer t"})
     assert r.status_code == 501 and "Audit" in r.json()["detail"]
     r = client.post("/api/v1/admin/backup-keys", headers={"Authorization": "Bearer t"})
-    assert r.status_code == 501 and "Backup" in r.json()["detail"]
+    assert r.status_code == 404
     r = client.get("/api/v1/admin/members", headers={"Authorization": "Bearer t"})
     assert r.status_code == 404
 

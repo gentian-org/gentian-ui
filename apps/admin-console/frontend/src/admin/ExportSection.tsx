@@ -70,11 +70,11 @@ export function ExportSection({ tenant }: BackupSectionProps) {
 
   const queryClient = useQueryClient();
   const [name, setName] = useState(defaultName);
-  const [keyChoice, setKeyChoice] = useState<KeyChoice>("new");
+  const [keyChoice, setKeyChoice] = useState<KeyChoice>("platform");
   const [keyDecision, setKeyDecision] = useState<KeyDecision>({
-    choice: "new",
+    choice: "platform",
     recipients: [],
-    ready: false,
+    ready: true,
   });
   const mode: "recipient" | "passphrase" = keyChoice === "passphrase" ? "passphrase" : "recipient";
   const [passphrase, setPassphrase] = useState("");
@@ -175,18 +175,12 @@ export function ExportSection({ tenant }: BackupSectionProps) {
       }
     }
 
-    // A key choice that was started and not finished — "a new key" with nothing
-    // generated yet, or "a key I already have" with nothing pasted — would
-    // otherwise submit as the platform key, quietly giving the backup to
-    // exactly the reader the choice was made to exclude.
+    // A key choice that was started and not finished — "a key I already
+    // have" with nothing pasted — would otherwise submit as the platform key,
+    // quietly giving the backup to exactly the reader the choice was made to
+    // exclude.
     if (!keyDecision.ready) {
-      setError(
-        t(
-          keyDecision.choice === "new"
-            ? "backup.generateKeyFirst"
-            : "backup.enterPublicKey",
-        ),
-      );
+      setError(t("backup.enterPublicKey"));
       return;
     }
 

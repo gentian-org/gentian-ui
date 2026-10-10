@@ -184,16 +184,32 @@ export type SecurityPolicies = {
   lockoutDurationSeconds: number;
   requireTotpAdmins: boolean;
   requireTotpMembers: "none" | "optional" | "required";
+  /** Clauses of the realm's password policy this form has no control for.
+   * Shown, and kept as they are when the form is saved. */
+  passwordPolicyOther?: string[];
+  /** False when the caller may not read the realm's password policy. The
+   * password parts are then neither shown as set nor written. */
+  passwordPolicyReadable?: boolean;
 };
 
 export function fetchSecurityPolicies(tenant?: string) {
   return apiFetch<SecurityPolicies>(`/admin/security-policies${tenantQuery(tenant)}`);
 }
 
+/** Sessions and lockout are committed by the director; the password parts
+ * are set on the realm by the registrar. A form that could not read the
+ * realm's password policy sends no password parts, so it cannot clear it. */
 export function updateSecurityPolicies(body: SecurityPolicies, tenant?: string) {
-  return apiFetch<SecurityPolicies>(`/admin/security-policies${tenantQuery(tenant)}`, {
+  const { passwordPolicyOther: _other, passwordPolicyReadable: readable, ...rest } = body;
+  const sent: Record<string, unknown> = { ...rest };
+  if (readable === false) {
+    for (const key of Object.keys(sent)) {
+      if (key.startsWith("password")) delete sent[key];
+    }
+  }
+  return apiFetch<{ commit?: string }>(`/admin/security-policies${tenantQuery(tenant)}`, {
     method: "PUT",
-    body: JSON.stringify(body),
+    body: JSON.stringify(sent),
   });
 }
 
@@ -647,125 +663,6 @@ export function backupIsTerminal(backup: Backup): boolean {
   return backup.phase === "Ready" || backup.phase === "Failed";
 }
 
-export type BackupDestination = {
-  endpoint: string;
-  bucket: string;
-  region: string;
-};
-
-export type BackupRetention = {
-  keepLast: number;
-  keepDaily: number;
-  keepWeekly: number;
-  keepMonthly: number;
-  keepYearly: number;
-};
-
-/** Who can read the bundles a policy or schedule produces. */
-export type BackupScheduleEncryption = {
-  /**
-   * platform: the cluster's key — its holder can help you restore.
-   * own: a key you hold — the platform writes bundles it cannot read, and
-   * nobody can help you restore.
-   */
-  mode: "platform" | "own";
-  recipients: string[];
-};
-
-export type BackupPolicy = {
-  scope: "cluster" | "tenant";
-  tenant: string;
-  /** False means this scope sets nothing and inherits. */
-  configured: boolean;
-  destination: BackupDestination;
-  schedule: string;
-  suspendSchedule: boolean;
-  retention: BackupRetention;
-  encryption: BackupScheduleEncryption;
-  allowTenantOverride: boolean;
-  /** What applies after inheritance, resolved by the operator. */
-  effectiveEndpoint: string;
-  effectiveBucket: string;
-  effectiveSchedule: string;
-  /** Empty means the platform's key; a key here means only its holder can read. */
-  effectiveRecipients: string[];
-  /** A destination whose keys have not been supplied yet. */
-  credentialRequirement: string;
-  credentialSatisfied: boolean;
-  message: string;
-};
-
-export type BackupPolicyBody = {
-  destination: BackupDestination;
-  schedule: string;
-  suspendSchedule: boolean;
-  retention: BackupRetention;
-  encryption: BackupScheduleEncryption;
-  allowTenantOverride?: boolean;
-  /** The tenant name, required when sending bundles to your own storage. */
-  confirm?: string;
-};
-
-export function fetchClusterBackupPolicy() {
-  return apiFetch<BackupPolicy>("/admin/backup-policy/cluster");
-}
-
-export function saveClusterBackupPolicy(body: BackupPolicyBody) {
-  return apiFetch<BackupPolicy>("/admin/backup-policy/cluster", {
-    method: "PUT",
-    body: JSON.stringify(body),
-  });
-}
-
-export function fetchBackupPolicy(tenant?: string) {
-  return apiFetch<BackupPolicy>(`/admin/backup-policy${tenantQuery(tenant)}`);
-}
-
-export function saveBackupPolicy(body: BackupPolicyBody, tenant?: string) {
-  return apiFetch<BackupPolicy>(`/admin/backup-policy${tenantQuery(tenant)}`, {
-    method: "PUT",
-    body: JSON.stringify(body),
-  });
-}
-
-export function resetBackupPolicy(tenant?: string) {
-  return apiFetch<void>(`/admin/backup-policy${tenantQuery(tenant)}`, {
-    method: "DELETE",
-  });
-}
-
-export type BackupSchedule = {
-  name: string;
-  tenant: string;
-  schedule: string;
-  suspended: boolean;
-  encryption: BackupScheduleEncryption;
-  retention: BackupRetention;
-  lastScheduleTime: string | null;
-  lastSuccessfulTime: string | null;
-  nextScheduleTime: string | null;
-  /** Derived from the backup settings; editing it is reverted by the operator. */
-  managed: boolean;
-  message: string;
-};
-
-export type BackupScheduleBody = {
-  schedule: string;
-  suspended: boolean;
-  retention: BackupRetention;
-  encryption: BackupScheduleEncryption;
-};
-
-/** A freshly generated key pair. The identity is in this response and nowhere
- * else: it is not stored and cannot be produced again. */
-export type MintedKey = { identity: string; recipient: string };
-
-/** Keep a copy of a minted key in the vault, so losing the download is not fatal.
- *
- * Written by the custodian with the caller's own OpenBao token, into
- * the caller's own workspace subtree. It is denied to External Secrets, so the
- * key can be read by a workspace administrator and not by the cluster.
- */
 /** What the vault holds for this workspace. Never the key itself: the public
  * half and metadata, read from OpenBao's metadata endpoint. */
 export type BackupKeyStatus = {
@@ -778,47 +675,6 @@ export type BackupKeyStatus = {
 export function fetchBackupKeyStatus() {
   return apiFetch<BackupKeyStatus>("/credentials/backup-identity");
 }
-
-export function escrowBackupKey(identity: string, recipient: string) {
-  return apiFetch<{ tenant: string; vaultPath: string; stored: boolean }>(
-    "/credentials/backup-identity",
-    { method: "PUT", body: JSON.stringify({ identity, recipient }) },
-  );
-}
-
-export function mintBackupKey(tenant?: string) {
-  return apiFetch<MintedKey>(`/admin/backup-keys/mint${tenantQuery(tenant)}`, {
-    method: "POST",
-  });
-}
-
-export function fetchBackupSchedules(tenant?: string, allTenants = false) {
-  const q = tenantQuery(tenant);
-  const all = allTenants ? (q ? "&" : "?") + "allTenants=true" : "";
-  return apiFetch<BackupSchedule[]>(`/admin/backup-schedules${q}${all}`);
-}
-
-export function saveBackupSchedule(name: string, body: BackupScheduleBody, tenant?: string) {
-  return apiFetch<BackupSchedule>(
-    `/admin/backup-schedules/${encodeURIComponent(name)}${tenantQuery(tenant)}`,
-    { method: "PUT", body: JSON.stringify(body) },
-  );
-}
-
-export function deleteBackupSchedule(name: string, tenant?: string) {
-  return apiFetch<void>(
-    `/admin/backup-schedules/${encodeURIComponent(name)}${tenantQuery(tenant)}`,
-    { method: "DELETE" },
-  );
-}
-
-export const emptyRetention: BackupRetention = {
-  keepLast: 0,
-  keepDaily: 0,
-  keepWeekly: 0,
-  keepMonthly: 0,
-  keepYearly: 0,
-};
 
 // --- Resources ---------------------------------------------------------------
 

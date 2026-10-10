@@ -109,14 +109,9 @@ async def app_states(
 # re-pointing, kept where the code is so it cannot drift from what the
 # console actually serves.
 NOT_YET_MAPPED: list[tuple[str, str, str]] = [
-    # Two things are left, and each is here for a reason rather than for
-    # want of time.
+    # One thing is left, and it is here for a reason rather than for want of
+    # time.
     #
-    # Minting a backup key would have this console generate an age private
-    # key and hand it over. It holds nothing by design, and a key that passes
-    # through it is a key it held. It belongs in the browser, or in the
-    # custodian beside the escrow that already exists.
-    ("POST", "/admin/backup-keys", "Backup"),
     # Sign-ins, refused requests and reads of data leave no commit. They need
     # stores that do not exist yet -- see gentian-os docs/roadmap.md 1.12,
     # which is a researched plan rather than a gap.
