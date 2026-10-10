@@ -1,4 +1,4 @@
-"""People, groups and the realm's password policy, relayed to the registrar.
+"""People and groups, relayed to the registrar.
 
 What these assert is the relay's shape rather than Keycloak's behaviour: the
 registrar is the one that holds a credential and decides, and a test here that
@@ -144,24 +144,14 @@ def test_membership_says_which_way(monkeypatch):
     assert seen["json"]["member"] is False
 
 
-def test_the_password_policy_is_read_and_written(monkeypatch):
+def test_the_realms_settings_for_the_member_screens_are_read(monkeypatch):
     seen: dict = {}
-    _fake_client(monkeypatch, {"realm": "platform", "passwordPolicy": "length(8)"}, seen)
+    _fake_client(monkeypatch, {"realm": "platform", "loginDomain": "example.test"}, seen)
     client = TestClient(_app(_settings()))
 
     r = client.get("/api/v1/admin/identity", headers={"Authorization": "Bearer t"})
-    assert r.json()["passwordPolicy"] == "length(8)"
+    assert r.json()["loginDomain"] == "example.test"
     assert seen["url"] == "http://registrar.test:8080/v1/tenants/platform/identity"
-
-    client.post(
-        "/api/v1/admin/identity/password-policy",
-        json={"passwordPolicy": "length(12)"},
-        headers={"Authorization": "Bearer t"},
-    )
-    assert (
-        seen["url"] == "http://registrar.test:8080/v1/tenants/platform/actions/set-password-policy"
-    )
-    assert seen["json"] == {"passwordPolicy": "length(12)"}
 
 
 def test_groups_are_served_rather_than_refused(monkeypatch):

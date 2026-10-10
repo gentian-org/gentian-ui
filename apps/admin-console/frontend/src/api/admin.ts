@@ -184,32 +184,16 @@ export type SecurityPolicies = {
   lockoutDurationSeconds: number;
   requireTotpAdmins: boolean;
   requireTotpMembers: "none" | "optional" | "required";
-  /** Clauses of the realm's password policy this form has no control for.
-   * Shown, and kept as they are when the form is saved. */
-  passwordPolicyOther?: string[];
-  /** False when the caller may not read the realm's password policy. The
-   * password parts are then neither shown as set nor written. */
-  passwordPolicyReadable?: boolean;
 };
 
 export function fetchSecurityPolicies(tenant?: string) {
   return apiFetch<SecurityPolicies>(`/admin/security-policies${tenantQuery(tenant)}`);
 }
 
-/** Sessions and lockout are committed by the director; the password parts
- * are set on the realm by the registrar. A form that could not read the
- * realm's password policy sends no password parts, so it cannot clear it. */
 export function updateSecurityPolicies(body: SecurityPolicies, tenant?: string) {
-  const { passwordPolicyOther: _other, passwordPolicyReadable: readable, ...rest } = body;
-  const sent: Record<string, unknown> = { ...rest };
-  if (readable === false) {
-    for (const key of Object.keys(sent)) {
-      if (key.startsWith("password")) delete sent[key];
-    }
-  }
-  return apiFetch<{ commit?: string }>(`/admin/security-policies${tenantQuery(tenant)}`, {
+  return apiFetch<SecurityPolicies>(`/admin/security-policies${tenantQuery(tenant)}`, {
     method: "PUT",
-    body: JSON.stringify(sent),
+    body: JSON.stringify(body),
   });
 }
 
@@ -837,7 +821,7 @@ export function fetchChanges(tenant?: string, scope: "tenant" | "cluster" = "ten
   return apiFetch<ChangesResponse>(`/admin/changes?${params.toString()}`);
 }
 
-// People, groups and the realm's password policy (S7A.17).
+// People and groups (S7A.17).
 //
 // The console reads and writes these through the director, with the caller's
 // own token. Nothing here holds a Keycloak credential: the director holds one
@@ -916,8 +900,6 @@ export type SettingsTemplate = { id: string; name: string };
 export type IdentitySettings = {
   tenant: string;
   realm: string;
-  /** Keycloak's own spelling, e.g. "length(12) and notUsername(undefined)". */
-  passwordPolicy: string;
   /** What follows the @ in a login composed here; empty when unknown. */
   loginDomain?: string;
   /** Whether settings templates can be offered at all. */
@@ -985,13 +967,6 @@ export function setMembership(
     `/admin/people/membership${tenantQuery(tenant)}`,
     { method: "POST", body: JSON.stringify(body) },
   );
-}
-
-export function setPasswordPolicy(passwordPolicy: string, tenant?: string) {
-  return apiFetch<IdentitySettings>(`/admin/identity/password-policy${tenantQuery(tenant)}`, {
-    method: "POST",
-    body: JSON.stringify({ passwordPolicy }),
-  });
 }
 
 function postAction<T>(path: string, body: unknown, tenant?: string) {

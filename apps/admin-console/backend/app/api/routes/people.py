@@ -1,4 +1,4 @@
-"""People, groups and the realm's password policy.
+"""People and groups.
 
 Every one of these is relayed to the registrar with the caller's own token.
 This component holds no Keycloak credential and never has: the registrar holds
@@ -155,12 +155,8 @@ async def identity_settings(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """The realm's settings a tenant administrator may see.
-
-    The password policy today, in Keycloak's own spelling. Passed through
-    unparsed: the platform does not interpret it, and a parse here would have
-    to be kept in step with a vocabulary Keycloak extends.
-    """
+    """What the member screens need to know about the realm: the domain a
+    login is composed under, and whether templates can be offered."""
     return await _relay(
         settings,
         "GET",
@@ -228,29 +224,6 @@ async def set_membership(
             "group": payload.get("group", ""),
             "member": payload.get("member"),
         },
-    )
-
-
-@router.post("/identity/password-policy")
-async def set_password_policy(
-    payload: dict = Body(...),
-    tenant: str | None = Query(default=None),
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    """Set the realm's password policy.
-
-    A different relation from the rest of this module: can_set_policy rather
-    than can_manage_users, because this is a statement about the tenant rather
-    than about a person. The registrar decides that; this only relays.
-    """
-    return await _relay(
-        settings,
-        "POST",
-        f"/v1/tenants/{_tenant(settings, tenant)}/actions/set-password-policy",
-        bearer_of(credentials),
-        json_body={"passwordPolicy": payload.get("passwordPolicy")},
     )
 
 

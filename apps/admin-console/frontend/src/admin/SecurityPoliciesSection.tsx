@@ -51,7 +51,8 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
 
   const saveMutation = useMutation({
     mutationFn: () => updateSecurityPolicies(form, tenant),
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      setForm(data);
       setError(null);
       setSuccess(t("securityPolicies.saved"));
       await queryClient.invalidateQueries({ queryKey: ["admin", "security-policies", tenant] });
@@ -86,21 +87,8 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
           saveMutation.mutate();
         }}
       >
-        <fieldset className="admin-console__fieldset" disabled={form.passwordPolicyReadable === false}>
+        <fieldset className="admin-console__fieldset">
           <legend>{t("securityPolicies.password")}</legend>
-          <p className="admin-console__hint">
-            {t(
-              form.passwordPolicyReadable === false
-                ? "securityPolicies.passwordNotReadable"
-                : "securityPolicies.passwordSetOnTheRealm",
-            )}
-          </p>
-          {(form.passwordPolicyOther?.length ?? 0) > 0 && (
-            <p className="admin-console__hint">
-              {t("securityPolicies.passwordAlsoRequires")}{" "}
-              <code className="admin-console__wrap">{form.passwordPolicyOther?.join(" and ")}</code>
-            </p>
-          )}
           <div className="admin-console__field">
             <label htmlFor="password-min-length">{t("securityPolicies.minimumLength")}</label>
             <input
