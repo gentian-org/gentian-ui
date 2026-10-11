@@ -13,8 +13,13 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "gentian-portal.labels" . | nindent 8 }}
+        {{- /* Not the chart's common labels: they name the chart, and a pod
+             carries the name its Deployment selects on. A key written twice
+             renders, and is refused by anything that reads the manifest
+             strictly -- a post-renderer among them. */}}
         app.kubernetes.io/name: {{ include "gentian-portal.name" . }}-web
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
         app.kubernetes.io/component: web
     spec:
       securityContext:
