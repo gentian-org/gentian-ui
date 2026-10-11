@@ -108,9 +108,16 @@ jobs:
         run: |
           base="$(sed -n 's/^version: *//p' apps/concierge/chart/Chart.yaml)"
           short="${GITHUB_SHA::7}"
+          # The chart's version is semver, and a prerelease part of digits
+          # alone is a number there: "0710412" is refused for its leading
+          # zero. A commit whose first seven characters are all digits is
+          # named by as many more as it takes to reach a letter. The image
+          # tag stays at seven.
+          vshort="${short}"; n=7
+          while [[ "${vshort}" =~ ^[0-9]+$ && "${n}" -lt 40 ]]; do n=$((n + 1)); vshort="${GITHUB_SHA::n}"; done
           branch="${GITHUB_REF_NAME//\//-}"
           echo "moving=${base}-${branch}" >> "$GITHUB_OUTPUT"
-          echo "immutable=${base}-${branch}.${short}" >> "$GITHUB_OUTPUT"
+          echo "immutable=${base}-${branch}.${vshort}" >> "$GITHUB_OUTPUT"
           echo "image=${branch}-${short}" >> "$GITHUB_OUTPUT"
       - name: Name this build's image
         run: |
