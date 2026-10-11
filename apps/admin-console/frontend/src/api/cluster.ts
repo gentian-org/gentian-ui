@@ -1,4 +1,4 @@
-import { apiFetch } from "@/api/client";
+import { ApiError, apiFetch } from "@/api/client";
 
 /**
  * One setting of the cluster, as the director describes it.
@@ -136,6 +136,26 @@ export type AdminActivation = {
     mailError?: string;
   };
 };
+
+/**
+ * Whether a refused activation says "not there yet" rather than "failed".
+ *
+ * A tenant is a commit first and a tenant on the cluster some minutes later,
+ * and the registrar, which reads the cluster, answers for each stage of that:
+ * 404 while the cluster has no such tenant, 503 naming the provisioning while
+ * its realm's credential or its login domain has not arrived, and 409 while
+ * the administrator account does not exist. The screen only ever asks about a
+ * tenant the deployments repository has, so each of those is a tenant on its
+ * way. Every other answer is a failure and is shown as one -- a 503 that does
+ * not speak of the tenant is a service that is down, not a tenant to wait for.
+ */
+export function notThereYet(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false;
+  if (err.status === 404 || err.status === 409) return true;
+  return (
+    err.status === 503 && /still being provisioned|login domain cannot be read/i.test(err.detail ?? "")
+  );
+}
 
 export function activateTenantAdmin(tenant: string, recoveryEmail?: string) {
   return apiFetch<AdminActivation>(`/cluster/tenants/${encodeURIComponent(tenant)}/activate-admin`, {

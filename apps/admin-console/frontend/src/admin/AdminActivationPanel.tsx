@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { activateTenantAdmin, type AdminActivation } from "@/api/cluster";
+import { Trans, useTranslation } from "react-i18next";
+import { activateTenantAdmin, notThereYet, type AdminActivation } from "@/api/cluster";
 import "./admin.css";
 
-/** How long a just-created tenant is waited for before giving up. */
+/** How long a tenant the cluster does not have yet is waited for. */
 const WAIT_LIMIT_MS = 15 * 60 * 1000;
+/** How often the registrar is asked again while waiting. */
+const ASK_AGAIN_MS = 10 * 1000;
 
 /**
  * Hand a tenant's administrator account to its holder.
@@ -15,19 +17,27 @@ const WAIT_LIMIT_MS = 15 * 60 * 1000;
  * once. Nobody but its holder ever knows the password; issuing a link again
  * is how a locked-out administrator gets back in.
  *
- * Right after a tenant is created its realm and account do not exist yet, so
- * in that case this waits and tries again until they do.
+ * A tenant is a commit before it is a tenant on the cluster. Until the
+ * cluster has it, with its realm and its administrator account, the registrar
+ * answers "not there yet" (see notThereYet). That is not an error and is not
+ * shown as one: this says the tenant is being created, offers nothing to
+ * press, and asks again until the registrar's answer is the activation. The
+ * console reads no state of its own for this -- the registrar's answer is the
+ * only one there is. Anything else it answers is a failure and is shown.
  */
 export function AdminActivationPanel({
   tenant,
   initialEmail = "",
   auto = false,
+  onWaiting,
   onClose,
 }: {
   tenant: string;
   initialEmail?: string;
-  /** Start straight away and wait out provisioning, as after creating it. */
+  /** Start straight away, as after creating the tenant. */
   auto?: boolean;
+  /** Told whenever this starts or stops waiting for the cluster. */
+  onWaiting?: (waiting: boolean) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -35,13 +45,15 @@ export function AdminActivationPanel({
   const [result, setResult] = useState<AdminActivation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [waiting, setWaiting] = useState(false);
+  // A tenant just created is waited for from the start: until the registrar
+  // has answered, nothing says the cluster has it.
+  const [waiting, setWaiting] = useState(auto);
+  const [gaveUp, setGaveUp] = useState(false);
   const [copied, setCopied] = useState(false);
   const started = useRef(0);
   const timer = useRef<number | undefined>(undefined);
 
-  const run = (wait: boolean) => {
-    if (!started.current) started.current = Date.now();
+  const ask = () => {
     setBusy(true);
     setError(null);
     activateTenantAdmin(tenant, email.trim() || undefined)
@@ -50,10 +62,14 @@ export function AdminActivationPanel({
         setResult(answer);
       })
       .catch((err: Error) => {
-        const provisioning = /still being provisioned/i.test(err.message);
-        if (wait && provisioning && Date.now() - started.current < WAIT_LIMIT_MS) {
-          setWaiting(true);
-          timer.current = window.setTimeout(() => run(true), 10000);
+        if (notThereYet(err)) {
+          if (Date.now() - started.current < WAIT_LIMIT_MS) {
+            setWaiting(true);
+            timer.current = window.setTimeout(ask, ASK_AGAIN_MS);
+            return;
+          }
+          setWaiting(false);
+          setGaveUp(true);
           return;
         }
         setWaiting(false);
@@ -62,12 +78,28 @@ export function AdminActivationPanel({
       .finally(() => setBusy(false));
   };
 
+  // Each time a person asks, the wait starts over.
+  const start = () => {
+    started.current = Date.now();
+    setGaveUp(false);
+    ask();
+  };
+
   useEffect(() => {
-    if (auto) run(true);
+    if (auto) start();
     return () => window.clearTimeout(timer.current);
     // Once, on opening: the address is the one the form was given.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    onWaiting?.(waiting);
+    return () => {
+      if (waiting) onWaiting?.(false);
+    };
+    // Only a change of the state is news.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waiting]);
 
   const activation = result?.activation;
   const expires = activation?.expiresAt ? new Date(activation.expiresAt * 1000).toLocaleString() : "";
@@ -76,7 +108,26 @@ export function AdminActivationPanel({
     <div className="admin-console__editor">
       <h3 className="admin-console__card-title">{t("tenants.activateTitle", { tenant })}</h3>
 
-      {!result && (
+      {!result && waiting && (
+        <>
+          <p className="admin-console__card-desc">
+            <Trans
+              i18nKey="tenants.notThereYet"
+              values={{ tenant }}
+              components={{ mono: <span className="admin-console__mono" /> }}
+            />
+          </p>
+          <p className="admin-console__hint">{t("tenants.waitingForProvisioning")}</p>
+          <div className="admin-console__editor-footer">
+            <span />
+            <button className="admin-console__btn admin-console__btn--quiet" type="button" onClick={onClose}>
+              {t("tenants.close")}
+            </button>
+          </div>
+        </>
+      )}
+
+      {!result && !waiting && (
         <>
           <p className="admin-console__card-desc">{t("tenants.activateLead")}</p>
           <div className="admin-console__field-row">
@@ -87,14 +138,18 @@ export function AdminActivationPanel({
                 type="email"
                 value={email}
                 placeholder={t("tenants.recoveryEmailPlaceholder")}
-                disabled={busy || waiting}
+                disabled={busy}
                 onChange={(e) => setEmail(e.target.value)}
               />
               <p className="admin-console__hint">{t("tenants.recoveryEmailHint")}</p>
             </div>
             <div className="admin-console__field" />
           </div>
-          {waiting && <p className="admin-console__hint">{t("tenants.waitingForProvisioning")}</p>}
+          {gaveUp && (
+            <p className="admin-console__error">
+              {t("tenants.stillNotThere", { tenant, minutes: WAIT_LIMIT_MS / 60000 })}
+            </p>
+          )}
           {error && <p className="admin-console__error">{error}</p>}
           <div className="admin-console__editor-footer">
             <button className="admin-console__btn admin-console__btn--quiet" type="button" onClick={onClose}>
@@ -103,8 +158,8 @@ export function AdminActivationPanel({
             <button
               className="admin-console__btn admin-console__btn--primary"
               type="button"
-              disabled={busy || waiting}
-              onClick={() => run(false)}
+              disabled={busy}
+              onClick={start}
             >
               {email.trim() ? t("tenants.sendActivation") : t("tenants.showActivationLink")}
             </button>
