@@ -5,13 +5,14 @@ name: app-store
 # builds the administration console -- the two are components of the same
 # kind, installed by the operator from a ComponentProfile gentian-os ships.
 
+# A branch is checked as a pull request, and what is merged is checked and
+# published as a push. Not both: a branch that ran on its push and again on its
+# pull request did the same work twice. A branch without a pull request is not
+# checked; open one, as a draft if need be, or start the workflow by hand.
 on:
   push:
     branches:
       - develop
-      - "feat/**"
-      - "fix/**"
-      - "chore/**"
     paths:
       - "apps/app-store/**"
       - ".github/workflows/app-store.yaml"
