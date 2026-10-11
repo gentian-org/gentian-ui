@@ -8,13 +8,14 @@ name: admin-console
 # Moved here from gentian-apps, where it was built by apps-ci.yaml: the console
 # is the platform's own UI, like the desktop, not a catalogue app.
 
+# A branch is checked as a pull request, and what is merged is checked and
+# published as a push. Not both: a branch that ran on its push and again on its
+# pull request did the same work twice. A branch without a pull request is not
+# checked; open one, as a draft if need be, or start the workflow by hand.
 on:
   push:
     branches:
       - develop
-      - "feat/**"
-      - "fix/**"
-      - "chore/**"
     paths:
       - "apps/admin-console/**"
       - ".github/workflows/admin-console.yaml"

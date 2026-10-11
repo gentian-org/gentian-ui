@@ -17,13 +17,14 @@ name: desktop
 # images there was no release image to pin: prod ran develop-<sha> images and a
 # tag named only the source. The paths filter below does not apply to tag
 # pushes, so every release gets its images.
+# A branch is checked as a pull request, and what is merged is checked and
+# published as a push. Not both: a branch that ran on its push and again on its
+# pull request did the same work twice. A branch without a pull request is not
+# checked; open one, as a draft if need be, or start the workflow by hand.
 on:
   push:
     branches:
       - develop
-      - "feat/**"
-      - "fix/**"
-      - "chore/**"
     tags:
       - "v*"
     paths:
