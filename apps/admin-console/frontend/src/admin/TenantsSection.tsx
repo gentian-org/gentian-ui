@@ -41,6 +41,9 @@ export function TenantsSection() {
   // The administrator account being handed over: right after creating a
   // tenant (waiting out its provisioning), or for an existing one on request.
   const [activating, setActivating] = useState<{ tenant: string; email: string; auto: boolean } | null>(null);
+  // The tenant the cluster does not have yet, as the open panel learned by
+  // asking: its activation is not offered a second time in its row.
+  const [waitingFor, setWaitingFor] = useState<string | null>(null);
   const [lastCommit, setLastCommit] = useState<string | null>(null);
   // Retiring or purging asks in a dialog, behind the tenant's name typed out.
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -117,6 +120,7 @@ export function TenantsSection() {
           tenant={activating.tenant}
           initialEmail={activating.email}
           auto={activating.auto}
+          onWaiting={(waiting) => setWaitingFor(waiting ? activating.tenant : null)}
           onClose={() => setActivating(null)}
         />
       )}
@@ -150,7 +154,13 @@ export function TenantsSection() {
                 <td>{tenant.apps.length === 0 ? "—" : tenant.apps.join(", ")}</td>
                 <td>
                   <span className="admin-console__actions">
-                    {tenant.purging ? null : (
+                    {tenant.purging ? null : waitingFor === tenant.name ? (
+                      <span
+                        className="admin-console__badge admin-console__badge--info"
+                        title={t("tenants.beingCreatedHint")}
+                      >
+                        {t("tenants.beingCreated")}</span>
+                    ) : (
                       <button
                         type="button"
                         className="admin-console__btn admin-console__btn--quiet"

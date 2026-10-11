@@ -213,6 +213,34 @@ def test_activating_an_administrator_relays_only_the_recovery_address(monkeypatc
     assert seen["json"] == {}
 
 
+def test_a_tenant_the_cluster_does_not_have_yet_is_answered_as_the_registrar_answered(monkeypatch):
+    """A tenant is a commit before it is a tenant on the cluster, and until
+    then the registrar refuses its administrator's activation with a status
+    that says which stage it is at. The screen tells "not there yet" from a
+    failure by that status and that sentence, so both come back as they were
+    given: a relay that flattened them into its own error would turn a tenant
+    on its way into a fault."""
+    for status, said in (
+        (404, "tenant not found"),
+        (503, "no credential for the realm acme yet: the tenant is still being provisioned"),
+        (409, "the administrator account does not exist yet"),
+    ):
+        answer = {"error": said, "request_id": "r1"}
+        _fake_client(
+            monkeypatch,
+            lambda m, url, status=status, answer=answer: httpx.Response(
+                status, json=answer, request=httpx.Request(m, url)
+            ),
+            {},
+        )
+        r = TestClient(_app(_settings())).post(
+            "/api/v1/cluster/tenants/acme/activate-admin",
+            headers={"Authorization": "Bearer person-token"},
+        )
+        assert r.status_code == status
+        assert r.json() == answer
+
+
 def test_activating_without_a_registrar_says_so_and_asks_nobody(monkeypatch):
     seen: dict = {}
     _fake_client(monkeypatch, lambda m, url: httpx.Response(200, json={}), seen)
