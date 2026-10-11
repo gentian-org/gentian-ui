@@ -266,7 +266,7 @@ export function TenantsSection() {
               className="admin-console__btn admin-console__btn--primary"
               disabled={!nameIsValid || createMutation.isPending}
             >
-              {createMutation.isPending ? "Committing…" : t("tenants.commitNewTenant")}
+              {createMutation.isPending ? "Creating…" : t("tenants.commitNewTenant")}
             </button>
           </div>
         </form>
