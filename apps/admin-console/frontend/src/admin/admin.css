@@ -708,6 +708,11 @@
   max-width: 34rem;
 }
 
+/* What a chosen card asks for sits under the cards, set apart from them. */
+.admin-console__choices + .admin-console__stack {
+  margin-top: 0.75rem;
+}
+
 /* A submit button with a consequence note underneath it. */
 .admin-console__submit {
   display: grid;
@@ -728,7 +733,8 @@
   color: var(--gtn-ink-3);
 }
 
-.admin-console__label input:not([type="radio"]):not([type="checkbox"]) {
+.admin-console__label input:not([type="radio"]):not([type="checkbox"]),
+.admin-console__label textarea {
   width: 100%;
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--gtn-border-strong);
@@ -738,7 +744,13 @@
   background: var(--gtn-paper-3);
 }
 
-.admin-console__label input:focus-visible {
+.admin-console__label textarea {
+  display: block;
+  resize: vertical;
+}
+
+.admin-console__label input:focus-visible,
+.admin-console__label textarea:focus-visible {
   outline: none;
   border-color: var(--gtn-400);
   box-shadow: var(--gtn-focus-ring);

@@ -123,7 +123,7 @@ export function BackupKeyChoice({
       )}
 
       {choice === "existing" && (
-        <div className="admin-console__stack">
+        <div className="admin-console__stack admin-console__stack--indent">
           {status?.exists && status.recipient && !pasted && (
             <p className="admin-console__hint">
               {t("backupKey.using")}<code className="admin-console__wrap">{status.recipient}</code>
