@@ -537,7 +537,18 @@
     "purgingHint": "Its data is set to be deleted; the tenant is removed as soon as the cluster has taken that in.",
     "keepBundles": "Keep its backups",
     "keepBundlesBody": "The backup bucket and the bundles in it stay. For a tenant that was handed a copy and whose provider keeps one under contract; otherwise the backups go with everything else.",
-    "activationNotMailed": "The realm cannot send mail yet (the SMTP relay is supplied in Credentials), so the link is shown here. {{email}} is kept as the recovery address."
+    "activationNotMailed": "The realm could not send the mail ({{reason}}), so the link is shown here. {{email}} is kept as the recovery address.",
+    "invitationAccepted": "The invitation will be mailed to {{email}} as soon as <mono>{{tenant}}</mono> is ready. You can close this page: the registrar sends it, and nothing has to stay open.",
+    "invitationWaiting": "The tenant is being provisioned. If this page stays open, it shows here when the invitation has gone out.",
+    "invitationSent": "The invitation was mailed to {{email}}.",
+    "invitationSentNoAddress": "The invitation was mailed.",
+    "invitationExpired": "{{tenant}} was not ready in time, and the invitation was given up. Nothing was mailed. Activate the administrator below.",
+    "invitationNotMailed": "{{tenant}} is ready, but its realm could not send the invitation ({{reason}}). The address is kept as the recovery address. Activate the administrator below; the link is shown here if the mail still cannot go.",
+    "invitationRefused": "The registrar did not send the invitation ({{reason}}).",
+    "invitationSuperseded": "The administrator's account has been activated another way since; no invitation is waiting.",
+    "invitationNotKept": "The registrar could not take the invitation ({{reason}}). Keep this page open: the invitation is sent from here once the tenant is ready.",
+    "invitationPending": "invitation pending",
+    "invitationPendingHint": "The registrar mails the administrator's invitation as soon as this tenant is ready."
   },
   "usage": {
     "committed": "committed",

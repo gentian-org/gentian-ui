@@ -253,6 +253,107 @@ def test_activating_without_a_registrar_says_so_and_asks_nobody(monkeypatch):
     assert seen == {}
 
 
+def test_an_administrators_invitation_is_handed_to_the_registrar_and_nothing_is_kept(monkeypatch):
+    """Creating a tenant with a recovery address hands the address to the
+    registrar, which keeps the request and sends the invitation when the
+    tenant is ready. The relay passes the person's token and the address and
+    nothing else, and the registrar's 202 comes back as it was given."""
+    seen: dict = {}
+    answer = {"tenant": "acme", "state": "pending", "expiresAt": 1791900000}
+    _fake_client(
+        monkeypatch,
+        lambda m, url: httpx.Response(202, json=answer, request=httpx.Request(m, url)),
+        seen,
+    )
+    client = TestClient(_app(_settings()))
+    r = client.post(
+        "/api/v1/cluster/tenants/acme/admin-invitation",
+        json={"recoveryEmail": "owner@example.org", "smuggled": True},
+        headers={"Authorization": "Bearer person-token"},
+    )
+    assert r.status_code == 202
+    assert r.json() == answer
+    assert seen["method"] == "POST"
+    assert (
+        seen["url"]
+        == "http://registrar.test:8080/v1/clusters/demo/tenants/acme/actions/request-admin-invitation"
+    )
+    assert seen["json"] == {"recoveryEmail": "owner@example.org"}
+    assert seen["auth"] == "Bearer person-token"
+
+
+def test_the_state_of_an_invitation_is_the_registrars_answer(monkeypatch):
+    seen: dict = {}
+    answers = {
+        "/tenants/acme/admin-invitation": {
+            "tenant": "acme",
+            "state": "not-mailed",
+            "reason": "HTTP 500: no relay",
+        },
+        "/admin-invitations": {"pending": [{"tenant": "acme", "requestedAt": 1, "expiresAt": 2}]},
+    }
+    for path, answer in answers.items():
+        _fake_client(
+            monkeypatch,
+            lambda m, url, answer=answer: httpx.Response(
+                200, json=answer, request=httpx.Request(m, url)
+            ),
+            seen,
+        )
+        r = TestClient(_app(_settings())).get(
+            f"/api/v1/cluster{path}", headers={"Authorization": "Bearer person-token"}
+        )
+        assert r.status_code == 200
+        assert r.json() == answer
+        assert seen["method"] == "GET"
+        assert seen["url"] == f"http://registrar.test:8080/v1/clusters/demo{path}"
+        assert seen["auth"] == "Bearer person-token"
+
+
+def test_a_refused_invitation_comes_back_as_the_registrar_refused_it(monkeypatch):
+    """The console holds no right of its own: whoever may not configure the
+    cluster is refused by the registrar, and a registrar that cannot keep the
+    request says so. The screen falls back on what it is told, so neither is
+    softened."""
+    for status, said in (
+        (403, "forbidden"),
+        (400, "that is not an address"),
+        (503, "this registrar has no database, so it cannot keep an invitation"),
+    ):
+        answer = {"error": said, "request_id": "r1"}
+        _fake_client(
+            monkeypatch,
+            lambda m, url, status=status, answer=answer: httpx.Response(
+                status, json=answer, request=httpx.Request(m, url)
+            ),
+            {},
+        )
+        r = TestClient(_app(_settings())).post(
+            "/api/v1/cluster/tenants/acme/admin-invitation",
+            json={"recoveryEmail": "owner@example.org"},
+            headers={"Authorization": "Bearer person-token"},
+        )
+        assert r.status_code == status
+        assert r.json() == answer
+
+
+def test_an_invitation_without_a_registrar_says_so_and_asks_nobody(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, lambda m, url: httpx.Response(200, json={}), seen)
+    client = TestClient(_app(_settings(registrar_url=None)))
+    for method, path in (
+        ("POST", "/tenants/acme/admin-invitation"),
+        ("GET", "/tenants/acme/admin-invitation"),
+        ("GET", "/admin-invitations"),
+    ):
+        r = client.request(
+            method, f"/api/v1/cluster{path}", headers={"Authorization": "Bearer person-token"}
+        )
+        assert r.status_code == 503
+        assert "REGISTRAR_URL" in r.json()["detail"]
+    assert seen == {}
+
+
 def test_purging_a_tenant_is_the_directors_purge_action(monkeypatch):
     seen: dict = {}
     _fake_client(

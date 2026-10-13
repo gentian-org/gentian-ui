@@ -543,7 +543,18 @@
     "purgingHint": "Die Daten sind zur Löschung vorgemerkt; der Mandant wird entfernt, sobald der Cluster das übernommen hat.",
     "keepBundles": "Backups behalten",
     "keepBundlesBody": "Der Backup-Bucket und die Bundles darin bleiben. Für einen Mandanten, der eine Kopie erhalten hat und dessen Anbieter vertraglich eine aufbewahrt; sonst gehen die Backups mit allem anderen.",
-    "activationNotMailed": "Der Realm kann noch keine E-Mail senden (das SMTP-Relay wird unter Zugangsdaten hinterlegt), daher wird der Link hier angezeigt. {{email}} bleibt die Wiederherstellungsadresse."
+    "activationNotMailed": "Der Realm konnte die E-Mail nicht senden ({{reason}}), daher wird der Link hier angezeigt. {{email}} bleibt die Wiederherstellungsadresse.",
+    "invitationAccepted": "Die Einladung wird an {{email}} gesendet, sobald <mono>{{tenant}}</mono> bereit ist. Sie können diese Seite schließen: Der Registrar versendet sie, und nichts muss offen bleiben.",
+    "invitationWaiting": "Der Mandant wird bereitgestellt. Bleibt diese Seite offen, zeigt sie hier an, wenn die Einladung verschickt wurde.",
+    "invitationSent": "Die Einladung wurde an {{email}} gesendet.",
+    "invitationSentNoAddress": "Die Einladung wurde gesendet.",
+    "invitationExpired": "{{tenant}} war nicht rechtzeitig bereit, und die Einladung wurde aufgegeben. Es wurde nichts versendet. Aktivieren Sie den Administrator unten.",
+    "invitationNotMailed": "{{tenant}} ist bereit, aber sein Realm konnte die Einladung nicht senden ({{reason}}). Die Adresse bleibt die Wiederherstellungsadresse. Aktivieren Sie den Administrator unten; der Link wird hier angezeigt, falls die E-Mail weiterhin nicht verschickt werden kann.",
+    "invitationRefused": "Der Registrar hat die Einladung nicht gesendet ({{reason}}).",
+    "invitationSuperseded": "Das Administratorkonto wurde inzwischen auf anderem Weg aktiviert; es wartet keine Einladung.",
+    "invitationNotKept": "Der Registrar konnte die Einladung nicht entgegennehmen ({{reason}}). Lassen Sie diese Seite offen: Die Einladung wird von hier gesendet, sobald der Mandant bereit ist.",
+    "invitationPending": "Einladung ausstehend",
+    "invitationPendingHint": "Der Registrar versendet die Einladung des Administrators, sobald dieser Mandant bereit ist."
   },
   "usage": {
     "committed": "zugesagt",
