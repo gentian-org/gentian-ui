@@ -22,7 +22,7 @@
     "noStoreBody": "Für diesen Cluster ist kein App Store konfiguriert. Apps werden installiert mit",
     "noStoreTitle": "Kein App Store konfiguriert",
     "notOfferedBody": "Dieser Cluster bietet keinen App Store an.",
-    "notOfferedNoReport": "Dieser Cluster bietet keinen App Store an, weil die Lizenzmeldung auf ihm ausgeschaltet ist. Darüber entscheidet die Administration des Clusters.",
+    "notOfferedNoReport": "Dieser Cluster bietet keinen App Store an, weil die Nutzungsstatistik auf ihm ausgeschaltet ist. Darüber entscheidet die Administration des Clusters.",
     "notOfferedTitle": "Der App Store wird auf diesem Cluster nicht angeboten",
     "unavailableBody": "Der Cluster konnte nicht gefragt werden, ob Sie in diesem Mandanten Apps installieren dürfen. Mit dem, was installiert ist, ist alles in Ordnung.",
     "unavailableTitle": "Der App Store ist gerade nicht verfügbar"
@@ -55,9 +55,9 @@
   },
   "standing": {
     "browsingStays": "Das Stöbern ist davon nicht betroffen. Erwerben ist nicht möglich, bis der Store diesen Mandanten bedient. Installierte Apps laufen weiter.",
-    "no-reports-for-tenant": "Dem Store liegt keine Lizenzmeldung vor, die {{tenantUrl}} nennt. Entweder meldet dieser Cluster nicht, oder die Adresse ist nicht die dieses Mandanten.",
+    "no-reports-for-tenant": "Dem Store liegt keine Nutzungsstatistik vor, die {{tenantUrl}} nennt. Entweder meldet dieser Cluster nicht, oder die Adresse ist nicht die dieses Mandanten.",
     "notServed": "Der Store bedient diesen Mandanten nicht",
-    "reports-stale": "Die letzte Lizenzmeldung, die dem Store für {{tenantUrl}} vorliegt, ist älter, als er akzeptiert.",
+    "reports-stale": "Die letzte Nutzungsstatistik, die dem Store für {{tenantUrl}} vorliegt, ist älter, als er akzeptiert.",
     "tenant-blocked": "Der Store hat entschieden, {{tenantUrl}} nicht zu bedienen.",
     "tenant-not-claimed": "Das Konto, mit dem Sie sich angemeldet haben, ist nicht das, das beim Store für {{tenantUrl}} handeln darf."
   },
@@ -105,7 +105,7 @@
     "addons": "Add-ons",
     "backToCatalogue": "Zurück zum Katalog",
     "latestVersion": "Version {{version}}",
-    "licence": "Lizenz:",
+    "license": "Lizenz:",
     "links": "Links",
     "listPrice": "Dies ist der Listenpreis. Was diesem Mandanten berechnet wird, sagt der Checkout beim Store.",
     "loading": "App wird geladen …",
@@ -130,7 +130,7 @@
   },
   "reportKind": {
     "accessibility": "Barrierefreiheit",
-    "licence": "Lizenz",
+    "license": "Lizenz",
     "other": "Sonstiges",
     "privacy": "Datenschutz",
     "quality": "Qualität",
@@ -140,7 +140,7 @@
     "account": "Ihr Konto beim Store",
     "documentation": "Dokumentation",
     "homepage": "Webseite",
-    "licence": "Lizenz",
+    "license": "Lizenz",
     "privacy": "Datenschutz",
     "source": "Quellcode",
     "subscription": "Abonnement",

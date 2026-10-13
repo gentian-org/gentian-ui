@@ -22,7 +22,7 @@
     "tabMembers": "Members",
     "tabGroups": "Groups",
     "tabExport": "Export",
-    "tabLicenceReport": "Licence report",
+    "tabUsageStatistics": "Usage Statistics",
     "tabApps": "Apps"
   },
   "audit": {
@@ -710,13 +710,13 @@
     "phase_failed": "Import of <mono>{{tenant}}</mono> failed: {{message}}",
     "passwordReset": "Members have no credentials yet: send them a password reset, and activate the administrator from the list above."
   },
-  "licenceReport": {
-    "title": "Licence report",
+  "usageStatistics": {
+    "title": "Usage Statistics",
     "lead": "What this cluster reports about what it runs. The report contains no names or addresses, only addresses of the cluster and its tenants and counts.",
-    "loading": "Loading the licence report…",
-    "unavailable": "The licence report is not available.",
-    "off": "Licence reporting is turned off on this cluster. Nothing is sent, and the App Store is not offered.",
-    "state": "Licence reporting",
+    "loading": "Loading the usage statistics report…",
+    "unavailable": "The usage statistics report is not available.",
+    "off": "Usage statistics are turned off on this cluster. Nothing is sent, and the App Store is not offered.",
+    "state": "Usage statistics",
     "on": "Turned on",
     "sentTo": "Sent to",
     "lastAttempt": "Last attempt",

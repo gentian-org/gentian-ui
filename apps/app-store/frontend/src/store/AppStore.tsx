@@ -70,7 +70,7 @@ export function AppStore() {
     return (
       <Plain title={t("gate.notOfferedTitle")}>
         <p className="admin-console__lead">
-          {context.appStore.reason === "licence-report-disabled" ? t("gate.notOfferedNoReport") : t("gate.notOfferedBody")}
+          {context.appStore.reason === "usage-statistics-disabled" ? t("gate.notOfferedNoReport") : t("gate.notOfferedBody")}
         </p>
         <p className="admin-console__lead">
           {t("gate.installByCommand")} <code>kubectl gentian apps install</code>

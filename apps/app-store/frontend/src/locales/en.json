@@ -22,7 +22,7 @@
     "noStoreBody": "No App Store is configured for this cluster. Apps are installed with",
     "noStoreTitle": "No App Store is configured",
     "notOfferedBody": "This cluster does not offer an App Store.",
-    "notOfferedNoReport": "This cluster does not offer an App Store, because licence reporting is turned off on it. The cluster’s administrator decides that.",
+    "notOfferedNoReport": "This cluster does not offer an App Store, because usage statistics are turned off on it. The cluster’s administrator decides that.",
     "notOfferedTitle": "The App Store is not offered on this cluster",
     "unavailableBody": "The cluster could not be asked whether you may install apps in this tenant. Nothing is wrong with what is installed.",
     "unavailableTitle": "The App Store is not available right now"
@@ -55,9 +55,9 @@
   },
   "standing": {
     "browsingStays": "Browsing is not affected. Acquiring is not available until the store serves this tenant. Apps that are installed keep running.",
-    "no-reports-for-tenant": "The store has no licence report that names {{tenantUrl}}. Either this cluster does not report, or the address is not this tenant’s.",
+    "no-reports-for-tenant": "The store has no usage statistics report that names {{tenantUrl}}. Either this cluster does not report, or the address is not this tenant’s.",
     "notServed": "The store does not serve this tenant",
-    "reports-stale": "The store’s latest licence report for {{tenantUrl}} is older than it accepts.",
+    "reports-stale": "The store’s latest usage statistics report for {{tenantUrl}} is older than it accepts.",
     "tenant-blocked": "The store has decided not to serve {{tenantUrl}}.",
     "tenant-not-claimed": "The account you signed in with is not the one the store lets act for {{tenantUrl}}."
   },
@@ -105,7 +105,7 @@
     "addons": "Add-ons",
     "backToCatalogue": "Back to the catalogue",
     "latestVersion": "Version {{version}}",
-    "licence": "Licence:",
+    "license": "License:",
     "links": "Links",
     "listPrice": "This is the list price. What this tenant is charged is what the checkout at the store says.",
     "loading": "Loading the app…",
@@ -130,7 +130,7 @@
   },
   "reportKind": {
     "accessibility": "accessibility",
-    "licence": "licence",
+    "license": "license",
     "other": "other",
     "privacy": "privacy",
     "quality": "quality",
@@ -140,7 +140,7 @@
     "account": "Your account at the store",
     "documentation": "Documentation",
     "homepage": "Homepage",
-    "licence": "Licence",
+    "license": "License",
     "privacy": "Privacy",
     "source": "Source code",
     "subscription": "Subscription",

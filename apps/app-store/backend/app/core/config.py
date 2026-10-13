@@ -114,7 +114,7 @@ class Settings(BaseSettings):
 
     @property
     def tenant_url(self) -> str | None:
-        """The tenant's address as the licence report spells it: https://<host>,
+        """The tenant's address as the usage statistics report spells it: https://<host>,
         lower case, no path and no trailing slash."""
         if not self.host:
             return None

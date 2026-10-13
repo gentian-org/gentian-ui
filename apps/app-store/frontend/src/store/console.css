@@ -1506,7 +1506,7 @@
   gap: 0.5rem;
 }
 
-/* The licence report as it was sent: long lines scroll, nothing is wrapped
+/* The usage statistics report as it was sent: long lines scroll, nothing is wrapped
    into something that was not in the body. */
 .admin-console__report-body {
   margin: 0.5rem 0 1rem;

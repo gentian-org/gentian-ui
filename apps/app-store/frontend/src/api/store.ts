@@ -108,7 +108,7 @@ export type AppDetail = AppSummary & {
   addons: { coordinate: string; name: string; summary: string }[];
   addonOf: string | null;
   links: Link[];
-  licence: { spdx?: string | null; name: string; url?: string | null } | null;
+  license: { spdx?: string | null; name: string; url?: string | null } | null;
 };
 
 export type Review = {

@@ -270,7 +270,7 @@ export function AppPage() {
 
         <div className="store-app__side">
           <InstallPanel key={coordinate} detail={detail} storeName={storeName} />
-          {detail.links.length > 0 || detail.licence ? (
+          {detail.links.length > 0 || detail.license ? (
             <aside className="store-install">
               <h2 className="admin-console__subsection-title">{t("app.links")}</h2>
               <ul className="store-links">
@@ -279,9 +279,9 @@ export function AppPage() {
                     <StoreLinkItem link={link} />
                   </li>
                 ))}
-                {detail.licence ? (
+                {detail.license ? (
                   <li>
-                    {t("app.licence")} <ExternalLink href={detail.licence.url}>{detail.licence.name}</ExternalLink>
+                    {t("app.license")} <ExternalLink href={detail.license.url}>{detail.license.name}</ExternalLink>
                   </li>
                 ) : null}
               </ul>
