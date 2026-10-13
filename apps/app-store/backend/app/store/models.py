@@ -229,7 +229,7 @@ class AddonRef(Model):
     summary: Text(300)
 
 
-class Licence(Model):
+class License(Model):
     spdx: Text(120) | None = None
     name: Text(120)
     url: HttpsUrl | None = None
@@ -242,7 +242,7 @@ class AppDetail(AppSummary):
     addons: list[AddonRef]
     addonOf: Coordinate | None
     links: list[Link]
-    licence: Licence | None
+    license: License | None
 
 
 class Review(Model):

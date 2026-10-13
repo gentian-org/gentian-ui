@@ -642,7 +642,7 @@ def test_a_tenant_the_store_does_not_serve_acquires_nothing_and_is_told_why(
     assert view["stage"] == "failed"
     assert view["error"]["code"] == "tenant-refused"
     assert view["error"]["reason"] == "no-reports-for-tenant"
-    assert view["error"]["detail"].startswith("No licence report names https://acme.example.")
+    assert view["error"]["detail"].startswith("No usage statistics report names https://acme.example.")
     assert store.calls_to("POST", "/v1/acquisitions") == []
     assert cluster.calls == []
     # Browsing is as it was.

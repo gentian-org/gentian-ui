@@ -99,8 +99,8 @@ async def customization_debt(
     )
 
 
-@router.get("/platform/licence-report")
-async def licence_report(
+@router.get("/platform/usage-statistics")
+async def usage_statistics(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
@@ -111,7 +111,7 @@ async def licence_report(
     decides: its refusal comes back as it is."""
     return await director.read(
         settings,
-        f"/v1/clusters/{director.cluster(settings)}/licence-report",
+        f"/v1/clusters/{director.cluster(settings)}/usage-statistics",
         bearer_of(credentials),
     )
 

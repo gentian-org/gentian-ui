@@ -41,7 +41,7 @@ def test_the_authorization_request_is_the_definitions(api, store):
     # Exactly this app's own callback: https, the app's host, no port, the
     # one path, no query.
     assert request["redirect_uri"] == f"https://{HOST}/oauth/callback"
-    # The tenant's address as the licence report spells it.
+    # The tenant's address as the usage statistics report spells it.
     assert request["tenant_url"] == "https://acme.example"
     assert request["scope"] == "store.read store.acquire"
     assert request["code_challenge_method"] == "S256"
@@ -90,7 +90,7 @@ def test_the_standing_is_asked_first_and_the_browser_learns_only_that(api, store
     assert session["signedIn"] is True
     assert session["expiresInSeconds"] == 900
     assert session["standing"]["served"] is True
-    assert session["standing"]["notices"][0]["type"] == "free-licence-limit"
+    assert session["standing"]["notices"][0]["type"] == "free-license-limit"
     assert set(session) == {"signedIn", "expiresInSeconds", "standing"}
     assert len(store.calls_to("GET", "/v1/tenant")) == 1
 

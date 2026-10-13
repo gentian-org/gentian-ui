@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { useQuery } from "@tanstack/react-query";
-import { fetchLicenceReport } from "@/api/admin";
+import { fetchUsageStatistics } from "@/api/admin";
 import "./admin.css";
 import { useTranslation } from "react-i18next";
 
@@ -47,21 +47,21 @@ function readable(body: string) {
  * them. Who may read it is the usher's decision, and its refusal is shown in
  * its own words.
  */
-export function LicenceReportSection() {
+export function UsageStatisticsSection() {
   const { t } = useTranslation();
 
   const reportQuery = useQuery({
-    queryKey: ["admin", "platform", "licence-report"],
-    queryFn: () => fetchLicenceReport(),
+    queryKey: ["admin", "platform", "usage-statistics"],
+    queryFn: () => fetchUsageStatistics(),
   });
 
   if (reportQuery.isLoading) {
-    return <p className="admin-console__loading">{t("licenceReport.loading")}</p>;
+    return <p className="admin-console__loading">{t("usageStatistics.loading")}</p>;
   }
   if (reportQuery.isError || !reportQuery.data) {
     return (
       <p className="admin-console__error">
-        {t("licenceReport.unavailable")}{" "}
+        {t("usageStatistics.unavailable")}{" "}
         {reportQuery.error instanceof Error ? reportQuery.error.message : ""}
       </p>
     );
@@ -73,51 +73,51 @@ export function LicenceReportSection() {
     <section>
       <header className="admin-console__section-head">
         <div>
-          <h2 className="admin-console__section-title">{t("licenceReport.title")}</h2>
-          <p className="admin-console__lead">{t("licenceReport.lead")}</p>
+          <h2 className="admin-console__section-title">{t("usageStatistics.title")}</h2>
+          <p className="admin-console__lead">{t("usageStatistics.lead")}</p>
         </div>
       </header>
 
       {!enabled ? (
-        <p className="admin-console__empty">{t("licenceReport.off")}</p>
+        <p className="admin-console__empty">{t("usageStatistics.off")}</p>
       ) : (
         <>
           <div className="admin-console__table-wrap">
             <table className="admin-console__table">
               <tbody>
                 <tr>
-                  <th scope="row">{t("licenceReport.state")}</th>
-                  <td>{t("licenceReport.on")}</td>
+                  <th scope="row">{t("usageStatistics.state")}</th>
+                  <td>{t("usageStatistics.on")}</td>
                 </tr>
                 <tr>
-                  <th scope="row">{t("licenceReport.sentTo")}</th>
+                  <th scope="row">{t("usageStatistics.sentTo")}</th>
                   <td>
                     <span className="admin-console__mono">{url || "—"}</span>
                   </td>
                 </tr>
                 <tr>
-                  <th scope="row">{t("licenceReport.lastAttempt")}</th>
-                  <td>{attempt ? when(attempt.at) : t("licenceReport.noAttempt")}</td>
+                  <th scope="row">{t("usageStatistics.lastAttempt")}</th>
+                  <td>{attempt ? when(attempt.at) : t("usageStatistics.noAttempt")}</td>
                 </tr>
                 {attempt ? (
                   <tr>
-                    <th scope="row">{t("licenceReport.outcome")}</th>
+                    <th scope="row">{t("usageStatistics.outcome")}</th>
                     <td>
                       <div>
                         {OUTCOME_KEYS[attempt.outcome]
-                          ? t(`licenceReport.${OUTCOME_KEYS[attempt.outcome]}`)
+                          ? t(`usageStatistics.${OUTCOME_KEYS[attempt.outcome]}`)
                           : attempt.outcome}
                       </div>
                       {attempt.reason ? (
                         <div className="admin-console__hint">
                           {REASON_KEYS[attempt.reason]
-                            ? t(`licenceReport.${REASON_KEYS[attempt.reason]}`)
+                            ? t(`usageStatistics.${REASON_KEYS[attempt.reason]}`)
                             : attempt.reason}
                         </div>
                       ) : null}
                       {attempt.httpStatus ? (
                         <div className="admin-console__hint">
-                          {t("licenceReport.httpStatus", { status: attempt.httpStatus })}
+                          {t("usageStatistics.httpStatus", { status: attempt.httpStatus })}
                         </div>
                       ) : null}
                       {attempt.error ? (
@@ -129,7 +129,7 @@ export function LicenceReportSection() {
                   </tr>
                 ) : null}
                 <tr>
-                  <th scope="row">{t("licenceReport.nextAttempt")}</th>
+                  <th scope="row">{t("usageStatistics.nextAttempt")}</th>
                   <td>{when(attempt?.nextAt)}</td>
                 </tr>
               </tbody>
@@ -137,11 +137,11 @@ export function LicenceReportSection() {
           </div>
 
           <div className="admin-console__subsection">
-            <h3 className="admin-console__subsection-title">{t("licenceReport.exactlyWhatWasSent")}</h3>
+            <h3 className="admin-console__subsection-title">{t("usageStatistics.exactlyWhatWasSent")}</h3>
             {report ? (
               <>
                 <p className="admin-console__hint">
-                  {t("licenceReport.sequence", { sequence: report.sequence })}
+                  {t("usageStatistics.sequence", { sequence: report.sequence })}
                 </p>
                 <pre className="admin-console__mono admin-console__report-body">
                   {readable(report.body)}
@@ -150,13 +150,13 @@ export function LicenceReportSection() {
                   <table className="admin-console__table">
                     <tbody>
                       <tr>
-                        <th scope="row">{t("licenceReport.signature")}</th>
+                        <th scope="row">{t("usageStatistics.signature")}</th>
                         <td>
                           <span className="admin-console__mono">{report.signature}</span>
                         </td>
                       </tr>
                       <tr>
-                        <th scope="row">{t("licenceReport.keyId")}</th>
+                        <th scope="row">{t("usageStatistics.keyId")}</th>
                         <td>
                           <span className="admin-console__mono">{report.keyId}</span>
                         </td>
@@ -166,7 +166,7 @@ export function LicenceReportSection() {
                 </div>
               </>
             ) : (
-              <p className="admin-console__empty">{t("licenceReport.nothingSent")}</p>
+              <p className="admin-console__empty">{t("usageStatistics.nothingSent")}</p>
             )}
           </div>
         </>

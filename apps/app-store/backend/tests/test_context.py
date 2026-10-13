@@ -52,9 +52,9 @@ def test_a_director_that_cannot_be_reached_is_not_read_as_a_refusal(api, store, 
 
 
 def test_a_cluster_that_does_not_report_says_the_app_store_is_not_offered(api, store, cluster):
-    cluster.app_store = {"available": False, "reason": "licence-report-disabled"}
+    cluster.app_store = {"available": False, "reason": "usage-statistics-disabled"}
     context = api.get("/api/v1/context", headers=ALICE).json()
-    assert context["appStore"] == {"available": False, "reason": "licence-report-disabled"}
+    assert context["appStore"] == {"available": False, "reason": "usage-statistics-disabled"}
 
 
 def test_an_usher_that_cannot_be_asked_blocks_nothing(api, store, cluster):
