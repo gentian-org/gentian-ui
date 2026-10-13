@@ -18,7 +18,6 @@ export type Brand = {
   name: string;
   shortName: string;
   icons?: BrandIcon[];
-  hideVendorPromotions?: boolean;
 };
 
 const DEFAULT_BRAND: Brand = { name: "Gentian", shortName: "Gentian" };

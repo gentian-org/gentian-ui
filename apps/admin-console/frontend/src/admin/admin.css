@@ -325,6 +325,85 @@
   box-shadow: var(--gtn-shadow-1);
 }
 
+/* The add-on's card under Export: one quiet block, set apart from the
+   console's own controls by a tint of the brand rather than by a frame. */
+.admin-console__promo {
+  margin-top: 2rem;
+  padding: 1.25rem 1.5rem 1.375rem;
+  border: 1px solid var(--gtn-200);
+  border-radius: var(--gtn-r2);
+  background: var(--gtn-50);
+}
+
+.admin-console__promo-eyebrow {
+  margin: 0 0 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gtn-600);
+}
+
+.admin-console__promo-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--gtn-ink-1);
+}
+
+.admin-console__promo-lead {
+  margin: 0.4rem 0 0;
+  max-width: 44rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--gtn-ink-3);
+}
+
+.admin-console__promo-points {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.625rem 1.5rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-console__promo-points li {
+  position: relative;
+  padding-left: 1.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--gtn-ink-2);
+}
+
+.admin-console__promo-points li::before {
+  content: "\2713";
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-weight: 700;
+  color: var(--gtn-600);
+}
+
+.admin-console__promo-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.125rem;
+}
+
+.admin-console__promo-action .admin-console__hint {
+  margin: 0;
+}
+
+.admin-console__promo-action a.admin-console__btn {
+  display: inline-block;
+  text-decoration: none;
+}
+
 .admin-console__card--attention {
   border-left: 3px solid var(--gtn-ember);
 }
