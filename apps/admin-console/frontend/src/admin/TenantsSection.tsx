@@ -3,7 +3,9 @@ import { useState } from "react";
 import {
   createClusterTenant,
   fetchClusterTenants,
+  fetchPendingAdminInvitations,
   purgeClusterTenant,
+  requestAdminInvitation,
   retireClusterTenant,
 } from "@/api/cluster";
 import { AdminActivationPanel } from "./AdminActivationPanel";
@@ -40,7 +42,27 @@ export function TenantsSection() {
   const [recoveryEmail, setRecoveryEmail] = useState("");
   // The administrator account being handed over: right after creating a
   // tenant (waiting out its provisioning), or for an existing one on request.
-  const [activating, setActivating] = useState<{ tenant: string; email: string; auto: boolean } | null>(null);
+  // `invited` is a tenant whose invitation the registrar has taken: it is
+  // sent from there, and the panel only reports. `notKept` is why the
+  // registrar did not take it, when the panel has to send it after all.
+  const [activating, setActivating] = useState<{
+    tenant: string;
+    email: string;
+    auto: boolean;
+    invited?: boolean;
+    notKept?: string;
+  } | null>(null);
+  // The tenants whose administrator's invitation the registrar holds. A
+  // person who may not ask for one is not told, and the screen is as before.
+  const invitationsQuery = useQuery({
+    queryKey: ["cluster", "admin-invitations"],
+    queryFn: () => fetchPendingAdminInvitations(),
+    refetchInterval: 30 * 1000,
+    retry: false,
+  });
+  const invitationPending = new Set(invitationsQuery.data ?? []);
+  const invalidateInvitations = () =>
+    queryClient.invalidateQueries({ queryKey: ["cluster", "admin-invitations"] });
   // The tenant the cluster does not have yet, as the open panel learned by
   // asking: its activation is not offered a second time in its row.
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
@@ -51,9 +73,31 @@ export function TenantsSection() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["cluster", "tenants"] });
 
   const createMutation = useMutation({
-    mutationFn: () => createClusterTenant(name.trim(), displayName.trim(), requireMFA),
-    onSuccess: (result) => {
-      setActivating({ tenant: name.trim(), email: recoveryEmail.trim(), auto: true });
+    mutationFn: async () => {
+      const tenant = name.trim();
+      const email = recoveryEmail.trim();
+      const result = await createClusterTenant(tenant, displayName.trim(), requireMFA);
+      // The tenant is committed. With an address, the invitation is handed to
+      // the registrar now: it keeps the request and mails the invitation when
+      // the tenant is ready, whether or not this page is still open. Without
+      // one the link has to be shown to somebody, so the panel waits for it.
+      // A registrar that does not take the request is not a tenant that
+      // failed: the panel then sends the invitation itself, as it used to.
+      let invited = false;
+      let notKept: string | undefined;
+      if (email) {
+        try {
+          await requestAdminInvitation(tenant, email);
+          invited = true;
+        } catch (err) {
+          notKept = (err as Error).message || t("tenants.couldNotCreate");
+        }
+      }
+      return { result, tenant, email, invited, notKept };
+    },
+    onSuccess: ({ result, tenant, email, invited, notKept }) => {
+      setActivating({ tenant, email, auto: !invited, invited, notKept });
+      void invalidateInvitations();
       setName("");
       setDisplayName("");
       setRecoveryEmail("");
@@ -120,6 +164,9 @@ export function TenantsSection() {
           tenant={activating.tenant}
           initialEmail={activating.email}
           auto={activating.auto}
+          invited={activating.invited}
+          notKept={activating.notKept}
+          onInvitationSettled={() => void invalidateInvitations()}
           onWaiting={(waiting) => setWaitingFor(waiting ? activating.tenant : null)}
           onClose={() => setActivating(null)}
         />
@@ -154,7 +201,13 @@ export function TenantsSection() {
                 <td>{tenant.apps.length === 0 ? "—" : tenant.apps.join(", ")}</td>
                 <td>
                   <span className="admin-console__actions">
-                    {tenant.purging ? null : waitingFor === tenant.name ? (
+                    {tenant.purging ? null : invitationPending.has(tenant.name) ? (
+                      <span
+                        className="admin-console__badge admin-console__badge--info"
+                        title={t("tenants.invitationPendingHint")}
+                      >
+                        {t("tenants.invitationPending")}</span>
+                    ) : waitingFor === tenant.name ? (
                       <span
                         className="admin-console__badge admin-console__badge--info"
                         title={t("tenants.beingCreatedHint")}

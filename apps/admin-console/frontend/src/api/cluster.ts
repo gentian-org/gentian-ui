@@ -132,7 +132,7 @@ export type AdminActivation = {
     /** Seconds since the epoch. */
     expiresAt?: number;
     actions: string[];
-    /** Why a link meant for `email` is shown instead of mailed. */
+    /** Why a link meant for `email` was not mailed: what the realm answered. */
     mailError?: string;
   };
 };
@@ -162,6 +162,44 @@ export function activateTenantAdmin(tenant: string, recoveryEmail?: string) {
     method: "POST",
     body: JSON.stringify(recoveryEmail ? { recoveryEmail } : {}),
   });
+}
+
+/**
+ * What became of the invitation the registrar was asked to send to a tenant's
+ * administrator once the tenant is ready. Presence and state, never the
+ * address: the registrar keeps that and answers it to nobody.
+ */
+export type AdminInvitationState = "none" | "pending" | "sent" | "expired" | "not-mailed" | "refused";
+
+export type AdminInvitation = {
+  tenant: string;
+  state: AdminInvitationState;
+  /** Seconds since the epoch, while it is pending. */
+  expiresAt?: number;
+  /** Why it was not mailed or was refused, as the registrar recorded it. */
+  reason?: string;
+};
+
+/**
+ * Hand the invitation of a tenant's administrator to the registrar. The
+ * tenant need not exist yet: the registrar keeps the request and mails the
+ * invitation itself when it does, so no page has to stay open for it.
+ */
+export function requestAdminInvitation(tenant: string, recoveryEmail: string) {
+  return apiFetch<AdminInvitation>(`/cluster/tenants/${encodeURIComponent(tenant)}/admin-invitation`, {
+    method: "POST",
+    body: JSON.stringify({ recoveryEmail }),
+  });
+}
+
+export function fetchAdminInvitation(tenant: string) {
+  return apiFetch<AdminInvitation>(`/cluster/tenants/${encodeURIComponent(tenant)}/admin-invitation`);
+}
+
+/** The tenants whose administrator's invitation is waiting. */
+export async function fetchPendingAdminInvitations(): Promise<string[]> {
+  const body = await apiFetch<{ pending?: { tenant: string }[] }>("/cluster/admin-invitations");
+  return (body.pending ?? []).map((entry) => entry.tenant);
 }
 
 /** Where an uploaded bundle went. */

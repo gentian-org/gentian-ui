@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { activateTenantAdmin, notThereYet, type AdminActivation } from "@/api/cluster";
+import {
+  activateTenantAdmin,
+  fetchAdminInvitation,
+  notThereYet,
+  type AdminActivation,
+  type AdminInvitation,
+} from "@/api/cluster";
 import "./admin.css";
 
 /** How long a tenant the cluster does not have yet is waited for. */
@@ -24,11 +30,20 @@ const ASK_AGAIN_MS = 10 * 1000;
  * press, and asks again until the registrar's answer is the activation. The
  * console reads no state of its own for this -- the registrar's answer is the
  * only one there is. Anything else it answers is a failure and is shown.
+ *
+ * A tenant created with a recovery address does not need any of that waiting:
+ * the registrar has taken the invitation (`invited`) and mails it itself when
+ * the tenant is ready. This then says so, says the page can be closed, and --
+ * if it stays open -- asks the registrar what became of the invitation. When
+ * it expired or could not be mailed, the activation is offered here by hand.
  */
 export function AdminActivationPanel({
   tenant,
   initialEmail = "",
   auto = false,
+  invited = false,
+  notKept,
+  onInvitationSettled,
   onWaiting,
   onClose,
 }: {
@@ -36,6 +51,12 @@ export function AdminActivationPanel({
   initialEmail?: string;
   /** Start straight away, as after creating the tenant. */
   auto?: boolean;
+  /** The registrar holds the invitation and sends it; this only reports. */
+  invited?: boolean;
+  /** Why the registrar did not take the invitation, when this sends it instead. */
+  notKept?: string;
+  /** Told when the registrar's invitation is no longer pending. */
+  onInvitationSettled?: () => void;
   /** Told whenever this starts or stops waiting for the cluster. */
   onWaiting?: (waiting: boolean) => void;
   onClose: () => void;
@@ -52,6 +73,40 @@ export function AdminActivationPanel({
   const [copied, setCopied] = useState(false);
   const started = useRef(0);
   const timer = useRef<number | undefined>(undefined);
+  // What the registrar says became of the invitation it holds. Pending until
+  // it says otherwise: it accepted the request a moment ago.
+  const [invitation, setInvitation] = useState<AdminInvitation | null>(
+    invited ? { tenant, state: "pending" } : null,
+  );
+  const invitationTimer = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (!invited) return;
+    let stopped = false;
+    const look = () => {
+      fetchAdminInvitation(tenant)
+        .then((answer) => {
+          if (stopped) return;
+          setInvitation(answer);
+          if (answer.state === "pending") {
+            invitationTimer.current = window.setTimeout(look, ASK_AGAIN_MS);
+          } else {
+            onInvitationSettled?.();
+          }
+        })
+        .catch(() => {
+          // Not knowing is not news: the registrar sends it all the same.
+          if (!stopped) invitationTimer.current = window.setTimeout(look, ASK_AGAIN_MS);
+        });
+    };
+    invitationTimer.current = window.setTimeout(look, ASK_AGAIN_MS);
+    return () => {
+      stopped = true;
+      window.clearTimeout(invitationTimer.current);
+    };
+    // Once, on opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const ask = () => {
     setBusy(true);
@@ -102,13 +157,64 @@ export function AdminActivationPanel({
   }, [waiting]);
 
   const activation = result?.activation;
+  // While the registrar holds the invitation, or has sent it, there is
+  // nothing to ask for here. Afterwards the activation by hand is offered.
+  const held = invitation?.state === "pending" || invitation?.state === "sent";
+  const reason = invitation?.reason ?? "";
   const expires = activation?.expiresAt ? new Date(activation.expiresAt * 1000).toLocaleString() : "";
 
   return (
     <div className="admin-console__editor">
       <h3 className="admin-console__card-title">{t("tenants.activateTitle", { tenant })}</h3>
 
-      {!result && waiting && (
+      {!result && invitation?.state === "pending" && (
+        <>
+          <p className="admin-console__success">
+            <Trans
+              i18nKey="tenants.invitationAccepted"
+              values={{ tenant, email: initialEmail }}
+              components={{ mono: <span className="admin-console__mono" /> }}
+            />
+          </p>
+          <p className="admin-console__hint">{t("tenants.invitationWaiting")}</p>
+          <div className="admin-console__editor-footer">
+            <span />
+            <button className="admin-console__btn admin-console__btn--quiet" type="button" onClick={onClose}>
+              {t("tenants.close")}
+            </button>
+          </div>
+        </>
+      )}
+      {!result && invitation?.state === "sent" && (
+        <>
+          <p className="admin-console__success">
+            {initialEmail
+              ? t("tenants.invitationSent", { email: initialEmail })
+              : t("tenants.invitationSentNoAddress")}
+          </p>
+          <div className="admin-console__editor-footer">
+            <span />
+            <button className="admin-console__btn" type="button" onClick={onClose}>
+              {t("tenants.close")}
+            </button>
+          </div>
+        </>
+      )}
+      {!result && invitation?.state === "expired" && (
+        <p className="admin-console__error">{t("tenants.invitationExpired", { tenant })}</p>
+      )}
+      {!result && invitation?.state === "not-mailed" && (
+        <p className="admin-console__error">{t("tenants.invitationNotMailed", { tenant, reason })}</p>
+      )}
+      {!result && invitation?.state === "refused" && (
+        <p className="admin-console__error">{t("tenants.invitationRefused", { reason })}</p>
+      )}
+      {!result && invitation?.state === "none" && (
+        <p className="admin-console__hint">{t("tenants.invitationSuperseded")}</p>
+      )}
+      {!result && notKept && <p className="admin-console__error">{t("tenants.invitationNotKept", { reason: notKept })}</p>}
+
+      {!result && !held && waiting && (
         <>
           <p className="admin-console__card-desc">
             <Trans
@@ -127,7 +233,7 @@ export function AdminActivationPanel({
         </>
       )}
 
-      {!result && !waiting && (
+      {!result && !held && !waiting && (
         <>
           <p className="admin-console__card-desc">{t("tenants.activateLead")}</p>
           <div className="admin-console__field-row">
@@ -183,7 +289,7 @@ export function AdminActivationPanel({
 
       {activation && !activation.mailed && activation.mailError && (
         <p className="admin-console__hint">
-          {t("tenants.activationNotMailed", { email: activation.email ?? "" })}
+          {t("tenants.activationNotMailed", { email: activation.email ?? "", reason: activation.mailError })}
         </p>
       )}
       {activation && !activation.mailed && activation.link && (

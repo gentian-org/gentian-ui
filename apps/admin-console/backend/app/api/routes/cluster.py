@@ -242,3 +242,63 @@ async def activate_tenant_admin(
         bearer_of(credentials),
         json_body=payload,
     )
+
+
+@router.post("/tenants/{tenant}/admin-invitation")
+async def request_admin_invitation(
+    tenant: str,
+    body: dict | None = None,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Ask for a tenant's administrator to be invited once the tenant is ready.
+
+    A new tenant takes minutes to exist, and its administrator cannot be
+    activated before it does. The registrar keeps the request, with the
+    address, and sends the invitation itself, so nobody has to keep a page
+    open. The console keeps nothing: the address goes to the registrar with
+    the person's own token and is not held here.
+    """
+    payload = {}
+    if body and body.get("recoveryEmail"):
+        payload["recoveryEmail"] = body["recoveryEmail"]
+    return await director.forward_to(
+        director.registrar_url(settings),
+        "POST",
+        _cluster_path(settings, f"/tenants/{tenant}/actions/request-admin-invitation"),
+        bearer_of(credentials),
+        json_body=payload,
+    )
+
+
+@router.get("/tenants/{tenant}/admin-invitation")
+async def admin_invitation(
+    tenant: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What became of a tenant's invitation: pending, sent, expired, not
+    mailed. The registrar answers the state and never the address."""
+    return await director.forward_to(
+        director.registrar_url(settings),
+        "GET",
+        _cluster_path(settings, f"/tenants/{tenant}/admin-invitation"),
+        bearer_of(credentials),
+    )
+
+
+@router.get("/admin-invitations")
+async def pending_admin_invitations(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """The tenants whose administrator's invitation is waiting."""
+    return await director.forward_to(
+        director.registrar_url(settings),
+        "GET",
+        _cluster_path(settings, "/admin-invitations"),
+        bearer_of(credentials),
+    )
