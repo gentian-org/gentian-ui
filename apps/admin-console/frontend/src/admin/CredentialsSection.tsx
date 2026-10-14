@@ -222,8 +222,12 @@ function CredentialCard({
 
         {credential.setBy ? (
           <p className="admin-console__card-meta">
-            {t("credentials.setBy")}{credential.setBy}
-            {credential.updatedAt ? ` on ${new Date(credential.updatedAt).toLocaleString()}` : ""}
+            {credential.updatedAt
+              ? t("credentials.setByOn", {
+                  who: credential.setBy,
+                  when: new Date(credential.updatedAt).toLocaleString(),
+                })
+              : t("credentials.setBy", { who: credential.setBy })}
           </p>
         ) : null}
       </div>
