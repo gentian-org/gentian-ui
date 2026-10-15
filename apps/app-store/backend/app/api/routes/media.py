@@ -23,13 +23,7 @@ async def image(
         headers={
             # The person's own browser may keep it; nothing between may.
             "Cache-Control": "private, max-age=3600",
-            # Nothing in the answer may run or load. An SVG may style
-            # itself, which is all its own stylesheet can do here.
-            "Content-Security-Policy": (
-                "default-src 'none'; style-src 'unsafe-inline'; sandbox"
-                if content_type == media.SVG_TYPE
-                else "default-src 'none'; sandbox"
-            ),
+            "Content-Security-Policy": "default-src 'none'; sandbox",
             "X-Content-Type-Options": "nosniff",
         },
     )

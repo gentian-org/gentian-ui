@@ -337,74 +337,18 @@ def test_an_address_that_is_not_on_a_media_origin_is_not_fetched(api, store, url
 @pytest.mark.parametrize(
     ("declared", "content"),
     [
-        ("image/svg+xml", SVG),  # an SVG that carries script
-        ("image/svg+xml", PNG),  # says SVG, is PNG
+        ("image/svg+xml", SVG),  # SVG is a document that can carry script
         ("image/png", SVG),  # says PNG, is not
         ("image/jpeg", PNG),  # says JPEG, is PNG
         ("text/html", b"<html></html>"),
         ("image/gif", b"GIF89a" + b"\x00" * 20),
     ],
 )
-def test_only_png_jpeg_webp_and_inert_svg_are_served_and_only_when_the_bytes_agree(
+def test_only_png_jpeg_and_webp_are_served_and_only_when_the_bytes_agree(
     api, store, declared, content
 ):
     store.media["/x"] = (declared, content)
     assert api.get(f"/api/v1/media?u={MEDIA}/x", headers=ALICE).status_code == 404
-
-
-INERT_SVG = (
-    b'<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg" '
-    b'xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 8 8">'
-    b'<defs><linearGradient id="g"><stop offset="0" stop-color="#fff"/></linearGradient>'
-    b'<path id="p" d="M0 0h8v8z"/></defs>'
-    b"<style>.a { fill: url(#g); }</style>"
-    b'<use xlink:href="#p" class="a"/><rect width="8" height="8" style="fill:url(#g)"/></svg>'
-)
-
-
-def test_an_svg_icon_that_is_only_a_picture_is_served_with_nothing_allowed_to_run(api, store):
-    store.media["/icons/x.svg"] = ("image/svg+xml", INERT_SVG)
-    answer = api.get(f"/api/v1/media?u={MEDIA}/icons/x.svg", headers=ALICE)
-    assert answer.status_code == 200
-    assert answer.headers["content-type"] == "image/svg+xml"
-    assert answer.content == INERT_SVG
-    policy = answer.headers["content-security-policy"]
-    assert "default-src 'none'" in policy and "sandbox" in policy
-    assert "script-src" not in policy
-
-
-@pytest.mark.parametrize(
-    "content",
-    [
-        b'<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>',
-        b'<svg xmlns="http://www.w3.org/2000/svg"><foreignObject><p>x</p></foreignObject></svg>',
-        (
-            b'<svg xmlns="http://www.w3.org/2000/svg" xmlns:x="http://www.w3.org/1999/xlink">'
-            b'<image x:href="https://tracker.example/p.png"/></svg>'
-        ),
-        b'<svg xmlns="http://www.w3.org/2000/svg"><a href="javascript:alert(1)"><rect/></a></svg>',
-        b'<svg xmlns="http://www.w3.org/2000/svg"><use href="https://elsewhere.example/s.svg#a"/></svg>',
-        b'<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:url(https://t.example/a)"/></svg>',
-        b'<svg xmlns="http://www.w3.org/2000/svg"><style>@import "https://t.example/a.css";</style></svg>',
-        b'<svg xmlns="http://www.w3.org/2000/svg"><set attributeName="href" to="#x"/></svg>',
-        b'<!DOCTYPE svg [<!ENTITY a "aaaa">]><svg xmlns="http://www.w3.org/2000/svg">&a;</svg>',
-        b'<?xml-stylesheet href="https://t.example/a.css"?><svg xmlns="http://www.w3.org/2000/svg"/>',
-        b"<svg><rect/></svg>",  # not in the SVG namespace
-        b'<html xmlns="http://www.w3.org/2000/svg"/>',
-        b'<svg xmlns="http://www.w3.org/2000/svg"><rect></svg>',  # not XML
-    ],
-)
-def test_an_svg_that_could_run_or_load_anything_is_not_served(api, store, content):
-    store.media["/icons/x.svg"] = ("image/svg+xml", content)
-    assert api.get(f"/api/v1/media?u={MEDIA}/icons/x.svg", headers=ALICE).status_code == 404
-
-
-def test_an_svg_larger_than_its_limit_is_not_served(api, store, monkeypatch):
-    from app.store import media
-
-    monkeypatch.setattr(media, "MAX_SVG_BYTES", 64)
-    store.media["/icons/x.svg"] = ("image/svg+xml", INERT_SVG)
-    assert api.get(f"/api/v1/media?u={MEDIA}/icons/x.svg", headers=ALICE).status_code == 404
 
 
 def test_an_image_larger_than_the_limit_is_not_served(api, store, monkeypatch):
