@@ -16,7 +16,6 @@ export function ImportTenantCard() {
   const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [key, setKey] = useState("");
-  const [name, setName] = useState("");
   const [tenant, setTenant] = useState<string | null>(null);
 
   const start = useMutation({
@@ -25,7 +24,7 @@ export function ImportTenantCard() {
       const bundle = await uploadBundle(file);
       const secret = key.trim();
       const decryption = secret.startsWith("AGE-SECRET-KEY-") ? { identity: secret } : { passphrase: secret };
-      return importTenant(bundle, decryption, name.trim() || undefined);
+      return importTenant(bundle, decryption);
     },
     onSuccess: (status) => {
       setTenant(status.tenant);
@@ -67,13 +66,6 @@ export function ImportTenantCard() {
             <input id="import-key" type="password" value={key} autoComplete="off" onChange={(e) => setKey(e.target.value)} />
           </label>
           <p className="admin-console__hint">{t("import.keyHint")}</p>
-        </div>
-        <div className="admin-console__field">
-          <label className="admin-console__label" htmlFor="import-name">
-            <span className="admin-console__label-text">{t("import.name")}</span>
-            <input id="import-name" type="text" value={name} autoComplete="off" onChange={(e) => setName(e.target.value)} />
-          </label>
-          <p className="admin-console__hint">{t("import.nameHint")}</p>
         </div>
         {start.isError && <p className="admin-console__error">{(start.error as Error).message}</p>}
         <div className="admin-console__form-footer">

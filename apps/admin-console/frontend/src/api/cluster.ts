@@ -223,10 +223,10 @@ export type ImportStatus = {
   passwordResetRequired?: boolean;
 };
 
-export function importTenant(bundle: BundleRef, decryption: { passphrase?: string; identity?: string }, name?: string) {
+export function importTenant(bundle: BundleRef, decryption: { passphrase?: string; identity?: string }) {
   return apiFetch<ImportStatus>("/cluster/tenants/import", {
     method: "POST",
-    body: JSON.stringify({ bundle, decryption, ...(name ? { name } : {}) }),
+    body: JSON.stringify({ bundle, decryption }),
   });
 }
 

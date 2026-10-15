@@ -193,7 +193,7 @@ async def import_tenant(
     """Create plus Restore from a bundle. The director reads the manifest
     with the key given, declares the tenant from it and restores once the
     operator has provisioned the shells; the status route follows it."""
-    payload = {k: body[k] for k in ("bundle", "decryption", "name") if k in body}
+    payload = {k: body[k] for k in ("bundle", "decryption") if k in body}
     return await director.forward(
         settings,
         "POST",

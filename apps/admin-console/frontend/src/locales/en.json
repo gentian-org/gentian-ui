@@ -700,8 +700,6 @@
     "file": "Bundle (.gentian)",
     "key": "Key",
     "keyHint": "The passphrase the export was taken with, or the age identity (AGE-SECRET-KEY-…) that opens it. It is kept only as long as the restore runs.",
-    "name": "Name",
-    "nameHint": "Optional. The bundle names the tenant it came from; give another name to bring it up beside the original.",
     "start": "Import",
     "uploading": "Uploading…",
     "chooseFile": "Choose a .gentian file first.",

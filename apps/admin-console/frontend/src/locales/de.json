@@ -700,8 +700,6 @@
     "file": "Bundle (.gentian)",
     "key": "Schlüssel",
     "keyHint": "Die Passphrase des Exports oder die age-Identität (AGE-SECRET-KEY-…), die ihn öffnet. Sie wird nur so lange aufbewahrt, wie die Wiederherstellung läuft.",
-    "name": "Name",
-    "nameHint": "Optional. Das Bundle nennt den Mandanten, von dem es stammt; ein anderer Name bringt ihn neben dem Original hoch.",
     "start": "Importieren",
     "uploading": "Wird hochgeladen …",
     "chooseFile": "Zuerst eine .gentian-Datei wählen.",
