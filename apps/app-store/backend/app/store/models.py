@@ -452,8 +452,18 @@ class ConfirmedItem(Model):
     repository: Repository | None = None
 
 
+class Metering(Model):
+    """Where an app priced by use reports its use, the name it reports
+    under, and the key it signs with: handed to the app, kept nowhere."""
+
+    url: HttpsUrl
+    install: Text(64, 1)
+    key: Text(128, 1) = Field(repr=False)
+
+
 class Confirmation(ConfirmedItem):
     addons: list[ConfirmedItem]
+    metering: Metering | None = Field(default=None, repr=False)
 
     def items(self) -> list[ConfirmedItem]:
         return [self, *self.addons]

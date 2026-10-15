@@ -110,6 +110,7 @@ class FakeStore:
         self.checkout_url: str | None = None  # overrides the example's
         self.confirmed_digest: str | None = None  # a store confirming another build
         self.confirmed_addons: list[dict] = []
+        self.metering: dict | None = None  # an app priced by use
         self.unavailable = False  # every API call answers 503
         self.rate_limited: int | None = None  # every API call answers 429 with this Retry-After
         self.token_expired = False  # signed-in calls answer 401
@@ -412,6 +413,8 @@ class FakeStore:
         if self.confirmed_digest is not None:
             confirmation["digest"] = self.confirmed_digest
         confirmation["addons"] = json.loads(json.dumps(self.confirmed_addons))
+        if self.metering is not None:
+            confirmation["metering"] = dict(self.metering)
         return acquisition
 
     def complete_checkout(self) -> None:

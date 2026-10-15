@@ -10,6 +10,7 @@ person's own token:
     credential   custodian  PUT  /v1/credentials/repository-{name}
     install      director   POST /v1/tenants/{t}/apps/{app}
     addons       director   PUT  /v1/tenants/{t}/apps/{app}/addons
+    metering     custodian  PUT  /v1/credentials/app-{t}-{app}-metering   (an app priced by use)
     rollout      usher      GET  /v1/tenants/{t}/apps/status
 
 How it runs
@@ -62,7 +63,7 @@ from app.store import oauth, patterns
 from app.store.client import Store, origin_of
 from app.store.media import checkout_origins
 from app.store.models import Acquisition, Confirmation
-from app.store.naming import credential_name, repository_name
+from app.store.naming import credential_name, repository_name, supplied_credential_name
 
 # How long the custodian is asked for before the sequence stops and says so.
 CREDENTIAL_WINDOW_SECONDS = 300
@@ -79,6 +80,7 @@ WAITS_FOR_PERSON = (
     "confirm-build",
     "confirm-repository",
     "credential-timeout",
+    "metering-timeout",
     "failed",
     "failing",
     "done",
@@ -149,6 +151,12 @@ class Operation:
     credential_attempts: int = 0
     install: dict[str, Any] | None = None
     addons: dict[str, Any] | None = None
+    # An app priced by use: where its usage goes and the key it signs with,
+    # held until the custodian has it and not a moment longer.
+    metering: dict[str, str] | None = field(default=None, repr=False)
+    metering_set: bool = False
+    metering_deadline: float | None = None
+    metering_attempts: int = 0
     rollout: dict[str, Any] | None = None
     error: dict[str, Any] | None = None
 
@@ -378,6 +386,13 @@ async def _take(
         raise Refusal(status=502, source="store", code="store-format")
     op.confirmation = confirmation
     op.repositories = [] if op.mode == "update" else _repositories(ctx.tenant, confirmation)
+    if confirmation.metering is not None and not op.metering_set:
+        op.metering = {
+            "url": str(confirmation.metering.url),
+            "install": confirmation.metering.install,
+            "key": confirmation.metering.key,
+        }
+        confirmation.metering = None
     if confirmation.digest != op.expected_digest and not op.build_confirmed:
         op.stage = "confirm-build"
         return
@@ -548,7 +563,7 @@ async def _install(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None
     if answer.status not in (200, 202) or not isinstance(answer.body, dict):
         raise answer.refusal()
     op.install = {"status": answer.body.get("status"), "commit": answer.body.get("commit")}
-    op.stage = "addons" if confirmation.addons else "rollout"
+    op.stage = "addons" if confirmation.addons else _after_install(op)
 
 
 async def _addons(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None:
@@ -593,7 +608,54 @@ async def _addons(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None:
     if answer.status not in (200, 202) or not isinstance(answer.body, dict):
         raise answer.refusal()
     op.addons = {"status": answer.body.get("status"), "commit": answer.body.get("commit")}
-    op.stage = "rollout"
+    op.stage = _after_install(op)
+
+
+def _after_install(op: Operation) -> str:
+    return "metering" if op.metering else "rollout"
+
+
+async def _metering(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None:
+    """Hand an app priced by use the address, name and key its usage reports
+    are sent with: the app's supplied credential `metering`, set at the
+    custodian. The install makes that requirement, which takes a sync, so it
+    is asked again for a bounded time -- as a repository's credential is."""
+    if not op.metering:
+        op.stage = "rollout"
+        return
+    if op.metering_deadline is None:
+        op.metering_deadline = clock() + CREDENTIAL_WINDOW_SECONDS
+    name = supplied_credential_name(
+        patterns.name(ctx.tenant, "tenant"), op.profile, "metering"
+    )
+    answer = await director.ask_custodian(
+        ctx.settings,
+        "PUT",
+        f"/v1/credentials/{name}",
+        ctx.cluster_token,
+        json_body={"fields": dict(op.metering)},
+    )
+    if answer.status == 200:
+        op.metering, op.metering_set = None, True
+        op.stage = "rollout"
+        return
+    if answer.status == 404:
+        if clock() >= op.metering_deadline:
+            op.stage = "metering-timeout"
+            op.error = answer.refusal().body()["problem"]
+            return
+        op.metering_attempts += 1
+        op.wait = min(2**op.metering_attempts, 10)
+        return
+    raise answer.refusal()
+
+
+async def _metering_timeout(_ctx: Context, op: Operation, answer: dict[str, Any]) -> None:
+    if answer.get("continue"):
+        op.stage = "metering"
+        op.error = None
+        op.metering_deadline = clock() + CREDENTIAL_WINDOW_SECONDS
+        op.metering_attempts = 0
 
 
 async def _rollout(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None:
@@ -623,6 +685,8 @@ _STEPS = {
     "credential-timeout": _credential_timeout,
     "install": _install,
     "addons": _addons,
+    "metering": _metering,
+    "metering-timeout": _metering_timeout,
     "rollout": _rollout,
     # A workload that is failing may recover: asking again looks again.
     "failing": _rollout,

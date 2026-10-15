@@ -230,7 +230,8 @@
     "credential": "Set the repository’s credential",
     "declare": "Declare the repository",
     "install": "Install",
-    "rollout": "Roll out on the cluster"
+    "rollout": "Roll out on the cluster",
+    "metering": "Hand the app its usage key"
   },
   "install": {
     "acquiredNotInstalled": "This tenant has acquired this app. It is not installed.",
@@ -297,7 +298,10 @@
     "updateNeedsAcquisition": "The store lists no acquisition of this app for this tenant, so it cannot be updated from here.",
     "updateNeedsSignIn": "Sign in to the store, under “Installed and acquired”, to update from here.",
     "updateTitle": "Update <mono>{{app}}</mono> to {{version}}?",
-    "waitingForRepository": "Waiting for the cluster to pick up the repository…"
+    "waitingForRepository": "Waiting for the cluster to pick up the repository…",
+    "settingMetering": "Giving the app the address and key it reports its use with…",
+    "meteringNotArrivedTitle": "The cluster has not made the app’s usage credential yet",
+    "meteringNotArrivedBody": "The app is installed and billed by use, but the cluster has not yet asked for the key it reports its use with. Continue to try again; nothing is billed for use that is not reported."
   },
   "refused": {
     "addons-403": "The cluster refused: you may not install in this tenant. The app itself is installed.",
@@ -314,7 +318,8 @@
     "install-409": "The cluster refused the install.",
     "install-422": "This cluster does not know this store’s catalogue, so it cannot fetch or verify the app. The cluster’s administrator names the catalogues a cluster installs from. Nothing was installed.",
     "install-502": "The cluster could not verify the build: its catalogue could not be read, or serves another build than the one the store named. Nothing was installed.",
-    "install-503": "The cluster cannot write to its deployments repository right now. Nothing was installed."
+    "install-503": "The cluster cannot write to its deployments repository right now. Nothing was installed.",
+    "metering-403": "The cluster refused: you may not set this app’s credentials."
   },
   "installed": {
     "colAcquisition": "At the store",

@@ -781,3 +781,28 @@ def test_an_acquisition_that_waits_without_a_checkout_is_asked_again(
     view = runner.run(runner.step())
     assert view["stage"] == "done"
     assert view["acquisition"]["waitingFor"] is None
+
+
+METERING_KEY = "m" * 64
+
+
+def test_an_app_priced_by_use_is_handed_its_metering_after_the_install(runner, store, cluster):
+    store.metering = {
+        "url": "https://commerce-hooks.team.example/api/v1/usage/reports",
+        "install": "acq_01JA2M8Y",
+        "key": METERING_KEY,
+    }
+    view = runner.install(forEveryone=True)
+    assert view["stage"] == "done"
+    assert cluster.order()[-1] == "custodian PUT /v1/credentials/app-acme-nextcloud-base-ee-metering"
+    assert cluster.supplied[("nextcloud-base-ee", "metering")] == store.metering
+    # Never told to the browser, and not kept once the custodian has it.
+    state = runner.api.get(f"/api/v1/apps/{PAID}/state", headers=ALICE)
+    for said in [*runner.answers, state.text]:
+        assert METERING_KEY not in said
+    assert METERING_KEY not in repr(sequence.find("alice\ns1", PAID))
+
+
+def test_an_app_without_metering_sets_none(runner, store, cluster):
+    runner.install(forEveryone=True)
+    assert not cluster.supplied

@@ -35,6 +35,7 @@ class FakeCluster:
         self.synced: set[str] = set()  # names the cluster has picked up
         self.sync_after = 0  # how many times the custodian answers 404 first
         self.credentials: dict[str, dict[str, str]] = {}
+        self.supplied: dict[tuple[str, str], dict[str, str]] = {}
         self.apps: dict[str, dict[str, Any]] = {}
         self.states: dict[str, dict[str, Any]] = {}
         self.ready_on_install = True
@@ -155,6 +156,14 @@ class FakeCluster:
                 "stored": True,
                 "setBy": "person",
             }
+        if method == "PUT" and path.startswith(f"/v1/credentials/app-{self.tenant}-"):
+            # An app's supplied credential: its requirement is made by the
+            # install, a sync after it.
+            app, _, name = path.removeprefix(f"/v1/credentials/app-{self.tenant}-").rpartition("-")
+            if app not in self.apps:
+                return 404, {"error": f'credential "app-{self.tenant}-{app}-{name}" is not known'}
+            self.supplied[(app, name)] = body["fields"]
+            return 200, {"name": f"app-{self.tenant}-{app}-{name}", "stored": True, "setBy": "person"}
         return 404, {"error": "not found"}
 
     # ── usher ───────────────────────────────────────────────────────────────

@@ -230,7 +230,8 @@
     "credential": "Zugangsdaten des Repositorys setzen",
     "declare": "Repository deklarieren",
     "install": "Installieren",
-    "rollout": "Auf dem Cluster ausrollen"
+    "rollout": "Auf dem Cluster ausrollen",
+    "metering": "Der App ihren Nutzungsschlüssel geben"
   },
   "install": {
     "acquiredNotInstalled": "Dieser Mandant hat diese App erworben. Sie ist nicht installiert.",
@@ -297,7 +298,10 @@
     "updateNeedsAcquisition": "Der Store führt für diesen Mandanten keinen Erwerb dieser App, daher kann sie von hier aus nicht aktualisiert werden.",
     "updateNeedsSignIn": "Melden Sie sich unter „Installiert und erworben“ beim Store an, um von hier aus zu aktualisieren.",
     "updateTitle": "<mono>{{app}}</mono> auf {{version}} aktualisieren?",
-    "waitingForRepository": "Es wird darauf gewartet, dass der Cluster das Repository übernimmt …"
+    "waitingForRepository": "Es wird darauf gewartet, dass der Cluster das Repository übernimmt …",
+    "settingMetering": "Die App erhält Adresse und Schlüssel, mit denen sie ihre Nutzung meldet…",
+    "meteringNotArrivedTitle": "Der Cluster hat die Nutzungs-Zugangsdaten der App noch nicht angelegt",
+    "meteringNotArrivedBody": "Die App ist installiert und wird nach Nutzung abgerechnet, aber der Cluster fragt den Schlüssel, mit dem sie ihre Nutzung meldet, noch nicht ab. Fahren Sie fort, um es erneut zu versuchen."
   },
   "refused": {
     "addons-403": "Der Cluster hat abgelehnt: Sie dürfen in diesem Mandanten nicht installieren. Die App selbst ist installiert.",
@@ -314,7 +318,8 @@
     "install-409": "Der Cluster hat die Installation abgelehnt.",
     "install-422": "Dieser Cluster kennt den Katalog dieses Stores nicht und kann die App daher weder abrufen noch prüfen. Die Administration des Clusters benennt die Kataloge, aus denen ein Cluster installiert. Es wurde nichts installiert.",
     "install-502": "Der Cluster konnte den Build nicht prüfen: Sein Katalog war nicht lesbar oder liefert einen anderen Build als den, den der Store genannt hat. Es wurde nichts installiert.",
-    "install-503": "Der Cluster kann gerade nicht in sein Deployments-Repository schreiben. Es wurde nichts installiert."
+    "install-503": "Der Cluster kann gerade nicht in sein Deployments-Repository schreiben. Es wurde nichts installiert.",
+    "metering-403": "Der Cluster hat abgelehnt: Sie dürfen die Zugangsdaten dieser App nicht setzen."
   },
   "installed": {
     "colAcquisition": "Beim Store",

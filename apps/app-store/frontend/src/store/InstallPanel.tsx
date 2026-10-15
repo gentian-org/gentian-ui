@@ -27,7 +27,7 @@ import { StoreMarkdown } from "@/store/StoreMarkdown";
 const mono = { mono: <span className="admin-console__mono" /> };
 
 /** The steps of a sequence, in the order they are taken. */
-const STEPS: Stage[] = ["acquire", "checkout", "declare", "credential", "install", "addons", "rollout"];
+const STEPS: Stage[] = ["acquire", "checkout", "declare", "credential", "install", "addons", "metering", "rollout"];
 
 /** The step a stage belongs to, for the list of steps. */
 const STEP_OF: Record<Stage, Stage> = {
@@ -40,6 +40,8 @@ const STEP_OF: Record<Stage, Stage> = {
   "credential-timeout": "credential",
   install: "install",
   addons: "addons",
+  metering: "metering",
+  "metering-timeout": "metering",
   rollout: "rollout",
   failing: "rollout",
   done: "rollout",
@@ -185,6 +187,8 @@ function StepList({ operation }: { operation: Operation }) {
     if (step === "checkout") return operation.stage === "checkout";
     if (step === "declare" || step === "credential") return operation.mode === "install" && operation.repositories.length > 0;
     if (step === "addons") return (operation.build?.addons.length ?? 0) > 0;
+    // Only an app priced by use has one, and nothing says so before it is reached.
+    if (step === "metering") return operation.stage === "metering" || operation.stage === "metering-timeout";
     return true;
   });
   const index = shown.indexOf(at);
@@ -363,6 +367,29 @@ function Progress({
         <div className="admin-console__warning" role="alert">
           <p className="store-notice__title">{t("install.repositoryNotArrivedTitle")}</p>
           <p className="store-notice__text">{t("install.repositoryNotArrivedBody")}</p>
+          {problem?.detail ? <p className="store-problem__said">{problem.detail}</p> : null}
+          <div className="admin-console__actions">
+            <button
+              type="button"
+              className="admin-console__btn admin-console__btn--primary"
+              disabled={busy}
+              onClick={() => onAdvance({ continue: true })}
+            >
+              {t("install.continue")}
+            </button>
+            <button type="button" className="admin-console__btn admin-console__btn--quiet" onClick={onStop}>
+              {t("install.stop")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {stage === "metering" ? <p className="admin-console__lead">{t("install.settingMetering")}</p> : null}
+
+      {stage === "metering-timeout" ? (
+        <div className="admin-console__warning" role="alert">
+          <p className="store-notice__title">{t("install.meteringNotArrivedTitle")}</p>
+          <p className="store-notice__text">{t("install.meteringNotArrivedBody")}</p>
           {problem?.detail ? <p className="store-problem__said">{problem.detail}</p> : null}
           <div className="admin-console__actions">
             <button

@@ -45,3 +45,9 @@ def repository_name(tenant: str, url: str) -> str:
 def credential_name(repository: str) -> str:
     """What the custodian calls a repository's credential."""
     return f"repository-{repository}"
+
+
+def supplied_credential_name(tenant: str, app: str, name: str) -> str:
+    """What the custodian calls a credential an app's profile asks a person
+    for (spec.secrets.supplied): app-<tenant>-<app>-<name>."""
+    return f"app-{tenant}-{app}-{name}"

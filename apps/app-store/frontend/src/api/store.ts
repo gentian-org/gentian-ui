@@ -210,6 +210,8 @@ export type Stage =
   | "credential-timeout"
   | "install"
   | "addons"
+  | "metering"
+  | "metering-timeout"
   | "rollout"
   | "failing"
   | "done"
