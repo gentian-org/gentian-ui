@@ -43,15 +43,15 @@ def test_the_authorization_request_is_the_definitions(api, store):
     assert request["redirect_uri"] == f"https://{HOST}/oauth/callback"
     # The tenant's address as the usage statistics report spells it.
     assert request["tenant_url"] == "https://acme.example"
-    # The two every store has, and the two of 1.1 its meta lists.
-    assert request["scope"] == "store.read store.acquire store.review store.account"
+    # A 1.2 store lists no scopes: the token says who signed in and for
+    # which tenant, and the store decides the rest. None is asked for.
+    assert "scope" not in request
     assert request["code_challenge_method"] == "S256"
     assert set(request) == {
         "url",
         "response_type",
         "client_id",
         "redirect_uri",
-        "scope",
         "state",
         "code_challenge",
         "code_challenge_method",
@@ -61,9 +61,9 @@ def test_the_authorization_request_is_the_definitions(api, store):
     assert store.calls_to("POST", "/token") == []
 
 
-def test_a_store_that_lists_only_the_first_two_scopes_is_asked_for_those(api, store):
-    """An issuer may refuse a scope it does not know: a 1.0 store is not
-    asked for the scopes 1.1 added."""
+def test_a_store_that_lists_scopes_is_asked_for_exactly_those(api, store):
+    """A 1.0 or 1.1 store lists the scopes it knows; an issuer may refuse
+    one it does not know, so no other is asked for."""
     store.meta["scopes"] = ["store.read", "store.acquire"]
     assert begin(api)["scope"] == "store.read store.acquire"
 

@@ -196,6 +196,19 @@ class TenantRefusal(Model):
     link: Link | None = None
 
 
+# What an account may do for a tenant (store API 1.2, `tenant-access`).
+# Open: a value this app does not know is taken for "none".
+TenantRole = Literal["holder", "manager", "requested", "declined", "none"]
+
+
+def _role(value: Any) -> Any:
+    return value if value in ("holder", "manager", "requested", "declined", "none") else "none"
+
+
+class TenantAccessRole(Model):
+    role: Annotated[TenantRole, BeforeValidator(_role)] = "none"
+
+
 class TenantStanding(Model):
     tenantUrl: Text(300)
     known: bool
@@ -203,6 +216,24 @@ class TenantStanding(Model):
     served: bool
     refusal: TenantRefusal | None
     notices: list[Notice]
+    # 1.2. A 1.1 store says nothing of it: its one account manages the tenant.
+    access: TenantAccessRole | None = None
+
+
+SUBJECT = re.compile(r"^[A-Za-z0-9._:@-]{1,256}$")
+
+
+class TenantAccount(Model):
+    subject: Matching(r"^[A-Za-z0-9._:@-]{1,256}$", 256)
+    name: Text(200) | None = None
+    email: Text(254) | None = None
+    role: Annotated[TenantRole, BeforeValidator(_role)]
+    since: Text(40)
+
+
+class TenantAccess(Model):
+    role: Annotated[TenantRole, BeforeValidator(_role)]
+    accounts: Annotated[list[TenantAccount], BeforeValidator(_known_only(TenantAccount))] = []
 
 
 class Category(Model):
@@ -439,6 +470,15 @@ class Acquisition(Model):
     status: Literal["pending", "confirmed", "cancelled", "failed"]
     createdAt: Text(40)
     updatedAt: Text(40)
+    # 1.2: what a pending acquisition waits for. Open: an unknown value is
+    # taken for "confirmation". A 1.1 store sends none: every pending one is
+    # at a checkout.
+    waitingFor: Annotated[
+        Literal["confirmation", "approval", "checkout"] | None,
+        BeforeValidator(
+            lambda v: v if v in (None, "confirmation", "approval", "checkout") else "confirmation"
+        ),
+    ] = None
     checkoutUrl: HttpsUrl | None
     checkoutExpiresAt: Text(40) | None
     failure: Failure | None

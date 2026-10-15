@@ -247,6 +247,21 @@ function Progress({
 
       {stage === "acquire" ? <p className="admin-console__lead">{t("install.acquiring", { store: storeName })}</p> : null}
 
+      {stage === "checkout" && !operation.checkout ? (
+        <>
+          <p className="admin-console__lead">
+            {operation.acquisition?.waitingFor === "approval"
+              ? t("install.approvalLead", { store: storeName })
+              : t("install.confirmingLead", { store: storeName })}
+          </p>
+          <div className="admin-console__actions">
+            <button type="button" className="admin-console__btn admin-console__btn--quiet" onClick={onStop}>
+              {t("install.stopWaiting")}
+            </button>
+          </div>
+        </>
+      ) : null}
+
       {stage === "checkout" && operation.checkout ? (
         <>
           <p className="admin-console__lead">{t("install.checkoutLead", { store: storeName })}</p>

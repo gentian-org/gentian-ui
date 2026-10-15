@@ -910,3 +910,19 @@ a.admin-console__btn {
   background: var(--gtn-50);
   color: var(--gtn-600);
 }
+
+/* Who manages the tenant: one row per account, its decision at the end. */
+.store-access {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+.store-access__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--gtn-border);
+}

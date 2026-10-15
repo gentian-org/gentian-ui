@@ -89,9 +89,24 @@ class FakeStore:
         ]
         self.meta["reviewing"] = {"requireAcquisition": True}
         self.company: dict | None = None  # the signed-in account's
+        # Who manages the tenant (1.2, tenant-access): the signed-in account
+        # holds it, and one other account asks to manage it.
+        self.access: dict = {
+            "role": "holder",
+            "accounts": [
+                {
+                    "subject": "5d1c0a2e-0b1f-4c55-9a43-1e2f3a4b5c6d",
+                    "name": "Grace Hopper",
+                    "email": "grace@acme.example",
+                    "role": "requested",
+                    "since": "2026-10-15T08:01:12Z",
+                }
+            ],
+        }
         self.my_review: dict | None = None  # the signed-in person's, of PAID
         self.standing = contract.example("TenantServed")
         self.checkout = False  # a paid acquisition answers 202 first
+        self.waiting_for: str | None = None  # ... or waits for approval, or confirmation
         self.checkout_url: str | None = None  # overrides the example's
         self.confirmed_digest: str | None = None  # a store confirming another build
         self.confirmed_addons: list[dict] = []
@@ -201,6 +216,8 @@ class FakeStore:
         doc = self.contract
         if path.endswith("/reviews/mine") or path == "/v1/account/company":
             return self._account(call)
+        if path.startswith("/v1/tenant/access"):
+            return self._access(call)
         if (method, path) == ("GET", "/v1/meta"):
             return self._open(call, self.meta, 3600)
         if (method, path) == ("GET", "/v1/categories"):
@@ -318,6 +335,22 @@ class FakeStore:
         }
         return self._signed(self.my_review)
 
+    def _access(self, call: Call) -> httpx.Response:
+        if self.token_expired or call.headers.get("authorization") != f"Bearer {STORE_TOKEN}":
+            return self._problem(401, "Unauthenticated", {"WWW-Authenticate": "Bearer"})
+        if (call.method, call.path) == ("GET", "/v1/tenant/access"):
+            return self._signed(self.access)
+        parts = call.path.removeprefix("/v1/tenant/access/").split("/")
+        if call.method != "POST" or len(parts) != 2 or parts[1] not in ("approve", "decline"):
+            return self._problem(404, "NotFound")
+        if self.access["role"] != "holder":
+            return self._problem(403, "Forbidden")
+        for account in self.access["accounts"]:
+            if account["subject"] == parts[0]:
+                account["role"] = "manager" if parts[1] == "approve" else "declined"
+                return self._signed(account)
+        return self._problem(404, "NotFound")
+
     def _refused(self, code: str) -> httpx.Response:
         problem = self.contract.response_example("Forbidden")
         problem["code"] = code
@@ -353,6 +386,11 @@ class FakeStore:
             return self._signed(existing)
         if coordinate == FREE:
             acquisition = self.contract.example("AcquisitionFree")
+        elif coordinate == PAID and self.waiting_for:
+            acquisition = self.contract.example("AcquisitionPending")
+            acquisition.update(
+                waitingFor=self.waiting_for, checkoutUrl=None, checkoutExpiresAt=None
+            )
         elif coordinate == PAID and self.checkout:
             acquisition = self.contract.example("AcquisitionPending")
             if self.checkout_url is not None:

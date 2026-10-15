@@ -642,7 +642,9 @@ def test_a_tenant_the_store_does_not_serve_acquires_nothing_and_is_told_why(
     assert view["stage"] == "failed"
     assert view["error"]["code"] == "tenant-refused"
     assert view["error"]["reason"] == "no-reports-for-tenant"
-    assert view["error"]["detail"].startswith("No usage statistics report names https://acme.example.")
+    assert view["error"]["detail"].startswith(
+        "No usage statistics report names https://acme.example."
+    )
     assert store.calls_to("POST", "/v1/acquisitions") == []
     assert cluster.calls == []
     # Browsing is as it was.
@@ -760,3 +762,22 @@ def test_an_acquisition_id_that_is_not_one_never_reaches_the_store(runner, store
         )
         assert answer.status_code in (400, 404)
     assert len(store.calls) == sent
+
+
+@pytest.mark.parametrize("waiting", ["approval", "confirmation"])
+def test_an_acquisition_that_waits_without_a_checkout_is_asked_again(
+    runner, store, cluster, waiting
+):
+    """A 1.2 store: the account does not manage the tenant yet, or the store
+    has not decided. Nothing to open; the outcome is asked for again."""
+    store.waiting_for = waiting
+    view = runner.install()
+    assert view["stage"] == "checkout" and view["checkout"] is None
+    assert view["acquisition"]["waitingFor"] == waiting
+    assert view["waitSeconds"] >= 2
+    assert cluster.order() == []
+
+    store.complete_checkout()
+    view = runner.run(runner.step())
+    assert view["stage"] == "done"
+    assert view["acquisition"]["waitingFor"] is None
