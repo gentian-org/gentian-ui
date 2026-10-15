@@ -1020,6 +1020,21 @@
     "historyWhat": "Was",
     "historyWho": "Wer",
     "historyAuthority": "Mit welcher Berechtigung",
-    "historyByHand": "Von Hand gepusht: kein Nachweis, was es erlaubt hat"
+    "historyByHand": "Von Hand gepusht: kein Nachweis, was es erlaubt hat",
+    "trafficTitle": "Verkehr",
+    "trafficWindow_day": "24 Stunden",
+    "trafficWindow_week": "7 Tage",
+    "trafficWindow_month": "30 Tage",
+    "trafficReading": "Verkehr wird gelesen…",
+    "trafficUnavailable": "Der Verkehr kann nicht gelesen werden:",
+    "trafficNone": "In diesem Zeitraum hat keine Anfrage eine veröffentlichte Adresse erreicht.",
+    "trafficChart": "Anfragen über die Zeit",
+    "trafficEntry": "Eintrag",
+    "trafficPath": "Pfad",
+    "trafficRequests": "Anfragen",
+    "traffic2xx": "Beantwortet (2xx)",
+    "traffic3xx": "Umgeleitet (3xx)",
+    "traffic4xx": "Abgelehnt (4xx)",
+    "traffic5xx": "Fehlgeschlagen (5xx)"
   }
 }

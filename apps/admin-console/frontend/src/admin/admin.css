@@ -1605,3 +1605,21 @@ fieldset.admin-console__choices > legend {
   padding: 0;
   margin-bottom: 0.5rem;
 }
+
+/* Perimeter traffic: requests per step, a bar each. */
+.admin-console__traffic-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 64px;
+  margin: 0.5rem 0 1rem;
+}
+.admin-console__traffic-bar {
+  flex: 1;
+  min-width: 2px;
+  background: #262696;
+  opacity: 0.8;
+}
+.admin-console__traffic-bar--failed {
+  background: #b42318;
+}

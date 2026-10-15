@@ -1020,6 +1020,21 @@
     "historyWhat": "What",
     "historyWho": "Who",
     "historyAuthority": "Under what authority",
-    "historyByHand": "Pushed by hand: no record of what allowed it"
+    "historyByHand": "Pushed by hand: no record of what allowed it",
+    "trafficTitle": "Traffic",
+    "trafficWindow_day": "24 hours",
+    "trafficWindow_week": "7 days",
+    "trafficWindow_month": "30 days",
+    "trafficReading": "Reading the traffic…",
+    "trafficUnavailable": "The traffic cannot be read:",
+    "trafficNone": "No requests reached a published address in this window.",
+    "trafficChart": "Requests over time",
+    "trafficEntry": "Entry",
+    "trafficPath": "Path",
+    "trafficRequests": "Requests",
+    "traffic2xx": "Answered (2xx)",
+    "traffic3xx": "Redirected (3xx)",
+    "traffic4xx": "Refused (4xx)",
+    "traffic5xx": "Failed (5xx)"
   }
 }

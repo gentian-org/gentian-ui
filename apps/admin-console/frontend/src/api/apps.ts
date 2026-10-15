@@ -223,6 +223,28 @@ export type PerimeterChange = {
   requestId?: string;
 };
 
+/** Requests by response class. */
+export type TrafficCounts = { requests: number; "2xx": number; "3xx": number; "4xx": number; "5xx": number };
+
+/** What one published path carried over the window. */
+export type TrafficRow = TrafficCounts & { component: string; exposure: string; path: string };
+
+export type Traffic = {
+  tenant: string;
+  from: string;
+  to: string;
+  stepSeconds: number;
+  totals: TrafficRow[];
+  series: (TrafficCounts & { at: string })[];
+  covers: string;
+};
+
+/** What the tenant's public paths carried, from the edge's counters. */
+export function fetchPerimeterTraffic(from: Date, to: Date, stepSeconds: number) {
+  const q = new URLSearchParams({ from: from.toISOString(), to: to.toISOString(), stepSeconds: String(stepSeconds) });
+  return apiFetch<Traffic>(`/admin/perimeter/traffic?${q}`);
+}
+
 /** Who published, reviewed or withdrew which entry, and when. */
 export function fetchPerimeterHistory() {
   return apiFetch<{ tenant: string; changes: PerimeterChange[]; covers: string }>("/admin/perimeter/history");

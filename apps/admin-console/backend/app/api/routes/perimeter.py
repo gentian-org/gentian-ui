@@ -50,3 +50,27 @@ async def history(
         bearer_of(credentials),
         params=params or None,
     )
+
+
+@router.get("/traffic")
+async def traffic(
+    from_: str | None = Query(default=None, alias="from", max_length=40),
+    to: str | None = Query(default=None, max_length=40),
+    stepSeconds: int | None = Query(default=None, ge=60),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What the tenant's public paths carried, read from the usher, which
+    answers it under can_expose: live state, not git."""
+    params = {
+        k: str(v)
+        for k, v in (("from", from_), ("to", to), ("stepSeconds", stepSeconds))
+        if v is not None
+    }
+    return await director.read(
+        settings,
+        f"/v1/tenants/{settings.tenant_id}/perimeter/traffic",
+        bearer_of(credentials),
+        params=params or None,
+    )
