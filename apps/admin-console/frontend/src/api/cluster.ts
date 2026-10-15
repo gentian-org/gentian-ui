@@ -214,19 +214,41 @@ export async function uploadBundle(file: File): Promise<BundleRef> {
   return body.bundle;
 }
 
+export type BundleDecryption = { passphrase?: string; identity?: string };
+
+/** What a bundle's manifest says, as far as the import card shows it. */
+export type BundleManifest = {
+  tenant: string;
+  export?: string;
+  createdAt?: string;
+  /** The custom domain a TenantDomain bound the tenant to when it was taken. */
+  customDomain?: string;
+};
+
+export async function inspectBundle(bundle: BundleRef, decryption: BundleDecryption): Promise<BundleManifest> {
+  const body = await apiFetch<{ manifest: BundleManifest }>("/cluster/bundles/inspect", {
+    method: "POST",
+    body: JSON.stringify({ bundle, decryption }),
+  });
+  return body.manifest;
+}
+
 export type ImportStatus = {
   tenant: string;
-  phase: "declared" | "provisioning" | "restoring" | "ready" | "failed";
+  phase: "declared" | "provisioning" | "awaiting-key" | "restoring" | "ready" | "failed";
   message?: string;
   commit?: string;
   restore?: string;
   passwordResetRequired?: boolean;
+  /** The bundle's custom domain, declared again with the tenant. */
+  customDomain?: string;
 };
 
-export function importTenant(bundle: BundleRef, decryption: { passphrase?: string; identity?: string }) {
+/** keepCustomDomain: whether the bundle's custom domain is declared again. */
+export function importTenant(bundle: BundleRef, decryption: BundleDecryption, keepCustomDomain: boolean) {
   return apiFetch<ImportStatus>("/cluster/tenants/import", {
     method: "POST",
-    body: JSON.stringify({ bundle, decryption }),
+    body: JSON.stringify({ bundle, decryption, keepCustomDomain }),
   });
 }
 
