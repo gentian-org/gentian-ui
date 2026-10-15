@@ -57,9 +57,15 @@ chart/      Helm. Two Deployments and two Services, named from fullnameOverride 
   signed-in person writes, changes and withdraws their own review of an
   entry, and says which company they are with -- its size and industry are
   shown with their reviews and filter them, its name never is. Offered only
-  by a store whose meta lists `review-writing` and `company`; the scopes
-  `store.review` and `store.account` are asked for at sign-in only when the
-  store lists them.
+  by a store whose meta lists `review-writing` and `company`. The sign-in
+  asks for exactly the scopes the store's meta lists; a 1.2 store lists
+  none, and decides from its own records what the account may do.
+* **Who manages the tenant** (`backend/app/api/routes/account.py`, store
+  API 1.2, `tenant-access`): the first account to sign in for the tenant at
+  the store holds it. Another account's acquisition waits for that holder's
+  approval, which the holder gives from the header ("Who manages this
+  tenant"); only an account that manages the tenant is handed its
+  repository credentials.
 * **Installed and acquired**: what the tenant has acquired joined with what
   is installed; update when the store's newest build is not the one pinned;
   replace a repository credential, behind a confirmation.

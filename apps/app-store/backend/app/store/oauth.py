@@ -61,11 +61,6 @@ from app.store import client as store_client
 from app.store import models
 from app.store.client import USER_AGENT, Store, assert_public, fetch, not_the_format, origin_of
 
-# What a client asks for at sign-in: the two every store has, and of the
-# later ones those this store's meta lists -- an issuer may refuse a scope it
-# does not know, and a 1.0 store knows only the two.
-SCOPES = ("store.read", "store.acquire")
-LATER_SCOPES = ("store.review", "store.account")
 PENDING_TTL_SECONDS = 600
 MAX_PENDING_PER_SESSION = 5
 MAX_PENDING = 2000
@@ -147,8 +142,11 @@ def _endpoint(metadata: Any, key: str, issuer_origin: str) -> str:
 
 
 def scopes_for(meta: models.Meta) -> str:
-    """The scopes this app asks the store's issuer for."""
-    return " ".join([*SCOPES, *(scope for scope in LATER_SCOPES if scope in meta.scopes)])
+    """The scopes this app asks the store's issuer for: exactly those the
+    store's meta lists. A 1.2 store lists none -- the token says who signed
+    in and for which tenant, and the store decides what that account may
+    do -- and then no scope is asked for at all."""
+    return " ".join(meta.scopes)
 
 
 async def begin(settings: Settings, store: Store, session: str) -> str:
@@ -213,7 +211,7 @@ async def begin(settings: Settings, store: Store, session: str) -> str:
             "response_type": "code",
             "client_id": meta.clientId,
             "redirect_uri": redirect_uri,
-            "scope": scopes_for(meta),
+            **({"scope": scopes_for(meta)} if meta.scopes else {}),
             "state": state,
             "code_challenge": _challenge(verifier),
             "code_challenge_method": "S256",

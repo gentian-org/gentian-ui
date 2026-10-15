@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { fetchContext, fetchMeta, type Notice } from "@/api/store";
+import { AccessButton } from "@/store/Access";
 import { CompanyButton, CompanyPrompt } from "@/store/Company";
 import { ExternalLink, ProblemNote, StoreLinkItem, useStoreName } from "@/store/parts";
 import { StoreSessionProvider, useStoreSession } from "@/store/session";
@@ -166,6 +167,7 @@ function Shell({ tenant }: { tenant: string }) {
           {session?.signedIn ? (
             <>
               <span className="admin-console__badge admin-console__badge--ok">{t("session.signedIn", { store: storeName })}</span>
+              <AccessButton />
               <CompanyButton />
               <button type="button" className="admin-console__btn admin-console__btn--quiet" onClick={signOut}>
                 {t("session.signOut")}

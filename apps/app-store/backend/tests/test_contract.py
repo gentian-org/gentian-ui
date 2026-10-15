@@ -41,6 +41,9 @@ def test_every_operation_of_the_definition_is_asked_and_answers_within_it(store,
         await client.my_review(STORE_TOKEN, "s", "gentian", "nextcloud-base-ee")
         await client.put_my_review(STORE_TOKEN, "s", "gentian", "nextcloud-base-ee", review)
         await client.delete_my_review(STORE_TOKEN, "s", "gentian", "nextcloud-base-ee")
+        subject = (await client.access(STORE_TOKEN, "s")).accounts[0].subject
+        await client.decide_access(STORE_TOKEN, "s", subject, True)
+        await client.decide_access(STORE_TOKEN, "s", subject, False)
 
     asyncio.run(ask_everything())
     assert store.answered == set(contract.operations())

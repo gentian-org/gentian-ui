@@ -1,5 +1,6 @@
 """What a person says at the store in their own name: their review of an
-entry, and the company they are with.
+entry, the company they are with, and -- for the account that holds the
+tenant at the store -- who else manages it.
 
 Signed-in calls, made with the person's store token, which stays in this
 process (`app.store.oauth`). They concern the person's account at the store
@@ -105,3 +106,33 @@ async def set_company(
     store = get_store(settings)
     recorded = await _signed(session, lambda t: store.put_company(t, session, body))
     return {"company": recorded.model_dump()}
+
+
+@router.get("/tenant/access")
+async def access(
+    session: str = Depends(session_of), settings: Settings = Depends(get_settings)
+) -> dict[str, Any]:
+    """Who manages the tenant at the store. A store without `tenant-access`
+    lets its one account manage it: answered as the holder, with nobody
+    else."""
+    store = get_store(settings)
+    found = await _signed(session, lambda t: store.access(t, session))
+    if found is None:
+        return {"role": "holder", "accounts": []}
+    return found.model_dump()
+
+
+@router.post("/tenant/access/{subject}/{act}")
+async def decide_access(
+    subject: str,
+    act: str,
+    session: str = Depends(session_of),
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
+    if act not in ("approve", "decline"):
+        raise Refusal(status=404, source="app", code="not-found")
+    store = get_store(settings)
+    decided = await _signed(
+        session, lambda t: store.decide_access(t, session, subject, act == "approve")
+    )
+    return {"account": decided.model_dump()}

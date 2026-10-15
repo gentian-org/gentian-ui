@@ -237,6 +237,7 @@
     "acquiring": "{{store}} wird nach dieser App gefragt …",
     "administeredInConsole": "Die Verwaltung — Zugriff, Deinstallation, endgültiges Löschen — befindet sich in der Admin-Konsole, unter Apps.",
     "alreadyInstalled": "Nichts zu committen — dieser Mandant hat diesen Build bereits.",
+    "approvalLead": "Ein anderes Konto verwaltet diesen Mandanten bei {{store}}. Es wurde gebeten, auch Ihr Konto verwalten zu lassen; die App wird erworben, sobald es zugestimmt hat. Diese Seite fährt von selbst fort.",
     "buildConfirmed": "Vom Store bestätigt (Version {{version}}):",
     "buildShown": "Ihnen angezeigt:",
     "cancel": "Abbrechen",
@@ -249,6 +250,7 @@
     "confirmRepositoryLead": "Das Repository dieser App zu deklarieren würde eines ändern, das dieser Mandant bereits hat. Der Cluster verlangt, dass der Name wiederholt wird, bevor er das tut:",
     "confirmRepositoryTitle": "Der Cluster bittet Sie, eine Änderung an einem Repository zu bestätigen",
     "confirmRepositoryType": "Geben Sie zur Bestätigung ein:",
+    "confirmingLead": "{{store}} bestätigt den Erwerb. Das dauert einen Moment; diese Seite fährt von selbst fort.",
     "continue": "Fortfahren",
     "declaring": "Das Repository der App wird für diesen Mandanten deklariert …",
     "donate": "Spenden",
@@ -359,6 +361,8 @@
     "not-configured": "Ein Dienst des Clusters ist für diese App nicht konfiguriert.",
     "not-found": "Der Store führt nichts dergleichen.",
     "not-installed": "Der Cluster führt die App nicht als installiert.",
+    "not-tenant-holder": "Nur das Konto, das diesen Mandanten beim Store hält, entscheidet, wer ihn sonst verwaltet.",
+    "not-tenant-manager": "Das darf nur ein Konto, das diesen Mandanten beim Store verwaltet.",
     "rate-limited": "Der Store bittet um Geduld: Es wurden zu viele Anfragen gestellt.",
     "retryAfter_one": "Versuchen Sie es in {{count}} Sekunde erneut.",
     "retryAfter_other": "Versuchen Sie es in {{count}} Sekunden erneut.",
@@ -377,5 +381,20 @@
     "director": "Der Director des Clusters hat mit {{status}} geantwortet:",
     "store": "Der Store hat mit {{status}} geantwortet:",
     "usher": "Der Usher des Clusters hat mit {{status}} geantwortet:"
+  },
+  "access": {
+    "headerAction": "Wer diesen Mandanten verwaltet",
+    "title": "Wer diesen Mandanten beim Store verwaltet",
+    "lead": "Sie halten diesen Mandanten beim Store: Ihr Konto hat sich als erstes für ihn angemeldet. Ein anderes Konto bittet darum, ihn zu verwalten, indem es eine App erwirbt; bis Sie zustimmen, wartet sein Erwerb. Ein Konto, dem Sie zustimmen, darf für den Mandanten erwerben und erhält seine Repository-Zugangsdaten.",
+    "nobody": "Sonst hat niemand gefragt.",
+    "approve": "Zustimmen",
+    "decline": "Ablehnen",
+    "end": "Beenden",
+    "close": "Schließen",
+    "role_holder": "hält den Mandanten",
+    "role_manager": "verwaltet den Mandanten",
+    "role_requested": "bittet darum, den Mandanten zu verwalten",
+    "role_declined": "abgelehnt",
+    "role_none": "angemeldet"
   }
 }

@@ -44,7 +44,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 
 import httpx
 
@@ -617,6 +617,30 @@ class Store:
 
     async def delete_my_review(self, token: str, session: str, catalogue: str, app: str) -> None:
         await self.signed("DELETE", self._mine(catalogue, app), token, session=session)
+
+    async def access(self, token: str, session: str) -> models.TenantAccess | None:
+        """Who manages the token's tenant (1.2, `tenant-access`); None from a
+        store without it."""
+        try:
+            _, body, _ = await self.signed("GET", "/v1/tenant/access", token, session=session)
+        except Refusal as exc:
+            if exc.upstream_status == 404:
+                return None
+            raise
+        return _model(models.TenantAccess, body)
+
+    async def decide_access(
+        self, token: str, session: str, subject: str, approve: bool
+    ) -> models.TenantAccount:
+        """Let another account manage the tenant, or not. The holder only;
+        the store refuses anybody else."""
+        if not models.SUBJECT.match(subject):
+            raise not_the_format()
+        act = "approve" if approve else "decline"
+        _, body, _ = await self.signed(
+            "POST", f"/v1/tenant/access/{quote(subject, safe='')}/{act}", token, session=session
+        )
+        return _model(models.TenantAccount, body)
 
     async def company(self, token: str, session: str) -> models.Company | None:
         """The company the person's account is with; None until they said."""

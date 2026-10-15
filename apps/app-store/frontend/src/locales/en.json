@@ -237,6 +237,7 @@
     "acquiring": "Asking {{store}} for this app…",
     "administeredInConsole": "Administration — access, uninstall, purge — is in the Admin Console, under Apps.",
     "alreadyInstalled": "Nothing to commit — this tenant already has that build.",
+    "approvalLead": "Another account manages this tenant at {{store}}. It has been asked to let yours manage it too; the app is acquired as soon as it has. This page carries on by itself.",
     "buildConfirmed": "Confirmed by the store (version {{version}}):",
     "buildShown": "Shown to you:",
     "cancel": "Cancel",
@@ -249,6 +250,7 @@
     "confirmRepositoryLead": "Declaring this app’s repository would change one this tenant already has. The cluster asks for the name to be repeated before it does that:",
     "confirmRepositoryTitle": "The cluster asks you to confirm a change to a repository",
     "confirmRepositoryType": "To confirm, type",
+    "confirmingLead": "{{store}} is confirming the acquisition. This takes a moment; this page carries on by itself.",
     "continue": "Continue",
     "declaring": "Declaring the app’s repository for this tenant…",
     "donate": "Donate",
@@ -359,6 +361,8 @@
     "not-configured": "A service of the cluster is not configured for this app.",
     "not-found": "The store lists no such thing.",
     "not-installed": "The cluster does not list the app as installed.",
+    "not-tenant-holder": "Only the account that holds this tenant at the store decides who else manages it.",
+    "not-tenant-manager": "Only an account that manages this tenant at the store may do this.",
     "rate-limited": "The store asks for patience: too many requests were made.",
     "retryAfter_one": "Try again in {{count}} second.",
     "retryAfter_other": "Try again in {{count}} seconds.",
@@ -377,5 +381,20 @@
     "director": "The cluster’s director answered {{status}}:",
     "store": "The store answered {{status}}:",
     "usher": "The cluster’s usher answered {{status}}:"
+  },
+  "access": {
+    "headerAction": "Who manages this tenant",
+    "title": "Who manages this tenant at the store",
+    "lead": "You hold this tenant at the store: you were the first to sign in for it. Another account asks to manage it by acquiring an app; until you approve, its acquisition waits. An account you approve may acquire for the tenant and is handed its repository credentials.",
+    "nobody": "Nobody else has asked.",
+    "approve": "Approve",
+    "decline": "Decline",
+    "end": "End",
+    "close": "Close",
+    "role_holder": "holds the tenant",
+    "role_manager": "manages the tenant",
+    "role_requested": "asks to manage the tenant",
+    "role_declined": "declined",
+    "role_none": "signed in"
   }
 }

@@ -225,7 +225,8 @@ export type Operation = {
   waitsForPerson: boolean;
   waitSeconds: number;
   expectedDigest: string;
-  acquisition: { id: string; status: string | null } | null;
+  /** `waitingFor` (store API 1.2): what a pending acquisition waits for. */
+  acquisition: { id: string; status: string | null; waitingFor?: "confirmation" | "approval" | "checkout" | null } | null;
   checkout: { url: string; expiresAt: string | null } | null;
   build: {
     coordinate: string;
@@ -330,6 +331,18 @@ export const putMyReview = (coordinate: string, body: ReviewRequest) =>
   });
 export const deleteMyReview = (coordinate: string) =>
   apiFetch<{ review: null }>(`/store/apps/${appPath(coordinate)}/reviews/mine`, { method: "DELETE" });
+
+/** Who manages the tenant at the store (1.2, `tenant-access`). */
+export type TenantRole = "holder" | "manager" | "requested" | "declined" | "none";
+export type TenantAccount = { subject: string; name: string | null; email: string | null; role: TenantRole; since: string };
+export type TenantAccess = { role: TenantRole; accounts: TenantAccount[] };
+
+export const fetchAccess = () => apiFetch<TenantAccess>("/store/tenant/access");
+export const decideAccess = (subject: string, approve: boolean) =>
+  apiFetch<{ account: TenantAccount }>(
+    `/store/tenant/access/${encodeURIComponent(subject)}/${approve ? "approve" : "decline"}`,
+    { method: "POST" },
+  );
 
 export const fetchCompany = () => apiFetch<{ company: Company | null }>("/store/account/company");
 export const putCompany = (body: Company) =>

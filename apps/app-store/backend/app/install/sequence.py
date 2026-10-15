@@ -136,6 +136,9 @@ class Operation:
     wait: int = 0
     touched: float = field(default_factory=lambda: clock())
     acquisition_status: str | None = None
+    # What a pending acquisition waits for: checkout, approval (by the
+    # account that holds the tenant at the store), or confirmation.
+    waiting_for: str | None = None
     checkout_url: str | None = None
     checkout_expires_at: str | None = None
     confirmation: Confirmation | None = field(default=None, repr=False)
@@ -176,7 +179,11 @@ class Operation:
             "waitSeconds": self.wait,
             "expectedDigest": self.expected_digest,
             "acquisition": (
-                {"id": self.acquisition_id, "status": self.acquisition_status}
+                {
+                    "id": self.acquisition_id,
+                    "status": self.acquisition_status,
+                    "waitingFor": self.waiting_for,
+                }
                 if self.acquisition_id
                 else None
             ),
@@ -328,6 +335,21 @@ async def _take(
     op.acquisition_id = acquisition.id
     op.acquisition_status = acquisition.status
     if acquisition.status == "pending":
+        # A 1.1 store names no waitingFor: every pending acquisition of it is
+        # at a checkout.
+        waiting = acquisition.waitingFor or (
+            "checkout" if acquisition.checkoutUrl else "confirmation"
+        )
+        op.waiting_for = waiting
+        if waiting != "checkout":
+            # The store has not decided yet, or another account is asked to
+            # let this one manage the tenant: nothing to open, ask again.
+            op.stage = "checkout"
+            op.checkout_url = op.checkout_expires_at = None
+            op.wait = min(
+                max(retry_after or DEFAULT_POLL_SECONDS, MIN_POLL_SECONDS), MAX_WAIT_SECONDS
+            )
+            return
         allowed = checkout_origins(await ctx.store.meta())
         if not acquisition.checkoutUrl or origin_of(acquisition.checkoutUrl) not in allowed:
             # A checkout this app will not open: the address is not on an
@@ -339,6 +361,7 @@ async def _take(
         op.wait = min(max(retry_after or DEFAULT_POLL_SECONDS, MIN_POLL_SECONDS), MAX_WAIT_SECONDS)
         return
     op.checkout_url = op.checkout_expires_at = None
+    op.waiting_for = None
     if acquisition.status == "cancelled":
         raise Refusal(status=409, source="store", code="acquisition-cancelled")
     if acquisition.status == "failed":

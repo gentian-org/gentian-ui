@@ -181,3 +181,36 @@ def test_a_store_token_that_ended_ends_the_sign_in(api, store):
     answer = api.get(COMPANY, headers=ALICE)
     assert answer.json()["problem"]["code"] == "store-sign-in-required"
     assert api.get("/api/v1/store/session", headers=ALICE).json()["signedIn"] is False
+
+
+ACCESS = "/api/v1/store/tenant/access"
+GRACE = "5d1c0a2e-0b1f-4c55-9a43-1e2f3a4b5c6d"
+
+
+def test_the_holder_sees_who_asks_and_decides(api, store):
+    assert api.get(ACCESS, headers=ALICE).status_code == 403
+    sign_in(api, store)
+    access = api.get(ACCESS, headers=ALICE).json()
+    assert access["role"] == "holder"
+    assert [(a["email"], a["role"]) for a in access["accounts"]] == [
+        ("grace@acme.example", "requested")
+    ]
+    decided = api.post(f"{ACCESS}/{GRACE}/approve", headers=ALICE)
+    assert decided.status_code == 200, decided.text
+    assert decided.json()["account"]["role"] == "manager"
+    asked = store.calls_to("POST", f"/v1/tenant/access/{GRACE}/approve")[0]
+    assert asked.headers["authorization"] == f"Bearer {STORE_TOKEN}"
+    assert api.post(f"{ACCESS}/{GRACE}/decline", headers=ALICE).json()["account"]["role"] == (
+        "declined"
+    )
+    # Only the two decisions are relayed, and only for a subject in the
+    # definition's spelling.
+    assert api.post(f"{ACCESS}/{GRACE}/promote", headers=ALICE).status_code == 404
+    assert api.post(f"{ACCESS}/not%20a%20subject/approve", headers=ALICE).status_code == 502
+
+
+def test_another_account_is_refused_with_the_stores_code(api, store):
+    sign_in(api, store)
+    store.access["role"] = "manager"
+    refused = api.post(f"{ACCESS}/{GRACE}/approve", headers=ALICE)
+    assert refused.status_code == 403
