@@ -5,7 +5,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { fetchContext, fetchMeta, fetchOverview, setCredential, type OverviewRow } from "@/api/store";
 import { coordinateParams } from "@/store/BrowsePage";
 import { CredentialOutcomeNote } from "@/store/InstallPanel";
-import { ExternalLink, ProblemNote, shortDigest, StoreSignIn, useStoreName } from "@/store/parts";
+import { EditionBadge, ExternalLink, ProblemNote, shortDigest, StoreSignIn, useStoreName } from "@/store/parts";
 import { useStoreSession } from "@/store/session";
 
 const mono = { mono: <span className="admin-console__mono" /> };
@@ -96,6 +96,11 @@ function Row({ row, storeName }: { row: OverviewRow; storeName: string }) {
           ) : (
             row.profile
           )}
+          {row.edition ? (
+            <span className="store-chip--after">
+              <EditionBadge edition={row.edition} />
+            </span>
+          ) : null}
           <div className="admin-console__meta admin-console__mono">{row.coordinate ?? row.profile}</div>
         </td>
         <td>

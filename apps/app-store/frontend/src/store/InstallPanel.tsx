@@ -20,7 +20,7 @@ import {
   type Version,
 } from "@/api/store";
 import i18n from "@/lib/i18n";
-import { ExternalLink, ProblemNote, shortDigest, StoreSignIn } from "@/store/parts";
+import { ExternalLink, giveBackLink, ProblemNote, shortDigest, StoreSignIn } from "@/store/parts";
 import { useStoreSession } from "@/store/session";
 import { StoreMarkdown } from "@/store/StoreMarkdown";
 
@@ -689,10 +689,28 @@ export function InstallPanel({ detail, storeName }: { detail: AppDetail; storeNa
     );
   }
 
+  // A community or maintained edition is not sold: where the panel of an
+  // enterprise edition has its price, theirs says where to give back.
+  const giveBack = giveBackLink(detail.edition, detail.links);
+
   return (
-    <aside className="store-install">
+    <aside className={`store-install store-install--${detail.edition}`}>
       <h2 className="admin-console__subsection-title">{t("install.heading")}</h2>
       {body}
+      {giveBack ? (
+        <div className="store-giveback">
+          <a
+            className="admin-console__btn store-giveback__btn"
+            href={giveBack.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={giveBack.label ?? undefined}
+          >
+            {giveBack.rel === "donate" ? t("install.donate") : t("install.supportProject")}
+          </a>
+          {giveBack.label ? <p className="admin-console__meta store-giveback__label">{giveBack.label}</p> : null}
+        </div>
+      ) : null}
       {dialog ? (
         <InstallDialog
           detail={detail}

@@ -43,7 +43,8 @@ def test_the_authorization_request_is_the_definitions(api, store):
     assert request["redirect_uri"] == f"https://{HOST}/oauth/callback"
     # The tenant's address as the usage statistics report spells it.
     assert request["tenant_url"] == "https://acme.example"
-    assert request["scope"] == "store.read store.acquire"
+    # The two every store has, and the two of 1.1 its meta lists.
+    assert request["scope"] == "store.read store.acquire store.review store.account"
     assert request["code_challenge_method"] == "S256"
     assert set(request) == {
         "url",
@@ -58,6 +59,13 @@ def test_the_authorization_request_is_the_definitions(api, store):
     }
     # Nothing was exchanged yet, and no client secret exists to send.
     assert store.calls_to("POST", "/token") == []
+
+
+def test_a_store_that_lists_only_the_first_two_scopes_is_asked_for_those(api, store):
+    """An issuer may refuse a scope it does not know: a 1.0 store is not
+    asked for the scopes 1.1 added."""
+    store.meta["scopes"] = ["store.read", "store.acquire"]
+    assert begin(api)["scope"] == "store.read store.acquire"
 
 
 def test_the_code_is_exchanged_here_with_the_verifier_of_the_challenge(api, store):

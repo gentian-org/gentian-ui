@@ -1,11 +1,12 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { fetchApp, fetchMeta, fetchReports, fetchReviews, type AppDetail, type Version } from "@/api/store";
+import { fetchApp, fetchMeta, fetchReports, type AppDetail, type Version } from "@/api/store";
 import i18n from "@/lib/i18n";
 import { coordinateParams } from "@/store/BrowsePage";
 import { InstallPanel } from "@/store/InstallPanel";
-import { DateText, ExternalLink, Picture, PriceText, ProblemNote, StoreLinkItem, useStoreName } from "@/store/parts";
+import { DateText, EditionBadge, ExternalLink, Picture, PriceText, ProblemNote, StoreLinkItem, useStoreName } from "@/store/parts";
+import { Reviews } from "@/store/Reviews";
 import { StoreMarkdown } from "@/store/StoreMarkdown";
 
 function Requirements({ version }: { version: Version }) {
@@ -90,54 +91,6 @@ function Reports({ coordinate }: { coordinate: string }) {
   );
 }
 
-function Reviews({ coordinate }: { coordinate: string }) {
-  const { t } = useTranslation();
-  const query = useInfiniteQuery({
-    queryKey: ["store", "reviews", coordinate],
-    queryFn: ({ pageParam }) => fetchReviews(coordinate, pageParam || undefined),
-    initialPageParam: "",
-    getNextPageParam: (last) => last.nextCursor ?? undefined,
-    retry: false,
-  });
-  const summary = query.data?.pages[0]?.summary;
-  const items = query.data?.pages.flatMap((page) => page.items) ?? [];
-  if (!summary || summary.count === 0) return null;
-  return (
-    <section className="admin-console__subsection">
-      <h2 className="admin-console__subsection-title">{t("app.reviews")}</h2>
-      <p className="admin-console__lead">
-        {summary.average !== null
-          ? t("app.reviewSummary", { average: summary.average.toFixed(1), count: summary.count })
-          : t("app.reviewCount", { count: summary.count })}
-      </p>
-      <ul className="admin-console__cards">
-        {items.map((review) => (
-          <li key={review.id} className="admin-console__card">
-            <div className="admin-console__card-main">
-              <p className="admin-console__card-title">
-                {t("app.reviewRating", { rating: review.rating })}
-                {review.title ? ` · ${review.title}` : ""}
-              </p>
-              <p className="admin-console__card-desc store-review__text">{review.text}</p>
-              <p className="admin-console__card-meta">
-                {review.author} · <DateText value={review.date} />
-                {review.version ? ` · ${review.version}` : ""}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ul>
-      {query.hasNextPage ? (
-        <div className="admin-console__actions">
-          <button type="button" className="admin-console__btn" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>
-            {t("app.moreReviews")}
-          </button>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
 /**
  * One entry of the store, in full, and the one place an app is acquired and
  * installed from.
@@ -178,8 +131,8 @@ export function AppPage() {
           {t("app.backToCatalogue")}
         </Link>
       </p>
-      <header className="store-app__head">
-        <Picture src={detail.iconUrl} alt="" className="store-app__icon" />
+      <header className={`store-app__head store-app__head--${detail.edition}`}>
+        <Picture src={detail.iconUrl} alt="" className="store-app__icon" initialOf={detail.name} />
         <div className="store-app__title">
           <h1 className="admin-console__section-title">{detail.name}</h1>
           <p className="admin-console__lead">{detail.summary}</p>
@@ -191,7 +144,7 @@ export function AppPage() {
             {t("app.latestVersion", { version: detail.latestVersion })}
           </p>
           <p className="store-card__meta">
-            <span className="admin-console__badge admin-console__badge--info">{t(`edition.${detail.edition}`)}</span>
+            <EditionBadge edition={detail.edition} />
             <span className="admin-console__chip">{t(`trustTier.${detail.trustTier}`)}</span>
             <span className="store-card__price">
               <PriceText price={detail.price} />
@@ -265,7 +218,7 @@ export function AppPage() {
 
           <Versions detail={detail} />
           <Reports coordinate={coordinate} />
-          <Reviews coordinate={coordinate} />
+          <Reviews detail={detail} meta={metaQuery.data} storeName={storeName} />
         </div>
 
         <div className="store-app__side">

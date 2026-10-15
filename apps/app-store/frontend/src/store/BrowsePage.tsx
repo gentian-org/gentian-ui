@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { fetchApps, fetchCategories, type AppSummary, type Edition } from "@/api/store";
-import { Picture, PriceText, ProblemNote } from "@/store/parts";
+import { EditionBadge, Picture, PriceText, ProblemNote } from "@/store/parts";
 
 const EDITIONS: Edition[] = ["ce", "me", "ee", "pe"];
 
@@ -12,18 +12,19 @@ export function coordinateParams(coordinate: string) {
   return { catalogue, app };
 }
 
+/** One entry of the catalogue. An enterprise edition's card stands out (store.css). */
 function AppCard({ entry }: { entry: AppSummary }) {
   const { t } = useTranslation();
   return (
-    <li className="store-card">
+    <li className={`store-card store-card--${entry.edition}`}>
       <Link to="/app/$catalogue/$app" params={coordinateParams(entry.coordinate)} className="store-card__link">
-        <Picture src={entry.iconUrl} alt="" className="store-card__icon" />
+        <Picture src={entry.iconUrl} alt="" className="store-card__icon" initialOf={entry.name} />
         <span className="store-card__main">
           <span className="store-card__name">{entry.name}</span>
           <span className="store-card__publisher">{entry.publisher.name}</span>
           <span className="store-card__summary">{entry.summary}</span>
           <span className="store-card__meta">
-            <span className="admin-console__badge admin-console__badge--info">{t(`edition.${entry.edition}`)}</span>
+            <EditionBadge edition={entry.edition} />
             <span className="admin-console__chip">{t(`trustTier.${entry.trustTier}`)}</span>
             <span className="store-card__price">
               <PriceText price={entry.price} />

@@ -34,10 +34,23 @@ def test_every_operation_of_the_definition_is_asked_and_answers_within_it(store,
         await client.acquisitions(STORE_TOKEN, "s")
         await client.acquisition(STORE_TOKEN, "s", acquisition.id)
         await client.replace_credential(STORE_TOKEN, "s", acquisition.id)
+        company = models.Company(name="Acme AG", size="10-49", industry="education")
+        await client.company(STORE_TOKEN, "s")
+        await client.put_company(STORE_TOKEN, "s", company)
+        review = models.ReviewRequest.model_validate(review_example(contract))
+        await client.my_review(STORE_TOKEN, "s", "gentian", "nextcloud-base-ee")
+        await client.put_my_review(STORE_TOKEN, "s", "gentian", "nextcloud-base-ee", review)
+        await client.delete_my_review(STORE_TOKEN, "s", "gentian", "nextcloud-base-ee")
 
     asyncio.run(ask_everything())
     assert store.answered == set(contract.operations())
     assert store.violations == []
+
+
+def review_example(contract) -> dict:
+    """The review the definition writes its request body with."""
+    put = contract.document["paths"]["/v1/apps/{catalogue}/{app}/reviews/mine"]["put"]
+    return put["requestBody"]["content"]["application/json"]["examples"]["review"]["value"]
 
 
 def test_the_fixture_notices_a_fake_that_left_the_definition(store, contract):
@@ -69,6 +82,20 @@ def test_the_fixture_notices_a_fake_that_left_the_definition(store, contract):
 )
 def test_the_definitions_examples_are_what_this_app_accepts(contract, example, model):
     model.model_validate(contract.example(example))
+
+
+def test_the_review_request_example_is_what_this_app_sends(contract):
+    sent = models.ReviewRequest.model_validate(review_example(contract)).model_dump()
+    problems = contract.check(
+        "PUT",
+        "/v1/apps/gentian/nextcloud-base-ee/reviews/mine",
+        200,
+        "application/json",
+        json.dumps(
+            {**sent, "id": "rv_1", "rating": 4, "author": "A. P.", "date": "2026-10-15"}
+        ).encode(),
+    )
+    assert problems == []
 
 
 def test_the_cancelled_and_failed_examples_are_accepted(contract):
@@ -124,3 +151,13 @@ def test_an_entry_of_an_edition_outside_the_four_is_refused(contract):
 def test_a_credential_is_not_in_what_a_model_prints(contract):
     acquisition = models.Acquisition.model_validate(contract.example("AcquisitionConfirmed"))
     assert "EXAMPLE-ONLY" not in repr(acquisition)
+
+
+def test_the_company_sizes_and_industries_this_app_knows_are_the_definitions(contract):
+    """Closed enumerations, written out in this app; this keeps them the
+    definition's, in its order."""
+    from typing import get_args
+
+    schemas = contract.document["components"]["schemas"]
+    assert list(get_args(models.CompanySize)) == schemas["CompanySize"]["enum"]
+    assert list(get_args(models.Industry)) == schemas["Industry"]["enum"]

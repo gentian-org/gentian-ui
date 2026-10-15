@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { type Problem, problemOf } from "@/api/client";
-import type { Link as StoreLink, Price } from "@/api/store";
+import type { Edition, Link as StoreLink, Price } from "@/api/store";
 import i18n from "@/lib/i18n";
 import { useStoreSession } from "@/store/session";
 
@@ -32,14 +32,30 @@ export function StoreLinkItem({ link }: { link: StoreLink }) {
  *
  * `src` is the API's address for it, or null when the store named none this
  * app will show: not on an origin the store's meta lists, or no picture at
- * all. Then, and when the API refuses the bytes -- not PNG, JPEG or WebP, or
- * too large -- a placeholder is shown instead. No referrer is sent with the
+ * all. Then, and when the API refuses the bytes -- not PNG, JPEG, WebP or an
+ * inert SVG, or too large -- a neutral tile is shown instead, with the first
+ * letter of `initialOf` when one is given. No referrer is sent with the
  * request.
  */
-export function Picture({ src, alt, className }: { src: string | null; alt: string; className: string }) {
+export function Picture({
+  src,
+  alt,
+  className,
+  initialOf,
+}: {
+  src: string | null;
+  alt: string;
+  className: string;
+  initialOf?: string;
+}) {
   const [failed, setFailed] = useState(false);
   if (!src || !src.startsWith("/api/v1/media?") || failed) {
-    return <span className={`${className} store-picture--none`} role="img" aria-label={alt} />;
+    const initial = initialOf ? Array.from(initialOf.trim())[0]?.toUpperCase() : "";
+    return (
+      <span className={`${className} store-picture--none`} role="img" aria-label={alt}>
+        {initial ? <span aria-hidden="true">{initial}</span> : null}
+      </span>
+    );
   }
   return (
     <img
@@ -52,6 +68,26 @@ export function Picture({ src, alt, className }: { src: string | null; alt: stri
       onError={() => setFailed(true)}
     />
   );
+}
+
+/**
+ * The edition, as a badge in its own colour: community plain, maintained a
+ * little brighter, enterprise dark, private orange (store.css).
+ */
+export function EditionBadge({ edition }: { edition: Edition }) {
+  const { t } = useTranslation();
+  return <span className={`admin-console__badge store-edition store-edition--${edition}`}>{t(`edition.${edition}`)}</span>;
+}
+
+/**
+ * Where to give back to the people who build an app that is not sold: the
+ * entry's `donate` link, or, for a project that takes no donations, its
+ * `support` link. Null when it has neither, and for an edition that is sold.
+ */
+export function giveBackLink(edition: Edition, links: StoreLink[]): StoreLink | null {
+  if (edition !== "ce" && edition !== "me") return null;
+  const usable = links.filter((link) => link.url.startsWith("https://"));
+  return usable.find((link) => link.rel === "donate") ?? usable.find((link) => link.rel === "support") ?? null;
 }
 
 const PRICE_KEYS: Record<string, string> = {

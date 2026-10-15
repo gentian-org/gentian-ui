@@ -410,6 +410,8 @@ class Store:
             json_body=json_body,
         )
         self._note_limits(session, raw)
+        if raw.status == 204:
+            return raw.status, None, None
         if raw.status not in (200, 201, 202):
             raise self._refusal(raw)
         return raw.status, raw.json(), _seconds(raw.headers.get("retry-after"))
@@ -578,6 +580,68 @@ class Store:
             return models.Confirmation.model_validate(answer)
         except ValueError as exc:
             raise not_the_format() from exc
+
+    # ── what a person says at the store in their own name ──────────────────
+
+    def _mine(self, catalogue: str, app: str) -> str:
+        return (
+            f"/v1/apps/{patterns.name(catalogue, 'catalogue')}/"
+            f"{patterns.name(app, 'app')}/reviews/mine"
+        )
+
+    async def my_review(
+        self, token: str, session: str, catalogue: str, app: str
+    ) -> models.Review | None:
+        """The person's own review of an entry; None when they wrote none."""
+        try:
+            _, body, _ = await self.signed(
+                "GET", self._mine(catalogue, app), token, session=session
+            )
+        except Refusal as exc:
+            if exc.upstream_status == 404:
+                return None
+            raise
+        return _model(models.Review, body)
+
+    async def put_my_review(
+        self, token: str, session: str, catalogue: str, app: str, review: models.ReviewRequest
+    ) -> models.Review:
+        _, body, _ = await self.signed(
+            "PUT",
+            self._mine(catalogue, app),
+            token,
+            session=session,
+            json_body=review.model_dump(),
+        )
+        return _model(models.Review, body)
+
+    async def delete_my_review(self, token: str, session: str, catalogue: str, app: str) -> None:
+        await self.signed("DELETE", self._mine(catalogue, app), token, session=session)
+
+    async def company(self, token: str, session: str) -> models.Company | None:
+        """The company the person's account is with; None until they said."""
+        try:
+            _, body, _ = await self.signed("GET", "/v1/account/company", token, session=session)
+        except Refusal as exc:
+            if exc.upstream_status == 404:
+                return None
+            raise
+        return _model(models.Company, body)
+
+    async def put_company(
+        self, token: str, session: str, company: models.Company
+    ) -> models.Company:
+        _, body, _ = await self.signed(
+            "PUT", "/v1/account/company", token, session=session, json_body=company.model_dump()
+        )
+        return _model(models.Company, body)
+
+
+def _model(model: type[models.Model], body: Any) -> Any:
+    try:
+        return model.model_validate(body)
+    except ValueError as exc:
+        raise not_the_format() from exc
 
 
 def _member(body: Any, key: str) -> Any:

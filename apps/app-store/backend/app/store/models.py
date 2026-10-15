@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 from pydantic import (
     AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     StringConstraints,
@@ -98,6 +99,65 @@ class MetaLinks(Model):
     account: HttpsUrl | None = None
 
 
+CompanySize = Literal["1-9", "10-49", "50-249", "250-999", "1000+"]
+Industry = Literal[
+    "agriculture",
+    "mining",
+    "manufacturing",
+    "energy",
+    "water-waste",
+    "construction",
+    "wholesale-retail",
+    "transport-logistics",
+    "accommodation-food",
+    "information-communication",
+    "finance-insurance",
+    "real-estate",
+    "professional-scientific",
+    "administrative-support",
+    "public-administration",
+    "education",
+    "health-social",
+    "arts-entertainment",
+    "other-services",
+    "households",
+    "extraterritorial",
+]
+
+
+class SizeName(Model):
+    id: CompanySize
+    name: Text(80)
+
+
+class IndustryName(Model):
+    id: Industry
+    name: Text(80)
+    nace: Matching(r"^[A-U]$", 1)
+
+
+class Reviewing(Model):
+    requireAcquisition: bool
+
+
+def _known_only(model: type["Model"]):
+    """A list of a meta's choices, each on its own: one this app does not
+    know is left out, rather than taking the store's description with it."""
+
+    def keep(value: Any) -> Any:
+        if not isinstance(value, list):
+            return value
+        out = []
+        for item in value:
+            try:
+                out.append(model.model_validate(item))
+            except ValueError:
+                continue
+        return out
+
+    return keep
+
+
 class Meta(Model):
     apiVersion: Matching(r"^1\.[0-9]+$", 20)
     name: Text(80)
@@ -110,6 +170,10 @@ class Meta(Model):
     checkoutOrigins: list[Text(300)]
     features: list[Text(100)]
     links: MetaLinks | None = None
+    # 1.1. A 1.0 store names none of these, and nothing asks for them then.
+    companySizes: Annotated[list[SizeName], BeforeValidator(_known_only(SizeName))] = []
+    industries: Annotated[list[IndustryName], BeforeValidator(_known_only(IndustryName))] = []
+    reviewing: Reviewing | None = None
 
 
 class Link(Model):
@@ -173,10 +237,31 @@ class Distribution(Model):
     five: int = Field(ge=0, alias="5")
 
 
+class Recommend(Model):
+    yes: int = Field(ge=0)
+    no: int = Field(ge=0)
+
+
+class ScoreSummary(Model):
+    average: float | None = Field(ge=1, le=5)
+    count: int = Field(ge=0)
+
+
+class ScoreSummaries(Model):
+    features: ScoreSummary
+    easeOfUse: ScoreSummary
+    easeOfSetup: ScoreSummary
+    support: ScoreSummary
+    value: ScoreSummary
+
+
 class ReviewSummary(Model):
     count: int = Field(ge=0)
     average: float | None = Field(ge=1, le=5)
     distribution: Distribution
+    # 1.1: absent from a 1.0 store's answer.
+    recommend: Recommend | None = None
+    scores: ScoreSummaries | None = None
 
 
 class AppSummary(Model):
@@ -245,6 +330,24 @@ class AppDetail(AppSummary):
     license: License | None
 
 
+Stars = Annotated[int, Field(ge=1, le=5)]
+
+
+class ReviewScores(Model):
+    """`support` and `value` are for an entry of edition `ee`."""
+
+    features: Stars
+    easeOfUse: Stars
+    easeOfSetup: Stars
+    support: Stars | None
+    value: Stars | None
+
+
+class Reviewer(Model):
+    size: CompanySize
+    industry: Industry
+
+
 class Review(Model):
     id: Text(100)
     rating: int = Field(ge=1, le=5)
@@ -253,6 +356,29 @@ class Review(Model):
     author: Text(80)
     date: Text(40)
     language: Text(35) | None = None
+    version: Text(64) | None = None
+    recommend: bool | None = None
+    scores: ReviewScores | None = None
+    reviewer: Reviewer | None = None
+    mine: bool = False
+
+
+class Company(Model):
+    name: Annotated[str, StringConstraints(min_length=1, max_length=120)]
+    size: CompanySize
+    industry: Industry
+
+
+class ReviewRequest(Model):
+    """What a person writes, as this app sends it on. Built from the
+    bundle's body, which is checked against this before it leaves."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    recommend: bool
+    scores: ReviewScores
+    title: Text(120) | None = None
+    text: Text(5000)
     version: Text(64) | None = None
 
 

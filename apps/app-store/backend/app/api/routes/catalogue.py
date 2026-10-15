@@ -10,7 +10,7 @@ an origin the store's meta does not list has no address at all, and the
 screen shows a placeholder.
 """
 
-from typing import Any
+from typing import Any, get_args
 
 from fastapi import APIRouter, Depends, Query, Request
 
@@ -19,11 +19,13 @@ from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
 from app.store import media, patterns
 from app.store.client import Store, get_store
-from app.store.models import AppSummary
+from app.store.models import AppSummary, CompanySize, Industry
 
 router = APIRouter(prefix="/store", tags=["catalogue"])
 
 _EDITIONS = ("ce", "pe", "me", "ee")
+_SIZES = get_args(CompanySize)
+_INDUSTRIES = get_args(Industry)
 
 
 def _store(settings: Settings = Depends(get_settings)) -> Store:
@@ -49,6 +51,11 @@ async def meta(
         "features": found.features,
         "languages": found.languages,
         "links": found.links.model_dump() if found.links else {},
+        # What a review's author and a company are described by, named in
+        # the language asked for; empty from a store that has none.
+        "companySizes": [c.model_dump() for c in found.companySizes],
+        "industries": [i.model_dump() for i in found.industries],
+        "reviewing": found.reviewing.model_dump() if found.reviewing else None,
     }
 
 
@@ -116,12 +123,24 @@ async def reviews(
     request: Request,
     cursor: str | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
+    company_size: str | None = Query(default=None, alias="companySize"),
+    industry: str | None = Query(default=None),
     _user: dict = Depends(get_current_user),
     store: Store = Depends(_store),
 ) -> dict[str, Any]:
+    """A page of reviews and the summary of all of them; narrowed, both,
+    to authors of one company size or industry when one is named."""
     params = {"limit": str(limit)}
     if cursor:
         params["cursor"] = patterns.cursor(cursor)
+    if company_size:
+        if company_size not in _SIZES:
+            raise patterns.invalid("That is not a company size.")
+        params["companySize"] = company_size
+    if industry:
+        if industry not in _INDUSTRIES:
+            raise patterns.invalid("That is not an industry.")
+        params["industry"] = industry
     summary, items, next_cursor = await store.reviews(catalogue, app, params, language_of(request))
     return {
         "summary": summary.model_dump(by_alias=True),

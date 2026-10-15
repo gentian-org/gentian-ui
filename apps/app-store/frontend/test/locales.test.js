@@ -69,7 +69,8 @@ for (const language of LANGUAGES) {
       // The definition's open enumerations: the values it names. One it does
       // not name falls back, in the component.
       reportKind: ["security", "quality", "accessibility", "privacy", "license", "other"],
-      links: ["homepage", "documentation", "source", "support", "license", "privacy", "terms", "subscription"],
+      links: ["homepage", "documentation", "source", "support", "license", "privacy", "terms", "subscription", "donate"],
+      score: ["features", "easeOfUse", "easeOfSetup", "support", "value"],
       standing: ["no-reports-for-tenant", "tenant-not-claimed", "reports-stale", "tenant-blocked"],
       problemSource: ["store", "director", "custodian", "usher", "app"],
       // The codes the store API's definition gives, and this app's own.
@@ -78,6 +79,7 @@ for (const language of LANGUAGES) {
         "idempotency-conflict", "not-acquirable", "rate-limited", "store-not-configured", "store-unreachable",
         "store-format", "store-unavailable", "store-sign-in-required", "checkout-refused", "acquisition-cancelled",
         "acquisition-failed", "host-not-configured", "no-operation", "unreachable", "not-configured", "failed",
+        "company-missing", "review-not-acquired",
       ],
     };
     for (const family of composed) {

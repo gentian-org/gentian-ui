@@ -166,6 +166,7 @@ async def overview(ctx: Context) -> dict[str, Any]:
             return
         newest = detail.versions[0]
         row["name"] = detail.name
+        row["edition"] = detail.edition
         row["latest"] = {"version": newest.version, "digest": newest.digest}
 
     wanted = [r for r in rows.values() if r["coordinate"] and r["installed"]]
