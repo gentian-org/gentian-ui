@@ -68,6 +68,28 @@ class FakeStore:
         self.answered: set[tuple[str, str]] = set()
         # What a test turns to get another answer.
         self.meta = contract.example("Meta")
+        # A 1.1 store: it writes reviews and keeps an account's company. A
+        # test of a 1.0 store takes these out again.
+        self.meta["apiVersion"] = "1.1"
+        self.meta["features"] += ["review-writing", "company"]
+        self.meta["companySizes"] = [
+            {"id": "1-9", "name": "1 to 9 people"},
+            {"id": "10-49", "name": "10 to 49 people"},
+            {"id": "50-249", "name": "50 to 249 people"},
+            {"id": "250-999", "name": "250 to 999 people"},
+            {"id": "1000+", "name": "1000 people or more"},
+        ]
+        self.meta["industries"] = [
+            {
+                "id": "information-communication",
+                "name": "Information and communication",
+                "nace": "J",
+            },
+            {"id": "education", "name": "Education", "nace": "P"},
+        ]
+        self.meta["reviewing"] = {"requireAcquisition": True}
+        self.company: dict | None = None  # the signed-in account's
+        self.my_review: dict | None = None  # the signed-in person's, of PAID
         self.standing = contract.example("TenantServed")
         self.checkout = False  # a paid acquisition answers 202 first
         self.checkout_url: str | None = None  # overrides the example's
@@ -177,6 +199,8 @@ class FakeStore:
             )
         path, method = call.path, call.method
         doc = self.contract
+        if path.endswith("/reviews/mine") or path == "/v1/account/company":
+            return self._account(call)
         if (method, path) == ("GET", "/v1/meta"):
             return self._open(call, self.meta, 3600)
         if (method, path) == ("GET", "/v1/categories"):
@@ -196,9 +220,16 @@ class FakeStore:
             if len(parts) == 2:
                 return self._open(call, doc.example("AppDetail"))
             if parts[2:] == ["reviews"]:
-                return self._open(
-                    call, doc.operation_example(template + "/reviews", "get", "200", "reviews")
-                )
+                page = doc.operation_example(template + "/reviews", "get", "200", "reviews")
+                if "companySize" in call.query or "industry" in call.query:
+                    # No review of the examples names its author's company.
+                    page["items"] = []
+                    page["summary"] = {
+                        "count": 0,
+                        "average": None,
+                        "distribution": {str(n): 0 for n in range(1, 6)},
+                    }
+                return self._open(call, page)
             if parts[2:] == ["reports"]:
                 return self._open(
                     call, doc.operation_example(template + "/reports", "get", "200", "reports")
@@ -238,6 +269,68 @@ class FakeStore:
                         item["repository"]["credential"]["token"] = ROTATED_TOKEN
                 return self._signed(acquisition["confirmation"])
         return self._problem(404, "NotFound")
+
+    def _account(self, call: Call) -> httpx.Response:
+        """A person's review and company: signed-in calls of their own."""
+        if self.token_expired or call.headers.get("authorization") != f"Bearer {STORE_TOKEN}":
+            return self._problem(401, "Unauthenticated", {"WWW-Authenticate": "Bearer"})
+        method = call.method
+        if call.path == "/v1/account/company":
+            if method == "PUT":
+                self.company = call.json
+            if self.company is None:
+                return self._problem(404, "NotFound")
+            return self._signed(self.company)
+        if call.path.removeprefix("/v1/apps/").removesuffix("/reviews/mine") != PAID:
+            return self._problem(404, "NotFound")
+        if method == "GET":
+            if self.my_review is None:
+                return self._problem(404, "NotFound")
+            return self._signed(self.my_review)
+        if method == "DELETE":
+            self.my_review = None
+            return httpx.Response(204)
+        if not self.standing["served"]:
+            return self._refused("tenant-refused")
+        if self.company is None:
+            return self._problem(409, "CompanyMissing")
+        if self.meta["reviewing"]["requireAcquisition"] and not any(
+            a["coordinate"] == PAID and a["status"] == "confirmed"
+            for a in self.acquisitions.values()
+        ):
+            return self._refused("review-not-acquired")
+        body = call.json
+        scores = body["scores"]
+        given = [v for v in scores.values() if v is not None]
+        self.my_review = {
+            "id": "rv_MINE",
+            "rating": round(sum(given) / len(given)),
+            "recommend": body["recommend"],
+            "scores": scores,
+            "reviewer": {"size": self.company["size"], "industry": self.company["industry"]},
+            "mine": True,
+            "title": body.get("title"),
+            "text": body["text"],
+            "author": "A. P.",
+            "date": "2026-10-15",
+            "language": "en",
+            "version": body.get("version"),
+        }
+        return self._signed(self.my_review)
+
+    def _refused(self, code: str) -> httpx.Response:
+        problem = self.contract.response_example("Forbidden")
+        problem["code"] = code
+        problem["type"] = f"urn:gentian:store:problem:{code}"
+        if code == "tenant-refused":
+            problem["reason"] = self.standing["refusal"]["reason"]
+        else:
+            del problem["reason"]
+            problem["title"] = "Reviews are of what a tenant acquired"
+            problem["detail"] = "No tenant you signed in for has acquired this app."
+        return httpx.Response(
+            403, content=json.dumps(problem), headers={"Content-Type": "application/problem+json"}
+        )
 
     def _without_credential(self, acquisition: dict) -> dict:
         copy = json.loads(json.dumps(acquisition))

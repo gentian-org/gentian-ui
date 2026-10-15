@@ -39,8 +39,9 @@ chart/      Helm. Two Deployments and two Services, named from fullnameOverride 
   store's meta lists, only PNG, JPEG, WebP, or an SVG with nothing in it
   that runs or loads anything — and served from this origin, so the pages'
   content security policy is `img-src 'self'`.
-* **Sign-in to the store** only when the person acquires something or opens
-  what the tenant has acquired: authorization code with PKCE, as a public
+* **Sign-in to the store** only when the person acquires something, opens
+  what the tenant has acquired, or writes a review: authorization code with
+  PKCE, as a public
   client. The backend builds the request, receives the redirect on
   `/oauth/callback`, exchanges the code and keeps the token in memory, bound
   to the person's cluster session (`backend/app/store/oauth.py`). The browser
@@ -53,6 +54,13 @@ chart/      Helm. Two Deployments and two Services, named from fullnameOverride 
   show the usher's progress. Every step is asked with the person's own token
   and is safe to repeat; a page loaded in the middle shows where things
   stand, derived from the store, the director and the usher.
+* **Reviews and the company** (`backend/app/api/routes/account.py`): a
+  signed-in person writes, changes and withdraws their own review of an
+  entry, and says which company they are with -- its size and industry are
+  shown with their reviews and filter them, its name never is. Offered only
+  by a store whose meta lists `review-writing` and `company`; the scopes
+  `store.review` and `store.account` are asked for at sign-in only when the
+  store lists them.
 * **Installed and acquired**: what the tenant has acquired joined with what
   is installed; update when the store's newest build is not the one pinned;
   replace a repository credential, behind a confirmation.

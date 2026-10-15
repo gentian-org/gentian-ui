@@ -19,12 +19,20 @@ export type Context = {
   adminConsoleUrl: string | null;
 };
 
+export type CompanySize = "1-9" | "10-49" | "50-249" | "250-999" | "1000+";
+export type Industry = string;
+
 export type StoreMeta = {
   name: string;
   apiVersion: string;
+  /** Open. `review-writing`: a person may write a review; `company`: an account has a company. */
   features: string[];
   languages: string[];
   links: { terms?: string | null; privacy?: string | null; support?: string | null; account?: string | null };
+  /** The store's own names for them, in the language asked for; empty from a 1.0 store. */
+  companySizes: { id: CompanySize; name: string }[];
+  industries: { id: Industry; name: string; nace: string }[];
+  reviewing: { requireAcquisition: boolean } | null;
 };
 
 export type Link = { rel?: string | null; label?: string | null; url: string };
@@ -64,10 +72,16 @@ export type Price = {
   note?: string | null;
 };
 
+export type ScoreName = "features" | "easeOfUse" | "easeOfSetup" | "support" | "value";
+export type ScoreSummary = { average: number | null; count: number };
+
 export type ReviewSummary = {
   count: number;
   average: number | null;
   distribution: Record<"1" | "2" | "3" | "4" | "5", number>;
+  /** Absent from a 1.0 store. */
+  recommend?: { yes: number; no: number } | null;
+  scores?: Record<ScoreName, ScoreSummary> | null;
 };
 
 export type AppSummary = {
@@ -111,6 +125,15 @@ export type AppDetail = AppSummary & {
   license: { spdx?: string | null; name: string; url?: string | null } | null;
 };
 
+/** Stars, 1 to 5. `support` and `value` are for an entry of edition `ee`, and null on any other. */
+export type ReviewScores = {
+  features: number;
+  easeOfUse: number;
+  easeOfSetup: number;
+  support: number | null;
+  value: number | null;
+};
+
 export type Review = {
   id: string;
   rating: number;
@@ -120,7 +143,22 @@ export type Review = {
   date: string;
   language?: string | null;
   version?: string | null;
+  recommend?: boolean | null;
+  scores?: ReviewScores | null;
+  /** The size and industry of the author's company; never its name. */
+  reviewer?: { size: CompanySize; industry: Industry } | null;
+  mine?: boolean;
 };
+
+export type ReviewRequest = {
+  recommend: boolean;
+  scores: ReviewScores;
+  title: string | null;
+  text: string;
+  version: string | null;
+};
+
+export type Company = { name: string; size: CompanySize; industry: Industry };
 
 export type Report = {
   id: string;
@@ -229,6 +267,7 @@ export type OverviewRow = {
   profile: string;
   coordinate: string | null;
   name?: string;
+  edition?: Edition;
   stage: AppStanding;
   installed: Installed | null;
   state: AppState | null;
@@ -269,10 +308,32 @@ export function fetchApps(filters: { category?: string; edition?: string; q?: st
 
 export const fetchApp = (coordinate: string) => apiFetch<AppDetail>(`/store/apps/${appPath(coordinate)}`);
 
-export function fetchReviews(coordinate: string, cursor?: string) {
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return apiFetch<ReviewsPage>(`/store/apps/${appPath(coordinate)}/reviews${query}`);
+export type ReviewFilters = { companySize?: string; industry?: string };
+
+export function fetchReviews(coordinate: string, filters: ReviewFilters = {}, cursor?: string) {
+  const params = new URLSearchParams();
+  if (filters.companySize) params.set("companySize", filters.companySize);
+  if (filters.industry) params.set("industry", filters.industry);
+  if (cursor) params.set("cursor", cursor);
+  const query = params.toString();
+  return apiFetch<ReviewsPage>(`/store/apps/${appPath(coordinate)}/reviews${query ? `?${query}` : ""}`);
 }
+
+// What the person says at the store in their own name. Signed-in calls; the
+// API holds the token.
+export const fetchMyReview = (coordinate: string) =>
+  apiFetch<{ review: Review | null }>(`/store/apps/${appPath(coordinate)}/reviews/mine`);
+export const putMyReview = (coordinate: string, body: ReviewRequest) =>
+  apiFetch<{ review: Review }>(`/store/apps/${appPath(coordinate)}/reviews/mine`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+export const deleteMyReview = (coordinate: string) =>
+  apiFetch<{ review: null }>(`/store/apps/${appPath(coordinate)}/reviews/mine`, { method: "DELETE" });
+
+export const fetchCompany = () => apiFetch<{ company: Company | null }>("/store/account/company");
+export const putCompany = (body: Company) =>
+  apiFetch<{ company: Company }>("/store/account/company", { method: "PUT", body: JSON.stringify(body) });
 
 export const fetchReports = (coordinate: string) =>
   apiFetch<{ items: Report[] }>(`/store/apps/${appPath(coordinate)}/reports`);

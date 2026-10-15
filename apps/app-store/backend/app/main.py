@@ -21,7 +21,7 @@ import logging
 
 from fastapi import FastAPI
 
-from app.api.routes import catalogue, health, install, media, session, store_session
+from app.api.routes import account, catalogue, health, install, media, session, store_session
 from app.core.config import get_settings
 from app.core.logging_middleware import RedactingAccessLogMiddleware
 from app.core.origin_check import OriginCheckMiddleware
@@ -54,4 +54,5 @@ app.include_router(session.router, prefix=settings.api_v1_str)
 app.include_router(catalogue.router, prefix=settings.api_v1_str)
 app.include_router(media.router, prefix=settings.api_v1_str)
 app.include_router(store_session.router, prefix=settings.api_v1_str)
+app.include_router(account.router, prefix=settings.api_v1_str)
 app.include_router(install.router, prefix=settings.api_v1_str)
