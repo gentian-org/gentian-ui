@@ -183,6 +183,25 @@ async def upload_bundle(
     )
 
 
+@router.post("/bundles/inspect")
+async def inspect_bundle(
+    body: dict,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What an uploaded bundle holds, read with the key given, before
+    anything is declared: its tenant, and the custom domain it was on."""
+    payload = {k: body[k] for k in ("bundle", "decryption") if k in body}
+    return await director.forward(
+        settings,
+        "POST",
+        _cluster_path(settings, "/bundles/inspect"),
+        bearer_of(credentials),
+        json_body=payload,
+    )
+
+
 @router.post("/tenants/import")
 async def import_tenant(
     body: dict,
@@ -192,8 +211,10 @@ async def import_tenant(
 ) -> Response:
     """Create plus Restore from a bundle. The director reads the manifest
     with the key given, declares the tenant from it and restores once the
-    operator has provisioned the shells; the status route follows it."""
-    payload = {k: body[k] for k in ("bundle", "decryption") if k in body}
+    operator has provisioned the shells; the status route follows it.
+    keepCustomDomain says whether a custom domain the bundle's tenant had is
+    declared again with it; the director keeps it when it is not said."""
+    payload = {k: body[k] for k in ("bundle", "decryption", "keepCustomDomain") if k in body}
     return await director.forward(
         settings,
         "POST",

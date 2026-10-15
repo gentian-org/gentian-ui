@@ -701,14 +701,21 @@
     "key": "Schlüssel",
     "keyHint": "Die Passphrase des Exports oder die age-Identität (AGE-SECRET-KEY-…), die ihn öffnet. Sie wird nur so lange aufbewahrt, wie die Wiederherstellung läuft.",
     "start": "Importieren",
-    "uploading": "Wird hochgeladen …",
     "chooseFile": "Zuerst eine .gentian-Datei wählen.",
     "phase_declared": "<mono>{{tenant}}</mono> ist committet; der Operator stellt ihn als Nächstes bereit.",
     "phase_provisioning": "<mono>{{tenant}}</mono>: {{message}}",
     "phase_restoring": "<mono>{{tenant}}</mono>: Bundle wird wiederhergestellt.",
     "phase_ready": "<mono>{{tenant}}</mono> ist importiert.",
     "phase_failed": "Import von <mono>{{tenant}}</mono> fehlgeschlagen: {{message}}",
-    "passwordReset": "Die Mitglieder haben noch keine Zugangsdaten: Senden Sie ihnen ein Passwort-Reset und aktivieren Sie den Administrator aus der Liste oben."
+    "passwordReset": "Die Mitglieder haben noch keine Zugangsdaten: Senden Sie ihnen ein Passwort-Reset und aktivieren Sie den Administrator aus der Liste oben.",
+    "open": "Öffnen",
+    "opening": "Wird hochgeladen und geöffnet …",
+    "bundleOf": "Das Bundle ist vom Mandanten <mono>{{tenant}}</mono>, exportiert {{createdAt}}.",
+    "keepDomain": "Eigene Domain {{domain}} behalten",
+    "keepDomainHint": "Der Mandant war unter einer eigenen Domain erreichbar. Behalten wird sie hier mit dem Mandanten wieder deklariert und nichts wird verschoben; das DNS der Domain richten Sie selbst auf diesen Cluster. Nicht behalten, wird der Mandant unter seiner Standardadresse angelegt und die Adressen seiner Leute ziehen mit.",
+    "dns": "Er behält seine eigene Domain <mono>{{domain}}</mono>: Richten Sie das DNS der Domain und ihrer Subdomains auf diesen Cluster; der Import tut das nicht.",
+    "phase_awaiting-key": "<mono>{{tenant}}</mono>: {{message}}",
+    "another": "Anderes Bundle wählen"
   },
   "usageStatistics": {
     "title": "Nutzungsstatistik",

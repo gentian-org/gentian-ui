@@ -701,14 +701,21 @@
     "key": "Key",
     "keyHint": "The passphrase the export was taken with, or the age identity (AGE-SECRET-KEY-…) that opens it. It is kept only as long as the restore runs.",
     "start": "Import",
-    "uploading": "Uploading…",
     "chooseFile": "Choose a .gentian file first.",
     "phase_declared": "<mono>{{tenant}}</mono> is committed; the operator provisions it next.",
     "phase_provisioning": "<mono>{{tenant}}</mono>: {{message}}",
     "phase_restoring": "<mono>{{tenant}}</mono>: restoring the bundle.",
     "phase_ready": "<mono>{{tenant}}</mono> is imported.",
     "phase_failed": "Import of <mono>{{tenant}}</mono> failed: {{message}}",
-    "passwordReset": "Members have no credentials yet: send them a password reset, and activate the administrator from the list above."
+    "passwordReset": "Members have no credentials yet: send them a password reset, and activate the administrator from the list above.",
+    "open": "Open",
+    "opening": "Uploading and opening…",
+    "bundleOf": "The bundle is of tenant <mono>{{tenant}}</mono>, exported {{createdAt}}.",
+    "keepDomain": "Keep its custom domain {{domain}}",
+    "keepDomainHint": "The tenant was served at its own domain. Kept, it is declared again here with the tenant and nothing is moved; point the domain's DNS at this cluster yourself. Not kept, the tenant is made at its default address and its people's addresses move with it.",
+    "dns": "It keeps its custom domain <mono>{{domain}}</mono>: point the DNS of the domain and its subdomains at this cluster; the import does not.",
+    "phase_awaiting-key": "<mono>{{tenant}}</mono>: {{message}}",
+    "another": "Choose another bundle"
   },
   "usageStatistics": {
     "title": "Usage Statistics",
