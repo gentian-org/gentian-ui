@@ -204,6 +204,31 @@ export function fetchTenantExposures() {
 }
 
 /**
+ * The same registry, as the perimeter's approvers read it (can_expose): an
+ * approver who is not otherwise a member of the tenant sees what they approve.
+ */
+export function fetchPerimeterExposures() {
+  return apiFetch<{ tenant: string; entries?: ExposureEntry[] }>("/admin/perimeter/exposures");
+}
+
+/** One publication, review or withdrawal, from the commit that made it. */
+export type PerimeterChange = {
+  commit: string;
+  author: { Name: string; Email: string };
+  at: string;
+  summary: string;
+  throughPlatform: boolean;
+  principal?: string;
+  decision?: string;
+  requestId?: string;
+};
+
+/** Who published, reviewed or withdrew which entry, and when. */
+export function fetchPerimeterHistory() {
+  return apiFetch<{ tenant: string; changes: PerimeterChange[]; covers: string }>("/admin/perimeter/history");
+}
+
+/**
  * What an approval may say. `apex` and `acknowledgeMainAddressRule` are for
  * an entry on the cluster's main address and travel only for one; the
  * console's backend refuses any other field.

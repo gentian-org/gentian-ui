@@ -17,6 +17,7 @@ import { IntegrationsSection } from "@/admin/IntegrationsSection";
 import { UsageStatisticsSection } from "@/admin/UsageStatisticsSection";
 import { NotificationsSection } from "@/admin/NotificationsSection";
 import { ResourcesSection } from "@/admin/ResourcesSection";
+import { PerimeterSection } from "@/admin/PerimeterSection";
 import { PlatformSecuritySection } from "@/admin/PlatformSecuritySection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
 import { TenantsSection } from "@/admin/TenantsSection";
@@ -34,6 +35,7 @@ type AdminTab =
   | "integrations"
   | "catalogue"
   | "credentials"
+  | "perimeter"
   | "notifications"
   | "audit"
   | "settings"
@@ -69,7 +71,14 @@ type AdminTab =
  */
 const SHOW_CATALOGUES = false;
 
-const TABS: { id: AdminTab; labelKey: string; platformOnly?: boolean; hidden?: boolean }[] = [
+const TABS: {
+  id: AdminTab;
+  labelKey: string;
+  platformOnly?: boolean;
+  /** Shown only to those the director says may publish for the tenant. */
+  approverOnly?: boolean;
+  hidden?: boolean;
+}[] = [
   // First, and platform-only, because bringing a customer on is what an MSP
   // employee opens this console to do. A tenant administrator sees their own
   // tenant's screens and has no business listing the others.
@@ -90,6 +99,9 @@ const TABS: { id: AdminTab; labelKey: string; platformOnly?: boolean; hidden?: b
   // maintained. Hidden at present: see SHOW_CATALOGUES.
   { id: "catalogue", labelKey: "tabCatalogues", hidden: !SHOW_CATALOGUES },
   { id: "credentials", labelKey: "tabCredentials" },
+  // What the tenant has on the internet and what asks to be, for those who
+  // answer for it (can_expose); the director guards the reads the same way.
+  { id: "perimeter", labelKey: "tabPerimeter", approverOnly: true },
   { id: "notifications", labelKey: "tabNotifications" },
   { id: "audit", labelKey: "tabAudit" },
   { id: "settings", labelKey: "tabClusterSettings", platformOnly: true },
@@ -149,7 +161,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
     );
   }
 
-  const { realm, isPlatformAdmin } = contextQuery.data;
+  const { realm, isPlatformAdmin, canExpose } = contextQuery.data;
 
   return (
     <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
@@ -165,7 +177,12 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
         </header>
 
         <nav className="admin-console__tabs" aria-label={t("adminConsole.adminSections")}>
-          {TABS.filter((entry) => !entry.hidden && (!entry.platformOnly || isPlatformAdmin)).map((entry) => (
+          {TABS.filter(
+            (entry) =>
+              !entry.hidden &&
+              (!entry.platformOnly || isPlatformAdmin) &&
+              (!entry.approverOnly || canExpose === true),
+          ).map((entry) => (
             <button
               key={entry.id}
               type="button"
@@ -209,6 +226,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <UsageStatisticsSection />
           ) : tab === "credentials" ? (
             <CredentialsSection />
+          ) : tab === "perimeter" ? (
+            <PerimeterSection />
           ) : tab === "notifications" ? (
             <NotificationsSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
           ) : tab === "export" ? (

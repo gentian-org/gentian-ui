@@ -23,7 +23,8 @@
     "tabGroups": "Gruppen",
     "tabExport": "Export",
     "tabUsageStatistics": "Nutzungsstatistik",
-    "tabApps": "Apps"
+    "tabApps": "Apps",
+    "tabPerimeter": "Perimeter"
   },
   "audit": {
     "action": "Aktion",
@@ -1000,6 +1001,25 @@
     "publicReviewConfirm": "Überprüfung bestätigen",
     "publicSending": "Wird gesendet …",
     "publicApproveRefused": "Nicht genehmigt. Die Antwort des Directors:",
-    "publicReviewRefused": "Nicht überprüft. Die Antwort des Directors:"
+    "publicReviewRefused": "Nicht überprüft. Die Antwort des Directors:",
+    "publicEntryOfApp": "Eintrag <mono>{{entry}}</mono> von <mono>{{app}}</mono>"
+  },
+  "perimeter": {
+    "title": "Perimeter",
+    "lead": "Was dieser Mandant im Internet hat, was dorthin möchte, und wer jeweils entschieden hat. Jeder Eintrag hier wurde von einer App angemeldet und ist erst veröffentlicht, wenn jemand, der für den Mandanten veröffentlichen darf, ihn genehmigt. Genehmigen und Zurückziehen funktionieren wie unter <mono>Apps</mono>, hier für alle Apps zugleich.",
+    "requestsTitle": "Wartet auf eine Entscheidung",
+    "requestsNone": "Nichts wartet: Keine App bittet um eine Adresse, über die nicht entschieden ist, und keine Genehmigung ist zur Überprüfung fällig.",
+    "surfaceTitle": "Veröffentlicht",
+    "surfaceLead": "Die Adressen, die jetzt im Internet sind: wer sie genehmigt hat und bis wann.",
+    "surfaceNone": "Nichts von diesem Mandanten ist im Internet.",
+    "historyTitle": "Verlauf",
+    "historyReading": "Verlauf wird gelesen…",
+    "historyUnavailable": "Der Verlauf kann nicht gelesen werden:",
+    "historyNone": "Bisher wurde nichts veröffentlicht oder zurückgezogen.",
+    "historyWhen": "Wann",
+    "historyWhat": "Was",
+    "historyWho": "Wer",
+    "historyAuthority": "Mit welcher Berechtigung",
+    "historyByHand": "Von Hand gepusht: kein Nachweis, was es erlaubt hat"
   }
 }

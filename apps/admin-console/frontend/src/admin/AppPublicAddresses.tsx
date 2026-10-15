@@ -1,11 +1,12 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { fetchAdminContext } from "@/api/admin";
 import {
   approveExposure,
+  fetchPerimeterExposures,
   fetchTenantExposures,
   withdrawExposure,
   type AppWriteResult,
@@ -86,10 +87,52 @@ type Done = { kind: "approved" | "reviewed" | "withdrawn"; name: string; result:
  */
 export function AppPublicAddresses({ app, addons }: { app: string; addons: string[] }) {
   const { t } = useTranslation();
+  const names = new Set([app, ...addons]);
+  return (
+    <PublicAddressList
+      source="apps"
+      app={app}
+      include={(entry) => names.has(entry.install)}
+      title={t("apps.publicTitle")}
+      lead={<Trans i18nKey="apps.publicLead" components={mono} />}
+    />
+  );
+}
+
+/** Where a list of entries is read from: the tenant's registry as any member
+ *  reads it (can_view), or as the perimeter's approvers do (can_expose). */
+type Source = "apps" | "perimeter";
+
+const exposuresKey = (source: Source) => ["admin", source, "exposures"];
+
+/**
+ * The entries one list shows, with what may be done to each. The Apps screen
+ * shows one app's; the Perimeter tab the tenant's, split by what is waiting
+ * for a decision and what is published. Every list refreshes every other
+ * after a change: they are views of one registry.
+ */
+export function PublicAddressList({
+  source,
+  include,
+  app,
+  title,
+  lead,
+  empty,
+}: {
+  source: Source;
+  include: (entry: ExposureEntry) => boolean;
+  /** The app the list is about, when it is about one; otherwise each entry names its app. */
+  app?: string;
+  title: string;
+  lead?: ReactNode;
+  /** Said when nothing matches; without it the list is not shown at all. */
+  empty?: string;
+}) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const query = useQuery({
-    queryKey: ["admin", "apps", "exposures"],
-    queryFn: () => fetchTenantExposures(),
+    queryKey: exposuresKey(source),
+    queryFn: () => (source === "perimeter" ? fetchPerimeterExposures() : fetchTenantExposures()),
   });
   // The same read the console opens with, so this asks nothing twice.
   const context = useQuery({
@@ -105,7 +148,12 @@ export function AppPublicAddresses({ app, addons }: { app: string; addons: strin
   const [done, setDone] = useState<Done | null>(null);
   const [failed, setFailed] = useState<{ name: string; message: string } | null>(null);
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["admin", "apps", "exposures"] });
+  const refresh = () =>
+    Promise.all(
+      (["apps", "perimeter"] as const).map((other) =>
+        queryClient.invalidateQueries({ queryKey: exposuresKey(other) }),
+      ),
+    ).then(() => queryClient.invalidateQueries({ queryKey: ["admin", "perimeter", "history"] }));
 
   const approve = useMutation({
     mutationFn: ({ entry, body }: { entry: ExposureEntry; body: ExposureApprovalRequest }) =>
@@ -148,27 +196,25 @@ export function AppPublicAddresses({ app, addons }: { app: string; addons: strin
     withdraw.mutate(entry);
   };
 
-  const names = new Set([app, ...addons]);
-  const entries = (query.data?.entries ?? []).filter((e) => names.has(e.install));
+  const entries = (query.data?.entries ?? []).filter(include);
 
   if (query.isError) {
     return (
       <div className="admin-console__subsection">
-        <h3 className="admin-console__subsection-title">{t("apps.publicTitle")}</h3>
+        <h3 className="admin-console__subsection-title">{title}</h3>
         <p className="admin-console__error">
           {t("apps.publicUnavailable")} {messageOf(query.error)}
         </p>
       </div>
     );
   }
-  if (entries.length === 0 && !done) return null;
+  if (entries.length === 0 && !done && !empty) return null;
 
   return (
     <div className="admin-console__subsection">
-      <h3 className="admin-console__subsection-title">{t("apps.publicTitle")}</h3>
-      <p className="admin-console__hint">
-        <Trans i18nKey="apps.publicLead" components={mono} />
-      </p>
+      <h3 className="admin-console__subsection-title">{title}</h3>
+      {lead ? <p className="admin-console__hint">{lead}</p> : null}
+      {query.isSuccess && entries.length === 0 && empty ? <p className="admin-console__hint">{empty}</p> : null}
       {context.isSuccess && !canExpose ? <p className="admin-console__hint">{t("apps.publicNotApprover")}</p> : null}
       {done ? <DoneNotice done={done} /> : null}
       {entries.length > 0 ? (
@@ -588,7 +634,7 @@ function ApproveDialog({
   );
 }
 
-function AddressCell({ entry, app }: { entry: ExposureEntry; app: string }) {
+function AddressCell({ entry, app }: { entry: ExposureEntry; app?: string }) {
   const { t } = useTranslation();
   return (
     <>
@@ -603,7 +649,13 @@ function AddressCell({ entry, app }: { entry: ExposureEntry; app: string }) {
         </div>
       ) : null}
       <div className="admin-console__hint">
-        {entry.install === app ? (
+        {app === undefined ? (
+          <Trans
+            i18nKey="apps.publicEntryOfApp"
+            values={{ entry: entry.exposureName, app: entry.install }}
+            components={mono}
+          />
+        ) : entry.install === app ? (
           <Trans i18nKey="apps.publicEntry" values={{ entry: entry.exposureName }} components={mono} />
         ) : (
           <Trans

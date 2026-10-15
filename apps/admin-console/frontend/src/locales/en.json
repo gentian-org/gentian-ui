@@ -23,7 +23,8 @@
     "tabGroups": "Groups",
     "tabExport": "Export",
     "tabUsageStatistics": "Usage Statistics",
-    "tabApps": "Apps"
+    "tabApps": "Apps",
+    "tabPerimeter": "Perimeter"
   },
   "audit": {
     "action": "Action",
@@ -1000,6 +1001,25 @@
     "publicReviewConfirm": "Confirm the review",
     "publicSending": "Sending…",
     "publicApproveRefused": "Not approved. The director's answer:",
-    "publicReviewRefused": "Not reviewed. The director's answer:"
+    "publicReviewRefused": "Not reviewed. The director's answer:",
+    "publicEntryOfApp": "Entry <mono>{{entry}}</mono> of <mono>{{app}}</mono>"
+  },
+  "perimeter": {
+    "title": "Perimeter",
+    "lead": "What this tenant has on the internet, what asks to be, and who decided each. Every entry here was declared by an app and is published only once somebody who may publish for the tenant approves it. Approving and withdrawing are the same as under <mono>Apps</mono>, here for every app at once.",
+    "requestsTitle": "Waiting for a decision",
+    "requestsNone": "Nothing is waiting: no app asks for an address that has not been decided, and no approval is due for review.",
+    "surfaceTitle": "Published",
+    "surfaceLead": "The addresses on the internet now, with who approved each and until when.",
+    "surfaceNone": "Nothing of this tenant is on the internet.",
+    "historyTitle": "History",
+    "historyReading": "Reading the history…",
+    "historyUnavailable": "The history cannot be read:",
+    "historyNone": "Nothing has been published or withdrawn yet.",
+    "historyWhen": "When",
+    "historyWhat": "What",
+    "historyWho": "Who",
+    "historyAuthority": "Under what authority",
+    "historyByHand": "Pushed by hand: no record of what allowed it"
   }
 }

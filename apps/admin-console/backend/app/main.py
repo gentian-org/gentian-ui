@@ -20,6 +20,7 @@ from app.api.routes import (
     health,
     notifications,
     people,
+    perimeter,
     platform,
     resources,
     security,
@@ -57,6 +58,7 @@ app.include_router(security.router, prefix=settings.api_v1_str)
 app.include_router(platform.router, prefix=settings.api_v1_str)
 app.include_router(catalogue.router, prefix=settings.api_v1_str)
 app.include_router(apps.router, prefix=settings.api_v1_str)
+app.include_router(perimeter.router, prefix=settings.api_v1_str)
 app.include_router(people.router, prefix=settings.api_v1_str)
 app.include_router(notifications.router, prefix=settings.api_v1_str)
 app.include_router(admin.router, prefix=settings.api_v1_str)
