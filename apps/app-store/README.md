@@ -36,8 +36,9 @@ chart/      Helm. Two Deployments and two Services, named from fullnameOverride 
   notes are the restricted Markdown subset `store-markdown-1`, read into a
   tree of allow-listed nodes (`frontend/src/lib/storeMarkdown.js`) and never
   into HTML. Pictures are fetched by the backend — only from the origins the
-  store's meta lists, only PNG, JPEG or WebP — and served from this origin,
-  so the pages' content security policy is `img-src 'self'`.
+  store's meta lists, only PNG, JPEG, WebP, or an SVG with nothing in it
+  that runs or loads anything — and served from this origin, so the pages'
+  content security policy is `img-src 'self'`.
 * **Sign-in to the store** only when the person acquires something or opens
   what the tenant has acquired: authorization code with PKCE, as a public
   client. The backend builds the request, receives the redirect on
