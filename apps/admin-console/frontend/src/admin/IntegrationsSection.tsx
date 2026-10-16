@@ -10,7 +10,7 @@ import {
   type EffectiveAccessRow,
 } from "@/api/admin";
 import { ApiError } from "@/api/client";
-import { withContract, withoutContract } from "./grants";
+import { withContract, withoutContract, type Written } from "./grants";
 import "./admin.css";
 import { useTranslation } from "react-i18next";
 
@@ -69,20 +69,26 @@ function IntegrationApprovals({
   const [withheld, setWithheld] = useState<Record<string, string[]>>({});
   const [done, setDone] = useState<string | null>(null);
   const [failed, setFailed] = useState<{ key: string; message: string } | null>(null);
+  const [written, setWritten] = useState<Written>({});
 
   const write = useMutation({
     mutationFn: async ({ row, granted }: { row: EffectiveAccessRow; granted: string[] | null }) => {
-      if (granted) {
-        return updateAppGrant(row.consumer, withContract(grants, row.consumer, row.contract, granted), tenant);
+      const body = granted
+        ? withContract(grants, written, row.consumer, row.contract, granted)
+        : withoutContract(grants, written, row.consumer, row.contract);
+      if (body) {
+        await updateAppGrant(row.consumer, body, tenant);
+      } else {
+        await clearAppGrant(row.consumer, tenant);
       }
-      const rest = withoutContract(grants, row.consumer, row.contract);
-      return rest ? updateAppGrant(row.consumer, rest, tenant) : clearAppGrant(row.consumer, tenant);
+      return body;
     },
     onMutate: () => {
       setDone(null);
       setFailed(null);
     },
-    onSuccess: (_answer, { row }) => {
+    onSuccess: (body, { row }) => {
+      setWritten((before) => ({ ...before, [row.consumer]: body }));
       setDone(rowKey(row));
       void queryClient.invalidateQueries({ queryKey: ["admin", "integrations", tenant] });
     },
