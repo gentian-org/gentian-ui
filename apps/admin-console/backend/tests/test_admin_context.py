@@ -121,6 +121,28 @@ def test_whether_the_person_may_publish_is_the_directors_answer(monkeypatch):
         assert r.json()["canExpose"] is want
 
 
+def test_whether_the_person_may_grant_is_the_directors_answer(monkeypatch):
+    """The buttons that approve and withdraw an integration follow can_grant
+    as the director answers it for this tenant; absent is no."""
+    for relations, want in (
+        ({"can_administer": True, "can_grant": True}, True),
+        ({"can_administer": True, "can_grant": False}, False),
+        ({"can_administer": True}, False),
+    ):
+        _director(
+            monkeypatch,
+            {
+                "/v1/tenants/platform/me": {"relations": relations},
+                "/v1/clusters/demo/me": {"relations": {}},
+            },
+        )
+        r = TestClient(_app(_settings())).get(
+            "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+        )
+        assert r.status_code == 200
+        assert r.json()["canGrant"] is want
+
+
 def test_someone_the_edge_let_in_but_who_may_not_administer_is_refused(monkeypatch):
     _director(
         monkeypatch,

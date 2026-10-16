@@ -46,6 +46,11 @@ class AdminContextResponse(BaseModel):
     # buttons the Apps screen offers and nothing else: the director asks again
     # on every approval and withdrawal.
     canExpose: bool = False
+    # The director's answer to whether this person may say what one app of
+    # this tenant may consume from another (can_grant). It decides whether
+    # the Integrations screen offers approving and withdrawing; the director
+    # asks again on every write.
+    canGrant: bool = False
     # Kept for the screens that read it. People are managed in Keycloak's own
     # console, which this component links to; it holds no store of its own.
     storeConfigured: bool = True
@@ -86,6 +91,7 @@ async def admin_context(
         availableTenants=[tenant],
         kernelDomain=settings.kernel_domain or "",
         canExpose=bool(tenant_rel.get("can_expose")),
+        canGrant=bool(tenant_rel.get("can_grant")),
     )
 
 
