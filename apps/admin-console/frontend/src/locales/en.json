@@ -515,6 +515,7 @@
     "requireMFA": "The administrator must set up a second factor when activating",
     "waitingForProvisioning": "The tenant is being provisioned; the link is issued as soon as its account exists…",
     "notThereYet": "<mono>{{tenant}}</mono> is recorded, and the cluster is creating it. There is nothing to do here: the administrator's activation follows by itself once the tenant is there.",
+    "creationFailed": "The cluster reports: {{reason}}. The platform administrator can sync Application tenant-{{tenant}} again in Argo CD, or re-run the installer.",
     "stillNotThere": "The cluster has not finished creating {{tenant}} after {{minutes}} minutes, and this screen has stopped asking. The activation can be tried again below.",
     "beingCreated": "being created",
     "beingCreatedHint": "Recorded; the cluster is creating this tenant. The administrator's activation becomes available by itself.",
