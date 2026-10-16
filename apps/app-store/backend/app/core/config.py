@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     cluster_id: str | None = Field(default=None, alias="GENTIAN_CLUSTER_ID")
     custodian_url: str | None = Field(default=None, alias="CUSTODIAN_URL")
     usher_url: str | None = Field(default=None, alias="USHER_URL")
+    # The tenant's desktop API, on the cluster network. Told the store's
+    # picture of an app after it is installed or updated, so the app's tile
+    # shows it. Unset leaves every tile with its profile's own picture.
+    desktop_api_url: str | None = Field(default=None, alias="DESKTOP_API_URL")
 
     # The store API's base address: what the Cluster claim names as
     # catalogue.storeUrl. https, no trailing slash, no path beyond a prefix.

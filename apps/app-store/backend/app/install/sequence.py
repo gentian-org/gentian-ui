@@ -12,6 +12,7 @@ person's own token:
     addons       director   PUT  /v1/tenants/{t}/apps/{app}/addons
     metering     custodian  PUT  /v1/credentials/app-{t}-{app}-metering   (an app priced by use)
     rollout      usher      GET  /v1/tenants/{t}/apps/status
+    tile         desktop    PUT  /api/v1/tenant-tiles/{app}   (once ready; never fails the install)
 
 How it runs
 -----------
@@ -59,6 +60,7 @@ from typing import Any
 from app.core import director
 from app.core.config import Settings
 from app.core.problems import Refusal
+from app.install import tile
 from app.store import oauth, patterns
 from app.store.client import Store, origin_of
 from app.store.media import checkout_origins
@@ -158,6 +160,8 @@ class Operation:
     metering_deadline: float | None = None
     metering_attempts: int = 0
     rollout: dict[str, Any] | None = None
+    # What came of putting the store's picture on the app's desktop tile.
+    tile: dict[str, Any] | None = None
     error: dict[str, Any] | None = None
 
     @property
@@ -206,6 +210,7 @@ class Operation:
             "install": self.install,
             "addons": self.addons,
             "rollout": self.rollout,
+            "tile": self.tile,
             "error": self.error,
         }
 
@@ -663,6 +668,10 @@ async def _rollout(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None
     op.rollout = state
     phase = state["phase"] if state else None
     if phase == "ready":
+        # The app is there. Its tile is given the store's picture once, and
+        # whatever comes of that, the install is done.
+        if op.tile is None:
+            op.tile = await tile.copy_to_desktop(ctx, op.coordinate, op.profile)
         op.stage = "done"
     elif phase == "failing":
         op.stage = "failing"

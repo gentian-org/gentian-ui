@@ -83,6 +83,10 @@ spec:
             - name: USHER_URL
               value: {{ .Values.usher.url | quote }}
             {{- end }}
+            {{- if and .Values.desktop .Values.desktop.url (not (hasKey (default dict .Values.api.env) "DESKTOP_API_URL")) }}
+            - name: DESKTOP_API_URL
+              value: {{ .Values.desktop.url | quote }}
+            {{- end }}
             {{- if and .Values.director.cluster (not (hasKey (default dict .Values.api.env) "GENTIAN_CLUSTER_ID")) }}
             - name: GENTIAN_CLUSTER_ID
               value: {{ .Values.director.cluster | quote }}

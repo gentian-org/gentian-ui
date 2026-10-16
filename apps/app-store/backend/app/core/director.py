@@ -227,3 +227,29 @@ async def ask_usher(settings: Settings, path: str, token: str) -> Answer:
         return _read("usher", await read(settings, path, token))
     except HTTPException as exc:
         raise _unanswered("usher", exc) from exc
+
+
+async def ask_desktop(
+    settings: Settings, method: str, path: str, token: str, *, content: bytes, content_type: str
+) -> Answer:
+    """One request to the tenant's desktop API, as the caller, with a body
+    that is not JSON: a tile's picture. The desktop verifies the token itself
+    and decides from the director's answer whether the caller may set it."""
+    if not settings.desktop_api_url:
+        raise Refusal(status=503, source="desktop", code="not-configured")
+    url = f"{settings.desktop_api_url.rstrip('/')}{path}"
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            upstream = await client.request(
+                method,
+                url,
+                content=content,
+                headers={"Authorization": f"Bearer {token}", "Content-Type": content_type},
+            )
+    except httpx.RequestError as exc:
+        raise Refusal(status=502, source="desktop", code="unreachable", detail=str(exc)) from exc
+    try:
+        body = upstream.json() if upstream.content else None
+    except ValueError:
+        body = None
+    return Answer(source="desktop", status=upstream.status_code, body=body)
