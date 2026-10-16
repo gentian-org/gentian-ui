@@ -21,6 +21,12 @@ export type AdminContext = {
    * backend older than this screen, which is a no.
    */
   canExpose?: boolean;
+  /**
+   * The director's answer to whether this person may say what one app of the
+   * tenant may consume from another (can_grant). Absent from a backend older
+   * than this screen, which is a no.
+   */
+  canGrant?: boolean;
 };
 
 export type AdminMember = {
@@ -508,6 +514,8 @@ export type EffectiveAccessRow = {
   macAllowed: boolean;
   grantPhase: string;
   openfgaGranted: Record<string, boolean>;
+  /** What the binding asks for and the grant does not permit. */
+  ungranted?: string[];
 };
 
 // Who holds which role, and what that role carries.
@@ -550,6 +558,13 @@ export function updateAppGrant(
   return apiFetch<AppGrant>(`/admin/grants/${encodeURIComponent(app)}${tenantQuery(tenant)}`, {
     method: "PUT",
     body: JSON.stringify(body),
+  });
+}
+
+/** Withdraw everything one app was permitted to consume and to offer. */
+export function clearAppGrant(app: string, tenant?: string) {
+  return apiFetch<void>(`/admin/grants/${encodeURIComponent(app)}${tenantQuery(tenant)}`, {
+    method: "DELETE",
   });
 }
 

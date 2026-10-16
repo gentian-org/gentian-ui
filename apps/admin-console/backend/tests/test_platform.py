@@ -192,6 +192,19 @@ def test_the_ushers_error_reaches_the_screen_in_either_shape(monkeypatch, body):
     assert r.json() == body
 
 
+def test_withdrawing_a_grant_is_the_directors_delete(monkeypatch):
+    """Withdrawing the last integration an app was granted removes its grant
+    at the director, which commits that too."""
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "removed", "commit": "d4e5f6a"}, seen, status=202)
+    r = TestClient(_app(_settings())).delete(
+        "/api/v1/admin/grants/notes", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 202
+    assert seen["method"] == "DELETE"
+    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/grants/notes"
+
+
 @pytest.mark.parametrize("status", [403, 502])
 def test_a_refusal_is_passed_through_unchanged(monkeypatch, status):
     _fake_client(monkeypatch, {"error": "refused"}, {}, status=status)
