@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
   activateTenantAdmin,
+  creationFailed,
   fetchAdminInvitation,
   notThereYet,
   type AdminActivation,
@@ -27,7 +28,9 @@ const ASK_AGAIN_MS = 10 * 1000;
  * cluster has it, with its realm and its administrator account, the registrar
  * answers "not there yet" (see notThereYet). That is not an error and is not
  * shown as one: this says the tenant is being created, offers nothing to
- * press, and asks again until the registrar's answer is the activation. The
+ * press, and asks again until the registrar's answer is the activation --
+ * unless the registrar says the creation failed (see creationFailed), which
+ * is shown as the failure it is, with Argo CD's message. The
  * console reads no state of its own for this -- the registrar's answer is the
  * only one there is. Anything else it answers is a failure and is shown.
  *
@@ -117,6 +120,11 @@ export function AdminActivationPanel({
         setResult(answer);
       })
       .catch((err: Error) => {
+        if (creationFailed(err)) {
+          setWaiting(false);
+          setError(t("tenants.creationFailed", { tenant, reason: err.detail ?? err.message }));
+          return;
+        }
         if (notThereYet(err)) {
           if (Date.now() - started.current < WAIT_LIMIT_MS) {
             setWaiting(true);

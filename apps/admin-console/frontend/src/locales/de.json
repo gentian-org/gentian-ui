@@ -521,6 +521,7 @@
     "requireMFA": "Der Administrator muss bei der Aktivierung einen zweiten Faktor einrichten",
     "waitingForProvisioning": "Der Mandant wird bereitgestellt; der Link wird ausgestellt, sobald sein Konto existiert…",
     "notThereYet": "<mono>{{tenant}}</mono> ist festgehalten, und der Cluster legt den Mandanten an. Hier ist nichts zu tun: Die Aktivierung des Administratorkontos folgt von selbst, sobald der Mandant da ist.",
+    "creationFailed": "Der Cluster meldet: {{reason}}. Der Plattform-Administrator kann die Application tenant-{{tenant}} in Argo CD erneut synchronisieren oder den Installer erneut ausführen.",
     "stillNotThere": "Der Cluster hat {{tenant}} nach {{minutes}} Minuten noch nicht fertig angelegt, und diese Seite fragt nicht weiter nach. Die Aktivierung kann unten erneut versucht werden.",
     "beingCreated": "wird angelegt",
     "beingCreatedHint": "Festgehalten; der Cluster legt diesen Mandanten an. Die Aktivierung des Administratorkontos wird von selbst verfügbar.",

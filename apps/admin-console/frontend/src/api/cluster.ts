@@ -146,8 +146,9 @@ export type AdminActivation = {
  * its realm's credential or its login domain has not arrived, and 409 while
  * the administrator account does not exist. The screen only ever asks about a
  * tenant the deployments repository has, so each of those is a tenant on its
- * way. Every other answer is a failure and is shown as one -- a 503 that does
- * not speak of the tenant is a service that is down, not a tenant to wait for.
+ * way -- except one whose creation failed (see creationFailed). Every other
+ * answer is a failure and is shown as one -- a 503 that does not speak of the
+ * tenant is a service that is down, not a tenant to wait for.
  */
 export function notThereYet(err: unknown): boolean {
   if (!(err instanceof ApiError)) return false;
@@ -155,6 +156,16 @@ export function notThereYet(err: unknown): boolean {
   return (
     err.status === 503 && /still being provisioned|login domain cannot be read/i.test(err.detail ?? "")
   );
+}
+
+/**
+ * Whether a refused activation says the cluster tried to create the tenant
+ * and failed: the registrar answers 424, with Argo CD's message, when the
+ * tenant is not on the cluster and the last sync of its Application failed.
+ * Not a tenant on its way, so not waited for.
+ */
+export function creationFailed(err: unknown): err is ApiError {
+  return err instanceof ApiError && err.status === 424;
 }
 
 export function activateTenantAdmin(tenant: string, recoveryEmail?: string) {
