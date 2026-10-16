@@ -27,6 +27,12 @@ export type AdminContext = {
    * than this screen, which is a no.
    */
   canGrant?: boolean;
+  /**
+   * The director's answer to whether this person may answer an app's egress
+   * request (can_approve_privilege). Absent from a backend older than the
+   * Approve button, which is a no.
+   */
+  canApprovePrivilege?: boolean;
 };
 
 export type AdminMember = {

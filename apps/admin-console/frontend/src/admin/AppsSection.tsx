@@ -4,12 +4,14 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
 import {
+  fetchAdminContext,
   fetchAppStates,
   fetchIntegrationsOverview,
   fetchPersonGroups,
   type AppState,
 } from "@/api/admin";
 import {
+  approvePrivilege,
   fetchDeclaredApps,
   fetchRetainedApps,
   fetchTenantPrivileges,
@@ -664,11 +666,16 @@ function IntegrationsPart({
 
 /**
  * Privileges: what the app asked of the platform beyond the default posture,
- * and what was answered. Read-only.
+ * and what was answered.
  *
  * Two services, joined: the cluster names the requests nobody has granted yet
  * (the app waits on them), and git holds each approval with who gave it and
  * why. Together they are everything the app asked for that needs an answer.
+ *
+ * An egress request is answered here, by whoever the director says may
+ * (can_approve_privilege): one commit with the approver's reason. A
+ * podSecurity or clusterRoles request is the cluster's security officer's,
+ * and this page says so rather than offering what the director would refuse.
  */
 function PrivilegesPart({ row }: { row: AppRow }) {
   const { t } = useTranslation();
@@ -679,6 +686,12 @@ function PrivilegesPart({ row }: { row: AppRow }) {
   const names = new Set([row.profile, row.state?.name].filter(Boolean) as string[]);
   const approved = (grantsQuery.data?.privileges ?? []).filter((g) => names.has(g.install));
   const pending = row.state?.pendingPrivileges ?? [];
+  const contextQuery = useQuery({
+    queryKey: ["admin", "context"],
+    queryFn: () => fetchAdminContext(),
+  });
+  const canApprove = contextQuery.data?.canApprovePrivilege === true;
+  const install = row.state?.name ?? row.profile;
 
   return (
     <div className="admin-console__subsection">
@@ -713,7 +726,18 @@ function PrivilegesPart({ row }: { row: AppRow }) {
                       {t("apps.privilegeWaiting")}
                     </span>
                   </td>
-                  <td>{t("apps.privilegeWaitingDetail")}</td>
+                  <td>
+                    <div>{t("apps.privilegeWaitingDetail")}</div>
+                    {privilege.startsWith("egress/") ? (
+                      canApprove ? (
+                        <ApprovePrivilege install={install} privilege={privilege} />
+                      ) : (
+                        <div className="admin-console__hint">{t("apps.privilegeApproveNotYours")}</div>
+                      )
+                    ) : (
+                      <div className="admin-console__hint">{t("apps.privilegeApproveSecurityOfficer")}</div>
+                    )}
+                  </td>
                 </tr>
               ))}
               {approved.map((grant) => (
@@ -750,6 +774,78 @@ function PrivilegesPart({ row }: { row: AppRow }) {
       )}
       <p className="admin-console__hint">{t("apps.privilegeDetailNotAvailable")}</p>
     </div>
+  );
+}
+
+/**
+ * Approve one waiting request: a reason in the approver's words, then one
+ * commit through the director. The director decides whether this person may
+ * and records them as the approver; its refusal is shown as it worded it.
+ */
+function ApprovePrivilege({ install, privilege }: { install: string; privilege: string }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const approve = useMutation({
+    mutationFn: () => approvePrivilege(install, privilege, { reason: reason.trim() }),
+    onSuccess: () => {
+      setOpen(false);
+      setReason("");
+      void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "privileges"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "status"] });
+    },
+  });
+  const tooShort = reason.trim().length < 10;
+
+  if (!open) {
+    return (
+      <div className="admin-console__actions">
+        <button type="button" className="admin-console__btn" onClick={() => setOpen(true)}>
+          {t("apps.privilegeApprove")}
+        </button>
+        {approve.isSuccess ? <span className="admin-console__hint">{t("apps.privilegeApproved")}</span> : null}
+      </div>
+    );
+  }
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!tooShort) approve.mutate();
+      }}
+    >
+      <label className="admin-console__field">
+        <span>{t("apps.privilegeApproveReason")}</span>
+        <textarea
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          required
+          minLength={10}
+          maxLength={1000}
+          rows={3}
+        />
+      </label>
+      <p className="admin-console__hint">{t("apps.privilegeApproveHint")}</p>
+      {approve.isError ? (
+        <p className="admin-console__error">
+          {t("apps.privilegeApproveFailed")} {messageOf(approve.error)}
+        </p>
+      ) : null}
+      <div className="admin-console__actions">
+        <button type="submit" className="admin-console__btn" disabled={tooShort || approve.isPending}>
+          {t("apps.privilegeApproveConfirm", { privilege })}
+        </button>
+        <button
+          type="button"
+          className="admin-console__btn admin-console__btn--quiet"
+          disabled={approve.isPending}
+          onClick={() => setOpen(false)}
+        >
+          {t("apps.privilegeApproveCancel")}
+        </button>
+      </div>
+    </form>
   );
 }
 

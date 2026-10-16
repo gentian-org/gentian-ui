@@ -103,6 +103,59 @@ def test_the_approved_privileges_are_the_directors_answer_untouched(monkeypatch)
     assert seen["auth"] == "Bearer person-token"
 
 
+def test_an_approval_goes_to_the_directors_privilege_route_as_given(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "abc"}, seen, status=202)
+    answer = _client().put(
+        "/api/v1/admin/apps/privileges/aluvian-commerce/egress/intake",
+        headers=_person,
+        json={"reason": "reads the order requests over https"},
+    )
+    assert answer.status_code == 202
+    assert answer.json() == {"status": "updated", "commit": "abc"}
+    assert (seen["method"], seen["url"]) == (
+        "PUT",
+        f"{_base}/privileges/aluvian-commerce/egress/intake",
+    )
+    assert seen["json"] == {"reason": "reads the order requests over https"}
+    assert seen["auth"] == "Bearer person-token"
+
+
+def test_the_directors_refusal_of_an_approval_comes_back_as_it_is(monkeypatch):
+    seen: dict = {}
+    refusal = {"error": "approving an egress request is the tenant administrator's"}
+    _fake_client(monkeypatch, refusal, seen, status=403)
+    answer = _client().put(
+        "/api/v1/admin/apps/privileges/aluvian-commerce/egress/intake",
+        headers=_person,
+        json={"reason": "reads the order requests over https"},
+    )
+    assert answer.status_code == 403
+    assert answer.json() == refusal
+
+
+@pytest.mark.parametrize(
+    "path, body",
+    [
+        # A kind the director does not know, and a name that would leave the route.
+        ("aluvian-commerce/hostNetwork/x", {"reason": "because it needs it"}),
+        ("aluvian-commerce/egress/..", {"reason": "because it needs it"}),
+        # Anything the dialog does not send.
+        (
+            "aluvian-commerce/egress/intake",
+            {"reason": "because it needs it", "approver": "someone"},
+        ),
+        ("aluvian-commerce/egress/intake", {}),
+    ],
+)
+def test_an_approval_the_director_could_not_mean_is_refused_here(monkeypatch, path, body):
+    seen: dict = {}
+    _fake_client(monkeypatch, {}, seen)
+    answer = _client().put(f"/api/v1/admin/apps/privileges/{path}", headers=_person, json=body)
+    assert answer.status_code in (400, 404, 422)
+    assert "url" not in seen
+
+
 def test_the_public_addresses_are_the_directors_answer_untouched(monkeypatch):
     seen: dict = {}
     body = {

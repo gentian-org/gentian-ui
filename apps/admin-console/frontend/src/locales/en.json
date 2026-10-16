@@ -821,7 +821,7 @@
     "grantPhase": "Grant",
     "openIntegrations": "Change grants on Integrations",
     "privilegesTitle": "Privileges",
-    "privilegesLead": "What this app asked of the platform beyond its default posture, and what was answered. Read-only: a request is not approved on this page.",
+    "privilegesLead": "What this app asked of the platform beyond its default posture, and what was answered.",
     "pendingUnknown": "The cluster reports no component for this app, so what is waiting for approval is not known.",
     "approvedUnavailable": "What has been approved could not be read.",
     "readingPrivileges": "Reading…",
@@ -1021,7 +1021,15 @@
     "publicSending": "Sending…",
     "publicApproveRefused": "Not approved. The director's answer:",
     "publicReviewRefused": "Not reviewed. The director's answer:",
-    "publicEntryOfApp": "Entry <mono>{{entry}}</mono> of <mono>{{app}}</mono>"
+    "publicEntryOfApp": "Entry <mono>{{entry}}</mono> of <mono>{{app}}</mono>",
+    "privilegeApprove": "Approve…",
+    "privilegeApproveReason": "Why you approve it, in your own words",
+    "privilegeApproveHint": "At least ten characters. The approval is a commit that names you and keeps this reason; removing it from git withdraws it.",
+    "privilegeApproveConfirm": "Approve {{privilege}}",
+    "privilegeApproveCancel": "Cancel",
+    "privilegeApproveFailed": "Not approved:",
+    "privilegeApproveNotYours": "Approving it is the tenant administrator's.",
+    "privilegeApproveSecurityOfficer": "Approving it is the cluster's security officer's: it weakens what protects the node, and every tenant on it."
   },
   "perimeter": {
     "title": "Perimeter",

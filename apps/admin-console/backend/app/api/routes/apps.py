@@ -69,9 +69,50 @@ async def privileges(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """What has been approved for this tenant's apps beyond the default
-    posture, by whom and why. A read; approving is not done from here."""
+    posture, by whom and why. A read."""
     return await director.forward(
         settings, "GET", f"/v1/tenants/{settings.tenant_id}/privileges", bearer_of(credentials)
+    )
+
+
+class PrivilegeApproval(BaseModel):
+    """What the approver states in the console: why, and optionally until
+    when. Who they are and when they answered come from the call, at the
+    director. A field this does not name is refused rather than dropped."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # In the approver's own words; the director wants at least ten characters.
+    reason: StrictStr
+    # RFC 3339. Absent: the approval stands until somebody withdraws it.
+    expiresAt: StrictStr | None = None
+
+
+@router.put("/privileges/{install}/{kind}/{name}")
+async def approve_privilege(
+    install: str,
+    kind: Literal["egress", "podSecurity", "clusterRoles"],
+    name: str,
+    body: PrivilegeApproval,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Answer one request an app's profile makes beyond the default posture.
+    A commit: the platform then gives the app what it asked for, and the app,
+    which waited, goes on.
+
+    The director's approval for this console's tenant, as the person. Whether
+    they may is the director's to decide by the kind -- an egress request is
+    the tenant administrator's, a podSecurity or clusterRoles one the
+    cluster's security officer's -- and its answer arrives as it is.
+    """
+    return await director.forward(
+        settings,
+        "PUT",
+        f"/v1/tenants/{settings.tenant_id}/privileges/{_name(install)}/{kind}/{_name(name)}",
+        bearer_of(credentials),
+        json_body=body.model_dump(exclude_none=True),
     )
 
 

@@ -821,7 +821,7 @@
     "grantPhase": "Freigabe",
     "openIntegrations": "Freigaben unter Integrationen ändern",
     "privilegesTitle": "Privilegien",
-    "privilegesLead": "Was diese App von der Plattform über ihre Standardstellung hinaus verlangt hat, und was darauf geantwortet wurde. Nur lesend: auf dieser Seite wird keine Anfrage genehmigt.",
+    "privilegesLead": "Was diese App von der Plattform über ihre Standardstellung hinaus verlangt hat, und was darauf geantwortet wurde.",
     "pendingUnknown": "Der Cluster meldet keine Komponente für diese App; was auf Genehmigung wartet, ist deshalb nicht bekannt.",
     "approvedUnavailable": "Was genehmigt wurde, konnte nicht gelesen werden.",
     "readingPrivileges": "Wird gelesen…",
@@ -1021,7 +1021,15 @@
     "publicSending": "Wird gesendet …",
     "publicApproveRefused": "Nicht genehmigt. Die Antwort des Directors:",
     "publicReviewRefused": "Nicht überprüft. Die Antwort des Directors:",
-    "publicEntryOfApp": "Eintrag <mono>{{entry}}</mono> von <mono>{{app}}</mono>"
+    "publicEntryOfApp": "Eintrag <mono>{{entry}}</mono> von <mono>{{app}}</mono>",
+    "privilegeApprove": "Genehmigen…",
+    "privilegeApproveReason": "Warum Sie es genehmigen, in Ihren eigenen Worten",
+    "privilegeApproveHint": "Mindestens zehn Zeichen. Die Genehmigung ist ein Commit, der Sie nennt und diese Begründung festhält; wird er aus git entfernt, ist sie zurückgenommen.",
+    "privilegeApproveConfirm": "{{privilege}} genehmigen",
+    "privilegeApproveCancel": "Abbrechen",
+    "privilegeApproveFailed": "Nicht genehmigt:",
+    "privilegeApproveNotYours": "Genehmigen ist Sache der Administratorin oder des Administrators des Mandanten.",
+    "privilegeApproveSecurityOfficer": "Genehmigen ist Sache der Sicherheitsverantwortlichen des Clusters: es schwächt, was den Knoten schützt, und damit jeden Mandanten darauf."
   },
   "perimeter": {
     "title": "Perimeter",

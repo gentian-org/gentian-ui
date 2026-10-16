@@ -132,6 +132,22 @@ export function fetchTenantPrivileges() {
   return apiFetch<{ tenant: string; privileges: PrivilegeGrant[] }>("/admin/apps/privileges");
 }
 
+/** What an approver states: why, and optionally until when (RFC 3339). */
+export type PrivilegeApprovalRequest = { reason: string; expiresAt?: string };
+
+/**
+ * Answer one request an app makes beyond the default posture, `<kind>/<name>`
+ * as the app's state names it. A commit; whether the person may is the
+ * director's answer, by the kind.
+ */
+export function approvePrivilege(install: string, privilege: string, body: PrivilegeApprovalRequest) {
+  const [kind, name] = privilege.split("/", 2);
+  return apiFetch<AppWriteResult>(
+    `/admin/apps/privileges/${encodeURIComponent(install)}/${encodeURIComponent(kind)}/${encodeURIComponent(name ?? "")}`,
+    { method: "PUT", body: JSON.stringify(body) },
+  );
+}
+
 /** The registry's record of an approved entry: by whom, when, until when, why. */
 export type ExposureApproval = {
   owner: string;
