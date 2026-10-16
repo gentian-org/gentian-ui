@@ -30,10 +30,17 @@ function brandBase(): string | null {
   return kernel ? `https://${kernel}/branding/` : null;
 }
 
-/** The icon a page shows as its logo: the first whose purpose admits "any". */
+/** Whether an icon is a raster image. An SVG is a document a browser runs, and
+ * no logo is drawn from one. */
+function isRaster(icon: BrandIcon): boolean {
+  if (icon.type && !/^image\/(png|jpeg|webp|x-icon|vnd\.microsoft\.icon)$/.test(icon.type)) return false;
+  return !/\.svgz?(\?|#|$)/i.test(icon.src);
+}
+
+/** The icon a page shows as its logo: the first raster one whose purpose admits "any". */
 export function brandLogo(brand: Brand): string | null {
   const base = brandBase();
-  const icon = brand.icons?.find((i) => !i.purpose || i.purpose.split(" ").includes("any"));
+  const icon = brand.icons?.find((i) => isRaster(i) && (!i.purpose || i.purpose.split(" ").includes("any")));
   if (!icon || !base) return null;
   const url = new URL(icon.src, base).href;
   return url.startsWith("https://") ? url : null;

@@ -56,8 +56,14 @@ async function applyBrand() {
     document.title = `Sign in · ${name}`;
     $("product").textContent = name;
     $("logo").setAttribute("aria-label", name);
+    // A raster icon only: an SVG is a document a browser runs, and no logo is
+    // drawn from one.
+    const raster = (i) =>
+      (!i.type || /^image\/(png|jpeg|webp|x-icon|vnd\.microsoft\.icon)$/.test(i.type)) &&
+      !/\.svgz?(\?|#|$)/i.test(i.src);
     const icon = (brand.icons || []).find(
-      (i) => i && typeof i.src === "string" && (!i.purpose || i.purpose.split(" ").includes("any")),
+      (i) =>
+        i && typeof i.src === "string" && raster(i) && (!i.purpose || i.purpose.split(" ").includes("any")),
     );
     if (icon) {
       const url = new URL(icon.src, `${window.location.origin}/branding/`).href;
