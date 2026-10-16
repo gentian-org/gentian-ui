@@ -17,6 +17,7 @@ from app.models.admin_notification import (  # noqa: F401 — register models
     AdminNotificationRow,
 )
 from app.models.user_shell_prefs import UserShellPrefsRow, ShellPrefsTemplateRow  # noqa: F401 — register models
+from app.models.tile_image import PersonTileRow, TenantTileRow  # noqa: F401 — register models
 from app.db.engine import init_portal_database, portal_database_ready
 from app.services.portal_shell_secrets import resolve_tenant_database_url
 

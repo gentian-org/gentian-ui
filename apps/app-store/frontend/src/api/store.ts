@@ -241,6 +241,12 @@ export type Operation = {
   install: { status: string | null; commit: string | null } | null;
   addons: { status: string | null; commit: string | null } | null;
   rollout: AppState | null;
+  /**
+   * What came of putting the store's picture of the app on its desktop tile,
+   * once the app was ready. `failed` never fails the install: the tile keeps
+   * the app's own picture, and `problem` says why.
+   */
+  tile: { outcome: "copied" | "no-picture" | "failed"; problem: Problem | null } | null;
   error: Problem | null;
 };
 

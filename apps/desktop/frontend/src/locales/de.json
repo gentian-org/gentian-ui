@@ -24,8 +24,10 @@
     "urlRequired": "Bitte geben Sie eine URL ein.",
     "openTargetIn": "Ziel öffnen in",
     "newBrowserTab": "Neuem Browser-Tab",
-    "iconHint": "PNG, JPEG oder SVG unter 200 KB",
-    "iconTooLarge": "Das Bild muss kleiner als 200 KB sein.",
+    "iconHint": "PNG, JPEG oder WebP, höchstens 1 MB",
+    "iconTooLarge": "Das Bild darf höchstens 1 MB groß sein.",
+    "iconWrongType": "Bitte laden Sie ein PNG-, JPEG- oder WebP-Bild hoch.",
+    "iconUploadFailed": "Das Bild konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
     "iconPreview": "Vorschau des gewählten Symbols",
     "deleteConfirm": "Möchten Sie diese Verknüpfung wirklich löschen?"
   },

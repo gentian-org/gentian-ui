@@ -1,5 +1,5 @@
-"""The cluster's services, for the tests: the director, the custodian and the
-usher, as far as this app asks them.
+"""The cluster's services, for the tests: the director, the custodian, the
+usher and the tenant's desktop, as far as this app asks them.
 
 Stands in where `app.core.director` opens its HTTP client. Every request is
 kept in `calls`, with the bearer it carried, and answered the way the real
@@ -14,6 +14,7 @@ import httpx
 DIRECTOR = "http://director.test:8080"
 CUSTODIAN = "http://custodian.test:9444"
 USHER = "http://usher.test:8081"
+DESKTOP = "http://desktop.test:8000"
 
 
 @dataclass
@@ -23,6 +24,8 @@ class Call:
     path: str
     json: Any
     bearer: str | None
+    content: bytes | None = None
+    content_type: str | None = None
 
 
 class FakeCluster:
@@ -41,6 +44,8 @@ class FakeCluster:
         self.ready_on_install = True
         self.install_refusal: tuple[int, str] | None = None
         self.down: set[str] = set()  # services that cannot be reached
+        self.tiles: dict[str, bytes] = {}  # app -> the tenant's tile the desktop keeps
+        self.tile_refusal: tuple[int, str] | None = None
 
     def of(self, service: str, method: str | None = None) -> list[Call]:
         return [
@@ -51,15 +56,34 @@ class FakeCluster:
         """The writes, in the order they were made."""
         return [f"{c.service} {c.method} {c.path}" for c in self.calls if c.method != "GET"]
 
-    def handle(self, method: str, url: str, json: Any, headers: dict | None) -> httpx.Response:
+    def handle(
+        self,
+        method: str,
+        url: str,
+        json: Any,
+        headers: dict | None,
+        content: bytes | None = None,
+    ) -> httpx.Response:
         bearer = (headers or {}).get("Authorization")
-        for service, base in (("director", DIRECTOR), ("custodian", CUSTODIAN), ("usher", USHER)):
+        content_type = (headers or {}).get("Content-Type")
+        services = (
+            ("director", DIRECTOR),
+            ("custodian", CUSTODIAN),
+            ("usher", USHER),
+            ("desktop", DESKTOP),
+        )
+        for service, base in services:
             if url.startswith(base):
                 path = url[len(base) :]
                 if service in self.down:
                     raise httpx.ConnectError("refused", request=httpx.Request(method, url))
-                self.calls.append(Call(service, method, path, json, bearer))
-                status, body = getattr(self, f"_{service}")(method, path, json)
+                self.calls.append(Call(service, method, path, json, bearer, content, content_type))
+                if service == "desktop":
+                    status, body = self._desktop(method, path, content, content_type)
+                else:
+                    status, body = getattr(self, f"_{service}")(method, path, json)
+                if body is None:
+                    return httpx.Response(status, request=httpx.Request(method, url))
                 return httpx.Response(status, json=body, request=httpx.Request(method, url))
         raise AssertionError(f"a request to somewhere that is not the cluster: {url}")
 
@@ -175,3 +199,19 @@ class FakeCluster:
         if (method, path) == ("GET", f"{prefix}/tiles"):
             return 200, {"tenant": self.tenant, "tiles": [], "appStore": self.app_store}
         return 404, {"error": "not found"}
+
+    # ── the desktop ─────────────────────────────────────────────────────────
+
+    def _desktop(
+        self, method: str, path: str, content: bytes | None, content_type: str | None
+    ) -> tuple[int, Any]:
+        prefix = "/api/v1/tenant-tiles/"
+        if method == "PUT" and path.startswith(prefix):
+            if self.tile_refusal is not None:
+                status, text = self.tile_refusal
+                return status, {"detail": text}
+            if content_type != "image/png" or not (content or b"").startswith(b"\x89PNG"):
+                return 415, {"detail": "A tenant's tile is a PNG"}
+            self.tiles[path.removeprefix(prefix)] = content or b""
+            return 204, None
+        return 404, {"detail": "Not Found"}

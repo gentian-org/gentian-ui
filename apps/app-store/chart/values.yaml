@@ -141,6 +141,13 @@ custodian:
 usher:
   url: ""
 
+# Told the store's picture of an app after it is installed or updated, so the
+# app's tile on the tenant's desktop shows it: the desktop API's Service, e.g.
+# http://desktop-gentian-portal-api:8000. Empty leaves every tile with its
+# profile's own picture.
+desktop:
+  url: ""
+
 # The store: a service outside the cluster. `url` is the base address of its
 # API -- what the Cluster claim names as catalogue.storeUrl -- https, with no
 # trailing slash. Empty means the cluster names no store: the app then says

@@ -36,7 +36,8 @@ backend/          shell-api (FastAPI) — same modules as gentian-app-template
 frontend/
   design-system/  Brand tokens (gentian-theme.css)
   public/fonts/   Self-hosted webfonts
-  public/tiles/   App launcher icons
+  public/tiles/   App launcher glyphs (PNG; `npm run glyphs` renders them)
+  assets/glyph-templates/  The glyphs' SVG templates, never served
   public/branding/ Logo
   src/auth/       OIDC stubs
   src/shell/      App menu, background, launcher

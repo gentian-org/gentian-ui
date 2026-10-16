@@ -142,6 +142,16 @@
         }
       }
     },
+    "desktop": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where the store's picture of an installed app is handed, for its desktop tile. Empty leaves every tile with its profile's own picture.",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      }
+    },
     "director": {
       "type": "object",
       "additionalProperties": false,

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { usePrefsStore, type DesktopTile } from "@/stores/prefs";
-import { tileIconUrl } from "@/lib/tiles";
+import { TileImage } from "@/shell/TileImage";
+import { deletePersonTile, uploadPersonTile } from "@/api/prefs";
+import { isApiTile } from "@/lib/tiles";
 import { CustomizeTileModal } from "@/shell/CustomizeTileModal";
 import { AiWidget } from "@/shell/AiWidget";
 import type { ShellApp } from "@/api/client";
@@ -75,7 +77,39 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
     setContextMenu(null);
   }
 
-  function handleSaveCustomization(data: { title: string; icon: string; url?: string; openMode?: "iframe" | "tab" }) {
+  /**
+   * The icon a tile is saved with. A picture the person picked is kept by the
+   * API under the tile's id first, and the tile is drawn from the address it
+   * answers; one they replaced with a glyph is let go of there. Null when the
+   * upload was refused, and nothing is saved.
+   */
+  async function savedIcon(
+    tileId: string,
+    previous: string | undefined,
+    data: { icon: string; iconFile?: File },
+  ): Promise<string | null> {
+    if (data.iconFile) {
+      try {
+        return await uploadPersonTile(tileId, data.iconFile);
+      } catch (err) {
+        console.error("Failed to save the tile picture:", err);
+        alert(t("tile.iconUploadFailed"));
+        return null;
+      }
+    }
+    if (previous && isApiTile(previous) && data.icon !== previous) {
+      deletePersonTile(tileId).catch((err) => console.error("Failed to remove the tile picture:", err));
+    }
+    return data.icon;
+  }
+
+  async function handleSaveCustomization(data: {
+    title: string;
+    icon: string;
+    iconFile?: File;
+    url?: string;
+    openMode?: "iframe" | "tab";
+  }) {
     if (isCreatingLink) {
       // Add new link shortcut
       const containerRect = containerRef.current?.getBoundingClientRect();
@@ -83,11 +117,14 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
       const clickY = contextMenu ? contextMenu.y - (containerRect?.top || 0) : 50;
       const snapped = snapToGrid(clickX - 46, clickY - 49); // offset to center tile relative to click
 
+      const id = crypto.randomUUID();
+      const icon = await savedIcon(id, undefined, data);
+      if (icon === null) return;
       const newTile: DesktopTile = {
-        id: crypto.randomUUID(),
+        id,
         type: "link",
         title: data.title,
-        icon: data.icon,
+        icon,
         url: data.url,
         openMode: data.openMode,
         position: snapped,
@@ -101,25 +138,30 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
     } else if (editingTile) {
       if (editingTile.type === "link") {
         // Update link shortcut
+        const icon = await savedIcon(editingTile.id, editingTile.icon, data);
+        if (icon === null) return;
         updateCustomPrefs((prev) => ({
           ...prev,
           desktopTiles: (prev.desktopTiles || []).map((t) =>
             t.id === editingTile.id
-              ? { ...t, title: data.title, icon: data.icon, url: data.url, openMode: data.openMode }
+              ? { ...t, title: data.title, icon, url: data.url, openMode: data.openMode }
               : t,
           ),
         }));
       } else if (editingTile.type === "app" && editingTile.appId) {
         // Customize app tile title and icon override (applies universally)
+        const appId = editingTile.appId;
+        const icon = await savedIcon(appId, customizations[appId]?.icon, data);
+        if (icon === null) return;
         updateCustomPrefs((prev) => {
           const tc = prev.tileCustomizations || {};
           return {
             ...prev,
             tileCustomizations: {
               ...tc,
-              [editingTile.appId!]: {
+              [appId]: {
                 title: data.title,
-                icon: data.icon,
+                icon,
               },
             },
           };
@@ -131,6 +173,10 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
 
   function handleDeleteShortcut(tileId: string) {
     if (confirm(t("tile.deleteConfirm"))) {
+      const removed = tiles.find((tile) => tile.id === tileId);
+      if (removed?.type === "link" && isApiTile(removed.icon)) {
+        deletePersonTile(tileId).catch((err) => console.error("Failed to remove the tile picture:", err));
+      }
       updateCustomPrefs((prev) => ({
         ...prev,
         desktopTiles: (prev.desktopTiles || []).filter((t) => t.id !== tileId),
@@ -207,12 +253,7 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
               </div>
             ) : (
               <div className="desktop-tile" title={tile.type === "link" ? tile.url : displayTitle}>
-                <img
-                  src={displayIcon.startsWith("data:") ? displayIcon : tileIconUrl(displayIcon)}
-                  alt=""
-                  className="desktop-tile__icon"
-                  draggable={false}
-                />
+                <TileImage className="desktop-tile__icon" icon={displayIcon} />
                 <span className="desktop-tile__label">{displayTitle}</span>
               </div>
             )}

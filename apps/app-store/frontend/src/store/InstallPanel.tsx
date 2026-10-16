@@ -436,6 +436,13 @@ function Progress({
         <div className="admin-console__success" role="status">
           <p className="store-notice__title">{t("install.doneTitle", { app: detail.name })}</p>
           <p className="store-notice__text">{t("install.doneTile")}</p>
+          {operation.tile?.outcome === "failed" ? (
+            <p className="store-notice__text">
+              {operation.tile.problem?.detail
+                ? t("install.tileNotCopiedBecause", { detail: operation.tile.problem.detail })
+                : t("install.tileNotCopied")}
+            </p>
+          ) : null}
           {operation.install?.commit ? (
             <p className="store-notice__text">
               <Trans i18nKey="install.committedAs" values={{ commit: operation.install.commit }} components={mono} />

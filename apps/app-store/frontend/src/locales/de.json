@@ -256,6 +256,8 @@
     "declaring": "Das Repository der App wird für diesen Mandanten deklariert …",
     "donate": "Spenden",
     "doneTile": "Ihre Kachel erscheint auf dem Desktop der Personen, die Zugriff haben.",
+    "tileNotCopied": "Das Bild aus dem Store konnte nicht auf die Kachel übernommen werden; die Kachel zeigt das eigene Bild der App.",
+    "tileNotCopiedBecause": "Das Bild aus dem Store konnte nicht auf die Kachel übernommen werden; die Kachel zeigt das eigene Bild der App. Rückmeldung: {{detail}}",
     "doneTitle": "{{app}} läuft",
     "failingLead": "Der Cluster meldet, dass die App nicht starten kann. In seinen eigenen Worten:",
     "forEveryone": "für alle",

@@ -16,6 +16,7 @@ from app.models.admin_notification import (  # noqa: F401 — register models
     AdminNotificationRow,
 )
 from app.models.user_shell_prefs import UserShellPrefsRow, ShellPrefsTemplateRow  # noqa: F401 — register models
+from app.models.tile_image import PersonTileRow, TenantTileRow  # noqa: F401 — register models
 
 _engine: Engine | None = None
 _session_factory: sessionmaker[Session] | None = None

@@ -24,8 +24,10 @@
     "urlRequired": "Please enter a URL.",
     "openTargetIn": "Open target in",
     "newBrowserTab": "New Browser Tab",
-    "iconHint": "PNG, JPEG or SVG under 200 KB",
-    "iconTooLarge": "Image must be smaller than 200 KB",
+    "iconHint": "PNG, JPEG or WebP, at most 1 MB",
+    "iconTooLarge": "The image must be at most 1 MB.",
+    "iconWrongType": "Upload a PNG, JPEG or WebP image.",
+    "iconUploadFailed": "The image could not be saved. Please try again.",
     "iconPreview": "Selected icon preview",
     "deleteConfirm": "Are you sure you want to delete this desktop shortcut?"
   },

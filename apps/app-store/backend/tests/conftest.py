@@ -119,8 +119,8 @@ def cluster(monkeypatch) -> FakeCluster:
         async def __aexit__(self, *args):
             return False
 
-        async def request(self, method, url, params=None, json=None, headers=None):
-            return fake.handle(method, url, json, headers)
+        async def request(self, method, url, params=None, json=None, headers=None, content=None):
+            return fake.handle(method, url, json, headers, content)
 
     # director.py's own httpx, not the module the store client uses: only the
     # cluster's services are stood in for here.

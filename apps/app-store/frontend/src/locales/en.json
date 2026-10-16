@@ -256,6 +256,8 @@
     "declaring": "Declaring the app’s repository for this tenant…",
     "donate": "Donate",
     "doneTile": "Its tile appears on the desktop for people who have access.",
+    "tileNotCopied": "The store's picture could not be put on its tile, so the tile shows the app's own picture.",
+    "tileNotCopiedBecause": "The store's picture could not be put on its tile, so the tile shows the app's own picture. The desktop said: {{detail}}",
     "doneTitle": "{{app}} is running",
     "failingLead": "The cluster reports that the app cannot start. In its own words:",
     "forEveryone": "for everyone",
