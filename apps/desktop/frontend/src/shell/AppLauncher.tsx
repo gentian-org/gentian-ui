@@ -1,5 +1,5 @@
 import type { ShellApp } from "@/api/client";
-import { tileIconUrl } from "@/lib/tiles";
+import { TileImage } from "@/shell/TileImage";
 import { usePrefsStore } from "@/stores/prefs";
 
 import { useTranslation } from "react-i18next";
@@ -79,12 +79,7 @@ export function AppLauncher({ apps, onSelect, onClose, loadFailed, onReload }: A
                   onClose();
                 }}
               >
-                <img
-                  className="app-launcher__icon"
-                  src={displayIcon.startsWith("data:") ? displayIcon : tileIconUrl(displayIcon)}
-                  alt=""
-                  draggable={false}
-                />
+                <TileImage className="app-launcher__icon" icon={displayIcon} />
                 <span className="app-launcher__label">{displayTitle}</span>
               </button>
             );

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ShellApp } from "@/api/client";
-import { tileIconUrl } from "@/lib/tiles";
+import { TileImage } from "@/shell/TileImage";
 import { usePrefsStore } from "@/stores/prefs";
 import type { MenuItem } from "@/shell/AppMenu";
 
@@ -78,11 +78,9 @@ export function AppMenuSlot({ item, isActive, onSelect, onUnpin, onDragStarted }
           cursor: "pointer",
         }}
       >
-        <img
+        <TileImage
           className="app-menu-slot__icon"
-          src={displayIcon.startsWith("data:") ? displayIcon : tileIconUrl(displayIcon)}
-          alt=""
-          draggable={false}
+          icon={displayIcon}
           style={{
             width: "var(--app-menu-slot-size, 40px)",
             height: "var(--app-menu-slot-size, 40px)",

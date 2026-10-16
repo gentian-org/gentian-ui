@@ -12,7 +12,18 @@ request forwards the CALLER's bearer token, and the usher decides -- from that
 person's relations in OpenFGA -- which tiles they may open. Nothing is
 substituted when it cannot be asked: a desktop with no usher configured, or
 one that is unreachable, answers with the failure.
+
+What it does change
+-------------------
+One thing, and only in an answer the usher gave with 200: the picture of an
+app's main tile, when the tenant holds one for that app (the App Store's,
+app/api/routes/tiles.py). The tile then names this API's own address for it,
+versioned by when it was set. Which tiles there are, and everything else
+about them, is the usher's answer as it came.
 """
+
+import json
+import logging
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -20,11 +31,13 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
+from app.services import tile_store
 
 router = APIRouter(prefix="/cluster", tags=["cluster"])
 
 _bearer = HTTPBearer(auto_error=False)
 _TIMEOUT = httpx.Timeout(15.0)
+_log = logging.getLogger(__name__)
 
 
 def _usher_url(settings: Settings) -> str:
@@ -82,8 +95,39 @@ async def cluster_tiles(
             detail=f"The usher is unreachable: {exc}",
         ) from exc
 
+    content = upstream.content
+    if upstream.status_code == 200:
+        content = _with_tenant_pictures(content, _tenant(settings), settings)
     return Response(
-        content=upstream.content,
+        content=content,
         status_code=upstream.status_code,
         media_type=upstream.headers.get("content-type", "application/json"),
     )
+
+
+def _with_tenant_pictures(content: bytes, tenant: str, settings: Settings) -> bytes:
+    """The usher's answer, with each main tile the tenant has a picture for
+    pointing at it. A picture that cannot be looked up leaves the answer as
+    it came: the profile's own picture is a tile, a missing tile list is not."""
+    try:
+        versions = tile_store.tenant_tile_versions(tenant)
+    except Exception as exc:  # noqa: BLE001 -- the tiles matter more than their pictures
+        _log.warning("tenant tile pictures could not be read: %s", exc)
+        return content
+    if not versions:
+        return content
+    try:
+        body = json.loads(content)
+    except ValueError:
+        return content
+    tiles = body.get("tiles") if isinstance(body, dict) else None
+    if not isinstance(tiles, list):
+        return content
+    for tile in tiles:
+        if not isinstance(tile, dict) or not isinstance(tile.get("name"), str):
+            continue
+        tile_id = f"kernel-{tile['name']}"
+        app = tile_store.main_app_of(tile_id, tenant)
+        if app is not None and app in versions:
+            tile["icon"] = f"{settings.api_v1_str}/tiles/{tile_id}?v=t{versions[app]}"
+    return json.dumps(body).encode()

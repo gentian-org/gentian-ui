@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "glyphs": "node scripts/glyphs.mjs",
+    "test": "node scripts/glyphs.mjs --check && node --test test/*.test.js"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.66.0",
@@ -20,6 +22,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/vite": "^4.1.0",
     "@types/node": "^22.0.0",
     "@types/qrcode": "^1.5.6",

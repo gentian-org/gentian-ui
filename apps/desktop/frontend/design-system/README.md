@@ -7,5 +7,5 @@ brand evolves.
 |-------|----------|
 | Theme CSS | `gentian-theme.css` (imported from `src/index.css`) |
 | Fonts | `../public/fonts/` |
-| App tiles | `../public/tiles/*.svg` |
+| App tiles | `../public/tiles/*.png`, rendered from `../assets/glyph-templates/*.svg` by `npm run glyphs` |
 | Logo | `../public/branding/logo.png` |

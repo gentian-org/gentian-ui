@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import tileCatalogue from "../../public/tiles/catalogue.json";
-import { tileIconUrl } from "@/lib/tiles";
+import { PERSON_TILE_TYPES, personTileFileError, tileIconUrl } from "@/lib/tiles";
+import { TileImage } from "@/shell/TileImage";
 
 import { useTranslation } from "react-i18next";
 type CustomizeTileModalProps = {
@@ -9,7 +10,18 @@ type CustomizeTileModalProps = {
   isLink?: boolean;
   initialUrl?: string;
   initialOpenMode?: "iframe" | "tab";
-  onSave: (data: { title: string; icon: string; url?: string; openMode?: "iframe" | "tab" }) => void;
+  /**
+   * `iconFile` is a picture the person picked and has not been kept yet: the
+   * caller uploads it under the tile's id and draws the tile from the address
+   * the API answers. Without it, `icon` is a glyph or the picture as it was.
+   */
+  onSave: (data: {
+    title: string;
+    icon: string;
+    iconFile?: File;
+    url?: string;
+    openMode?: "iframe" | "tab";
+  }) => void;
   onClose: () => void;
   onDelete?: () => void;
 };
@@ -30,6 +42,20 @@ export function CustomizeTileModal({
   const [url, setUrl] = useState(initialUrl);
   const [openMode, setOpenMode] = useState<"iframe" | "tab">(initialOpenMode);
   const [customIconError, setCustomIconError] = useState<string | null>(null);
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  // The picked file's preview, drawn from its own bytes and let go of when
+  // another is picked or the dialog closes.
+  useEffect(() => {
+    if (!iconFile) {
+      setPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(iconFile);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [iconFile]);
 
   const availableIcons = Object.keys(tileCatalogue.tiles);
 
@@ -37,19 +63,17 @@ export function CustomizeTileModal({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 200 * 1024) {
-      setCustomIconError(t("tile.iconTooLarge"));
+    // A PNG, JPEG or WebP of at most 1 MiB; never an SVG. The API checks the
+    // bytes again, so this only spares the person a refused upload.
+    const problem = personTileFileError(file);
+    if (problem) {
+      setCustomIconError(problem === "size" ? t("tile.iconTooLarge") : t("tile.iconWrongType"));
+      event.target.value = "";
       return;
     }
 
     setCustomIconError(null);
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setIcon(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
+    setIconFile(file);
   }
 
   function handleFormSave(e: React.FormEvent) {
@@ -72,6 +96,7 @@ export function CustomizeTileModal({
     onSave({
       title: title.trim() || initialTitle,
       icon,
+      ...(iconFile ? { iconFile } : {}),
       ...(isLink ? { url: finalUrl, openMode } : {}),
     });
   }
@@ -147,15 +172,15 @@ export function CustomizeTileModal({
           <div className="customize-modal-field">
             <label className="customize-modal-label">Tile Symbol / Icon</label>
             <div className="customize-modal-icon-preview-container">
-              <img
-                src={icon.startsWith("data:") ? icon : tileIconUrl(icon)}
-                alt={t("tile.iconPreview")}
-                className="customize-modal-icon-preview"
-              />
+              {preview ? (
+                <img src={preview} alt={t("tile.iconPreview")} className="customize-modal-icon-preview" />
+              ) : (
+                <TileImage icon={icon} alt={t("tile.iconPreview")} className="customize-modal-icon-preview" />
+              )}
               <div style={{ flex: 1 }}>
                 <input
                   type="file"
-                  accept="image/png,image/jpeg,image/svg+xml"
+                  accept={PERSON_TILE_TYPES.join(",")}
                   id="custom-tile-icon-upload"
                   style={{ display: "none" }}
                   onChange={handleFileUpload}
@@ -176,8 +201,11 @@ export function CustomizeTileModal({
                 <button
                   key={iconName}
                   type="button"
-                  className={`customize-modal-grid-icon-btn${icon === iconName ? " customize-modal-grid-icon-btn--selected" : ""}`}
-                  onClick={() => setIcon(iconName)}
+                  className={`customize-modal-grid-icon-btn${!iconFile && icon === iconName ? " customize-modal-grid-icon-btn--selected" : ""}`}
+                  onClick={() => {
+                    setIconFile(null);
+                    setIcon(iconName);
+                  }}
                   title={iconName}
                 >
                   <img src={tileIconUrl(iconName)} alt={iconName} />

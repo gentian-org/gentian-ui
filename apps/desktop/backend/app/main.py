@@ -11,6 +11,7 @@ from app.api.routes import (
     notifications,
     prefs,
     session,
+    tiles,
 )
 from app.core.config import get_settings
 from app.core.logging_middleware import RedactingAccessLogMiddleware
@@ -49,7 +50,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# What this service is: a relay for tiles, plus the shell's own preferences.
+# What this service is: a relay for tiles, the pictures they are drawn with,
+# plus the shell's own preferences.
 # It shows what a signed-in person may open and opens it. Nothing here
 # installs, removes, grants or configures anything: administering apps is the
 # administration console's, and an App Store, where a cluster has one, is an
@@ -85,3 +87,4 @@ app.include_router(prefs.router, prefix=settings.api_v1_str)
 app.include_router(account.router, prefix=settings.api_v1_str)
 app.include_router(notifications.router, prefix=settings.api_v1_str)
 app.include_router(llm.router, prefix=settings.api_v1_str)
+app.include_router(tiles.router, prefix=settings.api_v1_str)
