@@ -106,12 +106,24 @@ async def app(
     _user: dict = Depends(get_current_user),
     store: Store = Depends(_store),
 ) -> dict[str, Any]:
+    # No country is sent: neither the cluster nor the tenant records one, so
+    # the store lists every support offer it has for the entry.
     detail = await store.app(catalogue, app, language_of(request))
     origins = media.media_origins(await store.meta())
     out = _summary(detail, origins)
     out["screenshots"] = [
         {**shot.model_dump(), "url": media.proxied(shot.url, origins)}
         for shot in detail.screenshots
+    ]
+    out["support"] = [
+        {
+            **offer.model_dump(),
+            "partner": {
+                **offer.partner.model_dump(),
+                "logoUrl": media.proxied(offer.partner.logoUrl, origins),
+            },
+        }
+        for offer in detail.support
     ]
     return out
 

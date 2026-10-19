@@ -79,7 +79,7 @@ for (const language of LANGUAGES) {
         "idempotency-conflict", "not-acquirable", "rate-limited", "store-not-configured", "store-unreachable",
         "store-format", "store-unavailable", "store-sign-in-required", "checkout-refused", "acquisition-cancelled",
         "acquisition-failed", "host-not-configured", "no-operation", "unreachable", "not-configured", "failed",
-        "company-missing", "review-not-acquired",
+        "company-missing", "review-not-acquired", "not-requestable",
       ],
     };
     for (const family of composed) {

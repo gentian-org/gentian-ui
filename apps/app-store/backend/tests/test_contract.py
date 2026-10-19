@@ -41,6 +41,9 @@ def test_every_operation_of_the_definition_is_asked_and_answers_within_it(store,
         await client.my_review(STORE_TOKEN, "s", "gentian", "nextcloud-base-ee")
         await client.put_my_review(STORE_TOKEN, "s", "gentian", "nextcloud-base-ee", review)
         await client.delete_my_review(STORE_TOKEN, "s", "gentian", "nextcloud-base-ee")
+        await client.app("gentian", "nextcloud-base-ee", "en", country="CH")
+        support = models.SupportRequest.model_validate(support_example(contract))
+        await client.request_support(STORE_TOKEN, "s", "gentian", "nextcloud-base-ee", support)
         subject = (await client.access(STORE_TOKEN, "s")).accounts[0].subject
         await client.decide_access(STORE_TOKEN, "s", subject, True)
         await client.decide_access(STORE_TOKEN, "s", subject, False)
@@ -54,6 +57,17 @@ def review_example(contract) -> dict:
     """The review the definition writes its request body with."""
     put = contract.document["paths"]["/v1/apps/{catalogue}/{app}/reviews/mine"]["put"]
     return put["requestBody"]["content"]["application/json"]["examples"]["review"]["value"]
+
+
+def support_example(contract) -> dict:
+    """The support request the definition writes its request body with."""
+    post = contract.document["paths"]["/v1/apps/{catalogue}/{app}/support-requests"]["post"]
+    return post["requestBody"]["content"]["application/json"]["examples"]["request"]["value"]
+
+
+def test_the_support_request_example_is_what_this_app_sends(contract):
+    sent = models.SupportRequest.model_validate(support_example(contract)).model_dump()
+    assert sent == support_example(contract)
 
 
 def test_the_fixture_notices_a_fake_that_left_the_definition(store, contract):

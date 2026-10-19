@@ -1,6 +1,6 @@
 """What a person says at the store in their own name: their review of an
-entry, the company they are with, and -- for the account that holds the
-tenant at the store -- who else manages it.
+entry, a request for support with one, the company they are with, and -- for
+the account that holds the tenant at the store -- who else manages it.
 
 Signed-in calls, made with the person's store token, which stays in this
 process (`app.store.oauth`). They concern the person's account at the store
@@ -16,10 +16,10 @@ bundle does not offer the writes then.
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import ConfigDict
 
-from app.api.deps import session_of
+from app.api.deps import language_of, session_of
 from app.core.config import Settings, get_settings
 from app.core.problems import Refusal
 from app.store import models, oauth
@@ -29,6 +29,10 @@ router = APIRouter(prefix="/store", tags=["account"])
 
 
 class ReviewBody(models.ReviewRequest):
+    pass
+
+
+class SupportBody(models.SupportRequest):
     pass
 
 
@@ -86,6 +90,26 @@ async def withdraw_review(
     store = get_store(settings)
     await _signed(session, lambda t: store.delete_my_review(t, session, catalogue, app))
     return {"review": None}
+
+
+@router.post("/apps/{catalogue}/{app}/support-requests")
+async def request_support(
+    catalogue: str,
+    app: str,
+    body: SupportBody,
+    request: Request,
+    session: str = Depends(session_of),
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
+    """Ask a partner, through the store, for support with an entry. The
+    store's refusals -- no such offer, one that takes no request here -- are
+    handed on as it said them."""
+    store = get_store(settings)
+    received = await _signed(
+        session,
+        lambda t: store.request_support(t, session, catalogue, app, body, language_of(request)),
+    )
+    return {"request": received.model_dump()}
 
 
 @router.get("/account/company")
