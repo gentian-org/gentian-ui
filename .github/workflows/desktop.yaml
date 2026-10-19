@@ -30,12 +30,14 @@ on:
     paths:
       - "apps/desktop/**"
       - ".github/workflows/desktop.yaml"
+  # Every pull request, whatever it touches: the `gate` job below is a status
+  # the branch rules require, and a check that is never started never reports,
+  # so a path filter here would block the merge of anything outside this app.
+  # The `changes` job applies the filter instead and skips the build.
   pull_request:
     branches:
       - develop
-    paths:
-      - "apps/desktop/**"
-      - ".github/workflows/desktop.yaml"
+      - main
   workflow_dispatch:
 
 env:
@@ -44,15 +46,52 @@ env:
   API_IMAGE: ghcr.io/gentian-org/gentian-portal-api
 
 jobs:
+  # Whether this run has anything of this app's to build. A push or a manual
+  # run always has: the push trigger is path-filtered. A pull request is
+  # compared with its base, and when nothing under apps/desktop or this file
+  # changed, `test` is skipped and everything after it with it. When the
+  # comparison cannot be answered — too large to list, API error — the build
+  # runs.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          run=true
+          if [ "${EVENT}" = "pull_request" ] \
+            && gh api "repos/${GITHUB_REPOSITORY}/compare/${PR_BASE}...${PR_HEAD}" \
+                 --jq '.files[].filename' > /tmp/changed \
+            && [ "$(wc -l < /tmp/changed)" -gt 0 ] \
+            && [ "$(wc -l < /tmp/changed)" -lt 300 ]; then
+            if ! grep -qE '^(apps/desktop/|\.github/workflows/desktop\.yaml$)' /tmp/changed; then
+              run=false
+            fi
+          fi
+          echo "run=${run}" >> "$GITHUB_OUTPUT"
+          if [ "${run}" = "false" ]; then
+            echo "Nothing under apps/desktop changed; the build is skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   # The backend suite and the frontend typecheck, neither of which ran anywhere
   # before this job existed: the workflow built images and asserted nothing
   # about them, so the first thing to notice a broken build was a cluster.
   test:
+    needs: [changes]
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
 
@@ -63,7 +102,7 @@ jobs:
           pip install -e ".[dev]"
           python -m pytest -q
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: "22"
 
@@ -89,10 +128,10 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -106,15 +145,15 @@ jobs:
       # runner. Declared here rather than inherited, for the reason the lint
       # job installs PyYAML instead of relying on the image having it.
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130  # v3.7.0
         with:
           platforms: arm64
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3.12.0
 
       - name: Pull Node base image
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08  # v3.0.2
         with:
           timeout_minutes: 10
           max_attempts: 5
@@ -145,7 +184,7 @@ jobs:
           echo "immutable=${branch}-${short}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push web
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6.19.2
         with:
           context: apps/desktop/frontend
           file: apps/desktop/frontend/Dockerfile
@@ -176,7 +215,7 @@ jobs:
           # the environment at container start; see frontend/docker-entrypoint.sh.
 
       - name: Build and push api
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8  # v6.19.2
         with:
           context: apps/desktop/backend
           file: apps/desktop/backend/Dockerfile
@@ -212,7 +251,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: Chart version
         id: chart
         run: |
@@ -254,3 +293,23 @@ jobs:
         run: |
           helm push /tmp/chart-immutable/*.tgz oci://ghcr.io/gentian-org/charts
           helm push /tmp/chart-moving/*.tgz oci://ghcr.io/gentian-org/charts
+
+  # The one status the branch rules require. It passes when every job above
+  # succeeded or was skipped because this pull request gave it nothing to do,
+  # and fails when any of them failed or was cancelled. `changes` itself must
+  # have run: a decision that was skipped is not a decision.
+  gate:
+    name: desktop gate
+    runs-on: ubuntu-latest
+    needs: [changes, test, build, chart]
+    if: always()
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          printf '%s' "${RESULTS}" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          if printf '%s' "${RESULTS}" | jq -e '[.[] | .result] | any(. == "failure" or . == "cancelled")' > /dev/null; then
+            echo "a job this gate needs failed" >&2
+            exit 1
+          fi
+          test "$(printf '%s' "${RESULTS}" | jq -r '.changes.result')" = "success"
