@@ -925,7 +925,7 @@
     "leftoverEffectContested": "Strittig",
     "leftoverEffectNo": "Nein",
     "leftoverOnlyFor": "Konfiguriert: <mono>{{clients}}</mono>",
-    "leftoverAlsoElsewhere": "Eine weitere Anmeldekonfiguration ist für dieselbe App gekennzeichnet; welche gelesen wird, ist deshalb nicht festgelegt. Diese enthält: <mono>{{clients}}</mono>",
+    "leftoverAlsoElsewhere": "Eine weitere Anmeldekonfiguration ist für dieselbe App gekennzeichnet; die Anmelde-Clients der App werden deshalb abgelehnt, bis eine der beiden entfernt ist. Diese enthält: <mono>{{clients}}</mono>",
     "leftoverDelete": "Löschen…",
     "leftoverNotRemovable": "Wird hier nicht gelöscht:",
     "leftoverDeleted": "<mono>{{name}}</mono> wurde vom Cluster gelöscht.",

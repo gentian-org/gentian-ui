@@ -234,7 +234,8 @@ function classWord(t: T, cls: string): string {
  * the one sign-in configuration labelled with that app's name (an
  * extension's, from its parent app's), and from no other. A piece labelled
  * for an installed app is in effect; with a second piece labelled for the
- * same app it is contested.
+ * same app it is contested, and the app's sign-in clients are refused until
+ * one of the two is removed.
  */
 function InEffect({ item }: { item: ResidueItem }) {
   const { t } = useTranslation();

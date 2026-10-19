@@ -306,13 +306,14 @@ export function withdrawExposure(install: string, name: string) {
 export type ResidueOIDC = {
   /**
    * `yes`: the only piece labelled for an installed app. `contested`: another
-   * piece is labelled for the same app, and which is read is not defined.
+   * piece is labelled for the same app, and the app's sign-in clients are
+   * refused until one of the two is removed.
    * `no`: no installed app's label.
    */
   effective: string;
   /** The client ids this piece configures, when it is in effect. */
   clients?: string[];
-  /** The client ids this piece holds, when another piece is labelled for the same app. */
+  /** The client ids this piece holds, refused while another piece is labelled for the same app. */
   contested?: string[];
   /** The installed app whose label this piece carries, and whose sign-in reads it. */
   composition?: string;

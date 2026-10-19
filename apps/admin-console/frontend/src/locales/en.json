@@ -925,7 +925,7 @@
     "leftoverEffectContested": "Contested",
     "leftoverEffectNo": "No",
     "leftoverOnlyFor": "Configures: <mono>{{clients}}</mono>",
-    "leftoverAlsoElsewhere": "Another sign-in configuration is labelled for the same app, so which one is read is not defined. This one holds: <mono>{{clients}}</mono>",
+    "leftoverAlsoElsewhere": "Another sign-in configuration is labelled for the same app, so the app's sign-in clients are refused until one of the two is removed. This one holds: <mono>{{clients}}</mono>",
     "leftoverDelete": "Delete…",
     "leftoverNotRemovable": "Not deleted from here:",
     "leftoverDeleted": "<mono>{{name}}</mono> was deleted from the cluster.",
