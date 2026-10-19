@@ -441,9 +441,15 @@ class Store:
         except ValueError as exc:
             raise not_the_format() from exc
 
-    async def app(self, catalogue: str, app: str, language: str | None) -> models.AppDetail:
+    async def app(
+        self, catalogue: str, app: str, language: str | None, country: str | None = None
+    ) -> models.AppDetail:
+        """One entry in full. `country` (1.3) narrows its support offers to
+        those that cover the tenant's country; it is sent only when it is an
+        ISO 3166-1 alpha-2 code, and the answer is then cached under it."""
         path = f"/v1/apps/{patterns.name(catalogue, 'catalogue')}/{patterns.name(app, 'app')}"
-        body = await self.open_read(path, None, language)
+        params = {"country": country} if country and models.COUNTRY.match(country) else None
+        body = await self.open_read(path, params, language)
         try:
             detail = models.AppDetail.model_validate(body)
         except ValueError as exc:
@@ -617,6 +623,27 @@ class Store:
 
     async def delete_my_review(self, token: str, session: str, catalogue: str, app: str) -> None:
         await self.signed("DELETE", self._mine(catalogue, app), token, session=session)
+
+    async def request_support(
+        self,
+        token: str,
+        session: str,
+        catalogue: str,
+        app: str,
+        request: models.SupportRequest,
+        language: str | None = None,
+    ) -> models.SupportReceipt:
+        """Ask for one of an entry's support offers (1.3, `support`). The
+        store answers that it received the request; what follows is the
+        store's and the partner's."""
+        path = (
+            f"/v1/apps/{patterns.name(catalogue, 'catalogue')}/"
+            f"{patterns.name(app, 'app')}/support-requests"
+        )
+        _, body, _ = await self.signed(
+            "POST", path, token, session=session, json_body=request.model_dump(), language=language
+        )
+        return _model(models.SupportReceipt, body)
 
     async def access(self, token: str, session: str) -> models.TenantAccess | None:
         """Who manages the token's tenant (1.2, `tenant-access`); None from a

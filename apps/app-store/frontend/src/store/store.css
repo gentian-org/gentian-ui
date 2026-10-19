@@ -926,3 +926,38 @@ a.admin-console__btn {
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--gtn-border);
 }
+
+/* ── Support offers ──────────────────────────────────────────────────────── */
+
+.store-support__offer {
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.store-support__logo {
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--gtn-r2);
+  object-fit: contain;
+  background: var(--gtn-paper-1);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.store-support__offer .admin-console__card-title .admin-console__badge {
+  margin-left: 0.5rem;
+}
+
+.store-support__tiers {
+  margin: 0.5rem 0;
+  padding-left: 1.125rem;
+}
+
+.store-support__tier-name {
+  font-weight: 600;
+}
+
+.store-support__received {
+  margin: 0.75rem 0 0;
+}

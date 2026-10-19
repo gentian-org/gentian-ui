@@ -25,7 +25,7 @@ export type Industry = string;
 export type StoreMeta = {
   name: string;
   apiVersion: string;
-  /** Open. `review-writing`: a person may write a review; `company`: an account has a company. */
+  /** Open. `review-writing`: a person may write a review; `company`: an account has a company; `support`: apps carry support offers. */
   features: string[];
   languages: string[];
   links: { terms?: string | null; privacy?: string | null; support?: string | null; account?: string | null };
@@ -123,7 +123,34 @@ export type AppDetail = AppSummary & {
   addonOf: string | null;
   links: Link[];
   license: { spdx?: string | null; name: string; url?: string | null } | null;
+  /** The partners that offer support (store API 1.3); empty from a store without them. */
+  support: SupportOffer[];
 };
+
+/** A partner's offer of support for an app, in the store's words. */
+export type SupportOffer = {
+  id: string;
+  partner: {
+    slug: string;
+    name: string;
+    url: string | null;
+    /** This API's own address for the logo, or null when there is none to show. */
+    logoUrl: string | null;
+    verified: boolean;
+  };
+  /** ISO 3166-1 alpha-2; empty means worldwide. */
+  countries: string[];
+  /** BCP 47. */
+  languages: string[];
+  tiers: { name: string; description: string | null }[];
+  priceHint: string | null;
+  contactUrl: string | null;
+  /** Whether a request may be sent through the store. */
+  requestable: boolean;
+};
+
+export type SupportRequest = { offer: string; message: string | null };
+export type SupportReceipt = { id: string; status: string };
 
 /** Stars, 1 to 5. `support` and `value` are for an entry of edition `ee`, and null on any other. */
 export type ReviewScores = {
@@ -339,6 +366,13 @@ export const putMyReview = (coordinate: string, body: ReviewRequest) =>
   });
 export const deleteMyReview = (coordinate: string) =>
   apiFetch<{ review: null }>(`/store/apps/${appPath(coordinate)}/reviews/mine`, { method: "DELETE" });
+
+/** Ask a partner, through the store, for support with an app (1.3, `support`). */
+export const requestSupport = (coordinate: string, body: SupportRequest) =>
+  apiFetch<{ request: SupportReceipt }>(`/store/apps/${appPath(coordinate)}/support-requests`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 
 /** Who manages the tenant at the store (1.2, `tenant-access`). */
 export type TenantRole = "holder" | "manager" | "requested" | "declined" | "none";

@@ -66,6 +66,13 @@ chart/      Helm. Two Deployments and two Services, named from fullnameOverride 
   approval, which the holder gives from the header ("Who manages this
   tenant"); only an account that manages the tenant is handed its
   repository credentials.
+* **Support** (`backend/app/api/routes/account.py`, store API 1.3,
+  `support`): the partners that offer support for an app, as the store lists
+  them, on the app's page. A partner's contact address opens in a separate
+  window; a signed-in person may send a request for an offer the store takes
+  requests for, with an optional message, and the store says it received it.
+  No country is sent with the app's read: neither the cluster nor the tenant
+  records one, so every offer is listed.
 * **Installed and acquired**: what the tenant has acquired joined with what
   is installed; update when the store's newest build is not the one pinned;
   replace a repository credential, behind a confirmation.

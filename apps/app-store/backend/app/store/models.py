@@ -351,6 +351,45 @@ class License(Model):
     url: HttpsUrl | None = None
 
 
+CountryCode = Matching(r"^[A-Z]{2}$", 2)
+COUNTRY = re.compile(r"^[A-Z]{2}$")
+
+
+class SupportPartner(Model):
+    slug: Text(64, 1)
+    name: Text(120)
+    url: HttpsUrl | None = None
+    logoUrl: HttpsUrl | None = None
+    verified: bool = False
+
+
+class SupportTier(Model):
+    name: Text(80)
+    description: Text(500) | None = None
+
+
+def _each_that_fits(model: type["Model"]):
+    """A list from a store, each item on its own: one that does not fit is
+    left out, and an absent or null list is an empty one."""
+    keep = _known_only(model)
+    return lambda value: [] if value is None else keep(value)
+
+
+class SupportOffer(Model):
+    """A partner's offer of support for an entry (store API 1.3, `support`).
+    What it costs and on which terms are the partner's and the store's; this
+    app shows what the store says and sends a request on, nothing more."""
+
+    id: Text(64, 1)
+    partner: SupportPartner
+    countries: list[CountryCode] = []
+    languages: list[Text(35)] = []
+    tiers: Annotated[list[SupportTier], BeforeValidator(_each_that_fits(SupportTier))] = []
+    priceHint: Text(200) | None = None
+    contactUrl: HttpsUrl | None = None
+    requestable: bool = False
+
+
 class AppDetail(AppSummary):
     description: Text(20000)
     screenshots: list[Screenshot]
@@ -359,6 +398,9 @@ class AppDetail(AppSummary):
     addonOf: Coordinate | None
     links: list[Link]
     license: License | None
+    # 1.3. A store before it, or one without `support`, lists none; an offer
+    # that does not fit is left out rather than taking the entry with it.
+    support: Annotated[list[SupportOffer], BeforeValidator(_each_that_fits(SupportOffer))] = []
 
 
 Stars = Annotated[int, Field(ge=1, le=5)]
@@ -411,6 +453,22 @@ class ReviewRequest(Model):
     title: Text(120) | None = None
     text: Text(5000)
     version: Text(64) | None = None
+
+
+class SupportRequest(Model):
+    """A request for one of an entry's support offers, as this app sends it
+    on. Built from the bundle's body, which is checked against this first."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    offer: Text(64, 1)
+    message: Text(2000) | None = None
+
+
+class SupportReceipt(Model):
+    id: Text(200, 1)
+    # Open: `received` in 1.3, and an unknown value is taken for it.
+    status: Text(60)
 
 
 class Report(Model):

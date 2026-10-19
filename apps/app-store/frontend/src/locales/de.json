@@ -368,6 +368,7 @@
     "not-configured": "Ein Dienst des Clusters ist für diese App nicht konfiguriert.",
     "not-found": "Der Store führt nichts dergleichen.",
     "not-installed": "Der Cluster führt die App nicht als installiert.",
+    "not-requestable": "Für dieses Angebot ist hier keine Anfrage möglich. Nutzen Sie stattdessen die Kontaktadresse des Partnerunternehmens.",
     "not-tenant-holder": "Nur das Konto, das diesen Mandanten beim Store hält, entscheidet, wer ihn sonst verwaltet.",
     "not-tenant-manager": "Das darf nur ein Konto, das diesen Mandanten beim Store verwaltet.",
     "rate-limited": "Der Store bittet um Geduld: Es wurden zu viele Anfragen gestellt.",
@@ -403,5 +404,21 @@
     "role_requested": "bittet darum, den Mandanten zu verwalten",
     "role_declined": "abgelehnt",
     "role_none": "angemeldet"
+  },
+  "support": {
+    "title": "Support",
+    "lead": "Partnerunternehmen, die Support für diese App anbieten, wie {{store}} sie aufführt. Was sie anbieten und zu welchen Bedingungen, sagen sie selbst.",
+    "verified": "Verifiziert",
+    "worldwide": "Weltweit",
+    "countries": "In {{countries}}",
+    "languages": "auf {{languages}}",
+    "contact": "Kontakt",
+    "request": "Support anfragen",
+    "messageField": "Nachricht (optional)",
+    "sentTo": "Ihre Anfrage geht an {{store}}, der sie an {{partner}} weitergibt. Sie wird im Namen Ihres Kontos bei {{store}} gesendet.",
+    "send": "Anfrage senden",
+    "cancel": "Abbrechen",
+    "signInToRequest": "Melden Sie sich bei {{store}} an, um Support anzufragen. Die Anfrage wird im Namen Ihres Kontos dort gesendet.",
+    "received": "{{store}} hat Ihre Anfrage an {{partner}} erhalten. Referenz: {{reference}}."
   }
 }

@@ -8,6 +8,7 @@ import { InstallPanel } from "@/store/InstallPanel";
 import { DateText, EditionBadge, ExternalLink, Picture, PriceText, ProblemNote, StoreLinkItem, useStoreName } from "@/store/parts";
 import { Reviews } from "@/store/Reviews";
 import { StoreMarkdown } from "@/store/StoreMarkdown";
+import { Support } from "@/store/Support";
 
 function Requirements({ version }: { version: Version }) {
   const { t } = useTranslation();
@@ -218,6 +219,7 @@ export function AppPage() {
 
           <Versions detail={detail} />
           <Reports coordinate={coordinate} />
+          <Support detail={detail} meta={metaQuery.data} storeName={storeName} />
           <Reviews detail={detail} meta={metaQuery.data} storeName={storeName} />
         </div>
 

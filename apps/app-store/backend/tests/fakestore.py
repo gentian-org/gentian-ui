@@ -88,6 +88,10 @@ class FakeStore:
             {"id": "education", "name": "Education", "nace": "P"},
         ]
         self.meta["reviewing"] = {"requireAcquisition": True}
+        # 1.3: apps carry support offers, and a person may request one.
+        if "support" not in self.meta["features"]:
+            self.meta["features"].append("support")
+        self.support_requests: list[dict] = []  # what the signed-in person asked for
         self.company: dict | None = None  # the signed-in account's
         # Who manages the tenant (1.2, tenant-access): the signed-in account
         # holds it, and one other account asks to manage it.
@@ -217,6 +221,8 @@ class FakeStore:
         doc = self.contract
         if path.endswith("/reviews/mine") or path == "/v1/account/company":
             return self._account(call)
+        if path.endswith("/support-requests"):
+            return self._support(call)
         if path.startswith("/v1/tenant/access"):
             return self._access(call)
         if (method, path) == ("GET", "/v1/meta"):
@@ -236,7 +242,15 @@ class FakeStore:
                 return self._problem(404, "NotFound")
             template = "/v1/apps/{catalogue}/{app}"
             if len(parts) == 2:
-                return self._open(call, doc.example("AppDetail"))
+                detail = doc.example("AppDetail")
+                country = call.query.get("country", [None])[0]
+                if country is not None:
+                    detail["support"] = [
+                        offer
+                        for offer in detail["support"]
+                        if not offer["countries"] or country in offer["countries"]
+                    ]
+                return self._open(call, detail)
             if parts[2:] == ["reviews"]:
                 page = doc.operation_example(template + "/reviews", "get", "200", "reviews")
                 if "companySize" in call.query or "industry" in call.query:
@@ -335,6 +349,26 @@ class FakeStore:
             "version": body.get("version"),
         }
         return self._signed(self.my_review)
+
+    def _support(self, call: Call) -> httpx.Response:
+        """A request for one of an entry's support offers: received, and kept."""
+        if self.token_expired or call.headers.get("authorization") != f"Bearer {STORE_TOKEN}":
+            return self._problem(401, "Unauthenticated", {"WWW-Authenticate": "Bearer"})
+        coordinate = call.path.removeprefix("/v1/apps/").removesuffix("/support-requests")
+        if call.method != "POST" or coordinate != PAID:
+            return self._problem(404, "NotFound")
+        body = call.json
+        offers = {o["id"]: o for o in self.contract.example("AppDetail").get("support", [])}
+        offer = offers.get(body.get("offer"))
+        if offer is None:
+            return self._problem(404, "NotFound")
+        if not offer["requestable"]:
+            return self._problem(422, "NotRequestable")
+        self.support_requests.append(body)
+        received = self.contract.operation_example(
+            "/v1/apps/{catalogue}/{app}/support-requests", "post", "202", "received"
+        )
+        return self._signed(received, 202)
 
     def _access(self, call: Call) -> httpx.Response:
         if self.token_expired or call.headers.get("authorization") != f"Bearer {STORE_TOKEN}":
