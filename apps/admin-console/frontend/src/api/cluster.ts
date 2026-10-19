@@ -342,3 +342,57 @@ export async function updateClusterModels(settings: ModelSettings): Promise<Clus
   });
   return { ...body, changed: Boolean(body.commit) };
 }
+
+/**
+ * One installed app in the cluster's update report (gentian-os
+ * docs/plans/versioning.md §4.2): the build git pins, the build the cluster
+ * runs, the newest build its catalogue offers, the mode it moves under and
+ * what keeps it where it is.
+ */
+export type UpdateEntry = {
+  tenant: string;
+  profile: string;
+  pinned?: string;
+  running?: string;
+  catalogue?: string;
+  newest?: string;
+  newestVersion?: string;
+  outdated: boolean;
+  unmet?: string;
+  mode: string;
+  modeFrom: string;
+  held?: string[];
+  rollout?: { target?: string; phase?: string; reason?: string; message?: string; movedAt?: string; movedBy?: string };
+  ready: boolean;
+};
+
+export type UpdateReport = {
+  cluster: string;
+  policy: { mode: string; window?: { start?: string; end?: string; timezone?: string }; apps?: Record<string, string> };
+  windowOpen: boolean;
+  entries: UpdateEntry[];
+  unread?: string[];
+  partial?: string;
+};
+
+export function fetchClusterUpdates() {
+  return apiFetch<UpdateReport>("/cluster/updates");
+}
+
+export type MoveOutcome = { tenant: string; profile: string; to?: string; status: string; detail?: string };
+
+/** Move every outdated app, or those named, to the newest build its catalogue offers. */
+export function moveOutdated(selection: { tenants?: string[]; apps?: string[] }) {
+  return apiFetch<{ moved: MoveOutcome[]; skipped: MoveOutcome[] }>("/cluster/updates/move", {
+    method: "POST",
+    body: JSON.stringify(selection),
+  });
+}
+
+/** How one tenant's app moves to newer builds; "" removes the override. */
+export function setAppUpdateMode(tenant: string, profile: string, mode: string) {
+  return apiFetch<{ status: string; commit?: string }>(
+    `/cluster/tenants/${encodeURIComponent(tenant)}/apps/${encodeURIComponent(profile)}/update-mode`,
+    { method: "PUT", body: JSON.stringify({ mode }) },
+  );
+}

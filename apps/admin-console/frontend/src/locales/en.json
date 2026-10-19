@@ -24,7 +24,8 @@
     "tabExport": "Export",
     "tabUsageStatistics": "Usage Statistics",
     "tabApps": "Apps",
-    "tabPerimeter": "Perimeter"
+    "tabPerimeter": "Perimeter",
+    "tabUpdates": "Updates"
   },
   "audit": {
     "action": "Action",
@@ -1041,5 +1042,39 @@
     "traffic3xx": "Redirected (3xx)",
     "traffic4xx": "Refused (4xx)",
     "traffic5xx": "Failed (5xx)"
+  },
+  "updates": {
+    "title": "Updates",
+    "lead": "Every installed app against the newest build its catalogue offers. Moving one exports its data first, verifies the new build and rolls back by itself when it does not come up.",
+    "policy": "Policy: {{mode}} mode, {{window}}.",
+    "anyTime": "any time",
+    "windowOpen": "The window is open now.",
+    "windowClosed": "The window is closed now.",
+    "partial": "The cluster's side could not be read: {{detail}}",
+    "loading": "Loading the update report…",
+    "unavailable": "The update report is unavailable.",
+    "moveAll": "Move all outdated ({{count}})",
+    "moveSelected": "Move selected ({{count}})",
+    "moved": "{{moved}} moved, {{skipped}} not moved.",
+    "tenant": "Tenant",
+    "app": "App",
+    "pinned": "Pinned",
+    "running": "Running",
+    "newest": "Newest",
+    "mode": "Mode",
+    "state": "State",
+    "select": "Select {{app}} in {{tenant}}",
+    "modeFor": "Update mode of {{app}} in {{tenant}}",
+    "modeDefault": "as the cluster says ({{mode}})",
+    "cannot": "cannot: {{why}}",
+    "moving": "moving",
+    "outdated": "outdated",
+    "outdatedHeld": "outdated, held",
+    "rolledBack": "rolled back: {{reason}}",
+    "current": "current",
+    "unread": "Not read, the director could not reach them: {{names}}.",
+    "modeLatest": "latest: the platform moves it",
+    "modeManual": "manual: the cluster's administrator moves it",
+    "modeTenant": "tenant: the tenant's administrator may move it"
   }
 }

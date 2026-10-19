@@ -301,7 +301,9 @@
     "waitingForRepository": "Waiting for the cluster to pick up the repository…",
     "settingMetering": "Giving the app the address and key it reports its use with…",
     "meteringNotArrivedTitle": "The cluster has not made the app’s usage credential yet",
-    "meteringNotArrivedBody": "The app is installed and billed by use, but the cluster has not yet asked for the key it reports its use with. Continue to try again; nothing is billed for use that is not reported."
+    "meteringNotArrivedBody": "The app is installed and billed by use, but the cluster has not yet asked for the key it reports its use with. Continue to try again; nothing is billed for use that is not reported.",
+    "updateByPlatform": "The platform moves this app to the newest build inside the cluster's update window.",
+    "updateByCluster": "The cluster's administrator moves this app to newer builds."
   },
   "refused": {
     "addons-403": "The cluster refused: you may not install in this tenant. The app itself is installed.",

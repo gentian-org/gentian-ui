@@ -141,10 +141,15 @@ function Row({ row, storeName }: { row: OverviewRow; storeName: string }) {
                 {acquisition.status === "pending" ? t("install.continue") : t("install.installAction")}
               </Link>
             ) : null}
-            {page && row.updateAvailable ? (
+            {page && row.updateAvailable && row.mayUpdate ? (
               <Link to="/app/$catalogue/$app" params={page} className="admin-console__btn admin-console__btn--primary">
                 {t("install.updateAction")}
               </Link>
+            ) : null}
+            {row.updateAvailable && !row.mayUpdate ? (
+              <span className="admin-console__meta">
+                {row.installed?.updateMode === "latest" ? t("install.updateByPlatform") : t("install.updateByCluster")}
+              </span>
             ) : null}
             {acquisition && acquisition.status === "confirmed" && acquisition.repositories.length > 0 ? (
               <button type="button" className="admin-console__btn" disabled={replace.isPending} onClick={() => setConfirming(true)}>

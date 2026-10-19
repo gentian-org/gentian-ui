@@ -176,7 +176,14 @@ export type AppsPage = { items: AppSummary[]; nextCursor: string | null; omitted
 export type ReviewsPage = { summary: ReviewSummary; items: Review[]; nextCursor: string | null };
 
 /** What git says of an installed app. */
-export type Installed = { profile: string; digest: string | null; forEveryone: boolean; addons: string[] };
+export type Installed = {
+  profile: string;
+  digest: string | null;
+  forEveryone: boolean;
+  addons: string[];
+  /** How the app moves to newer builds: "latest" (the platform), "manual" (the cluster's administrator) or "tenant" (this store may). Null when the director could not say. */
+  updateMode?: string | null;
+};
 
 /** What the cluster has made of it, in its own words. */
 export type AppState = {
@@ -258,6 +265,8 @@ export type AppStateAnswer = {
   profile: string;
   stage: AppStanding;
   installed: Installed | null;
+  /** Whether a newer build may be taken from here: only under the tenant mode. */
+  mayUpdate: boolean;
   state: AppState | null;
   clusterProblems: Record<string, Problem>;
   storeSignedIn: boolean;
@@ -277,6 +286,8 @@ export type OverviewRow = {
   acquisition: AcquisitionView | null;
   latest: { version: string; digest: string } | null;
   updateAvailable: boolean;
+  /** Whether this store may take the newer build: the tenant mode. */
+  mayUpdate: boolean;
   operation: Operation | null;
 };
 

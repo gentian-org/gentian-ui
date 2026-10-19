@@ -24,7 +24,8 @@
     "tabExport": "Export",
     "tabUsageStatistics": "Nutzungsstatistik",
     "tabApps": "Apps",
-    "tabPerimeter": "Perimeter"
+    "tabPerimeter": "Perimeter",
+    "tabUpdates": "Aktualisierungen"
   },
   "audit": {
     "action": "Aktion",
@@ -1041,5 +1042,39 @@
     "traffic3xx": "Umgeleitet (3xx)",
     "traffic4xx": "Abgelehnt (4xx)",
     "traffic5xx": "Fehlgeschlagen (5xx)"
+  },
+  "updates": {
+    "title": "Aktualisierungen",
+    "lead": "Jede installierte App gegen den neuesten Build ihres Katalogs. Ein Wechsel exportiert zuerst die Daten, prüft den neuen Build und nimmt ihn von selbst zurück, wenn er nicht hochkommt.",
+    "policy": "Richtlinie: Modus {{mode}}, {{window}}.",
+    "anyTime": "jederzeit",
+    "windowOpen": "Das Fenster ist jetzt offen.",
+    "windowClosed": "Das Fenster ist jetzt geschlossen.",
+    "partial": "Die Seite des Clusters konnte nicht gelesen werden: {{detail}}",
+    "loading": "Aktualisierungsbericht wird geladen…",
+    "unavailable": "Der Aktualisierungsbericht ist nicht verfügbar.",
+    "moveAll": "Alle veralteten wechseln ({{count}})",
+    "moveSelected": "Ausgewählte wechseln ({{count}})",
+    "moved": "{{moved}} gewechselt, {{skipped}} nicht gewechselt.",
+    "tenant": "Mandant",
+    "app": "App",
+    "pinned": "Festgelegt",
+    "running": "Läuft",
+    "newest": "Neuester",
+    "mode": "Modus",
+    "state": "Zustand",
+    "select": "{{app}} in {{tenant}} auswählen",
+    "modeFor": "Aktualisierungsmodus von {{app}} in {{tenant}}",
+    "modeDefault": "wie der Cluster sagt ({{mode}})",
+    "cannot": "nicht möglich: {{why}}",
+    "moving": "wird gewechselt",
+    "outdated": "veraltet",
+    "outdatedHeld": "veraltet, gehalten",
+    "rolledBack": "zurückgenommen: {{reason}}",
+    "current": "aktuell",
+    "unread": "Nicht gelesen, der Director erreichte sie nicht: {{names}}.",
+    "modeLatest": "latest: die Plattform wechselt",
+    "modeManual": "manual: die Cluster-Administration wechselt",
+    "modeTenant": "tenant: die Mandanten-Administration darf wechseln"
   }
 }

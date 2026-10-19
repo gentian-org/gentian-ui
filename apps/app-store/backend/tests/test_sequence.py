@@ -606,7 +606,11 @@ def test_after_an_interruption_the_sequence_resumes_and_nothing_is_acquired_agai
         "digest": DIGEST,
         "forEveryone": True,
         "addons": [],
+        # How the app moves to newer builds is the director's report's to
+        # say, and this cluster answers none: unknown, so nothing may move.
+        "updateMode": None,
     }
+    assert state["mayUpdate"] is False
 
 
 def test_installing_twice_changes_nothing_the_second_time(runner, store, cluster):

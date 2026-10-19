@@ -759,7 +759,32 @@ async def declared_apps(ctx: Context) -> dict[str, dict[str, Any]]:
             "digest": entry.get("digest") if isinstance(entry.get("digest"), str) else None,
             "forEveryone": entry.get("defaultGrant") is True,
             "addons": [a for a in entry.get("addons") or [] if isinstance(a, str)],
+            # The tenant's override of how the app moves to newer builds, when
+            # the cluster's administrator wrote one; the effective mode is the
+            # director's report's to say (updates), this is what git carries.
+            "updateMode": entry.get("updateMode") if isinstance(entry.get("updateMode"), str) else None,
         }
+    return out
+
+
+async def update_modes(ctx: Context) -> dict[str, str]:
+    """How each installed app moves to newer builds, by profile: the
+    director's report, which decides the mode from the cluster's policy, the
+    tenant's override and the app's customizations. A director that cannot
+    answer leaves the modes unknown, and nothing here lets a person move an
+    app on a guess."""
+    answer = await director.ask_director(
+        ctx.settings,
+        "GET",
+        f"/v1/tenants/{patterns.name(ctx.tenant, 'tenant')}/updates",
+        ctx.cluster_token,
+    )
+    if answer.status != 200 or not isinstance(answer.body, dict):
+        return {}
+    out: dict[str, str] = {}
+    for entry in answer.body.get("entries") or []:
+        if isinstance(entry, dict) and isinstance(entry.get("profile"), str) and isinstance(entry.get("mode"), str):
+            out[entry["profile"]] = entry["mode"]
     return out
 
 
