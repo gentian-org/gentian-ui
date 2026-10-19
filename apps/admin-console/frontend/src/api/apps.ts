@@ -298,15 +298,24 @@ export function withdrawExposure(install: string, name: string) {
   return apiFetch<AppWriteResult>(entryPath(install, name), { method: "DELETE" });
 }
 
-/** Whether a leftover sign-in configuration is still read. */
+/**
+ * Whether a leftover sign-in configuration is still read. An app's sign-in
+ * clients are configured from the one piece labelled with the app's name (an
+ * extension's, from its parent app's) and from no other piece.
+ */
 export type ResidueOIDC = {
-  /** `yes`, `contested` or `no`. */
+  /**
+   * `yes`: the only piece labelled for an installed app. `contested`: another
+   * piece is labelled for the same app, and the app's sign-in clients are
+   * refused until one of the two is removed.
+   * `no`: no installed app's label.
+   */
   effective: string;
-  /** The client ids only this piece holds a configuration for. */
+  /** The client ids this piece configures, when it is in effect. */
   clients?: string[];
-  /** The client ids another piece holds a configuration for too. */
+  /** The client ids this piece holds, refused while another piece is labelled for the same app. */
   contested?: string[];
-  /** The installed app whose sign-in reads this piece by its label. */
+  /** The installed app whose label this piece carries, and whose sign-in reads it. */
   composition?: string;
 };
 

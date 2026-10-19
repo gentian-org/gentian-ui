@@ -12,6 +12,8 @@ APP_VERSION = "0.1.0"
 # issuer accepts is spelled from this, character for character.
 _HOST = re.compile(r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$")
 
+_COUNTRY = re.compile(r"^[A-Z]{2}$")
+
 # The host label of this component. The store's issuer computes the one
 # redirect address it accepts as https://store.<host of tenant_url>/oauth/callback,
 # so the tenant's address is this app's host without that label.
@@ -58,6 +60,10 @@ class Settings(BaseSettings):
     # picture of an app after it is installed or updated, so the app's tile
     # shows it. Unset leaves every tile with its profile's own picture.
     desktop_api_url: str | None = Field(default=None, alias="DESKTOP_API_URL")
+    # The tenant's country (Tenant spec.country), ISO 3166-1 alpha-2, from
+    # the profile's valueMapping.platform.countryKey. Empty when the tenant
+    # names none. A store is asked for the support offered there by default.
+    tenant_country: str = Field(default="", alias="TENANT_COUNTRY")
 
     # The store API's base address: what the Cluster claim names as
     # catalogue.storeUrl. https, no trailing slash, no path beyond a prefix.
@@ -102,6 +108,12 @@ class Settings(BaseSettings):
         """The store API's base, or None when the cluster names no store."""
         value = (self.store_url or "").strip().rstrip("/")
         return value or None
+
+    @property
+    def country(self) -> str | None:
+        """The tenant's country when it is an alpha-2 code, upper case; else None."""
+        value = self.tenant_country.strip().upper()
+        return value if _COUNTRY.match(value) else None
 
     @property
     def host(self) -> str | None:

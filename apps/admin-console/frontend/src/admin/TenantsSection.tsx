@@ -28,8 +28,18 @@ import { Trans, useTranslation } from "react-i18next";
  * those can be renamed afterwards without moving data. The screen says so
  * before the field rather than after the refusal.
  */
+/** A country's name in a language, or null where the browser knows none. */
+function regionName(language: string, code: string): string | null {
+  try {
+    const name = new Intl.DisplayNames([language], { type: "region", fallback: "none" }).of(code);
+    return name ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function TenantsSection() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const queryClient = useQueryClient();
   const tenantsQuery = useQuery({
@@ -39,6 +49,8 @@ export function TenantsSection() {
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [requireMFA, setRequireMFA] = useState(true);
+  // ISO 3166-1 alpha-2, or empty for none.
+  const [country, setCountry] = useState("");
   const [recoveryEmail, setRecoveryEmail] = useState("");
   // The administrator account being handed over: right after creating a
   // tenant (waiting out its provisioning), or for an existing one on request.
@@ -76,7 +88,7 @@ export function TenantsSection() {
     mutationFn: async () => {
       const tenant = name.trim();
       const email = recoveryEmail.trim();
-      const result = await createClusterTenant(tenant, displayName.trim(), requireMFA);
+      const result = await createClusterTenant(tenant, displayName.trim(), requireMFA, country.trim());
       // The tenant is committed. With an address, the invitation is handed to
       // the registrar now: it keeps the request and mails the invitation when
       // the tenant is ready, whether or not this page is still open. Without
@@ -102,6 +114,7 @@ export function TenantsSection() {
       setDisplayName("");
       setRecoveryEmail("");
       setRequireMFA(true);
+      setCountry("");
       setLastCommit(result.commit ?? null);
       void invalidate();
     },
@@ -120,6 +133,10 @@ export function TenantsSection() {
   // what is wrong while it is being typed rather than after a round trip.
   const nameIsValid = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(name.trim());
   const nameTouched = name.length > 0;
+  // A country is optional: two letters, ISO 3166-1 alpha-2, named back in
+  // the reader's language by the browser.
+  const countryIsValid = country === "" || /^[A-Z]{2}$/.test(country);
+  const countryName = /^[A-Z]{2}$/.test(country) ? regionName(i18n.resolvedLanguage ?? "en", country) : null;
 
   if (tenantsQuery.isLoading) {
     return <p className="admin-console__loading">{t("tenants.loadingTenants")}</p>;
@@ -306,6 +323,23 @@ export function TenantsSection() {
               {t("tenants.whatPeopleCallThisCustomer")}</p>
           </div>
           <div className="admin-console__field">
+            <label className="admin-console__label" htmlFor="tenant-country">
+              <span className="admin-console__label-text">{t("tenants.country")}</span>
+              <input
+                id="tenant-country"
+                type="text"
+                value={country}
+                autoComplete="off"
+                maxLength={2}
+                placeholder={t("tenants.countryPlaceholder")}
+                onChange={(event) => setCountry(event.target.value.toUpperCase())}
+              />
+            </label>
+            <p className={countryIsValid ? "admin-console__hint" : "admin-console__field-error"}>
+              {countryName ? t("tenants.countryNamed", { country: countryName }) : t("tenants.countryHint")}
+            </p>
+          </div>
+          <div className="admin-console__field">
             <label className="admin-console__label" htmlFor="tenant-admin-email">
               <span className="admin-console__label-text">{t("tenants.recoveryEmail")}</span>
               <input
@@ -327,7 +361,7 @@ export function TenantsSection() {
             <button
               type="submit"
               className="admin-console__btn admin-console__btn--primary"
-              disabled={!nameIsValid || createMutation.isPending}
+              disabled={!nameIsValid || !countryIsValid || createMutation.isPending}
             >
               {createMutation.isPending ? "Creating…" : t("tenants.commitNewTenant")}
             </button>

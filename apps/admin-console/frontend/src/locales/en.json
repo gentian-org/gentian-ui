@@ -564,7 +564,11 @@
     "invitationSuperseded": "The administrator's account has been activated another way since; no invitation is waiting.",
     "invitationNotKept": "The registrar could not take the invitation ({{reason}}). Keep this page open: the invitation is sent from here once the tenant is ready.",
     "invitationPending": "invitation pending",
-    "invitationPendingHint": "The registrar mails the administrator's invitation as soon as this tenant is ready."
+    "invitationPendingHint": "The registrar mails the administrator's invitation as soon as this tenant is ready.",
+    "country": "Country (optional)",
+    "countryHint": "Two letters, ISO 3166-1 (CH, DE). Apps such as the App Store are told it; it can be changed later.",
+    "countryNamed": "{{country}}. Apps such as the App Store are told it; it can be changed later.",
+    "countryPlaceholder": "CH"
   },
   "usage": {
     "committed": "committed",
@@ -920,8 +924,8 @@
     "leftoverEffectYes": "Yes",
     "leftoverEffectContested": "Contested",
     "leftoverEffectNo": "No",
-    "leftoverOnlyFor": "The only configuration for: <mono>{{clients}}</mono>",
-    "leftoverAlsoElsewhere": "Another piece also configures: <mono>{{clients}}</mono>",
+    "leftoverOnlyFor": "Configures: <mono>{{clients}}</mono>",
+    "leftoverAlsoElsewhere": "Another sign-in configuration is labelled for the same app, so the app's sign-in clients are refused until one of the two is removed. This one holds: <mono>{{clients}}</mono>",
     "leftoverDelete": "Delete…",
     "leftoverNotRemovable": "Not deleted from here:",
     "leftoverDeleted": "<mono>{{name}}</mono> was deleted from the cluster.",

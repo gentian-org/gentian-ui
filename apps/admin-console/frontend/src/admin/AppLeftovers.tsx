@@ -230,15 +230,19 @@ function classWord(t: T, cls: string): string {
 
 /**
  * Whether a leftover sign-in configuration still decides anything. It is the
- * one kind of leftover that does: a sign-in client is configured from the
- * first piece on the cluster that holds its entry, whoever brought it.
+ * one kind of leftover that can: an app's sign-in clients are configured from
+ * the one sign-in configuration labelled with that app's name (an
+ * extension's, from its parent app's), and from no other. A piece labelled
+ * for an installed app is in effect; with a second piece labelled for the
+ * same app it is contested, and the app's sign-in clients are refused until
+ * one of the two is removed.
  */
 function InEffect({ item }: { item: ResidueItem }) {
   const { t } = useTranslation();
   const oidc = item.oidc;
   if (!oidc) return <>—</>;
-  const only = oidc.clients ?? [];
-  const shared = oidc.contested ?? [];
+  const configures = oidc.clients ?? [];
+  const contested = oidc.contested ?? [];
   return (
     <>
       {oidc.effective === "yes" ? (
@@ -252,14 +256,14 @@ function InEffect({ item }: { item: ResidueItem }) {
       ) : (
         <span className="admin-console__badge admin-console__mono">{oidc.effective}</span>
       )}
-      {only.length > 0 ? (
+      {configures.length > 0 ? (
         <div className="admin-console__hint">
-          <Trans i18nKey="apps.leftoverOnlyFor" values={{ clients: only.join(", ") }} components={mono} />
+          <Trans i18nKey="apps.leftoverOnlyFor" values={{ clients: configures.join(", ") }} components={mono} />
         </div>
       ) : null}
-      {shared.length > 0 ? (
+      {contested.length > 0 ? (
         <div className="admin-console__hint">
-          <Trans i18nKey="apps.leftoverAlsoElsewhere" values={{ clients: shared.join(", ") }} components={mono} />
+          <Trans i18nKey="apps.leftoverAlsoElsewhere" values={{ clients: contested.join(", ") }} components={mono} />
         </div>
       ) : null}
     </>

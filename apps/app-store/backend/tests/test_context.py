@@ -19,6 +19,7 @@ def test_whether_a_person_may_install_is_the_directors_answer(api, store, cluste
         "storeConfigured": True,
         "appStore": {"available": True, "reason": None},
         "adminConsoleUrl": "https://admin.acme.example/",
+        "tenantCountry": None,
     }
     # Asked with the person's own token.
     me = [c for c in cluster.calls if c.path == "/v1/tenants/acme/me"]

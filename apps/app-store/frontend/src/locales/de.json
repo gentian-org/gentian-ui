@@ -419,6 +419,10 @@
     "send": "Anfrage senden",
     "cancel": "Abbrechen",
     "signInToRequest": "Melden Sie sich bei {{store}} an, um Support anzufragen. Die Anfrage wird im Namen Ihres Kontos dort gesendet.",
-    "received": "{{store}} hat Ihre Anfrage an {{partner}} erhalten. Referenz: {{reference}}."
+    "received": "{{store}} hat Ihre Anfrage an {{partner}} erhalten. Referenz: {{reference}}.",
+    "country": "Land",
+    "allCountries": "Alle Länder",
+    "noneIn": "Für das gewählte Land ist für diese App kein Support aufgeführt.",
+    "consent": "Ihr Name, Ihre E-Mail-Adresse, Ihr Unternehmen und diese Nachricht werden an {{partner}} gesendet, damit Sie kontaktiert werden können."
   }
 }

@@ -19,7 +19,7 @@ from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
 from app.store import media, patterns
 from app.store.client import Store, get_store
-from app.store.models import AppSummary, CompanySize, Industry
+from app.store.models import COUNTRY, AppDetail, AppSummary, CompanySize, Industry
 
 router = APIRouter(prefix="/store", tags=["catalogue"])
 
@@ -98,24 +98,21 @@ async def apps(
     }
 
 
-@router.get("/apps/{catalogue}/{app}")
-async def app(
-    catalogue: str,
-    app: str,
-    request: Request,
-    _user: dict = Depends(get_current_user),
-    store: Store = Depends(_store),
-) -> dict[str, Any]:
-    # No country is sent: neither the cluster nor the tenant records one, so
-    # the store lists every support offer it has for the entry.
-    detail = await store.app(catalogue, app, language_of(request))
-    origins = media.media_origins(await store.meta())
-    out = _summary(detail, origins)
-    out["screenshots"] = [
-        {**shot.model_dump(), "url": media.proxied(shot.url, origins)}
-        for shot in detail.screenshots
-    ]
-    out["support"] = [
+def _country(asked: str | None, settings: Settings) -> str | None:
+    """The country support offers are asked for: the one named, none for an
+    empty one, and the tenant's own when none is named at all."""
+    if asked is None:
+        return settings.country
+    asked = asked.strip().upper()
+    if not asked:
+        return None
+    if not COUNTRY.match(asked):
+        raise patterns.invalid("That is not a country code.")
+    return asked
+
+
+def _offers(detail: AppDetail, origins: set[str]) -> list[dict[str, Any]]:
+    return [
         {
             **offer.model_dump(),
             "partner": {
@@ -125,7 +122,48 @@ async def app(
         }
         for offer in detail.support
     ]
+
+
+@router.get("/apps/{catalogue}/{app}")
+async def app(
+    catalogue: str,
+    app: str,
+    request: Request,
+    country: str | None = Query(default=None, max_length=2),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    store: Store = Depends(_store),
+) -> dict[str, Any]:
+    """One entry in full. Its support offers are those for `country` -- the
+    tenant's own unless another, or none (empty), is named; with none the
+    store lists what it has for the entry."""
+    detail = await store.app(catalogue, app, language_of(request), _country(country, settings))
+    origins = media.media_origins(await store.meta())
+    out = _summary(detail, origins)
+    out["screenshots"] = [
+        {**shot.model_dump(), "url": media.proxied(shot.url, origins)}
+        for shot in detail.screenshots
+    ]
+    out["support"] = _offers(detail, origins)
     return out
+
+
+@router.get("/apps/{catalogue}/{app}/support")
+async def support(
+    catalogue: str,
+    app: str,
+    request: Request,
+    country: str | None = Query(default=None, max_length=2),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    store: Store = Depends(_store),
+) -> dict[str, Any]:
+    """An entry's support offers alone, for the country switch on its page:
+    asked of the store as the entry is, and answered from the same cache."""
+    asked = _country(country, settings)
+    detail = await store.app(catalogue, app, language_of(request), asked)
+    origins = media.media_origins(await store.meta())
+    return {"country": asked, "items": _offers(detail, origins)}
 
 
 @router.get("/apps/{catalogue}/{app}/reviews")
