@@ -73,6 +73,8 @@ export type ClusterTenant = {
   realm?: string;
   /** Profile names installed into it. */
   apps: string[];
+  /** Its country, ISO 3166-1 alpha-2, when it names one. */
+  country?: string;
   /** True for a tenant the director refuses to retire. */
   protected: boolean;
   /** True while a purge is under way: its data is set to be deleted and the
@@ -93,10 +95,12 @@ export async function createClusterTenant(
   name: string,
   displayName: string,
   requireMFA = true,
+  /** ISO 3166-1 alpha-2; empty names none. */
+  country = "",
 ): Promise<ClusterSettingsWriteResult> {
   const body = await apiFetch<{ status: string; commit?: string }>("/cluster/tenants", {
     method: "POST",
-    body: JSON.stringify({ name, displayName, requireMFA }),
+    body: JSON.stringify({ name, displayName, requireMFA, ...(country ? { country } : {}) }),
   });
   return { ...body, changed: Boolean(body.commit) };
 }

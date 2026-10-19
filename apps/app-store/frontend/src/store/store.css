@@ -961,3 +961,21 @@ a.admin-console__btn {
 .store-support__received {
   margin: 0.75rem 0 0;
 }
+
+.store-support__country {
+  max-width: 20rem;
+  margin: 0 0 1rem;
+}
+
+/* What a request passes on to the partner, said beside the field it is
+   written in. */
+.store-support__consent {
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  border-left: 3px solid var(--gtn-400);
+  border-radius: var(--gtn-r1);
+  background: var(--gtn-paper-1);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--gtn-ink-1);
+}

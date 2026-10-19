@@ -34,8 +34,56 @@ def test_an_entry_carries_its_support_offers_with_the_logo_from_this_apps_origin
     }
     assert offer["contactUrl"] == "https://integrations.example/contact"
     assert offer["requestable"] is True
-    # Neither the cluster nor the tenant records a country: none is sent.
+    # The tenant names no country: none is sent.
     assert "country" not in store.calls_to("GET", f"/v1/apps/{PAID}")[-1].query
+
+
+@pytest.fixture
+def in_switzerland(api):
+    """The application, for a tenant whose country is CH."""
+    from app.core.config import get_settings
+    from app.main import app
+
+    app.dependency_overrides[get_settings] = lambda: make_settings(TENANT_COUNTRY="ch")
+    return api
+
+
+def test_the_offers_are_asked_for_in_the_tenants_country(in_switzerland, store):
+    detail = in_switzerland.get(APP, headers=ALICE).json()
+    assert [o["id"] for o in detail["support"]] == [OFFER]
+    assert store.calls_to("GET", f"/v1/apps/{PAID}")[-1].query["country"] == ["CH"]
+    context = in_switzerland.get("/api/v1/context", headers=ALICE).json()
+    assert context["tenantCountry"] == "CH"
+
+
+def test_the_country_switch_asks_for_another_country_or_none(in_switzerland, store):
+    answer = in_switzerland.get(f"{APP}/support", params={"country": "fr"}, headers=ALICE)
+    assert answer.status_code == 200, answer.text
+    assert answer.json() == {"country": "FR", "items": []}
+    assert store.calls_to("GET", f"/v1/apps/{PAID}")[-1].query["country"] == ["FR"]
+
+    # All countries: none is sent, and the store answers with what it has.
+    answer = in_switzerland.get(f"{APP}/support", params={"country": ""}, headers=ALICE).json()
+    assert answer["country"] is None and [o["id"] for o in answer["items"]] == [OFFER]
+    assert "country" not in store.calls_to("GET", f"/v1/apps/{PAID}")[-1].query
+
+    # Nothing named: the tenant's own.
+    answer = in_switzerland.get(f"{APP}/support", headers=ALICE).json()
+    assert answer["country"] == "CH" and [o["id"] for o in answer["items"]] == [OFFER]
+    assert answer["items"][0]["partner"]["logoUrl"].startswith("/api/v1/media?u=")
+
+
+@pytest.mark.parametrize("wrong", ["C1", "12", "CHE", "c&"])
+def test_a_country_that_is_no_code_is_refused_and_the_store_not_asked(api, store, wrong):
+    answer = api.get(f"{APP}/support", params={"country": wrong}, headers=ALICE)
+    assert answer.status_code in (400, 422)
+    assert store.calls_to("GET", f"/v1/apps/{PAID}") == []
+
+
+def test_a_tenant_country_that_is_no_code_is_none(store):
+    assert make_settings(TENANT_COUNTRY="Switzerland").country is None
+    assert make_settings(TENANT_COUNTRY="").country is None
+    assert make_settings(TENANT_COUNTRY=" de ").country == "DE"
 
 
 def test_a_logo_off_the_media_origins_is_not_shown(api, store, contract, monkeypatch):

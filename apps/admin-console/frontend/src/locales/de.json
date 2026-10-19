@@ -570,7 +570,11 @@
     "invitationSuperseded": "Das Administratorkonto wurde inzwischen auf anderem Weg aktiviert; es wartet keine Einladung.",
     "invitationNotKept": "Der Registrar konnte die Einladung nicht entgegennehmen ({{reason}}). Lassen Sie diese Seite offen: Die Einladung wird von hier gesendet, sobald der Mandant bereit ist.",
     "invitationPending": "Einladung ausstehend",
-    "invitationPendingHint": "Der Registrar versendet die Einladung des Administrators, sobald dieser Mandant bereit ist."
+    "invitationPendingHint": "Der Registrar versendet die Einladung des Administrators, sobald dieser Mandant bereit ist.",
+    "country": "Land (optional)",
+    "countryHint": "Zwei Buchstaben, ISO 3166-1 (CH, DE). Apps wie der App Store erhalten es; es lässt sich später ändern.",
+    "countryNamed": "{{country}}. Apps wie der App Store erhalten es; es lässt sich später ändern.",
+    "countryPlaceholder": "CH"
   },
   "usage": {
     "committed": "zugesagt",
@@ -920,8 +924,8 @@
     "leftoverEffectYes": "Ja",
     "leftoverEffectContested": "Strittig",
     "leftoverEffectNo": "Nein",
-    "leftoverOnlyFor": "Die einzige Konfiguration für: <mono>{{clients}}</mono>",
-    "leftoverAlsoElsewhere": "Ein anderes Teil konfiguriert ebenfalls: <mono>{{clients}}</mono>",
+    "leftoverOnlyFor": "Konfiguriert: <mono>{{clients}}</mono>",
+    "leftoverAlsoElsewhere": "Eine weitere Anmeldekonfiguration ist für dieselbe App gekennzeichnet; welche gelesen wird, ist deshalb nicht festgelegt. Diese enthält: <mono>{{clients}}</mono>",
     "leftoverDelete": "Löschen…",
     "leftoverNotRemovable": "Wird hier nicht gelöscht:",
     "leftoverDeleted": "<mono>{{name}}</mono> wurde vom Cluster gelöscht.",

@@ -71,8 +71,11 @@ chart/      Helm. Two Deployments and two Services, named from fullnameOverride 
   them, on the app's page. A partner's contact address opens in a separate
   window; a signed-in person may send a request for an offer the store takes
   requests for, with an optional message, and the store says it received it.
-  No country is sent with the app's read: neither the cluster nor the tenant
-  records one, so every offer is listed.
+  The form says what is passed on: the person's name, e-mail address,
+  company and message, to the partner. The offers are asked for the tenant's
+  country (`TENANT_COUNTRY`) by default; a switch on the page asks for
+  another, or for none ("All countries"), and holds for the browser session.
+  With no country the store lists what it has.
 * **Installed and acquired**: what the tenant has acquired joined with what
   is installed; update when the store's newest build is not the one pinned;
   replace a repository credential, behind a confirmation.
@@ -94,6 +97,8 @@ facts of the cluster into this chart's values (`chart/values.yaml`):
 | `director.url`, `director.cluster` | The director, and the cluster's id |
 | `custodian.url`, `usher.url` | The custodian and the usher |
 | `platform.tenant`, `platform.kernelDomain`, `platform.realm`, `platform.zoneKind` | Facts of the cluster |
+| `api.env.DESKTOP_API_URL` | The tenant's desktop API, where a tile the tenant chose is stored |
+| `api.env.TENANT_COUNTRY` | The tenant's country (Tenant `spec.country`), ISO 3166-1 alpha-2; empty when it names none |
 | `auth.mode`, `auth.issuer`, `auth.clientId`, `auth.audience` | How the forwarded token is verified |
 
 The edge has to route `/api`, `/oauth/callback`, `/healthz` and `/readyz` to

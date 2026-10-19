@@ -419,6 +419,10 @@
     "send": "Send the request",
     "cancel": "Cancel",
     "signInToRequest": "Sign in to {{store}} to request support. The request is sent in the name of your account there.",
-    "received": "{{store}} has received your request for {{partner}}. Reference: {{reference}}."
+    "received": "{{store}} has received your request for {{partner}}. Reference: {{reference}}.",
+    "country": "Country",
+    "allCountries": "All countries",
+    "noneIn": "No partner lists support for this app in the country chosen.",
+    "consent": "Your name, e-mail address, company and this message will be sent to {{partner}} so they can contact you."
   }
 }

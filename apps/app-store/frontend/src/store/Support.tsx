@@ -1,8 +1,17 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { problemOf } from "@/api/client";
-import { requestSupport, type AppDetail, type StoreMeta, type SupportOffer, type SupportReceipt } from "@/api/store";
+import {
+  fetchContext,
+  fetchSupport,
+  requestSupport,
+  type AppDetail,
+  type StoreMeta,
+  type SupportOffer,
+  type SupportReceipt,
+} from "@/api/store";
+import { countryOptions, keepCountryChoice, readCountryChoice } from "@/lib/countries";
 import i18n from "@/lib/i18n";
 import { ExternalLink, Picture, ProblemNote, StoreSignIn } from "@/store/parts";
 import { useStoreSession } from "@/store/session";
@@ -17,7 +26,19 @@ import { useStoreSession } from "@/store/session";
  * offer and what it costs as they put it. What it costs, and on which terms,
  * is between the person, the partner and the store; this app shows it and
  * sends a request on. A partner's own pages open in a separate window.
+ *
+ * The offers are asked for the tenant's country by default, and for the one
+ * chosen in the switch otherwise -- or for none, where the store lists what it
+ * has. The choice holds for the browser session.
  */
+
+function sessionStore(): Storage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
 
 /** A country's or a language's name in the reader's language; the code when there is none. */
 function displayName(type: "region" | "language", code: string): string {
@@ -88,6 +109,11 @@ function RequestForm({ offer, coordinate, storeName }: { offer: SupportOffer; co
           onChange={(event) => setMessage(event.target.value)}
         />
       </label>
+      {/* What is passed on, said where the request is written: the form,
+          and so its send button, exists only with this notice in it. */}
+      <p className="store-support__consent" role="note">
+        {t("support.consent", { partner: offer.partner.name })}
+      </p>
       <p className="admin-console__hint">{t("support.sentTo", { store: storeName, partner: offer.partner.name })}</p>
       {send.error ? <ProblemNote error={send.error} /> : null}
       <div className="admin-console__actions">
@@ -150,19 +176,65 @@ function OfferCard({ offer, coordinate, storeName }: { offer: SupportOffer; coor
   );
 }
 
+function CountrySwitch({ value, onChange }: { value: string; onChange: (country: string) => void }) {
+  const { t } = useTranslation();
+  const language = i18n.resolvedLanguage ?? "en";
+  const options = useMemo(() => countryOptions(language), [language]);
+  return (
+    <label className="admin-console__label store-support__country">
+      <span className="admin-console__label-text">{t("support.country")}</span>
+      <select className="store-input" value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{t("support.allCountries")}</option>
+        {options.map((option) => (
+          <option key={option.code} value={option.code}>
+            {option.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function Support({ detail, meta, storeName }: { detail: AppDetail; meta: StoreMeta | undefined; storeName: string }) {
   const { t } = useTranslation();
-  const offers = detail.support ?? [];
-  if (meta?.features.includes("support") !== true || offers.length === 0) return null;
+  const contextQuery = useQuery({ queryKey: ["context"], queryFn: fetchContext, retry: false });
+  // null: nothing chosen in this session, so the tenant's country -- which
+  // the entry's own offers were already asked for.
+  const [choice, setChoice] = useState<string | null>(() => readCountryChoice(sessionStore()));
+  const tenantCountry = contextQuery.data?.tenantCountry ?? "";
+  const country = choice ?? tenantCountry;
+  const supported = meta?.features.includes("support") === true;
+  const switched = useQuery({
+    queryKey: ["store", "support", detail.coordinate, country],
+    queryFn: () => fetchSupport(detail.coordinate, country),
+    enabled: supported && choice !== null,
+    retry: false,
+  });
+  if (!supported) return null;
+  const offers = choice === null ? (detail.support ?? []) : (switched.data?.items ?? []);
+  // A store with no offer for the app anywhere: nothing to show, nor to switch.
+  if (offers.length === 0 && country === "" && !switched.isLoading) return null;
   return (
     <section className="admin-console__subsection store-support">
       <h2 className="admin-console__subsection-title">{t("support.title")}</h2>
       <p className="admin-console__lead">{t("support.lead", { store: storeName })}</p>
-      <ul className="admin-console__cards">
-        {offers.map((offer) => (
-          <OfferCard key={offer.id} offer={offer} coordinate={detail.coordinate} storeName={storeName} />
-        ))}
-      </ul>
+      <CountrySwitch
+        value={country}
+        onChange={(next) => {
+          keepCountryChoice(sessionStore(), next);
+          setChoice(next);
+        }}
+      />
+      {switched.error ? <ProblemNote error={switched.error} /> : null}
+      {offers.length > 0 ? (
+        <ul className="admin-console__cards">
+          {offers.map((offer) => (
+            <OfferCard key={offer.id} offer={offer} coordinate={detail.coordinate} storeName={storeName} />
+          ))}
+        </ul>
+      ) : switched.isLoading ? null : (
+        <p className="admin-console__empty">{t("support.noneIn")}</p>
+      )}
     </section>
   );
 }

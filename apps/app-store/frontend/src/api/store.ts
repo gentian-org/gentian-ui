@@ -17,6 +17,8 @@ export type Context = {
   /** Whether the cluster offers an App Store at all; null when it could not be asked. */
   appStore: { available: boolean; reason: string | null } | null;
   adminConsoleUrl: string | null;
+  /** The tenant's country, ISO 3166-1 alpha-2; null when it names none. */
+  tenantCountry: string | null;
 };
 
 export type CompanySize = "1-9" | "10-49" | "50-249" | "250-999" | "1000+";
@@ -343,6 +345,12 @@ export function fetchApps(filters: { category?: string; edition?: string; q?: st
 }
 
 export const fetchApp = (coordinate: string) => apiFetch<AppDetail>(`/store/apps/${appPath(coordinate)}`);
+
+/** An app's support offers for a country, or for none ("") -- what the store has. */
+export const fetchSupport = (coordinate: string, country: string) =>
+  apiFetch<{ country: string | null; items: SupportOffer[] }>(
+    `/store/apps/${appPath(coordinate)}/support?${new URLSearchParams({ country })}`,
+  );
 
 export type ReviewFilters = { companySize?: string; industry?: string };
 
