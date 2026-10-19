@@ -48,6 +48,62 @@ async def cluster_settings(
     )
 
 
+@router.get("/updates")
+async def updates(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Which installed apps, in every tenant, are behind the build their
+    catalogue offers, and what keeps them there: the director's report, read
+    under `can_audit` on the cluster. The policy and whether its window is
+    open now come with it."""
+    return await director.forward(
+        settings, "GET", _cluster_path(settings, "/updates"), bearer_of(credentials)
+    )
+
+
+@router.post("/updates/move")
+async def move_outdated(
+    body: dict,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Move every outdated app -- or those of the tenants and apps the body
+    names -- to the newest build its catalogue offers. The cluster
+    administrator's act (`can_configure`); each move exports first, verifies
+    after and rolls back by itself, and the report says how each went."""
+    return await director.forward(
+        settings,
+        "POST",
+        _cluster_path(settings, "/actions/move-outdated"),
+        bearer_of(credentials),
+        json_body=body,
+    )
+
+
+@router.put("/tenants/{tenant}/apps/{profile}/update-mode")
+async def set_update_mode(
+    tenant: str,
+    profile: str,
+    body: dict,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """How one tenant's app moves to newer builds: `{"mode": "latest" |
+    "manual" | "tenant" | ""}`, "" removing the override so the cluster's
+    policy applies again. The cluster administrator's write."""
+    return await director.forward(
+        settings,
+        "PUT",
+        _cluster_path(settings, f"/tenants/{tenant}/apps/{profile}/update-mode"),
+        bearer_of(credentials),
+        json_body=body,
+    )
+
+
 @router.patch("/settings")
 async def set_cluster_settings(
     body: dict,

@@ -694,7 +694,15 @@ export function InstallPanel({ detail, storeName }: { detail: AppDetail; storeNa
             ) : null}
             {credential.data ? <CredentialOutcomeNote outcome={credential.data} /> : null}
             {credential.error ? <ProblemNote error={credential.error} /> : null}
-            {updateAvailable ? (
+            {updateAvailable && !state.mayUpdate ? (
+              <div className="store-notice" role="note">
+                <p className="store-notice__title">{t("install.updateAvailable", { version: latest.version })}</p>
+                <p className="store-notice__text">
+                  {installed.updateMode === "latest" ? t("install.updateByPlatform") : t("install.updateByCluster")}
+                </p>
+              </div>
+            ) : null}
+            {updateAvailable && state.mayUpdate ? (
               <div className="store-notice" role="note">
                 <p className="store-notice__title">{t("install.updateAvailable", { version: latest.version })}</p>
                 {state.acquisition ? (

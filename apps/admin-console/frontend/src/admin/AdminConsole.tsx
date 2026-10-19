@@ -9,6 +9,7 @@ import { OperationsPromo } from "@/admin/OperationsPromo";
 import { CatalogueSection } from "@/admin/CatalogueSection";
 import { CredentialsSection } from "@/admin/CredentialsSection";
 import { CustomizationDebtSection } from "@/admin/CustomizationDebtSection";
+import { UpdatesSection } from "@/admin/UpdatesSection";
 import { ClusterSettingsSection } from "@/admin/ClusterSettingsSection";
 import { GroupsSection } from "@/admin/GroupsSection";
 import { MembersSection } from "@/admin/MembersSection";
@@ -25,6 +26,7 @@ import "./admin.css";
 import { useTranslation } from "react-i18next";
 
 type AdminTab =
+  | "updates"
   | "tenants"
   | "members"
   | "groups"
@@ -112,6 +114,7 @@ const TABS: {
   { id: "models", labelKey: "tabModels", platformOnly: true },
   { id: "platform", labelKey: "tabPlatform", platformOnly: true },
   { id: "customization", labelKey: "tabCustomization", platformOnly: true },
+  { id: "updates", labelKey: "tabUpdates", platformOnly: true },
   // What the cluster reports about itself. Read-only, and the usher decides
   // who may read it: this entry only keeps it out of a tenant's own console.
   { id: "usageStatistics", labelKey: "tabUsageStatistics", platformOnly: true },
@@ -222,6 +225,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <PlatformSecuritySection />
           ) : tab === "customization" ? (
             <CustomizationDebtSection />
+          ) : tab === "updates" ? (
+            <UpdatesSection />
           ) : tab === "usageStatistics" ? (
             <UsageStatisticsSection />
           ) : tab === "credentials" ? (

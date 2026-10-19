@@ -64,9 +64,13 @@ async def _cluster(ctx: Context) -> tuple[dict | None, dict | None, dict[str, An
             problems[name] = refusal.body()["problem"]
             return None
 
-    declared, states = await asyncio.gather(
-        ask("director", sequence.declared_apps), ask("usher", sequence.app_states)
+    declared, states, modes = await asyncio.gather(
+        ask("director", sequence.declared_apps), ask("usher", sequence.app_states), sequence.update_modes(ctx)
     )
+    # How each installed app moves to newer builds, beside what git says of
+    # it: "tenant" is the one mode under which this store may move it.
+    for profile, installed in (declared or {}).items():
+        installed["updateMode"] = (modes or {}).get(profile)
     return declared, states, problems
 
 
@@ -112,6 +116,10 @@ async def of_app(ctx: Context, coordinate: str) -> dict[str, Any]:
         "profile": profile,
         "stage": _stage(installed, state, acquisition),
         "installed": installed,
+        # Whether a newer build may be taken from here: only under the tenant
+        # mode. Under latest the platform moves the app; under manual the
+        # cluster's administrator does.
+        "mayUpdate": installed is not None and installed.get("updateMode") == "tenant",
         "state": state,
         "clusterProblems": problems,
         "storeSignedIn": oauth.current(ctx.session) is not None,
@@ -183,6 +191,7 @@ async def overview(ctx: Context) -> dict[str, Any]:
         row["updateAvailable"] = bool(
             row["latest"] and pinned and row["latest"]["digest"] != pinned
         )
+        row["mayUpdate"] = bool(row["updateAvailable"] and (row["installed"] or {}).get("updateMode") == "tenant")
         operation = sequence.find(ctx.session, row["coordinate"]) if row["coordinate"] else None
         row["operation"] = operation.view() if operation else None
     return {

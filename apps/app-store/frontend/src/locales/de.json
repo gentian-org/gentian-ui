@@ -303,7 +303,9 @@
     "waitingForRepository": "Es wird darauf gewartet, dass der Cluster das Repository übernimmt …",
     "settingMetering": "Die App erhält Adresse und Schlüssel, mit denen sie ihre Nutzung meldet…",
     "meteringNotArrivedTitle": "Der Cluster hat die Nutzungs-Zugangsdaten der App noch nicht angelegt",
-    "meteringNotArrivedBody": "Die App ist installiert und wird nach Nutzung abgerechnet, aber der Cluster fragt den Schlüssel, mit dem sie ihre Nutzung meldet, noch nicht ab. Fahren Sie fort, um es erneut zu versuchen."
+    "meteringNotArrivedBody": "Die App ist installiert und wird nach Nutzung abgerechnet, aber der Cluster fragt den Schlüssel, mit dem sie ihre Nutzung meldet, noch nicht ab. Fahren Sie fort, um es erneut zu versuchen.",
+    "updateByPlatform": "Die Plattform bringt diese App im Aktualisierungsfenster des Clusters auf den neuesten Build.",
+    "updateByCluster": "Die Cluster-Administration bringt diese App auf neuere Builds."
   },
   "refused": {
     "addons-403": "Der Cluster hat abgelehnt: Sie dürfen in diesem Mandanten nicht installieren. Die App selbst ist installiert.",
