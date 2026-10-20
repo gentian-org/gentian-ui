@@ -260,14 +260,16 @@ jobs:
       # behind the OCI referrers API by default; the cluster's Kyverno 1.13 verifies
       # the legacy form, a sha256-<digest>.sig tag, with its default verifier. The
       # bundle form returns with the Kyverno upgrade (certification plan C5).
+      # --use-signing-config=false goes with it: the TUF signing config is only
+      # for the bundle form, and cosign refuses the legacy form while it is on.
       - name: Sign the images
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
         env:
           WEB_DIGEST: ${{ steps.web.outputs.digest }}
           API_DIGEST: ${{ steps.api.outputs.digest }}
         run: |
-          cosign sign --yes --new-bundle-format=false "${WEB_IMAGE}@${WEB_DIGEST}"
-          cosign sign --yes --new-bundle-format=false "${API_IMAGE}@${API_DIGEST}"
+          cosign sign --yes --new-bundle-format=false --use-signing-config=false "${WEB_IMAGE}@${WEB_DIGEST}"
+          cosign sign --yes --new-bundle-format=false --use-signing-config=false "${API_IMAGE}@${API_DIGEST}"
       - name: Scan the web image
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
         continue-on-error: true
