@@ -117,6 +117,13 @@ jobs:
           npm ci --no-audit --no-fund
           npm run build
 
+      # vitest over src/**/*.test.tsx: a section rendered from the director's
+      # answer as it is served, so a field the screen reads and the director
+      # never sends fails here rather than as a blank tab in a browser.
+      - name: Frontend tests
+        working-directory: apps/admin-console/frontend
+        run: npm test
+
       # Known vulnerabilities in the production dependencies. Advisory until
       # the backlog is triaged (certification plan C2).
       - name: Frontend dependency audit

@@ -517,11 +517,9 @@ export type EffectiveAccessRow = {
   provider: string;
   bindingCapabilities: string[];
   grantedCapabilities: string[];
-  macAllowed: boolean;
   grantPhase: string;
-  openfgaGranted: Record<string, boolean>;
   /** What the binding asks for and the grant does not permit. */
-  ungranted?: string[];
+  ungranted: string[];
 };
 
 // Who holds which role, and what that role carries.

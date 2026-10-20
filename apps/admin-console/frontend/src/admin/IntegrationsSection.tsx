@@ -18,17 +18,6 @@ type IntegrationsSectionProps = {
   tenant: string;
 };
 
-function formatOpenfga(cap: string, granted: Record<string, boolean>): string {
-  if (Object.keys(granted).length === 0) {
-    return "—";
-  }
-  const value = granted[cap];
-  if (value === undefined) {
-    return "—";
-  }
-  return value ? "yes" : "no";
-}
-
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /** What the director said, as it said it, when the answer carried a reason. */
@@ -201,9 +190,9 @@ function IntegrationApprovals({
                 <td>{row.provider}</td>
                 <td>
                   <code>{row.grantedCapabilities.join(", ")}</code>
-                  {(row.ungranted ?? []).length > 0 ? (
+                  {row.ungranted.length > 0 ? (
                     <div className="admin-console__hint">
-                      {t("integrations.notGranted", { capabilities: (row.ungranted ?? []).join(", ") })}</div>
+                      {t("integrations.notGranted", { capabilities: row.ungranted.join(", ") })}</div>
                   ) : null}
                   {outcome(row)}
                 </td>
@@ -271,7 +260,7 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
       <p className="admin-console__mono" style={{ fontSize: "0.8125rem", color: "var(--gtn-ink-4)", marginBottom: "1.5rem" }}>
         {summary.bindingCount} binding{summary.bindingCount === 1 ? "" : "s"} ·{" "}
         {summary.grantCount} grant{summary.grantCount === 1 ? "" : "s"} ·{" "}
-        {summary.grantReadyCount} OpenFGA-synced
+        {summary.grantReadyCount} ready
       </p>
 
       <IntegrationApprovals tenant={tenant} rows={effectiveAccess} grants={grants} />
@@ -288,9 +277,7 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
               <th>{t("integrations.consumerProvider")}</th>
               <th>{t("integrations.bound")}</th>
               <th>{t("integrations.granted")}</th>
-              <th>{t("integrations.macEgress")}</th>
               <th>{t("integrations.grantPhase")}</th>
-              <th>{t("integrations.openfga")}</th>
             </tr>
           </thead>
           <tbody>
@@ -302,15 +289,7 @@ export function IntegrationsSection({ tenant }: IntegrationsSectionProps) {
                 </td>
                 <td>{row.bindingCapabilities.join(", ") || "—"}</td>
                 <td>{row.grantedCapabilities.join(", ") || "—"}</td>
-                <td>{row.macAllowed ? "allowed" : "denied"}</td>
                 <td>{row.grantPhase || "—"}</td>
-                <td>
-                  {row.grantedCapabilities.length === 0
-                    ? "—"
-                    : row.grantedCapabilities
-                        .map((cap) => `${cap}: ${formatOpenfga(cap, row.openfgaGranted)}`)
-                        .join("; ")}
-                </td>
               </tr>
             ))}
           </tbody>

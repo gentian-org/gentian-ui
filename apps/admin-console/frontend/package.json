@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "node scripts/i18n.mjs --check && tsc && vite build",
     "preview": "vite preview",
+    "test": "vitest run",
     "i18n": "node scripts/i18n.mjs --check",
     "i18n:extract": "node scripts/i18n.mjs --apply && node scripts/i18n-hooks.mjs"
   },
@@ -28,6 +29,7 @@
     "@vitejs/plugin-react-swc": "^4.0.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.8.0",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vitest": "^3.2.7"
   }
 }
