@@ -14,7 +14,7 @@ dependencies = [
 [project.optional-dependencies]
 # pyyaml and jsonschema are for the contract tests only: the fake store the
 # suite runs against is itself validated against the store API's definition.
-dev = ["pytest>=8.0.0", "ruff>=0.16,<0.17", "pyyaml>=6.0", "jsonschema>=4.23.0"]
+dev = ["pytest>=8.0.0", "ruff>=0.16,<0.18", "pyyaml>=6.0", "jsonschema>=4.23.0"]
 
 [build-system]
 requires = ["hatchling"]
