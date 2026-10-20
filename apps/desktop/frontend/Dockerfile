@@ -20,8 +20,10 @@ WORKDIR /app
 # (docker-entrypoint.sh -> /config.js), which is where they belong. The image is
 # byte-identical across clusters.
 
-COPY package.json ./
-RUN npm install
+# The lockfile decides what is installed: npm ci refuses a lockfile that does
+# not match package.json instead of resolving anew.
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
