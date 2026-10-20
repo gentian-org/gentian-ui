@@ -1,12 +1,52 @@
 version: 2
+# One grouped pull request per ecosystem and week. The version comment
+# beside each pinned Action or base image is what Dependabot reads and
+# rewrites. Security updates are opened as they appear, outside the groups.
 updates:
-  # Keeps the commit SHAs the workflows pin their Actions to current. One
-  # grouped pull request a week; the version comment beside each SHA is
-  # what Dependabot reads and rewrites.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     groups:
       actions:
+        patterns: ["*"]
+
+  # Python backends: uv.lock is the file that changes.
+  - package-ecosystem: uv
+    directories:
+      - /apps/admin-console/backend
+      - /apps/app-store/backend
+      - /apps/desktop/backend
+    schedule:
+      interval: weekly
+    groups:
+      python-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Frontends: package-lock.json is the file that changes.
+  - package-ecosystem: npm
+    directories:
+      - /apps/admin-console/frontend
+      - /apps/app-store/frontend
+      - /apps/desktop/frontend
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Base images, pinned by digest in every Dockerfile.
+  - package-ecosystem: docker
+    directories:
+      - /apps/admin-console/backend
+      - /apps/admin-console/frontend
+      - /apps/app-store/backend
+      - /apps/app-store/frontend
+      - /apps/concierge
+      - /apps/desktop/backend
+      - /apps/desktop/frontend
+    schedule:
+      interval: weekly
+    groups:
+      base-images:
         patterns: ["*"]
