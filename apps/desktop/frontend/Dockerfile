@@ -6,7 +6,7 @@
 # identical bundle for several times the wall clock. Only the runtime stage
 # below is built per target platform, where the architecture actually shows up
 # in the `serve` install.
-FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS build
+FROM --platform=$BUILDPLATFORM node:26-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5 AS build
 WORKDIR /app
 
 # No VITE_* build args. Vite substitutes import.meta.env.VITE_* at BUILD time,
@@ -27,7 +27,7 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
-FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd
+FROM node:26-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5
 RUN npm install -g serve@14.2.4
 COPY --from=build /app/dist /app/dist
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

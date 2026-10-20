@@ -1,6 +1,6 @@
 # The concierge: static files, nothing to build. Served by the same small
 # static server the consoles' web images run, as the same unprivileged user.
-FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+FROM node:26-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5
 RUN npm install -g serve@14.2.4
 COPY serve.json /app/serve.json
 COPY site /app/site
