@@ -165,6 +165,30 @@ def test_whether_the_person_may_approve_a_privilege_is_the_directors_answer(monk
         assert r.json()["canApprovePrivilege"] is want
 
 
+def test_whether_the_person_may_approve_a_node_privilege_is_the_directors_answer(monkeypatch):
+    """The button that approves a podSecurity or clusterRoles request follows
+    the cluster's can_approve -- the security officer's -- as the director
+    answers it; absent is no, and the tenant's own approval right is not it."""
+    for tenant_rel, cluster_rel, want in (
+        ({"can_administer": True}, {"can_approve": True}, True),
+        ({"can_administer": True}, {"can_approve": False}, False),
+        ({"can_administer": True}, {}, False),
+        ({"can_administer": True, "can_approve_privilege": True}, {"can_configure": True}, False),
+    ):
+        _director(
+            monkeypatch,
+            {
+                "/v1/tenants/platform/me": {"relations": tenant_rel},
+                "/v1/clusters/demo/me": {"relations": cluster_rel},
+            },
+        )
+        r = TestClient(_app(_settings())).get(
+            "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+        )
+        assert r.status_code == 200
+        assert r.json()["canApproveNodePrivilege"] is want
+
+
 def test_someone_the_edge_let_in_but_who_may_not_administer_is_refused(monkeypatch):
     _director(
         monkeypatch,

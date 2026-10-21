@@ -33,6 +33,13 @@ export type AdminContext = {
    * Approve button, which is a no.
    */
   canApprovePrivilege?: boolean;
+  /**
+   * The director's answer to whether this person may answer the requests
+   * that weaken what protects the node, podSecurity and clusterRoles: the
+   * cluster's security officer's (cluster#can_approve). Absent from a backend
+   * older than the security officer's Approve button, which is a no.
+   */
+  canApproveNodePrivilege?: boolean;
 };
 
 export type AdminMember = {
@@ -1061,6 +1068,17 @@ export function fetchSettingsTemplates(tenant?: string) {
   return apiFetch<{ templates: SettingsTemplate[] }>(`/admin/templates${tenantQuery(tenant)}`);
 }
 
+/**
+ * Who answers one pending request: the tenant's administrator
+ * (can_approve_privilege) or the cluster's security officer (cluster
+ * can_approve). Any other value is a kind of answer this console does not
+ * know, and it offers no button for it.
+ */
+export type PendingPrivilegeApproval = {
+  privilege: string;
+  approvedBy: "tenant" | "security-officer" | (string & {});
+};
+
 /** One of the tenant's components as the cluster holds it. */
 export type AppState = {
   profile: string;
@@ -1071,6 +1089,12 @@ export type AppState = {
   failure?: string;
   /** Requests of the app's profile nobody has granted yet, as `<kind>/<name>`. */
   pendingPrivileges?: string[];
+  /**
+   * The same requests, each with who answers it, as the operator decides it
+   * from the kind and the director applies it to the approval. Absent from an
+   * operator older than this field, and then no request offers the button.
+   */
+  pendingPrivilegeApprovals?: PendingPrivilegeApproval[];
   /** The component's own conditions, as the operator reports them. */
   conditions?: { type: string; status: string; reason?: string; message?: string }[];
 };
