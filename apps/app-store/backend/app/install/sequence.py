@@ -11,6 +11,7 @@ person's own token:
     install      director   POST /v1/tenants/{t}/apps/{app}
     addons       director   PUT  /v1/tenants/{t}/apps/{app}/addons
     metering     custodian  PUT  /v1/credentials/app-{t}-{app}-metering   (an app priced by use)
+    approvals    usher      GET  /v1/tenants/{t}/apps/status  (while the app waits on a person)
     rollout      usher      GET  /v1/tenants/{t}/apps/status
     tile         desktop    PUT  /api/v1/tenant-tiles/{app}   (once ready; never fails the install)
 
@@ -39,6 +40,12 @@ Where it stops for the person
   and continues from this step when the person says.
 * `failed`: a step was refused. The refusing service's own words are shown,
   and the step can be asked again.
+* `approvals` does not stop: the cluster says the app waits for a privilege
+  somebody must approve (store-contract.md §6.4 step 4). The step lists each
+  with the profile's reason and who answers it -- the tenant's administrator
+  approves theirs here (`approve_privilege`), and asks the security officer
+  for the rest (`request_privilege`); the usher is asked again until nothing
+  is pending, and the sequence goes on to the rollout by itself.
 
 What is kept, and where
 -----------------------
@@ -675,6 +682,12 @@ async def _rollout(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None
         op.stage = "done"
     elif phase == "failing":
         op.stage = "failing"
+    elif state and state["pendingPrivilegeApprovals"]:
+        # Waiting on a person, not on the cluster. The step shows whom, and
+        # the usher is asked again all the same: an approval arrives as a
+        # change of the app's state, from whoever gave it.
+        op.stage = "approvals"
+        op.wait = ROLLOUT_POLL_SECONDS
     else:
         op.stage = "rollout"
         op.wait = ROLLOUT_POLL_SECONDS
@@ -697,6 +710,9 @@ _STEPS = {
     "metering": _metering,
     "metering-timeout": _metering_timeout,
     "rollout": _rollout,
+    # Each approval given or asked for shows in the app's state; the step
+    # looks again until none is pending.
+    "approvals": _rollout,
     # A workload that is failing may recover: asking again looks again.
     "failing": _rollout,
     "done": _done,
@@ -722,10 +738,39 @@ def state_view(entry: Any) -> dict[str, Any] | None:
         "ready": entry.get("ready") is True,
         "message": text("message"),
         "failure": text("failure"),
+        # The Component's name, which the approval route names; the profile's
+        # where an older operator does not say.
+        "name": text("name"),
         "pendingPrivileges": [p for p in privileges if isinstance(p, str)]
         if isinstance(privileges, list)
         else [],
+        "pendingPrivilegeApprovals": _approvals_view(entry.get("pendingPrivilegeApprovals")),
     }
+
+
+APPROVER_KINDS = ("tenant", "security-officer")
+
+
+def _approvals_view(entries: Any) -> list[dict[str, Any]]:
+    """Each pending request with who answers it and what has been said of
+    it, as the operator reports them (store-contract.md §8). An entry that
+    does not name a privilege, or names an approver this app does not know,
+    is left out: the button it would show is one the director would refuse."""
+    out: list[dict[str, Any]] = []
+    if not isinstance(entries, list):
+        return out
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        privilege, approved_by = entry.get("privilege"), entry.get("approvedBy")
+        if not isinstance(privilege, str) or "/" not in privilege or approved_by not in APPROVER_KINDS:
+            continue
+        view: dict[str, Any] = {"privilege": privilege, "approvedBy": approved_by}
+        for key in ("reason", "requestedBy", "requestedAt", "note", "expiredAt"):
+            value = entry.get(key)
+            view[key] = value[:2000] if isinstance(value, str) and value else None
+        out.append(view)
+    return out
 
 
 async def app_states(ctx: Context) -> dict[str, dict[str, Any]]:
@@ -843,3 +888,65 @@ async def set_credentials(ctx: Context, acquisition_id: str, *, rotate: bool) ->
         step.username = step.token = None
         results.append(result)
     return {"acquisition": acquisition_id, "rotated": rotate, "repositories": results}
+
+
+# ── the approvals ───────────────────────────────────────────────────────────
+
+
+def _privilege_path(privilege: str) -> tuple[str, str]:
+    kind, _, name = privilege.partition("/")
+    if kind not in ("egress", "podSecurity", "clusterRoles"):
+        raise Refusal(status=400, source="app", code="invalid-request", detail="The privilege is <kind>/<name>.")
+    return kind, patterns.name(name, "privilege")
+
+
+async def _install_name(ctx: Context, profile: str) -> str:
+    """What the approval route names: the Component, which the cluster's state
+    names; the profile where it does not."""
+    state = await app_state(ctx, profile)
+    name = state.get("name") if state else None
+    return patterns.name(name, "install") if isinstance(name, str) and name else profile
+
+
+async def approve_privilege(
+    ctx: Context, profile: str, privilege: str, reason: str, expires_at: str | None
+) -> dict[str, Any]:
+    """Approve one request the app waits for, as the person: one commit through
+    the director, which decides whether they may by the kind and records them
+    as the approver. Its refusal is passed through as it worded it."""
+    kind, name = _privilege_path(privilege)
+    body: dict[str, str] = {"reason": reason}
+    if expires_at:
+        body["expiresAt"] = expires_at
+    answer = await director.ask_director(
+        ctx.settings,
+        "PUT",
+        f"/v1/tenants/{patterns.name(ctx.tenant, 'tenant')}/privileges/"
+        f"{await _install_name(ctx, profile)}/{kind}/{name}",
+        ctx.cluster_token,
+        json_body=body,
+    )
+    if answer.status not in (200, 202) or not isinstance(answer.body, dict):
+        raise answer.refusal()
+    return {"status": answer.body.get("status"), "commit": answer.body.get("commit")}
+
+
+async def request_privilege(ctx: Context, profile: str, privilege: str, note: str | None) -> dict[str, Any]:
+    """Ask the security officer for one request the tenant cannot approve
+    itself. The director has the operator record who asked, when and the
+    note on the app, where the platform console's Approvals page lists it."""
+    _privilege_path(privilege)
+    answer = await director.ask_director(
+        ctx.settings,
+        "POST",
+        f"/v1/tenants/{patterns.name(ctx.tenant, 'tenant')}/apps/{profile}/actions/request-privilege",
+        ctx.cluster_token,
+        json_body={"privilege": privilege, "note": note or ""},
+    )
+    if answer.status not in (200, 202) or not isinstance(answer.body, dict):
+        raise answer.refusal()
+    request = answer.body.get("request")
+    return {
+        "status": answer.body.get("status"),
+        "request": request if isinstance(request, dict) else None,
+    }

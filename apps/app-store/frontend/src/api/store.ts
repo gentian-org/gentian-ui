@@ -17,6 +17,12 @@ export type Context = {
   /** Whether the cluster offers an App Store at all; null when it could not be asked. */
   appStore: { available: boolean; reason: string | null } | null;
   adminConsoleUrl: string | null;
+  /**
+   * The platform console's Approvals page, entered through this tenant's
+   * realm: where the cluster's security officer answers what an app asks of
+   * the node. Null when the cluster's domain is not known here.
+   */
+  platformApprovalsUrl?: string | null;
   /** The tenant's country, ISO 3166-1 alpha-2; null when it names none. */
   tenantCountry: string | null;
 };
@@ -214,13 +220,32 @@ export type Installed = {
   updateMode?: string | null;
 };
 
+/**
+ * One request of the app's profile nobody has granted yet, as the operator
+ * reports it: who answers it, the profile's reason, and what has been asked
+ * of the security officer so far.
+ */
+export type PendingApproval = {
+  privilege: string;
+  approvedBy: "tenant" | "security-officer";
+  reason: string | null;
+  requestedBy: string | null;
+  requestedAt: string | null;
+  note: string | null;
+  /** When a grant for it ran out: approved once, waiting again. */
+  expiredAt: string | null;
+};
+
 /** What the cluster has made of it, in its own words. */
 export type AppState = {
   phase: string | null;
   ready: boolean;
   message: string | null;
   failure: string | null;
+  /** The Component's name, which an approval names; null from an older operator. */
+  name?: string | null;
   pendingPrivileges: string[];
+  pendingPrivilegeApprovals?: PendingApproval[];
 };
 
 export type AcquisitionView = {
@@ -248,6 +273,7 @@ export type Stage =
   | "addons"
   | "metering"
   | "metering-timeout"
+  | "approvals"
   | "rollout"
   | "failing"
   | "done"
@@ -443,6 +469,29 @@ export const advanceOperation = (coordinate: string, body: AdvanceRequest = {}) 
   apiFetch<Operation>(`/apps/${appPath(coordinate)}/operation/advance`, {
     method: "POST",
     body: JSON.stringify(body),
+  });
+
+export type ApproveRequest = { reason: string; expiresAt?: string };
+export type ApproveOutcome = { status: string | null; commit: string | null };
+export type RequestOutcome = {
+  status: string | null;
+  request: { requestedBy: string; requestedAt: string; note?: string } | null;
+};
+
+const privilegePath = (coordinate: string, privilege: string) => {
+  const [kind, name] = privilege.split("/", 2);
+  return `/apps/${appPath(coordinate)}/privileges/${encodeURIComponent(kind)}/${encodeURIComponent(name ?? "")}`;
+};
+
+/** Approve one request the app waits for, as the person; the director decides whether they may. */
+export const approvePrivilege = (coordinate: string, privilege: string, body: ApproveRequest) =>
+  apiFetch<ApproveOutcome>(`${privilegePath(coordinate, privilege)}/approve`, { method: "POST", body: JSON.stringify(body) });
+
+/** Ask the cluster's security officer for one the tenant cannot approve itself. */
+export const requestPrivilege = (coordinate: string, privilege: string, note: string) =>
+  apiFetch<RequestOutcome>(`${privilegePath(coordinate, privilege)}/request`, {
+    method: "POST",
+    body: JSON.stringify(note ? { note } : {}),
   });
 
 export const stopOperation = (coordinate: string) =>

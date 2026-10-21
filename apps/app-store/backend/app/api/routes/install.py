@@ -125,6 +125,44 @@ async def stop(catalogue: str, app: str, ctx: Context = Depends(context)) -> dic
     return await state.of_app(ctx, coordinate)
 
 
+class ApproveBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # In the approver's own words; the director wants at least ten characters.
+    reason: str = Field(min_length=10, max_length=1000)
+    # RFC 3339. Absent: the approval stands until somebody withdraws it.
+    expiresAt: str | None = Field(default=None, max_length=40)
+
+
+@router.post("/apps/{catalogue}/{app}/privileges/{kind}/{name}/approve")
+async def approve_privilege(
+    catalogue: str, app: str, kind: str, name: str, body: ApproveBody, ctx: Context = Depends(context)
+) -> dict[str, Any]:
+    """Approve one request the app waits for (store-contract.md §6.4 step 4).
+    The director decides whether this person may, by the kind."""
+    return await sequence.approve_privilege(
+        ctx, patterns.app_of(_coordinate(catalogue, app)), f"{kind}/{name}", body.reason.strip(), body.expiresAt
+    )
+
+
+class RequestBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # For the security officer, if the person has anything to add.
+    note: str | None = Field(default=None, max_length=1000)
+
+
+@router.post("/apps/{catalogue}/{app}/privileges/{kind}/{name}/request")
+async def request_privilege(
+    catalogue: str, app: str, kind: str, name: str, body: RequestBody, ctx: Context = Depends(context)
+) -> dict[str, Any]:
+    """Ask the security officer for one request the tenant cannot approve
+    itself; the platform console's Approvals page lists it."""
+    return await sequence.request_privilege(
+        ctx, patterns.app_of(_coordinate(catalogue, app)), f"{kind}/{name}", (body.note or "").strip() or None
+    )
+
+
 class CredentialBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

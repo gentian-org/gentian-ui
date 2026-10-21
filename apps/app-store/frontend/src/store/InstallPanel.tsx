@@ -20,6 +20,7 @@ import {
   type Version,
 } from "@/api/store";
 import i18n from "@/lib/i18n";
+import { Approvals } from "@/store/Approvals";
 import { ExternalLink, giveBackLink, ProblemNote, shortDigest, StoreSignIn } from "@/store/parts";
 import { useStoreSession } from "@/store/session";
 import { StoreMarkdown } from "@/store/StoreMarkdown";
@@ -27,7 +28,7 @@ import { StoreMarkdown } from "@/store/StoreMarkdown";
 const mono = { mono: <span className="admin-console__mono" /> };
 
 /** The steps of a sequence, in the order they are taken. */
-const STEPS: Stage[] = ["acquire", "checkout", "declare", "credential", "install", "addons", "metering", "rollout"];
+const STEPS: Stage[] = ["acquire", "checkout", "declare", "credential", "install", "addons", "metering", "approvals", "rollout"];
 
 /** The step a stage belongs to, for the list of steps. */
 const STEP_OF: Record<Stage, Stage> = {
@@ -42,6 +43,7 @@ const STEP_OF: Record<Stage, Stage> = {
   addons: "addons",
   metering: "metering",
   "metering-timeout": "metering",
+  approvals: "approvals",
   rollout: "rollout",
   failing: "rollout",
   done: "rollout",
@@ -189,6 +191,9 @@ function StepList({ operation }: { operation: Operation }) {
     if (step === "addons") return (operation.build?.addons.length ?? 0) > 0;
     // Only an app priced by use has one, and nothing says so before it is reached.
     if (step === "metering") return operation.stage === "metering" || operation.stage === "metering-timeout";
+    // Only an app that asks for more than the default posture has one, and
+    // the cluster says so once the install reaches it.
+    if (step === "approvals") return operation.stage === "approvals" || (operation.rollout?.pendingPrivilegeApprovals?.length ?? 0) > 0;
     return true;
   });
   const index = shown.indexOf(at);
@@ -224,6 +229,7 @@ function Progress({
   detail,
   operation,
   storeName,
+  platformApprovalsUrl,
   onAdvance,
   onStop,
   busy,
@@ -232,6 +238,7 @@ function Progress({
   detail: AppDetail;
   operation: Operation;
   storeName: string;
+  platformApprovalsUrl: string | null | undefined;
   onAdvance: (body?: AdvanceRequest) => void;
   onStop: () => void;
   busy: boolean;
@@ -409,6 +416,15 @@ function Progress({
 
       {stage === "install" ? <p className="admin-console__lead">{t("install.installing")}</p> : null}
       {stage === "addons" ? <p className="admin-console__lead">{t("install.pinningAddons")}</p> : null}
+
+      {stage === "approvals" && operation.rollout ? (
+        <Approvals
+          coordinate={operation.coordinate}
+          approvals={operation.rollout.pendingPrivilegeApprovals ?? []}
+          platformApprovalsUrl={platformApprovalsUrl}
+          onChanged={() => onAdvance()}
+        />
+      ) : null}
 
       {stage === "rollout" ? (
         <>
@@ -640,6 +656,7 @@ export function InstallPanel({ detail, storeName }: { detail: AppDetail; storeNa
         detail={detail}
         operation={operation}
         storeName={storeName}
+        platformApprovalsUrl={contextQuery.data?.platformApprovalsUrl}
         busy={busy}
         error={stepError}
         onAdvance={(request) => {
@@ -679,6 +696,16 @@ export function InstallPanel({ detail, storeName }: { detail: AppDetail; storeNa
               <p className="admin-console__meta">{t("install.notPinned")}</p>
             )}
             {state.stage !== "ready" ? <ClusterState state={state.state} /> : null}
+            {state.stage === "installing" && (state.state?.pendingPrivilegeApprovals?.length ?? 0) > 0 ? (
+              // The same step as in a sequence under way: a page opened
+              // again shows what the app waits on and lets the person act.
+              <Approvals
+                coordinate={coordinate}
+                approvals={state.state?.pendingPrivilegeApprovals ?? []}
+                platformApprovalsUrl={contextQuery.data?.platformApprovalsUrl}
+                onChanged={() => void queryClient.invalidateQueries({ queryKey: ["state", coordinate] })}
+              />
+            ) : null}
             {state.stage === "ready" ? <p className="admin-console__meta">{t("install.doneTile")}</p> : null}
             {state.stage === "failing" && state.acquisition && state.acquisition.repositories.length > 0 ? (
               <div className="admin-console__actions">
