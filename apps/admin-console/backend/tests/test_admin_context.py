@@ -268,3 +268,41 @@ def test_the_catch_all_is_the_last_route_of_its_router(monkeypatch):
     finally:
         app.dependency_overrides.pop(get_settings, None)
     assert r.status_code == 200
+
+
+def test_the_security_officer_is_let_in_for_the_approvals_screen_alone(monkeypatch):
+    """The one widening of the entry: cluster#can_approve without
+    can_administer opens the console with isTenantAdmin false. Nothing of the
+    tenant's is granted by it; the director refuses every other read."""
+    _director(
+        monkeypatch,
+        {
+            "/v1/tenants/platform/me": {"relations": {"can_enter": True}},
+            "/v1/clusters/demo/me": {"relations": {"can_approve": True, "can_configure": True}},
+        },
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer officer"}
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["isTenantAdmin"] is False
+    assert body["canApproveNodePrivilege"] is True
+    # Not a platform administrator either: the platform screens need the
+    # tenant's console entered as its administrator, as before.
+    assert body["isPlatformAdmin"] is False
+    assert body["canApprovePrivilege"] is False and body["canExpose"] is False
+
+
+def test_a_cluster_administrator_who_is_not_a_security_officer_is_still_refused(monkeypatch):
+    _director(
+        monkeypatch,
+        {
+            "/v1/tenants/platform/me": {"relations": {"can_enter": True}},
+            "/v1/clusters/demo/me": {"relations": {"can_configure": True, "can_audit": True}},
+        },
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 403

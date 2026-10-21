@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { fetchAdminContext } from "@/api/admin";
 import { AppsSection } from "@/admin/AppsSection";
+import { ApprovalsSection } from "@/admin/ApprovalsSection";
 import { AuditSection } from "@/admin/AuditSection";
 import { ExportSection } from "@/admin/ExportSection";
 import { OperationsPromo } from "@/admin/OperationsPromo";
@@ -26,6 +27,7 @@ import "./admin.css";
 import { useTranslation } from "react-i18next";
 
 type AdminTab =
+  | "approvals"
   | "updates"
   | "tenants"
   | "members"
@@ -79,12 +81,22 @@ const TABS: {
   platformOnly?: boolean;
   /** Shown only to those the director says may publish for the tenant. */
   approverOnly?: boolean;
+  /**
+   * Shown only to the cluster's security officer (cluster can_approve), and
+   * the one tab a person who does not administer the tenant is shown: the
+   * console lets them in for this screen alone (/admin/context).
+   */
+  officerOnly?: boolean;
   hidden?: boolean;
 }[] = [
   // First, and platform-only, because bringing a customer on is what an MSP
   // employee opens this console to do. A tenant administrator sees their own
   // tenant's screens and has no business listing the others.
   { id: "tenants", labelKey: "tabTenants", platformOnly: true },
+  // What every tenant's apps ask of the node, for the security officer who
+  // answers it. At the platform console, where they act; the usher decides
+  // who reads the list and the director decides each approval.
+  { id: "approvals", labelKey: "tabApprovals", officerOnly: true },
   { id: "members", labelKey: "tabMembers" },
   { id: "groups", labelKey: "tabGroups" },
   // What the tenant has installed, and everything done to an app after it is
@@ -125,10 +137,18 @@ type AdminConsoleProps = {
   embedded?: boolean;
 };
 
+/** The tab a link names (?tab=approvals), when it is one. */
+function linkedTab(): AdminTab | null {
+  if (typeof window === "undefined") return null;
+  const wanted = new URLSearchParams(window.location.search).get("tab");
+  const entry = TABS.find((candidate) => candidate.id === wanted && !candidate.hidden);
+  return entry ? entry.id : null;
+}
+
 export function AdminConsole({ embedded = false }: AdminConsoleProps) {
   const { t } = useTranslation();
 
-  const [tab, setTab] = useState<AdminTab>("members");
+  const [tab, setTab] = useState<AdminTab | null>(linkedTab);
   const contextQuery = useQuery({
     queryKey: ["admin", "context"],
     queryFn: () => fetchAdminContext(),
@@ -164,7 +184,22 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
     );
   }
 
-  const { realm, isPlatformAdmin, canExpose } = contextQuery.data;
+  const { realm, isPlatformAdmin, canExpose, canApproveNodePrivilege } = contextQuery.data;
+  // False only for the security officer let in for the Approvals screen; a
+  // backend older than that field answered nobody who did not administer.
+  const administers = contextQuery.data.isTenantAdmin !== false;
+  const shown = TABS.filter(
+    (entry) =>
+      !entry.hidden &&
+      (administers || entry.officerOnly) &&
+      (!entry.platformOnly || isPlatformAdmin) &&
+      (!entry.approverOnly || canExpose === true) &&
+      (!entry.officerOnly || canApproveNodePrivilege === true),
+  );
+  // Members first, as it always was, for whoever has it; the officer let in
+  // for one screen lands on it.
+  const isShown = (id: AdminTab) => shown.some((entry) => entry.id === id);
+  const current: AdminTab = tab && isShown(tab) ? tab : isShown("members") ? "members" : (shown[0]?.id ?? "members");
 
   return (
     <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
@@ -180,18 +215,13 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
         </header>
 
         <nav className="admin-console__tabs" aria-label={t("adminConsole.adminSections")}>
-          {TABS.filter(
-            (entry) =>
-              !entry.hidden &&
-              (!entry.platformOnly || isPlatformAdmin) &&
-              (!entry.approverOnly || canExpose === true),
-          ).map((entry) => (
+          {shown.map((entry) => (
             <button
               key={entry.id}
               type="button"
-              aria-current={tab === entry.id ? "page" : undefined}
+              aria-current={current === entry.id ? "page" : undefined}
               className={`admin-console__tab${
-                tab === entry.id ? " admin-console__tab--active" : ""
+                current === entry.id ? " admin-console__tab--active" : ""
               }`}
               onClick={() => setTab(entry.id)}
             >
@@ -201,41 +231,43 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
         </nav>
 
         <div className="admin-console__body">
-          {tab === "tenants" ? (
+          {!administers && current !== "approvals" ? null : current === "approvals" ? (
+            <ApprovalsSection />
+          ) : current === "tenants" ? (
             <TenantsSection />
-          ) : tab === "members" ? (
+          ) : current === "members" ? (
             <MembersSection tenant={tenant} />
-          ) : tab === "groups" ? (
+          ) : current === "groups" ? (
             <GroupsSection tenant={tenant} />
-          ) : tab === "apps" ? (
+          ) : current === "apps" ? (
             <AppsSection tenant={tenant} onOpenIntegrations={() => setTab("integrations")} />
-          ) : tab === "security" ? (
+          ) : current === "security" ? (
             <SecurityPoliciesSection tenant={tenant} />
-          ) : tab === "integrations" ? (
+          ) : current === "integrations" ? (
             <IntegrationsSection tenant={tenant} />
-          ) : tab === "catalogue" ? (
+          ) : current === "catalogue" ? (
             <CatalogueSection tenant={tenant} />
-          ) : tab === "resources" ? (
+          ) : current === "resources" ? (
             <ResourcesSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
-          ) : tab === "settings" ? (
+          ) : current === "settings" ? (
             <ClusterSettingsSection />
-          ) : tab === "models" ? (
+          ) : current === "models" ? (
             <ModelsSection />
-          ) : tab === "platform" ? (
+          ) : current === "platform" ? (
             <PlatformSecuritySection />
-          ) : tab === "customization" ? (
+          ) : current === "customization" ? (
             <CustomizationDebtSection />
-          ) : tab === "updates" ? (
+          ) : current === "updates" ? (
             <UpdatesSection />
-          ) : tab === "usageStatistics" ? (
+          ) : current === "usageStatistics" ? (
             <UsageStatisticsSection />
-          ) : tab === "credentials" ? (
+          ) : current === "credentials" ? (
             <CredentialsSection />
-          ) : tab === "perimeter" ? (
+          ) : current === "perimeter" ? (
             <PerimeterSection />
-          ) : tab === "notifications" ? (
+          ) : current === "notifications" ? (
             <NotificationsSection tenant={tenant} isPlatformAdmin={isPlatformAdmin} />
-          ) : tab === "export" ? (
+          ) : current === "export" ? (
             <>
               <ExportSection tenant={tenant} />
               <OperationsPromo />
