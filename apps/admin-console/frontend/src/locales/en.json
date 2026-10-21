@@ -25,7 +25,8 @@
     "tabUsageStatistics": "Usage Statistics",
     "tabApps": "Apps",
     "tabPerimeter": "Perimeter",
-    "tabUpdates": "Updates"
+    "tabUpdates": "Updates",
+    "tabSecurityOfficers": "Security officers"
   },
   "audit": {
     "action": "Action",
@@ -494,7 +495,13 @@
     "securityPolicies": "Security policies",
     "securityPoliciesAreNotAvailable": "Security policies are not available.",
     "session": "Session",
-    "ssoIdleTimeoutMinutes": "SSO idle timeout (minutes)"
+    "ssoIdleTimeoutMinutes": "SSO idle timeout (minutes)",
+    "platformAccessTitle": "Platform administrators",
+    "platformAccessBody": "Whether the platform's administrators may sign in to this workspace as its administrators, with their platform account. Off, they still administer it through the platform console where the cluster operates it; this switch is about signing in. Each entry is in the realm's login events, and whoever leaves the platform's administrators loses the access at their next sign-in.",
+    "platformAccessSwitch": "Platform administrators may sign in to this workspace",
+    "platformAccessOnCommitted": "Committed: the platform's administrators may sign in once the cluster has taken it in.",
+    "platformAccessOffCommitted": "Committed: the platform's administrators may no longer sign in. An account one of them already has here stays until it is removed under Members.",
+    "platformAccessUnchanged": "The workspace already says so; nothing was committed."
   },
   "tenants": {
     "apps": "Apps",
@@ -567,7 +574,9 @@
     "country": "Country (optional)",
     "countryHint": "Two letters, ISO 3166-1 (CH, DE). Apps such as the App Store are told it; it can be changed later.",
     "countryNamed": "{{country}}. Apps such as the App Store are told it; it can be changed later.",
-    "countryPlaceholder": "CH"
+    "countryPlaceholder": "CH",
+    "enterTenant": "Enter tenant",
+    "enterTenantHint": "This tenant lets the platform's administrators sign in to it. Opens its desktop through the kernel realm; you arrive as one of its administrators."
   },
   "usage": {
     "committed": "committed",
@@ -1100,5 +1109,33 @@
     "modeLatest": "latest: the platform moves it",
     "modeManual": "manual: the cluster's administrator moves it",
     "modeTenant": "tenant: the tenant's administrator may move it"
+  },
+  "securityOfficers": {
+    "title": "Security officers",
+    "lead": "Who approves what escapes the default posture: pod-security waivers, cluster roles, catalogue entries at the platform trust tier. The administrators of the cluster's tenants, picked here and declared on the Cluster claim; each signs in to the platform with their own tenant account.",
+    "loading": "Reading who holds the role…",
+    "unavailable": "The security officers could not be read.",
+    "whoHoldsIt": "Who holds it",
+    "nobodyYet": "Nobody holds the role yet. Pick a tenant's administrator below.",
+    "tenant": "Tenant",
+    "login": "Login",
+    "email": "Email",
+    "signsInAt": "Signs in at",
+    "remove": "Remove",
+    "nameOne": "Name a security officer",
+    "pickerHint": "The administrators of every tenant, as their realms list them. The person keeps their tenant account; the kernel realm links to it and asks them for an authenticator of its own the first time.",
+    "loadingAdministrators": "Reading the tenants' administrators…",
+    "administratorsUnavailable": "The tenants' administrators could not be read: the registrar answers them under <code>can_configure</code> on the cluster.",
+    "administrator": "Administrator",
+    "choose": "Choose an administrator…",
+    "noCandidates": "Every tenant administrator already holds the role, or no tenant has one yet.",
+    "someRealmsUnread": "The realm of {{tenants}} could not be read; its administrators are missing from the list.",
+    "makeSecurityOfficer": "Make security officer",
+    "namedCommitted": "Committed: {{login}} of {{tenant}} is a security officer once the cluster has taken it in.",
+    "namedAlready": "{{login}} of {{tenant}} is a security officer already; nothing was committed.",
+    "removedCommitted": "Committed: {{login}} of {{tenant}} is no longer a security officer. Their linked account in the kernel realm goes with it.",
+    "howItWorks": "How it works",
+    "howItWorksBody": "A holder signs in at the platform's address with their tenant account: the link above goes straight to their tenant's realm. Only that tenant's administrators pass the gate there, the kernel realm links to an account it already declared and never makes one, and the role comes with exactly the one group it names and nothing else.",
+    "secondFactorHint": "The kernel realm asks a holder for a second factor of its own, enrolled there, unless the cluster setting <code>platformAccess.brokeredSecondFactor</code> is set to <code>off</code> — which makes their approval as strong as their tenant realm's sign-in policy."
   }
 }

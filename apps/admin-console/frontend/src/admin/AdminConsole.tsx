@@ -20,6 +20,7 @@ import { NotificationsSection } from "@/admin/NotificationsSection";
 import { ResourcesSection } from "@/admin/ResourcesSection";
 import { PerimeterSection } from "@/admin/PerimeterSection";
 import { PlatformSecuritySection } from "@/admin/PlatformSecuritySection";
+import { SecurityOfficersSection } from "@/admin/SecurityOfficersSection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
 import { TenantsSection } from "@/admin/TenantsSection";
 import "./admin.css";
@@ -43,6 +44,7 @@ type AdminTab =
   | "settings"
   | "models"
   | "platform"
+  | "securityOfficers"
   | "customization"
   | "usageStatistics";
 
@@ -113,6 +115,10 @@ const TABS: {
   // refuses anybody else whatever this strip shows.
   { id: "models", labelKey: "tabModels", platformOnly: true },
   { id: "platform", labelKey: "tabPlatform", platformOnly: true },
+  // Who holds the security officer role: the tenants' administrators the
+  // cluster's administrator picks, declared on the Cluster claim. The
+  // director refuses anybody else whatever this strip shows.
+  { id: "securityOfficers", labelKey: "tabSecurityOfficers", platformOnly: true },
   { id: "customization", labelKey: "tabCustomization", platformOnly: true },
   { id: "updates", labelKey: "tabUpdates", platformOnly: true },
   // What the cluster reports about itself. Read-only, and the usher decides
@@ -223,6 +229,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <ModelsSection />
           ) : tab === "platform" ? (
             <PlatformSecuritySection />
+          ) : tab === "securityOfficers" ? (
+            <SecurityOfficersSection />
           ) : tab === "customization" ? (
             <CustomizationDebtSection />
           ) : tab === "updates" ? (

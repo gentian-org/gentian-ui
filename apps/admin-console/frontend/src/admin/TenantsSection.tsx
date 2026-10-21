@@ -239,6 +239,17 @@ export function TenantsSection() {
                         {t("tenants.activateAdmin")}
                       </button>
                     )}
+                    {tenant.adminsEnter && tenant.loginDomain && !tenant.purging ? (
+                      <a
+                        className="admin-console__btn admin-console__btn--quiet"
+                        href={`https://desktop.${tenant.loginDomain}/?kc_idp_hint=kernel`}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={t("tenants.enterTenantHint")}
+                      >
+                        {t("tenants.enterTenant")}
+                      </a>
+                    ) : null}
                     {tenant.protected ? (
                       <span
                         className="admin-console__badge admin-console__badge--info"

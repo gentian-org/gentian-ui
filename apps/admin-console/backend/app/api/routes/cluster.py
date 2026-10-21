@@ -379,3 +379,82 @@ async def pending_admin_invitations(
         _cluster_path(settings, "/admin-invitations"),
         bearer_of(credentials),
     )
+
+
+# --- The security officers (iam.md 1.1c) ------------------------------------
+#
+# Who holds cluster#security_officer is declared on the Cluster claim: the
+# administrators of the cluster's tenants, each by the subject of their account
+# in their tenant's realm. The director commits the choice (can_configure) and
+# answers who holds it (can_audit); the registrar answers who could, the
+# members of each tenant's admins group, for whoever configures the cluster.
+# The console relays both as the caller and decides nothing.
+
+
+@router.get("/security-officers")
+async def security_officers(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Who holds the security officer role, as the claim declares it, each
+    with the address they sign in at."""
+    return await director.forward(
+        settings,
+        "GET",
+        _cluster_path(settings, "/platform-roles/security-officers"),
+        bearer_of(credentials),
+    )
+
+
+@router.put("/security-officers/{tenant}/{subject}")
+async def set_security_officer(
+    tenant: str,
+    subject: str,
+    body: dict,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """A tenant's administrator holds the role: one commit to the claim. The
+    body carries the login and the address the kernel realm shows."""
+    return await director.forward(
+        settings,
+        "PUT",
+        _cluster_path(settings, f"/platform-roles/security-officers/{tenant}/{subject}"),
+        bearer_of(credentials),
+        json_body=body,
+    )
+
+
+@router.delete("/security-officers/{tenant}/{subject}")
+async def remove_security_officer(
+    tenant: str,
+    subject: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """No longer: the entry goes, and with it the linked account."""
+    return await director.forward(
+        settings,
+        "DELETE",
+        _cluster_path(settings, f"/platform-roles/security-officers/{tenant}/{subject}"),
+        bearer_of(credentials),
+    )
+
+
+@router.get("/tenant-administrators")
+async def tenant_administrators(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Who could hold it: every tenant's administrators, read by the registrar
+    from each tenant's realm, under can_configure on the cluster."""
+    return await director.forward_to(
+        director.registrar_url(settings),
+        "GET",
+        _cluster_path(settings, "/tenant-administrators"),
+        bearer_of(credentials),
+    )

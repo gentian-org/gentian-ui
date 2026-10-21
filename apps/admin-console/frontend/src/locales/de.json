@@ -25,7 +25,8 @@
     "tabUsageStatistics": "Nutzungsstatistik",
     "tabApps": "Apps",
     "tabPerimeter": "Perimeter",
-    "tabUpdates": "Aktualisierungen"
+    "tabUpdates": "Aktualisierungen",
+    "tabSecurityOfficers": "Sicherheitsbeauftragte"
   },
   "audit": {
     "action": "Aktion",
@@ -500,7 +501,13 @@
     "securityPolicies": "Sicherheitsrichtlinien",
     "securityPoliciesAreNotAvailable": "Sicherheitsrichtlinien sind nicht verfügbar.",
     "session": "Sitzung",
-    "ssoIdleTimeoutMinutes": "SSO-Leerlaufzeit (Minuten)"
+    "ssoIdleTimeoutMinutes": "SSO-Leerlaufzeit (Minuten)",
+    "platformAccessTitle": "Plattform-Administratoren",
+    "platformAccessBody": "Ob die Administratoren der Plattform sich mit ihrem Plattform-Konto bei diesem Arbeitsbereich als dessen Administratoren anmelden dürfen. Ausgeschaltet verwalten sie ihn weiterhin über die Plattform-Konsole, wo der Cluster ihn betreibt; dieser Schalter betrifft das Anmelden. Jeder Eintritt steht in den Anmeldeereignissen des Realms, und wer die Plattform-Administratoren verlässt, verliert den Zugang bei der nächsten Anmeldung.",
+    "platformAccessSwitch": "Plattform-Administratoren dürfen sich bei diesem Arbeitsbereich anmelden",
+    "platformAccessOnCommitted": "Committet: die Administratoren der Plattform dürfen sich anmelden, sobald der Cluster es übernommen hat.",
+    "platformAccessOffCommitted": "Committet: die Administratoren der Plattform dürfen sich nicht mehr anmelden. Ein Konto, das einer von ihnen hier schon hat, bleibt, bis es unter Mitglieder entfernt wird.",
+    "platformAccessUnchanged": "Der Arbeitsbereich sagt das bereits; nichts wurde committet."
   },
   "tenants": {
     "apps": "Apps",
@@ -573,7 +580,9 @@
     "country": "Land (optional)",
     "countryHint": "Zwei Buchstaben, ISO 3166-1 (CH, DE). Apps wie der App Store erhalten es; es lässt sich später ändern.",
     "countryNamed": "{{country}}. Apps wie der App Store erhalten es; es lässt sich später ändern.",
-    "countryPlaceholder": "CH"
+    "countryPlaceholder": "CH",
+    "enterTenant": "Mandant betreten",
+    "enterTenantHint": "Dieser Mandant lässt die Administratoren der Plattform sich bei ihm anmelden. Öffnet seinen Desktop über den Kernel-Realm; Sie kommen als einer seiner Administratoren an."
   },
   "usage": {
     "committed": "zugesagt",
@@ -1100,5 +1109,33 @@
     "modeLatest": "latest: die Plattform wechselt",
     "modeManual": "manual: die Cluster-Administration wechselt",
     "modeTenant": "tenant: die Mandanten-Administration darf wechseln"
+  },
+  "securityOfficers": {
+    "title": "Sicherheitsbeauftragte",
+    "lead": "Wer genehmigt, was die Standardhaltung verlässt: Pod-Security-Ausnahmen, Cluster-Rollen, Katalogeinträge der Vertrauensstufe Plattform. Die Administratoren der Mandanten des Clusters, hier ausgewählt und auf dem Cluster-Claim deklariert; jeder meldet sich mit seinem eigenen Mandantenkonto bei der Plattform an.",
+    "loading": "Lese, wer die Rolle innehat…",
+    "unavailable": "Die Sicherheitsbeauftragten konnten nicht gelesen werden.",
+    "whoHoldsIt": "Wer sie innehat",
+    "nobodyYet": "Niemand hat die Rolle bisher inne. Wählen Sie unten den Administrator eines Mandanten.",
+    "tenant": "Mandant",
+    "login": "Anmeldename",
+    "email": "E-Mail",
+    "signsInAt": "Meldet sich an unter",
+    "remove": "Entfernen",
+    "nameOne": "Sicherheitsbeauftragten ernennen",
+    "pickerHint": "Die Administratoren jedes Mandanten, wie ihre Realms sie führen. Die Person behält ihr Mandantenkonto; der Kernel-Realm verknüpft es und verlangt beim ersten Mal einen eigenen Authenticator.",
+    "loadingAdministrators": "Lese die Administratoren der Mandanten…",
+    "administratorsUnavailable": "Die Administratoren der Mandanten konnten nicht gelesen werden: der Registrar beantwortet sie unter <code>can_configure</code> auf dem Cluster.",
+    "administrator": "Administrator",
+    "choose": "Administrator wählen…",
+    "noCandidates": "Jeder Mandanten-Administrator hat die Rolle bereits inne, oder noch kein Mandant hat einen.",
+    "someRealmsUnread": "Der Realm von {{tenants}} konnte nicht gelesen werden; seine Administratoren fehlen in der Liste.",
+    "makeSecurityOfficer": "Zum Sicherheitsbeauftragten ernennen",
+    "namedCommitted": "Committet: {{login}} von {{tenant}} ist Sicherheitsbeauftragter, sobald der Cluster es übernommen hat.",
+    "namedAlready": "{{login}} von {{tenant}} ist bereits Sicherheitsbeauftragter; nichts wurde committet.",
+    "removedCommitted": "Committet: {{login}} von {{tenant}} ist nicht mehr Sicherheitsbeauftragter. Das verknüpfte Konto im Kernel-Realm geht damit.",
+    "howItWorks": "So funktioniert es",
+    "howItWorksBody": "Ein Inhaber meldet sich unter der Adresse der Plattform mit seinem Mandantenkonto an: der Link oben führt direkt zum Realm seines Mandanten. Nur dessen Administratoren passieren dort die Sperre, der Kernel-Realm verknüpft ein Konto, das er bereits deklariert hat, und legt nie eines an, und die Rolle bringt genau die eine Gruppe mit, die sie nennt, und nichts sonst.",
+    "secondFactorHint": "Der Kernel-Realm verlangt von einem Inhaber einen eigenen, dort eingerichteten zweiten Faktor, sofern die Cluster-Einstellung <code>platformAccess.brokeredSecondFactor</code> nicht auf <code>off</code> steht — womit seine Genehmigung genau so stark ist wie die Anmelderichtlinie seines Mandanten-Realms."
   }
 }
