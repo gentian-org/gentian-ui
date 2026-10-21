@@ -20,6 +20,13 @@ export type Approval = {
   note?: string | null;
   /** When a grant for it ran out: approved once, waiting again. */
   expiredAt?: string | null;
+  /**
+   * The approver's no, when one was said: who, when and why. The privilege
+   * is still pending; a new request or a later approval clears it.
+   */
+  declinedBy?: string | null;
+  declinedAt?: string | null;
+  declineReason?: string | null;
 };
 
 export function fetchApprovals() {
@@ -37,5 +44,20 @@ export function approveNodePrivilege(approval: Approval, body: NodePrivilegeAppr
   return apiFetch<{ status: string; commit?: string }>(
     `/admin/approvals/${encodeURIComponent(approval.tenant)}/${encodeURIComponent(approval.install)}/${encodeURIComponent(kind)}/${encodeURIComponent(name ?? "")}`,
     { method: "PUT", body: JSON.stringify(body) },
+  );
+}
+
+export type NodePrivilegeDecline = { reason: string };
+
+/**
+ * Decline one request for the tenant it was made in. The same right as the
+ * approval's, decided by the director; nothing is committed, and the
+ * operator records who declined, when and why on the app.
+ */
+export function declineNodePrivilege(approval: Approval, body: NodePrivilegeDecline) {
+  const [kind, name] = approval.privilege.split("/", 2);
+  return apiFetch<{ status: string }>(
+    `/admin/approvals/${encodeURIComponent(approval.tenant)}/${encodeURIComponent(approval.profile)}/${encodeURIComponent(kind)}/${encodeURIComponent(name ?? "")}/decline`,
+    { method: "POST", body: JSON.stringify(body) },
   );
 }

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """The Approvals screen's relays: the cluster's list from the usher, and the
-security officer's approval to the director, for the request's tenant."""
+security officer's approval or decline to the director, for the request's
+tenant."""
 
 import httpx
 import pytest
@@ -132,5 +133,61 @@ def test_what_is_not_an_approval_never_reaches_the_director(monkeypatch, path, b
     seen: dict = {}
     _fake_client(monkeypatch, {}, seen)
     answer = _client().put(path, headers=_person, json=body)
+    assert answer.status_code in (400, 422)
+    assert seen == {}
+
+
+def test_a_decline_goes_to_the_directors_action_on_the_app_for_the_requests_tenant(monkeypatch):
+    seen: dict = {}
+    recorded = {
+        "status": "declined",
+        "tenant": "acme",
+        "profile": "crm",
+        "install": "crm",
+        "privilege": "podSecurity/run-as-root",
+        "request": {"declinedBy": "sam@example.com", "declinedAt": "2026-10-21T10:00:00Z", "declineReason": "no root on shared nodes"},
+    }
+    _fake_client(monkeypatch, recorded, seen, status=202)
+    answer = _client().post(
+        "/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root/decline",
+        headers=_person,
+        json={"reason": "no root on shared nodes"},
+    )
+    assert answer.status_code == 202
+    assert answer.json() == recorded
+    assert (seen["method"], seen["url"]) == (
+        "POST",
+        "http://director.test:8080/v1/tenants/acme/apps/crm/actions/decline-privilege",
+    )
+    assert seen["json"] == {"privilege": "podSecurity/run-as-root", "reason": "no root on shared nodes"}
+    assert seen["auth"] == "Bearer officer-token"
+
+
+def test_the_directors_refusal_of_a_decline_comes_back_as_it_is(monkeypatch):
+    seen: dict = {}
+    refusal = {"error": "a podSecurity privilege weakens what protects the node; approving one is the security officer's"}
+    _fake_client(monkeypatch, refusal, seen, status=403)
+    answer = _client().post(
+        "/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root/decline",
+        headers=_person,
+        json={"reason": "we would rather not have it"},
+    )
+    assert answer.status_code == 403
+    assert answer.json() == refusal
+
+
+@pytest.mark.parametrize(
+    "path, body",
+    [
+        ("/api/v1/admin/approvals/acme/crm/hostNetwork/x/decline", {"reason": "long enough indeed"}),
+        ("/api/v1/admin/approvals/Acme/crm/podSecurity/run-as-root/decline", {"reason": "long enough indeed"}),
+        ("/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root/decline", {"reason": "long enough", "expiresAt": "x"}),
+        ("/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root/decline", {}),
+    ],
+)
+def test_what_is_not_a_decline_never_reaches_the_director(monkeypatch, path, body):
+    seen: dict = {}
+    _fake_client(monkeypatch, {}, seen)
+    answer = _client().post(path, headers=_person, json=body)
     assert answer.status_code in (400, 422)
     assert seen == {}

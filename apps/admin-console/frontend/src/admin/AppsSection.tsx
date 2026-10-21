@@ -698,6 +698,9 @@ export function PrivilegesPart({ row }: { row: AppRow }) {
   const approvedBy = new Map(
     (row.state?.pendingPrivilegeApprovals ?? []).map((p) => [p.privilege, p.approvedBy]),
   );
+  const declined = new Map(
+    (row.state?.pendingPrivilegeApprovals ?? []).filter((p) => p.declinedBy).map((p) => [p.privilege, p]),
+  );
   const install = row.state?.name ?? row.profile;
 
   return (
@@ -730,11 +733,30 @@ export function PrivilegesPart({ row }: { row: AppRow }) {
                   <td className="admin-console__mono">{privilege}</td>
                   <td>
                     <span className="admin-console__badge admin-console__badge--warn">
-                      {t("apps.privilegeWaiting")}
+                      {t(declined.has(privilege) ? "apps.privilegeDeclined" : "apps.privilegeWaiting")}
                     </span>
                   </td>
                   <td>
-                    <div>{t("apps.privilegeWaitingDetail")}</div>
+                    {declined.has(privilege) ? (
+                      <>
+                        <div>
+                          <Trans
+                            i18nKey="apps.privilegeDeclinedBy"
+                            values={{
+                              who: declined.get(privilege)?.declinedBy ?? "",
+                              when: declined.get(privilege)?.declinedAt
+                                ? new Date(declined.get(privilege)?.declinedAt as string).toLocaleString()
+                                : "",
+                            }}
+                            components={mono}
+                          />
+                        </div>
+                        <div>{declined.get(privilege)?.declineReason}</div>
+                        <div className="admin-console__hint">{t("apps.privilegeDeclinedDetail")}</div>
+                      </>
+                    ) : (
+                      <div>{t("apps.privilegeWaitingDetail")}</div>
+                    )}
                     {mayApprove(approvedBy.get(privilege), context) ? (
                       <ApprovePrivilege install={install} privilege={privilege} />
                     ) : (approvedBy.get(privilege) ?? legacyApprover(privilege)) === "tenant" ? (

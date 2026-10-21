@@ -844,6 +844,9 @@
     "answerDetail": "Einzelheiten",
     "privilegeWaiting": "Wartet",
     "privilegeWaitingDetail": "Noch niemand hat dies genehmigt. Die App wartet, bis es jemand tut.",
+    "privilegeDeclined": "Abgelehnt",
+    "privilegeDeclinedBy": "Abgelehnt von <mono>{{who}}</mono> am {{when}}",
+    "privilegeDeclinedDetail": "Die App wartet weiter. Sie kann im App Store erneut angefragt oder doch noch genehmigt werden.",
     "privilegeApproved": "Genehmigt",
     "privilegeApprovedBy": "Von <mono>{{approver}}</mono> am {{when}}",
     "privilegeExpires": "Läuft ab am {{when}}",
@@ -1154,6 +1157,7 @@
     "requestedBy": "Angefragt von <mono>{{who}}</mono> am {{when}}",
     "notRequested": "Noch niemand hat darum gebeten; die App wartet trotzdem.",
     "expired": "Eine frühere Genehmigung ist am {{when}} abgelaufen.",
+    "declinedBy": "Abgelehnt von <mono>{{who}}</mono> am {{when}}: {{reason}}",
     "notYours": "Die Genehmigung ist Sache des Security Officers des Clusters.",
     "approve": "Genehmigen…",
     "reasonLabel": "Warum Sie es genehmigen, in Ihren eigenen Worten",
@@ -1163,6 +1167,12 @@
     "approveConfirm": "{{privilege}} genehmigen",
     "approvedAs": "Genehmigt: als <mono>{{commit}}</mono> committet.",
     "approvedAlready": "Bereits genehmigt; nichts wurde committet.",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "decline": "Ablehnen…",
+    "declineReasonLabel": "Warum Sie es ablehnen, in Ihren eigenen Worten",
+    "declineReasonHint": "Mindestens zehn Zeichen. Nichts wird committet: die App wartet weiter, und wer gefragt hat, sieht Ihren Grund und kann erneut anfragen. Eine spätere Genehmigung gilt.",
+    "declineConfirm": "{{privilege}} ablehnen",
+    "declineFailed": "Nicht abgelehnt:",
+    "declined": "Abgelehnt. Die App wartet weiter; der Mandant sieht Ihren Grund."
   }
 }

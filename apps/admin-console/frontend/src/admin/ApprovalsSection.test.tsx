@@ -30,6 +30,20 @@ const approvals: Approval[] = [
   },
 ];
 
+// One the officer said no to: still listed, still pending, with the no.
+const declined: Approval = {
+  tenant: "acme",
+  profile: "crm",
+  install: "crm",
+  privilege: "podSecurity/run-as-root",
+  approvedBy: "security-officer",
+  requestedBy: "tom@acme.example",
+  requestedAt: "2026-10-21T09:12:00Z",
+  declinedBy: "sam@example.com",
+  declinedAt: "2026-10-21T10:00:00Z",
+  declineReason: "no root on shared nodes; use the rootless image",
+};
+
 function render(list: Approval[], context: Partial<AdminContext>) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(["admin", "approvals"], { approvals: list });
@@ -54,11 +68,24 @@ describe("ApprovalsSection", () => {
     expect(html).toContain("A previous approval ran out");
   });
 
-  it("offers the security officer the button, and tells anybody else whose it is", () => {
-    expect(render(approvals, { canApproveNodePrivilege: true })).toContain("Approve…");
+  it("offers the security officer both buttons, and tells anybody else whose they are", () => {
+    const officer = render(approvals, { canApproveNodePrivilege: true });
+    expect(officer).toContain("Approve…");
+    expect(officer).toContain("Decline…");
     const administrator = render(approvals, { canApproveNodePrivilege: false, isPlatformAdmin: true });
     expect(administrator).not.toContain("Approve…");
+    expect(administrator).not.toContain("Decline…");
     expect(administrator).toContain("security officer");
+  });
+
+  it("shows a declined request as declined, by whom and why, and still offers the answer", () => {
+    const html = render([declined], { canApproveNodePrivilege: true });
+    expect(html).toContain("Declined by");
+    expect(html).toContain("sam@example.com");
+    expect(html).toContain("no root on shared nodes; use the rootless image");
+    expect(html).toContain("tom@acme.example");
+    expect(html).toContain("Approve…");
+    expect(html).toContain("Decline…");
   });
 
   it("says so when nothing waits", () => {

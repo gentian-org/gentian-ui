@@ -1077,6 +1077,14 @@ export function fetchSettingsTemplates(tenant?: string) {
 export type PendingPrivilegeApproval = {
   privilege: string;
   approvedBy: "tenant" | "security-officer" | (string & {});
+  /**
+   * The approver's no, when one was said: who, when and why. The request is
+   * still pending -- the app keeps waiting -- until somebody approves, or
+   * asks again. Absent from an older operator.
+   */
+  declinedBy?: string | null;
+  declinedAt?: string | null;
+  declineReason?: string | null;
 };
 
 /** One of the tenant's components as the cluster holds it. */
