@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { approvePrivilege, requestPrivilege, type PendingApproval } from "@/api/store";
-import { DateText, ExternalLink, ProblemNote } from "@/store/parts";
+import { DateText, ProblemNote } from "@/store/parts";
 
 const mono = { mono: <span className="admin-console__mono" /> };
 
@@ -15,18 +15,16 @@ const mono = { mono: <span className="admin-console__mono" /> };
  * the cluster's security officer for what weakens the node -- and the
  * director decides again on every approval. This step offers what the
  * answer says: the tenant's own is approved here, with the person's reason;
- * the security officer's is asked for, and answered at the platform console.
+ * the security officer's is asked for, and answered in their admin console.
  * Nothing here decides who may; a refusal is shown in the director's words.
  */
 export function Approvals({
   coordinate,
   approvals,
-  platformApprovalsUrl,
   onChanged,
 }: {
   coordinate: string;
   approvals: PendingApproval[];
-  platformApprovalsUrl: string | null | undefined;
   /** Something was approved or asked for: look at the cluster again. */
   onChanged: () => void;
 }) {
@@ -57,16 +55,7 @@ export function Approvals({
           </li>
         ))}
       </ul>
-      {forOfficer ? (
-        <p className="admin-console__meta">
-          {t("approvals.officerHint")}{" "}
-          {platformApprovalsUrl ? (
-            <ExternalLink href={platformApprovalsUrl}>{t("approvals.openPlatformConsole")}</ExternalLink>
-          ) : (
-            t("approvals.platformConsoleUnknown")
-          )}
-        </p>
-      ) : null}
+      {forOfficer ? <p className="admin-console__meta">{t("approvals.officerHint")}</p> : null}
       <p className="admin-console__meta">{t("approvals.carriesOn")}</p>
     </div>
   );

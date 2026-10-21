@@ -17,12 +17,6 @@ export type Context = {
   /** Whether the cluster offers an App Store at all; null when it could not be asked. */
   appStore: { available: boolean; reason: string | null } | null;
   adminConsoleUrl: string | null;
-  /**
-   * The platform console's Approvals page, entered through this tenant's
-   * realm: where the cluster's security officer answers what an app asks of
-   * the node. Null when the cluster's domain is not known here.
-   */
-  platformApprovalsUrl?: string | null;
   /** The tenant's country, ISO 3166-1 alpha-2; null when it names none. */
   tenantCountry: string | null;
 };

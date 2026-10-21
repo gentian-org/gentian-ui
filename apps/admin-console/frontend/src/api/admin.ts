@@ -40,6 +40,8 @@ export type AdminContext = {
    * older than the security officer's Approve button, which is a no.
    */
   canApproveNodePrivilege?: boolean;
+  /** Whether this person may read who holds the cluster's roles (cluster#can_audit). */
+  canAuditCluster?: boolean;
 };
 
 export type AdminMember = {

@@ -157,7 +157,7 @@ async def request_privilege(
     catalogue: str, app: str, kind: str, name: str, body: RequestBody, ctx: Context = Depends(context)
 ) -> dict[str, Any]:
     """Ask the security officer for one request the tenant cannot approve
-    itself; the platform console's Approvals page lists it."""
+    itself; the security officer's admin console lists it."""
     return await sequence.request_privilege(
         ctx, patterns.app_of(_coordinate(catalogue, app)), f"{kind}/{name}", (body.note or "").strip() or None
     )

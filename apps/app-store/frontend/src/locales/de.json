@@ -449,9 +449,7 @@
     "declinedBy": "Abgelehnt von <mono>{{who}}</mono> am",
     "declinedWaits": "Die Installation wartet weiter. Sie können erneut anfragen, mit dem, was sich geändert hat, oder die App deinstallieren.",
     "requestAgain": "Erneut anfragen…",
-    "officerHint": "Sind Sie der Security Officer des Clusters, genehmigen Sie es in der Plattform-Konsole.",
-    "openPlatformConsole": "Seite „Genehmigungen“ öffnen",
-    "platformConsoleUnknown": "Ihre Adresse ist hier nicht bekannt.",
+    "officerHint": "Ein Security Officer dieses Clusters genehmigt dies in seiner Admin-Konsole.",
     "carriesOn": "Diese Seite fragt den Cluster alle paar Sekunden und geht von selbst zum Ausrollen über, sobald nichts mehr wartet."
   }
 }

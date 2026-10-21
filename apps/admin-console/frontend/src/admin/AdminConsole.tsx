@@ -21,7 +21,7 @@ import { NotificationsSection } from "@/admin/NotificationsSection";
 import { ResourcesSection } from "@/admin/ResourcesSection";
 import { PerimeterSection } from "@/admin/PerimeterSection";
 import { PlatformSecuritySection } from "@/admin/PlatformSecuritySection";
-import { SecurityOfficersSection } from "@/admin/SecurityOfficersSection";
+import { RoleHoldersSection } from "@/admin/RoleHoldersSection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
 import { TenantsSection } from "@/admin/TenantsSection";
 import "./admin.css";
@@ -46,7 +46,7 @@ type AdminTab =
   | "settings"
   | "models"
   | "platform"
-  | "securityOfficers"
+  | "clusterRoles"
   | "customization"
   | "usageStatistics";
 
@@ -89,6 +89,8 @@ const TABS: {
    * console lets them in for this screen alone (/admin/context).
    */
   officerOnly?: boolean;
+  /** Shown only to those who may read the cluster's roles (cluster can_audit). */
+  auditorOnly?: boolean;
   hidden?: boolean;
 }[] = [
   // First, and platform-only, because bringing a customer on is what an MSP
@@ -96,8 +98,8 @@ const TABS: {
   // tenant's screens and has no business listing the others.
   { id: "tenants", labelKey: "tabTenants", platformOnly: true },
   // What every tenant's apps ask of the node, for the security officer who
-  // answers it. At the platform console, where they act; the usher decides
-  // who reads the list and the director decides each approval.
+  // answers it, in the console of their own tenant; the usher decides who
+  // reads the list and the director decides each approval.
   { id: "approvals", labelKey: "tabApprovals", officerOnly: true },
   { id: "members", labelKey: "tabMembers" },
   { id: "groups", labelKey: "tabGroups" },
@@ -127,10 +129,10 @@ const TABS: {
   // refuses anybody else whatever this strip shows.
   { id: "models", labelKey: "tabModels", platformOnly: true },
   { id: "platform", labelKey: "tabPlatform", platformOnly: true },
-  // Who holds the security officer role: the tenants' administrators the
-  // cluster's administrator picks, declared on the Cluster claim. The
-  // director refuses anybody else whatever this strip shows.
-  { id: "securityOfficers", labelKey: "tabSecurityOfficers", platformOnly: true },
+  // Who holds a cluster role by name: the tenants' administrators the
+  // cluster's administrator picks, declared on the Cluster claim. Read-only
+  // for an auditor; the director refuses anybody else whatever this shows.
+  { id: "clusterRoles", labelKey: "tabClusterRoles", auditorOnly: true },
   { id: "customization", labelKey: "tabCustomization", platformOnly: true },
   { id: "updates", labelKey: "tabUpdates", platformOnly: true },
   // What the cluster reports about itself. Read-only, and the usher decides
@@ -190,7 +192,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
     );
   }
 
-  const { realm, isPlatformAdmin, canExpose, canApproveNodePrivilege } = contextQuery.data;
+  const { realm, isPlatformAdmin, canExpose, canApproveNodePrivilege, canAuditCluster } = contextQuery.data;
   // False only for the security officer let in for the Approvals screen; a
   // backend older than that field answered nobody who did not administer.
   const administers = contextQuery.data.isTenantAdmin !== false;
@@ -200,7 +202,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
       (administers || entry.officerOnly) &&
       (!entry.platformOnly || isPlatformAdmin) &&
       (!entry.approverOnly || canExpose === true) &&
-      (!entry.officerOnly || canApproveNodePrivilege === true),
+      (!entry.officerOnly || canApproveNodePrivilege === true) &&
+      (!entry.auditorOnly || canAuditCluster === true),
   );
   // Members first, as it always was, for whoever has it; the officer let in
   // for one screen lands on it.
@@ -261,8 +264,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <ModelsSection />
           ) : current === "platform" ? (
             <PlatformSecuritySection />
-          ) : current === "securityOfficers" ? (
-            <SecurityOfficersSection />
+          ) : current === "clusterRoles" ? (
+            <RoleHoldersSection canEdit={isPlatformAdmin} />
           ) : current === "customization" ? (
             <CustomizationDebtSection />
           ) : current === "updates" ? (

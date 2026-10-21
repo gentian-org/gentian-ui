@@ -229,7 +229,6 @@ function Progress({
   detail,
   operation,
   storeName,
-  platformApprovalsUrl,
   onAdvance,
   onStop,
   busy,
@@ -238,7 +237,6 @@ function Progress({
   detail: AppDetail;
   operation: Operation;
   storeName: string;
-  platformApprovalsUrl: string | null | undefined;
   onAdvance: (body?: AdvanceRequest) => void;
   onStop: () => void;
   busy: boolean;
@@ -421,7 +419,6 @@ function Progress({
         <Approvals
           coordinate={operation.coordinate}
           approvals={operation.rollout.pendingPrivilegeApprovals ?? []}
-          platformApprovalsUrl={platformApprovalsUrl}
           onChanged={() => onAdvance()}
         />
       ) : null}
@@ -656,7 +653,6 @@ export function InstallPanel({ detail, storeName }: { detail: AppDetail; storeNa
         detail={detail}
         operation={operation}
         storeName={storeName}
-        platformApprovalsUrl={contextQuery.data?.platformApprovalsUrl}
         busy={busy}
         error={stepError}
         onAdvance={(request) => {
@@ -702,7 +698,6 @@ export function InstallPanel({ detail, storeName }: { detail: AppDetail; storeNa
               <Approvals
                 coordinate={coordinate}
                 approvals={state.state?.pendingPrivilegeApprovals ?? []}
-                platformApprovalsUrl={contextQuery.data?.platformApprovalsUrl}
                 onChanged={() => void queryClient.invalidateQueries({ queryKey: ["state", coordinate] })}
               />
             ) : null}

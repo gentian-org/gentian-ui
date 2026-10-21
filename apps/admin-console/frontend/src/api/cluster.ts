@@ -423,43 +423,48 @@ export function setAppUpdateMode(tenant: string, profile: string, mode: string) 
 
 // --- The security officers (iam.md 1.1c) ------------------------------------
 
+/** A cluster role a tenant's account can hold by name. */
+export type ClusterRole = "auditor" | "securityOfficer";
+
 /**
- * One holder of cluster#security_officer, as the Cluster claim declares it: a
- * tenant's administrator, by the subject of their account in the tenant's
- * realm, with the login and address the kernel realm shows.
+ * One holder of a cluster role, as the Cluster claim declares it: an account
+ * of a tenant's realm, by its subject there. The holder signs in to their own
+ * tenant.
  */
-export type SecurityOfficer = {
+export type RoleHolder = {
+  role: ClusterRole;
   tenant: string;
   subject: string;
   username: string;
   email?: string;
-  /** The kernel realm's identity provider for the tenant, tenant-<tenant>. */
-  identityProvider: string;
-  /** Where the person signs in: the platform's address, straight to that provider. */
-  signIn?: string;
 };
 
-export function fetchSecurityOfficers() {
-  return apiFetch<{ cluster: string; securityOfficers: SecurityOfficer[] }>("/cluster/security-officers");
+export function fetchRoleHolders() {
+  return apiFetch<{ cluster: string; roles: ClusterRole[]; roleHolders: RoleHolder[] }>("/cluster/role-holders");
 }
 
-/** Name a tenant's administrator a security officer: one commit to the claim. */
-export async function addSecurityOfficer(
+function roleHolderPath(role: string, tenant: string, subject: string) {
+  return `/cluster/role-holders/${encodeURIComponent(role)}/${encodeURIComponent(tenant)}/${encodeURIComponent(subject)}`;
+}
+
+/** Give a tenant's account a cluster role: one commit to the claim. */
+export async function addRoleHolder(
+  role: ClusterRole,
   tenant: string,
   subject: string,
   username: string,
   email: string,
 ): Promise<ClusterSettingsWriteResult> {
-  const body = await apiFetch<{ status: string; commit?: string }>(
-    `/cluster/security-officers/${encodeURIComponent(tenant)}/${encodeURIComponent(subject)}`,
-    { method: "PUT", body: JSON.stringify({ username, email }) },
-  );
+  const body = await apiFetch<{ status: string; commit?: string }>(roleHolderPath(role, tenant, subject), {
+    method: "PUT",
+    body: JSON.stringify({ username, email }),
+  });
   return { ...body, changed: Boolean(body.commit) };
 }
 
-export async function removeSecurityOfficer(tenant: string, subject: string): Promise<ClusterSettingsWriteResult> {
+export async function removeRoleHolder(holder: RoleHolder): Promise<ClusterSettingsWriteResult> {
   const body = await apiFetch<{ status: string; commit?: string }>(
-    `/cluster/security-officers/${encodeURIComponent(tenant)}/${encodeURIComponent(subject)}`,
+    roleHolderPath(holder.role, holder.tenant, holder.subject),
     { method: "DELETE" },
   );
   return { ...body, changed: Boolean(body.commit) };
