@@ -143,6 +143,19 @@ class Settings(BaseSettings):
             return None
         return "https://admin." + self.host[len(HOST_LABEL) + 1 :] + "/"
 
+    @property
+    def platform_approvals_url(self) -> str | None:
+        """Where the cluster's security officer approves what this tenant's
+        apps ask of the node: the platform tenant's console, its Approvals
+        page, signed in through this tenant's realm (kc_idp_hint names the
+        tenant's identity provider in the kernel realm, tenant-<name>)."""
+        if not self.kernel_domain:
+            return None
+        return (
+            f"https://admin.platform.{self.kernel_domain}/?tab=approvals"
+            f"&kc_idp_hint=tenant-{self.tenant_id}"
+        )
+
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
         if self.is_production and self.auth_disabled:

@@ -557,6 +557,161 @@ def test_progress_is_the_clusters_own_until_the_app_runs(runner, store, cluster,
     assert runner.step()["stage"] == "done"
 
 
+# ── the approvals ───────────────────────────────────────────────────────────
+
+APP = "nextcloud-base-ee"
+WAITING = {
+    "profile": APP,
+    "name": APP,
+    "phase": "installing",
+    "ready": False,
+    "message": "waiting for approval of egress/smtp, podSecurity/run-as-root",
+    "pendingPrivileges": ["egress/smtp", "podSecurity/run-as-root"],
+    "pendingPrivilegeApprovals": [
+        {"privilege": "egress/smtp", "approvedBy": "tenant", "reason": "sends mail through the relay"},
+        {"privilege": "podSecurity/run-as-root", "approvedBy": "security-officer", "reason": "writes its cache as root"},
+    ],
+}
+
+
+def to_rollout(runner, cluster, clock) -> dict:
+    cluster.ready_on_install = False
+    view = runner.start()
+    while view["stage"] != "rollout":
+        clock.advance(view["waitSeconds"])
+        view = runner.step()
+    return view
+
+
+def test_an_app_that_waits_on_a_person_stands_at_approvals_until_none_is_pending(
+    runner, store, cluster, clock
+):
+    to_rollout(runner, cluster, clock)
+    cluster.states[APP] = dict(WAITING)
+    view = runner.step()
+    # Not a stop: the page keeps asking, and shows whom each request waits on.
+    assert view["stage"] == "approvals"
+    assert view["waitsForPerson"] is False and view["waitSeconds"] == 5
+    assert view["rollout"]["name"] == APP
+    assert [(p["privilege"], p["approvedBy"], p["reason"]) for p in view["rollout"]["pendingPrivilegeApprovals"]] == [
+        ("egress/smtp", "tenant", "sends mail through the relay"),
+        ("podSecurity/run-as-root", "security-officer", "writes its cache as root"),
+    ]
+
+    # The tenant's own: approved here, with the person's reason, naming the
+    # Component the cluster named.
+    answer = runner.api.post(
+        f"/api/v1/apps/{PAID}/privileges/egress/smtp/approve",
+        json={"reason": "the relay is ours and rate-limited"},
+        headers=ALICE,
+    )
+    assert answer.status_code == 200, answer.text
+    assert answer.json() == {"status": "updated", "commit": "c0ffee5"}
+    assert cluster.approved == [(f"{APP}/egress/smtp", {"reason": "the relay is ours and rate-limited"})]
+    assert cluster.of("director", "PUT")[-1].bearer == "Bearer alice.s1"
+
+    # The security officer's: asked for, with a note.
+    answer = runner.api.post(
+        f"/api/v1/apps/{PAID}/privileges/podSecurity/run-as-root/request",
+        json={"note": "needed for the pilot"},
+        headers=ALICE,
+    )
+    assert answer.status_code == 200, answer.text
+    assert answer.json()["status"] == "requested"
+    assert answer.json()["request"]["requestedBy"] == "alice@acme.example"
+    assert cluster.requested == [(APP, {"privilege": "podSecurity/run-as-root", "note": "needed for the pilot"})]
+
+    # The cluster takes the approval in and shows the request: still waiting,
+    # on the security officer alone now.
+    cluster.states[APP] = {
+        **WAITING,
+        "pendingPrivileges": ["podSecurity/run-as-root"],
+        "pendingPrivilegeApprovals": [
+            {
+                "privilege": "podSecurity/run-as-root",
+                "approvedBy": "security-officer",
+                "reason": "writes its cache as root",
+                "requestedBy": "alice@acme.example",
+                "requestedAt": "2026-10-21T09:12:00Z",
+                "note": "needed for the pilot",
+            }
+        ],
+    }
+    view = runner.step()
+    assert view["stage"] == "approvals"
+    assert view["rollout"]["pendingPrivilegeApprovals"][0]["requestedBy"] == "alice@acme.example"
+
+    # Approved at the platform console: nothing is pending, the rollout goes on.
+    cluster.states[APP] = {"profile": APP, "name": APP, "phase": "installing", "ready": False, "message": "deploying"}
+    view = runner.step()
+    assert view["stage"] == "rollout" and view["rollout"]["pendingPrivilegeApprovals"] == []
+    cluster.states[APP] = {"profile": APP, "name": APP, "phase": "ready", "ready": True}
+    assert runner.step()["stage"] == "done"
+
+
+def test_a_grant_that_ran_out_and_an_approver_this_app_does_not_know(runner, store, cluster, clock):
+    to_rollout(runner, cluster, clock)
+    cluster.states[APP] = {
+        **WAITING,
+        "pendingPrivilegeApprovals": [
+            {"privilege": "podSecurity/run-as-root", "approvedBy": "security-officer", "expiredAt": "2026-10-20T00:00:00Z"},
+            {"privilege": "egress/smtp", "approvedBy": "somebody-else"},
+            {"approvedBy": "tenant"},
+        ],
+    }
+    view = runner.step()
+    assert view["stage"] == "approvals"
+    approvals = view["rollout"]["pendingPrivilegeApprovals"]
+    assert [p["privilege"] for p in approvals] == ["podSecurity/run-as-root"]
+    assert approvals[0]["expiredAt"] == "2026-10-20T00:00:00Z"
+
+
+def test_a_reload_shows_the_approvals_without_an_operation(runner, store, cluster, clock):
+    to_rollout(runner, cluster, clock)
+    cluster.states[APP] = dict(WAITING)
+    runner.step()
+    sequence.reset()
+    state = runner.api.get(f"/api/v1/apps/{PAID}/state", headers=ALICE).json()
+    assert state["operation"] is None and state["stage"] == "installing"
+    assert [p["approvedBy"] for p in state["state"]["pendingPrivilegeApprovals"]] == ["tenant", "security-officer"]
+
+
+def test_the_directors_refusal_of_an_approval_is_said_in_its_words(runner, store, cluster, clock):
+    to_rollout(runner, cluster, clock)
+    cluster.states[APP] = dict(WAITING)
+    runner.step()
+    cluster.privilege_refusal = (403, "a podSecurity privilege weakens what protects the node; approving one is the security officer's")
+    answer = runner.api.post(
+        f"/api/v1/apps/{PAID}/privileges/podSecurity/run-as-root/approve",
+        json={"reason": "we would like it anyway"},
+        headers=ALICE,
+    )
+    assert answer.status_code == 403
+    problem = answer.json()["problem"]
+    assert problem["source"] == "director" and "security officer" in problem["detail"]
+    answer = runner.api.post(
+        f"/api/v1/apps/{PAID}/privileges/podSecurity/run-as-root/request", json={}, headers=ALICE
+    )
+    assert answer.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "path, body",
+    [
+        ("privileges/egress/smtp/approve", {"reason": "short"}),
+        ("privileges/egress/smtp/approve", {"reason": "long enough indeed", "install": "x"}),
+        ("privileges/hostNetwork/x/approve", {"reason": "long enough indeed"}),
+        ("privileges/egress/Not%20A%20Name/approve", {"reason": "long enough indeed"}),
+        ("privileges/hostNetwork/x/request", {}),
+        ("privileges/egress/smtp/request", {"reason": "x"}),
+    ],
+)
+def test_an_approval_that_is_not_well_formed_never_reaches_the_director(runner, cluster, path, body):
+    answer = runner.api.post(f"/api/v1/apps/{PAID}/{path}", json=body, headers=ALICE)
+    assert answer.status_code in (400, 422), answer.text
+    assert cluster.approved == [] and cluster.requested == []
+
+
 # ── resuming ────────────────────────────────────────────────────────────────
 
 

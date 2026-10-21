@@ -26,7 +26,8 @@
     "tabApps": "Apps",
     "tabPerimeter": "Perimeter",
     "tabUpdates": "Aktualisierungen",
-    "tabSecurityOfficers": "Sicherheitsbeauftragte"
+    "tabSecurityOfficers": "Sicherheitsbeauftragte",
+    "tabApprovals": "Genehmigungen"
   },
   "audit": {
     "action": "Aktion",
@@ -1137,5 +1138,31 @@
     "howItWorks": "So funktioniert es",
     "howItWorksBody": "Ein Inhaber meldet sich unter der Adresse der Plattform mit seinem Mandantenkonto an: der Link oben führt direkt zum Realm seines Mandanten. Nur dessen Administratoren passieren dort die Sperre, der Kernel-Realm verknüpft ein Konto, das er bereits deklariert hat, und legt nie eines an, und die Rolle bringt genau die eine Gruppe mit, die sie nennt, und nichts sonst.",
     "secondFactorHint": "Der Kernel-Realm verlangt von einem Inhaber einen eigenen, dort eingerichteten zweiten Faktor, sofern die Cluster-Einstellung <code>platformAccess.brokeredSecondFactor</code> nicht auf <code>off</code> steht — womit seine Genehmigung genau so stark ist wie die Anmelderichtlinie seines Mandanten-Realms."
+  },
+  "approvals": {
+    "title": "Genehmigungen",
+    "lead": "Was die Apps aller Mandanten über die Standardhaltung hinaus vom Node verlangen — Pod-Security-Ausnahmen und Cluster-Rollen — und wer darum gebeten hat. Die Genehmigung ist Sache des Security Officers: sie schwächt, was den Node schützt, und damit jeden Mandanten darauf.",
+    "reading": "Wird gelesen…",
+    "unavailable": "Die Liste ist nicht verfügbar:",
+    "none": "Nichts wartet auf den Security Officer.",
+    "tenant": "Mandant",
+    "app": "App",
+    "privilege": "Privileg",
+    "request": "Anfrage",
+    "answer": "Antwort",
+    "noReason": "Die App nennt keinen Grund.",
+    "requestedBy": "Angefragt von <mono>{{who}}</mono> am {{when}}",
+    "notRequested": "Noch niemand hat darum gebeten; die App wartet trotzdem.",
+    "expired": "Eine frühere Genehmigung ist am {{when}} abgelaufen.",
+    "notYours": "Die Genehmigung ist Sache des Security Officers des Clusters.",
+    "approve": "Genehmigen…",
+    "reasonLabel": "Warum Sie es genehmigen, in Ihren eigenen Worten",
+    "expiresLabel": "Bis (optional)",
+    "reasonHint": "Mindestens zehn Zeichen. Die Genehmigung ist ein Commit, der Sie nennt und diesen Grund festhält; wird sie aus Git entfernt, ist sie zurückgenommen. Eine Ausnahme ohne Ende prüft niemand.",
+    "approveFailed": "Nicht genehmigt:",
+    "approveConfirm": "{{privilege}} genehmigen",
+    "approvedAs": "Genehmigt: als <mono>{{commit}}</mono> committet.",
+    "approvedAlready": "Bereits genehmigt; nichts wurde committet.",
+    "cancel": "Abbrechen"
   }
 }

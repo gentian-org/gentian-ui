@@ -231,7 +231,8 @@
     "declare": "Declare the repository",
     "install": "Install",
     "rollout": "Roll out on the cluster",
-    "metering": "Hand the app its usage key"
+    "metering": "Hand the app its usage key",
+    "approvals": "Approvals"
   },
   "install": {
     "acquiredNotInstalled": "This tenant has acquired this app. It is not installed.",
@@ -426,5 +427,28 @@
     "allCountries": "All countries",
     "noneIn": "No partner lists support for this app in the country chosen.",
     "consent": "Your name, e-mail address, company and this message will be sent to {{partner}} so they can contact you."
+  },
+  "approvals": {
+    "lead": "The app asks for more than an app gets by default. Each request is answered by the person it belongs to; the install waits until every one is approved.",
+    "kindTenant": "approved by this tenant's administrator",
+    "kindSecurityOfficer": "approved by the cluster's security officer",
+    "noReason": "The app gives no reason for this request.",
+    "expired": "A previous approval ran out on",
+    "approve": "Approve…",
+    "reasonLabel": "Why you approve it, in your own words",
+    "reasonHint": "At least ten characters. The approval is a commit that names you and keeps this reason; removing it from git withdraws it.",
+    "approveConfirm": "Approve {{privilege}}",
+    "approvedAs": "Approved: committed as <mono>{{commit}}</mono>. The app goes on once the platform has it.",
+    "approvedAlready": "Approved already; nothing was committed.",
+    "cancel": "Cancel",
+    "request": "Request approval…",
+    "noteLabel": "A note for the security officer (optional)",
+    "requestConfirm": "Request approval of {{privilege}}",
+    "requestedBy": "Requested by <mono>{{who}}</mono> on",
+    "waitingForOfficer": "Waiting for the security officer. This page carries on by itself once they have answered.",
+    "officerHint": "If you are the cluster's security officer, approve it at the platform console.",
+    "openPlatformConsole": "Open the Approvals page",
+    "platformConsoleUnknown": "Its address is not known here.",
+    "carriesOn": "This page asks the cluster every few seconds and goes on to the rollout by itself once nothing is waiting."
   }
 }

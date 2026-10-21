@@ -231,7 +231,8 @@
     "declare": "Repository deklarieren",
     "install": "Installieren",
     "rollout": "Auf dem Cluster ausrollen",
-    "metering": "Der App ihren Nutzungsschlüssel geben"
+    "metering": "Der App ihren Nutzungsschlüssel geben",
+    "approvals": "Genehmigungen"
   },
   "install": {
     "acquiredNotInstalled": "Dieser Mandant hat diese App erworben. Sie ist nicht installiert.",
@@ -426,5 +427,28 @@
     "allCountries": "Alle Länder",
     "noneIn": "Für das gewählte Land ist für diese App kein Support aufgeführt.",
     "consent": "Ihr Name, Ihre E-Mail-Adresse, Ihr Unternehmen und diese Nachricht werden an {{partner}} gesendet, damit Sie kontaktiert werden können."
+  },
+  "approvals": {
+    "lead": "Die App verlangt mehr, als eine App standardmäßig bekommt. Jede Anfrage beantwortet die Person, der sie zusteht; die Installation wartet, bis alle genehmigt sind.",
+    "kindTenant": "genehmigt die Administration dieses Mandanten",
+    "kindSecurityOfficer": "genehmigt der Security Officer des Clusters",
+    "noReason": "Die App nennt keinen Grund für diese Anfrage.",
+    "expired": "Eine frühere Genehmigung ist abgelaufen am",
+    "approve": "Genehmigen…",
+    "reasonLabel": "Warum Sie es genehmigen, in Ihren eigenen Worten",
+    "reasonHint": "Mindestens zehn Zeichen. Die Genehmigung ist ein Commit, der Sie nennt und diesen Grund festhält; wird sie aus Git entfernt, ist sie zurückgenommen.",
+    "approveConfirm": "{{privilege}} genehmigen",
+    "approvedAs": "Genehmigt: als <mono>{{commit}}</mono> committet. Die App fährt fort, sobald die Plattform es übernommen hat.",
+    "approvedAlready": "Bereits genehmigt; nichts wurde committet.",
+    "cancel": "Abbrechen",
+    "request": "Genehmigung anfragen…",
+    "noteLabel": "Eine Notiz für den Security Officer (optional)",
+    "requestConfirm": "Genehmigung von {{privilege}} anfragen",
+    "requestedBy": "Angefragt von <mono>{{who}}</mono> am",
+    "waitingForOfficer": "Wartet auf den Security Officer. Diese Seite fährt von selbst fort, sobald er geantwortet hat.",
+    "officerHint": "Sind Sie der Security Officer des Clusters, genehmigen Sie es in der Plattform-Konsole.",
+    "openPlatformConsole": "Seite „Genehmigungen“ öffnen",
+    "platformConsoleUnknown": "Ihre Adresse ist hier nicht bekannt.",
+    "carriesOn": "Diese Seite fragt den Cluster alle paar Sekunden und geht von selbst zum Ausrollen über, sobald nichts mehr wartet."
   }
 }

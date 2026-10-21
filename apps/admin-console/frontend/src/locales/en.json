@@ -26,7 +26,8 @@
     "tabApps": "Apps",
     "tabPerimeter": "Perimeter",
     "tabUpdates": "Updates",
-    "tabSecurityOfficers": "Security officers"
+    "tabSecurityOfficers": "Security officers",
+    "tabApprovals": "Approvals"
   },
   "audit": {
     "action": "Action",
@@ -1137,5 +1138,31 @@
     "howItWorks": "How it works",
     "howItWorksBody": "A holder signs in at the platform's address with their tenant account: the link above goes straight to their tenant's realm. Only that tenant's administrators pass the gate there, the kernel realm links to an account it already declared and never makes one, and the role comes with exactly the one group it names and nothing else.",
     "secondFactorHint": "The kernel realm asks a holder for a second factor of its own, enrolled there, unless the cluster setting <code>platformAccess.brokeredSecondFactor</code> is set to <code>off</code> — which makes their approval as strong as their tenant realm's sign-in policy."
+  },
+  "approvals": {
+    "title": "Approvals",
+    "lead": "What the apps of every tenant ask of the node beyond the default posture — pod-security waivers and cluster roles — and who asked for it. Approving one is the security officer's: it weakens what protects the node, and every tenant on it.",
+    "reading": "Reading…",
+    "unavailable": "The list is not available:",
+    "none": "Nothing is waiting for the security officer.",
+    "tenant": "Tenant",
+    "app": "App",
+    "privilege": "Privilege",
+    "request": "Request",
+    "answer": "Answer",
+    "noReason": "The app gives no reason.",
+    "requestedBy": "Requested by <mono>{{who}}</mono> on {{when}}",
+    "notRequested": "Nobody has asked for it yet; the app waits all the same.",
+    "expired": "A previous approval ran out on {{when}}.",
+    "notYours": "Approving it is the cluster's security officer's.",
+    "approve": "Approve…",
+    "reasonLabel": "Why you approve it, in your own words",
+    "expiresLabel": "Until (optional)",
+    "reasonHint": "At least ten characters. The approval is a commit that names you and keeps this reason; removing it from git withdraws it. A waiver with no end is a waiver nobody reviews.",
+    "approveFailed": "Not approved:",
+    "approveConfirm": "Approve {{privilege}}",
+    "approvedAs": "Approved: committed as <mono>{{commit}}</mono>.",
+    "approvedAlready": "Approved already; nothing was committed.",
+    "cancel": "Cancel"
   }
 }

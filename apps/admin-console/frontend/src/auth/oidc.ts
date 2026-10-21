@@ -131,6 +131,12 @@ export function loginRedirect(returnTo = window.location.pathname): void {
     scope: config.scopes,
     state: returnTo,
   });
+  // A link may name the identity provider to sign in through -- the
+  // platform console's Approvals page is reached from a tenant's App Store
+  // as ?kc_idp_hint=<the tenant's alias> -- and Keycloak reads it off the
+  // authorization request. Under edge the Gateway makes that request.
+  const hint = new URLSearchParams(window.location.search).get("kc_idp_hint");
+  if (hint) params.set("kc_idp_hint", hint);
   window.location.href = `${config.issuer.replace(/\/$/, "")}/protocol/openid-connect/auth?${params}`;
 }
 
