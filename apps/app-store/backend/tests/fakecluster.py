@@ -43,6 +43,10 @@ class FakeCluster:
         self.states: dict[str, dict[str, Any]] = {}
         self.ready_on_install = True
         self.install_refusal: tuple[int, str] | None = None
+        # Approvals given and requests made, as the director was asked them.
+        self.privilege_refusal: tuple[int, str] | None = None
+        self.approved: list[tuple[str, dict[str, Any]]] = []  # (install/kind/name, body)
+        self.requested: list[tuple[str, dict[str, Any]]] = []  # (profile, body)
         self.down: set[str] = set()  # services that cannot be reached
         self.tiles: dict[str, bytes] = {}  # app -> the tenant's tile the desktop keeps
         self.tile_refusal: tuple[int, str] | None = None
@@ -135,6 +139,26 @@ class FakeCluster:
             self.apps[profile]["addons"] = names
             self.apps[profile]["addonPins"] = pins
             return 202, {"status": "updated", "commit": "c0ffee3"}
+        if method == "PUT" and path.startswith(f"{prefix}/privileges/"):
+            if self.privilege_refusal is not None:
+                status, text = self.privilege_refusal
+                return status, {"error": text, "request_id": "r-5"}
+            self.approved.append((path.removeprefix(f"{prefix}/privileges/"), body))
+            return 202, {"status": "updated", "commit": "c0ffee5"}
+        if method == "POST" and path.startswith(f"{prefix}/apps/") and path.endswith("/actions/request-privilege"):
+            profile = path.split("/")[-3]
+            if self.privilege_refusal is not None:
+                status, text = self.privilege_refusal
+                return status, {"error": text, "request_id": "r-6"}
+            self.requested.append((profile, body))
+            return 202, {
+                "status": "requested",
+                "tenant": self.tenant,
+                "profile": profile,
+                "install": profile,
+                "privilege": body["privilege"],
+                "request": {"requestedBy": "alice@acme.example", "requestedAt": "2026-10-21T09:12:00Z", "note": body.get("note", "")},
+            }
         if method == "POST" and path.startswith(f"{prefix}/apps/"):
             profile = path.rsplit("/", 1)[1]
             if self.install_refusal is not None:

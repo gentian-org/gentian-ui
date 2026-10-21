@@ -53,6 +53,7 @@ def make_settings(**over) -> Settings:
         "CUSTODIAN_URL": CUSTODIAN,
         "USHER_URL": USHER,
         "GENTIAN_CLUSTER_ID": "cluster-under-test",
+        "KERNEL_DOMAIN": "example",
     }
     base.update(over)
     return Settings(**{k: v for k, v in base.items() if v is not None})
