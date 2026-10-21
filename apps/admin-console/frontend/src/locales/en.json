@@ -844,6 +844,9 @@
     "answerDetail": "Detail",
     "privilegeWaiting": "Waiting",
     "privilegeWaitingDetail": "Nobody has approved this yet. The app waits until somebody does.",
+    "privilegeDeclined": "Declined",
+    "privilegeDeclinedBy": "Declined by <mono>{{who}}</mono> on {{when}}",
+    "privilegeDeclinedDetail": "The app keeps waiting. It can be asked for again from the App Store, or approved after all.",
     "privilegeApproved": "Approved",
     "privilegeApprovedBy": "By <mono>{{approver}}</mono> on {{when}}",
     "privilegeExpires": "Expires {{when}}",
@@ -1154,6 +1157,7 @@
     "requestedBy": "Requested by <mono>{{who}}</mono> on {{when}}",
     "notRequested": "Nobody has asked for it yet; the app waits all the same.",
     "expired": "A previous approval ran out on {{when}}.",
+    "declinedBy": "Declined by <mono>{{who}}</mono> on {{when}}: {{reason}}",
     "notYours": "Approving it is the cluster's security officer's.",
     "approve": "Approve…",
     "reasonLabel": "Why you approve it, in your own words",
@@ -1163,6 +1167,12 @@
     "approveConfirm": "Approve {{privilege}}",
     "approvedAs": "Approved: committed as <mono>{{commit}}</mono>.",
     "approvedAlready": "Approved already; nothing was committed.",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "decline": "Decline…",
+    "declineReasonLabel": "Why you decline it, in your own words",
+    "declineReasonHint": "At least ten characters. Nothing is committed: the app keeps waiting, and whoever asked is shown your reason and may ask again. An approval later stands.",
+    "declineConfirm": "Decline {{privilege}}",
+    "declineFailed": "Not declined:",
+    "declined": "Declined. The app keeps waiting; the tenant sees your reason."
   }
 }

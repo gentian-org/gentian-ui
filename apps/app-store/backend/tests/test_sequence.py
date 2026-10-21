@@ -666,6 +666,45 @@ def test_a_grant_that_ran_out_and_an_approver_this_app_does_not_know(runner, sto
     assert approvals[0]["expiredAt"] == "2026-10-20T00:00:00Z"
 
 
+def test_a_declined_request_is_shown_as_such_and_can_be_asked_for_again(runner, store, cluster, clock):
+    to_rollout(runner, cluster, clock)
+    cluster.states[APP] = {
+        **WAITING,
+        "pendingPrivileges": ["podSecurity/run-as-root"],
+        "pendingPrivilegeApprovals": [
+            {
+                "privilege": "podSecurity/run-as-root",
+                "approvedBy": "security-officer",
+                "reason": "writes its cache as root",
+                "requestedBy": "alice@acme.example",
+                "requestedAt": "2026-10-21T09:12:00Z",
+                "declinedBy": "sam@example.com",
+                "declinedAt": "2026-10-21T10:00:00Z",
+                "declineReason": "no root on shared nodes; use the rootless image",
+            }
+        ],
+    }
+    view = runner.step()
+    # Still the approvals step: a decline installs nothing, and the no is
+    # shown with who said it and why.
+    assert view["stage"] == "approvals"
+    approval = view["rollout"]["pendingPrivilegeApprovals"][0]
+    assert (approval["declinedBy"], approval["declinedAt"], approval["declineReason"]) == (
+        "sam@example.com",
+        "2026-10-21T10:00:00Z",
+        "no root on shared nodes; use the rootless image",
+    )
+    # Asking again is the same request route; the operator treats it as new.
+    answer = runner.api.post(
+        f"/api/v1/apps/{PAID}/privileges/podSecurity/run-as-root/request",
+        json={"note": "now with the rootless image"},
+        headers=ALICE,
+    )
+    assert answer.status_code == 200, answer.text
+    assert answer.json()["status"] == "requested"
+    assert cluster.requested == [(APP, {"privilege": "podSecurity/run-as-root", "note": "now with the rootless image"})]
+
+
 def test_a_reload_shows_the_approvals_without_an_operation(runner, store, cluster, clock):
     to_rollout(runner, cluster, clock)
     cluster.states[APP] = dict(WAITING)

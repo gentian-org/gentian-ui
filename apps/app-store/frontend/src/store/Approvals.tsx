@@ -149,7 +149,11 @@ function Approve({
 
 /**
  * Asking the security officer. Once asked, the request is shown as the
- * cluster records it -- who, when, the note -- and the step waits.
+ * cluster records it -- who, when, the note -- and the step waits. One the
+ * officer declined is shown with their reason and can be asked for again:
+ * the same request, which the operator treats as new and which clears the
+ * no. A request just made here is shown from the answer until the cluster
+ * reports it.
  */
 function Request({
   coordinate,
@@ -170,11 +174,11 @@ function Request({
       onChanged();
     },
   });
-  const recorded = approval.requestedBy
-    ? { by: approval.requestedBy, at: approval.requestedAt, note: approval.note }
-    : request.data?.request
-      ? { by: request.data.request.requestedBy, at: request.data.request.requestedAt, note: request.data.request.note ?? null }
-      : null;
+  const justAsked = request.data?.request
+    ? { by: request.data.request.requestedBy, at: request.data.request.requestedAt, note: request.data.request.note ?? null }
+    : null;
+  const declined = !justAsked && approval.declinedBy ? approval : null;
+  const recorded = justAsked ?? (!declined && approval.requestedBy ? { by: approval.requestedBy, at: approval.requestedAt, note: approval.note } : null);
 
   if (recorded) {
     return (
@@ -187,13 +191,26 @@ function Request({
       </>
     );
   }
+  const said = declined ? (
+    <>
+      <p className="admin-console__hint">
+        <Trans i18nKey="approvals.declinedBy" values={{ who: declined.declinedBy }} components={mono} />{" "}
+        {declined.declinedAt ? <DateText value={declined.declinedAt} /> : null}
+      </p>
+      {declined.declineReason ? <p className="store-problem__said">{declined.declineReason}</p> : null}
+      <p className="admin-console__hint">{t("approvals.declinedWaits")}</p>
+    </>
+  ) : null;
   if (!open) {
     return (
-      <div className="admin-console__actions">
-        <button type="button" className="admin-console__btn admin-console__btn--primary" onClick={() => setOpen(true)}>
-          {t("approvals.request")}
-        </button>
-      </div>
+      <>
+        {said}
+        <div className="admin-console__actions">
+          <button type="button" className="admin-console__btn admin-console__btn--primary" onClick={() => setOpen(true)}>
+            {t(declined ? "approvals.requestAgain" : "approvals.request")}
+          </button>
+        </div>
+      </>
     );
   }
   return (
@@ -203,6 +220,7 @@ function Request({
         request.mutate();
       }}
     >
+      {said}
       <label className="admin-console__label">
         <span className="admin-console__label-text">{t("approvals.noteLabel")}</span>
         <textarea className="store-input" value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} rows={2} />

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { fetchAdminContext } from "@/api/admin";
-import { approveNodePrivilege, fetchApprovals, type Approval } from "@/api/approvals";
+import { approveNodePrivilege, declineNodePrivilege, fetchApprovals, type Approval } from "@/api/approvals";
 import "./admin.css";
 
 const mono = { mono: <span className="admin-console__mono" /> };
@@ -13,9 +13,11 @@ const messageOf = (err: unknown) => (err instanceof Error ? err.message : String
  * What every tenant's apps ask of the node, for the cluster's security
  * officer: pod-security waivers and cluster roles, each with the profile's
  * reason and the request its tenant's administrator made. The list is the
- * usher's, read under cluster can_approve or can_configure; the button
- * follows the director's answer to can_approve (adminContext.
- * canApproveNodePrivilege), and the director decides again on the approval.
+ * usher's, read under cluster can_approve or can_configure; the buttons
+ * follow the director's answer to can_approve (adminContext.
+ * canApproveNodePrivilege), and the director decides again on the answer.
+ * A decline is the same right: it commits nothing and the app keeps
+ * waiting, but whoever asked is told why.
  */
 export function ApprovalsSection() {
   const { t } = useTranslation();
@@ -78,10 +80,23 @@ export function ApprovalsSection() {
                         {t("approvals.expired", { when: new Date(approval.expiredAt).toLocaleString() })}
                       </div>
                     ) : null}
+                    {approval.declinedBy ? (
+                      <div className="admin-console__hint">
+                        <Trans
+                          i18nKey="approvals.declinedBy"
+                          values={{
+                            who: approval.declinedBy,
+                            when: approval.declinedAt ? new Date(approval.declinedAt).toLocaleString() : "",
+                            reason: approval.declineReason ?? "",
+                          }}
+                          components={mono}
+                        />
+                      </div>
+                    ) : null}
                   </td>
                   <td>
                     {mayApprove ? (
-                      <ApproveRequest approval={approval} />
+                      <AnswerRequest approval={approval} />
                     ) : (
                       <div className="admin-console__hint">{t("approvals.notYours")}</div>
                     )}
@@ -97,29 +112,36 @@ export function ApprovalsSection() {
 }
 
 /**
- * One approval: a reason in the officer's words, an optional end, then one
- * commit through the director for the request's tenant. The director's
+ * The officer's answer: an approval -- a reason in their words, an optional
+ * end, then one commit through the director for the request's tenant -- or
+ * a decline, a reason and nothing committed. Either way the director's
  * refusal is shown as it worded it.
  */
-function ApproveRequest({ approval }: { approval: Approval }) {
+function AnswerRequest({ approval }: { approval: Approval }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<"approve" | "decline" | null>(null);
   const [reason, setReason] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
+  const settle = () => {
+    setOpen(null);
+    setReason("");
+    void queryClient.invalidateQueries({ queryKey: ["admin", "approvals"] });
+  };
   const approve = useMutation({
     mutationFn: () =>
       approveNodePrivilege(approval, {
         reason: reason.trim(),
         ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
       }),
-    onSuccess: () => {
-      setOpen(false);
-      setReason("");
-      void queryClient.invalidateQueries({ queryKey: ["admin", "approvals"] });
-    },
+    onSuccess: settle,
+  });
+  const decline = useMutation({
+    mutationFn: () => declineNodePrivilege(approval, { reason: reason.trim() }),
+    onSuccess: settle,
   });
   const tooShort = reason.trim().length < 10;
+  const busy = approve.isPending || decline.isPending;
 
   if (approve.isSuccess) {
     return (
@@ -132,41 +154,57 @@ function ApproveRequest({ approval }: { approval: Approval }) {
       </span>
     );
   }
+  if (decline.isSuccess) {
+    return <span className="admin-console__hint">{t("approvals.declined")}</span>;
+  }
   if (!open) {
     return (
       <div className="admin-console__actions">
-        <button type="button" className="admin-console__btn" onClick={() => setOpen(true)}>
+        <button type="button" className="admin-console__btn" onClick={() => setOpen("approve")}>
           {t("approvals.approve")}
+        </button>
+        <button type="button" className="admin-console__btn admin-console__btn--quiet" onClick={() => setOpen("decline")}>
+          {t("approvals.decline")}
         </button>
       </div>
     );
   }
+  const declining = open === "decline";
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        if (!tooShort) approve.mutate();
+        if (tooShort) return;
+        if (declining) decline.mutate();
+        else approve.mutate();
       }}
     >
       <label className="admin-console__field">
-        <span>{t("approvals.reasonLabel")}</span>
+        <span>{t(declining ? "approvals.declineReasonLabel" : "approvals.reasonLabel")}</span>
         <textarea value={reason} onChange={(event) => setReason(event.target.value)} required minLength={10} maxLength={1000} rows={3} />
       </label>
-      <label className="admin-console__field">
-        <span>{t("approvals.expiresLabel")}</span>
-        <input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} />
-      </label>
-      <p className="admin-console__hint">{t("approvals.reasonHint")}</p>
+      {declining ? null : (
+        <label className="admin-console__field">
+          <span>{t("approvals.expiresLabel")}</span>
+          <input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} />
+        </label>
+      )}
+      <p className="admin-console__hint">{t(declining ? "approvals.declineReasonHint" : "approvals.reasonHint")}</p>
       {approve.isError ? (
         <p className="admin-console__error">
           {t("approvals.approveFailed")} {messageOf(approve.error)}
         </p>
       ) : null}
+      {decline.isError ? (
+        <p className="admin-console__error">
+          {t("approvals.declineFailed")} {messageOf(decline.error)}
+        </p>
+      ) : null}
       <div className="admin-console__actions">
-        <button type="submit" className="admin-console__btn" disabled={tooShort || approve.isPending}>
-          {t("approvals.approveConfirm", { privilege: approval.privilege })}
+        <button type="submit" className="admin-console__btn" disabled={tooShort || busy}>
+          {t(declining ? "approvals.declineConfirm" : "approvals.approveConfirm", { privilege: approval.privilege })}
         </button>
-        <button type="button" className="admin-console__btn admin-console__btn--quiet" disabled={approve.isPending} onClick={() => setOpen(false)}>
+        <button type="button" className="admin-console__btn admin-console__btn--quiet" disabled={busy} onClick={() => setOpen(null)}>
           {t("approvals.cancel")}
         </button>
       </div>

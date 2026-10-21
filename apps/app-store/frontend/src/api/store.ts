@@ -234,6 +234,14 @@ export type PendingApproval = {
   note: string | null;
   /** When a grant for it ran out: approved once, waiting again. */
   expiredAt: string | null;
+  /**
+   * The approver's no, when one was said: who, when and why. The request is
+   * still pending; asking again clears it, as does an approval after it.
+   * Absent from an older backend.
+   */
+  declinedBy?: string | null;
+  declinedAt?: string | null;
+  declineReason?: string | null;
 };
 
 /** What the cluster has made of it, in its own words. */

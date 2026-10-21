@@ -67,6 +67,30 @@ describe("PrivilegesPart", () => {
     expect(rowOf(neither, "egress/smtp-relay")).toContain(notYours);
   });
 
+  it("shows a declined request as declined, by whom and why, and still waiting", () => {
+    const refused: AppState = {
+      ...state,
+      pendingPrivilegeApprovals: [
+        { privilege: "egress/smtp-relay", approvedBy: "tenant" },
+        {
+          privilege: "podSecurity/run-as-root",
+          approvedBy: "security-officer",
+          declinedBy: "sam@example.com",
+          declinedAt: "2026-10-21T10:00:00Z",
+          declineReason: "no root on shared nodes; use the rootless image",
+        },
+      ],
+    };
+    const html = render(refused, tenantAdmin);
+    const row = rowOf(html, "podSecurity/run-as-root");
+    expect(row).toContain("Declined by");
+    expect(row).toContain("sam@example.com");
+    expect(row).toContain("no root on shared nodes; use the rootless image");
+    expect(row).toContain("The app keeps waiting");
+    expect(row).not.toContain(approve);
+    expect(rowOf(html, "egress/smtp-relay")).not.toContain("Declined by");
+  });
+
   it("offers nothing when an older operator does not say who answers", () => {
     const older: AppState = { ...state, pendingPrivilegeApprovals: undefined };
     const html = render(older, { canApprovePrivilege: true, canApproveNodePrivilege: true });

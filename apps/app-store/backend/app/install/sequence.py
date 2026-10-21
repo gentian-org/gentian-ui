@@ -766,7 +766,7 @@ def _approvals_view(entries: Any) -> list[dict[str, Any]]:
         if not isinstance(privilege, str) or "/" not in privilege or approved_by not in APPROVER_KINDS:
             continue
         view: dict[str, Any] = {"privilege": privilege, "approvedBy": approved_by}
-        for key in ("reason", "requestedBy", "requestedAt", "note", "expiredAt"):
+        for key in ("reason", "requestedBy", "requestedAt", "note", "expiredAt", "declinedBy", "declinedAt", "declineReason"):
             value = entry.get(key)
             view[key] = value[:2000] if isinstance(value, str) and value else None
         out.append(view)
@@ -934,7 +934,8 @@ async def approve_privilege(
 async def request_privilege(ctx: Context, profile: str, privilege: str, note: str | None) -> dict[str, Any]:
     """Ask the security officer for one request the tenant cannot approve
     itself. The director has the operator record who asked, when and the
-    note on the app, where the platform console's Approvals page lists it."""
+    note on the app, where the platform console's Approvals page lists it.
+    Asked again after a decline, it is a new request and clears the no."""
     _privilege_path(privilege)
     answer = await director.ask_director(
         ctx.settings,
