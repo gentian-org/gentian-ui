@@ -449,9 +449,7 @@
     "declinedBy": "Declined by <mono>{{who}}</mono> on",
     "declinedWaits": "The install keeps waiting. You can ask again, with what has changed, or uninstall the app.",
     "requestAgain": "Request again…",
-    "officerHint": "If you are the cluster's security officer, approve it at the platform console.",
-    "openPlatformConsole": "Open the Approvals page",
-    "platformConsoleUnknown": "Its address is not known here.",
+    "officerHint": "A security officer of this cluster approves this in their admin console.",
     "carriesOn": "This page asks the cluster every few seconds and goes on to the rollout by itself once nothing is waiting."
   }
 }

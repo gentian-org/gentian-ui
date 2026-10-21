@@ -2,20 +2,19 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import "@/lib/i18n";
-import { SecurityOfficersSection } from "./SecurityOfficersSection";
+import { RoleHoldersSection } from "./RoleHoldersSection";
 
-// The director's and the registrar's answers as they are served: who holds
-// the role, and who could.
+// The director's and the registrar's answers as they are served.
 const holders = {
   cluster: "demo",
-  securityOfficers: [
+  roles: ["auditor", "securityOfficer"],
+  roleHolders: [
     {
+      role: "securityOfficer",
       tenant: "acme",
       subject: "7d0f3c2e",
       username: "it@acme.example",
       email: "it@acme.example",
-      identityProvider: "tenant-acme",
-      signIn: "https://platform.k.example/?kc_idp_hint=tenant-acme",
     },
   ],
 };
@@ -36,28 +35,31 @@ const candidates = {
   ],
 };
 
-function render(withHolders = holders, withCandidates: unknown = candidates) {
+function render(canEdit = true, withHolders: unknown = holders) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  client.setQueryData(["admin", "platform", "security-officers"], withHolders);
-  client.setQueryData(["admin", "platform", "tenant-administrators"], withCandidates);
+  client.setQueryData(["admin", "platform", "role-holders"], withHolders);
+  client.setQueryData(["admin", "platform", "tenant-administrators"], candidates);
   return renderToString(
     <QueryClientProvider client={client}>
-      <SecurityOfficersSection />
+      <RoleHoldersSection canEdit={canEdit} />
     </QueryClientProvider>,
   );
 }
 
-describe("SecurityOfficersSection", () => {
-  it("lists the holders with where each signs in", () => {
+describe("RoleHoldersSection", () => {
+  it("lists the holders by role", () => {
     const html = render();
+    expect(html).toContain("Security officer");
+    expect(html).toContain("Auditor");
     expect(html).toContain("it@acme.example");
     expect(html).toContain("7d0f3c2e");
-    expect(html).toContain("https://platform.k.example/?kc_idp_hint=tenant-acme");
+    expect(html).toContain("Nobody holds this role by name");
   });
 
-  it("offers only the administrators who do not hold the role yet", () => {
+  it("offers only the administrators who do not hold the picked role yet", () => {
     const html = render();
-    const picker = html.slice(html.indexOf("<select"), html.indexOf("</select>"));
+    const start = html.indexOf('id="role-holder-pick"');
+    const picker = html.slice(start, html.indexOf("</select>", start));
     expect(picker).toContain("ciso@acme.example");
     expect(picker).not.toContain("it@acme.example");
     expect(picker).toContain("Acme AG (acme)");
@@ -67,8 +69,10 @@ describe("SecurityOfficersSection", () => {
     expect(render()).toContain("globex");
   });
 
-  it("says so when nobody holds the role", () => {
-    const html = render({ cluster: "demo", securityOfficers: [] });
-    expect(html).toContain("Nobody holds the role yet");
+  it("is read-only without can_configure", () => {
+    const html = render(false);
+    expect(html).toContain("it@acme.example");
+    expect(html).not.toContain("Remove");
+    expect(html).not.toContain("<select");
   });
 });

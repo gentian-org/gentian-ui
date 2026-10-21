@@ -19,9 +19,6 @@ def test_whether_a_person_may_install_is_the_directors_answer(api, store, cluste
         "storeConfigured": True,
         "appStore": {"available": True, "reason": None},
         "adminConsoleUrl": "https://admin.acme.example/",
-        # The platform console's Approvals page, entered through this
-        # tenant's realm: where the security officer answers.
-        "platformApprovalsUrl": "https://admin.platform.example/?tab=approvals&kc_idp_hint=tenant-acme",
         "tenantCountry": None,
     }
     # Asked with the person's own token.

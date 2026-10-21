@@ -1,4 +1,4 @@
-"""The security officers and the tenant's switch for the platform's
+"""The cluster role holders and the tenant's switch for the platform's
 administrators: every route relays as the caller, to the director for what
 is declared in git and to the registrar for who could be chosen."""
 
@@ -53,39 +53,39 @@ def test_the_holders_are_read_from_the_director(monkeypatch):
     seen: dict = {}
     holders = {
         "cluster": "demo",
-        "securityOfficers": [
+        "roles": ["auditor", "securityOfficer"],
+        "roleHolders": [
             {
+                "role": "securityOfficer",
                 "tenant": "acme",
                 "subject": "7d0f",
                 "username": "it@acme.example",
-                "signIn": "https://platform.desk.gentian.org/?kc_idp_hint=tenant-acme",
+                "email": "it@acme.example",
             }
         ],
     }
     _fake_client(monkeypatch, 200, holders, seen)
     r = TestClient(_app(_settings())).get(
-        "/api/v1/cluster/security-officers", headers={"Authorization": "Bearer t"}
+        "/api/v1/cluster/role-holders", headers={"Authorization": "Bearer t"}
     )
     assert r.status_code == 200
-    assert r.json()["securityOfficers"][0]["signIn"].endswith("kc_idp_hint=tenant-acme")
-    assert (
-        seen["url"] == "http://director.test:8080/v1/clusters/demo/platform-roles/security-officers"
-    )
+    assert r.json()["roleHolders"][0]["role"] == "securityOfficer"
+    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/platform-roles/holders"
     assert seen["auth"] == "Bearer t"
 
 
-def test_naming_one_is_a_commit_by_the_subject(monkeypatch):
+def test_naming_one_is_a_commit_by_role_tenant_and_subject(monkeypatch):
     seen: dict = {}
     _fake_client(monkeypatch, 202, {"status": "updated", "commit": "a1b2c3d4"}, seen)
     r = TestClient(_app(_settings())).put(
-        "/api/v1/cluster/security-officers/acme/7d0f",
+        "/api/v1/cluster/role-holders/auditor/acme/7d0f",
         json={"username": "it@acme.example", "email": "it@acme.example"},
         headers={"Authorization": "Bearer t"},
     )
     assert r.status_code == 202 and r.json()["commit"] == "a1b2c3d4"
     assert seen["method"] == "PUT"
     assert seen["url"] == (
-        "http://director.test:8080/v1/clusters/demo/platform-roles/security-officers/acme/7d0f"
+        "http://director.test:8080/v1/clusters/demo/platform-roles/holders/auditor/acme/7d0f"
     )
     assert seen["json"] == {"username": "it@acme.example", "email": "it@acme.example"}
 
@@ -94,10 +94,12 @@ def test_a_refusal_comes_back_as_it_was(monkeypatch):
     seen: dict = {}
     _fake_client(monkeypatch, 403, {"error": "can_configure on cluster:demo refused"}, seen)
     r = TestClient(_app(_settings())).delete(
-        "/api/v1/cluster/security-officers/acme/7d0f", headers={"Authorization": "Bearer t"}
+        "/api/v1/cluster/role-holders/securityOfficer/acme/7d0f",
+        headers={"Authorization": "Bearer t"},
     )
     assert r.status_code == 403
     assert seen["method"] == "DELETE"
+    assert seen["url"].endswith("/platform-roles/holders/securityOfficer/acme/7d0f")
 
 
 def test_who_could_be_chosen_is_the_registrars_answer(monkeypatch):

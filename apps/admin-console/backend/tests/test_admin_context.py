@@ -189,6 +189,22 @@ def test_whether_the_person_may_approve_a_node_privilege_is_the_directors_answer
         assert r.json()["canApproveNodePrivilege"] is want
 
 
+def test_whether_the_person_may_read_the_cluster_roles_is_the_directors_answer(monkeypatch):
+    for cluster_rel, want in (({"can_audit": True}, True), ({}, False)):
+        _director(
+            monkeypatch,
+            {
+                "/v1/tenants/platform/me": {"relations": {"can_administer": True}},
+                "/v1/clusters/demo/me": {"relations": cluster_rel},
+            },
+        )
+        r = TestClient(_app(_settings())).get(
+            "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+        )
+        assert r.status_code == 200
+        assert r.json()["canAuditCluster"] is want
+
+
 def test_someone_the_edge_let_in_but_who_may_not_administer_is_refused(monkeypatch):
     _director(
         monkeypatch,

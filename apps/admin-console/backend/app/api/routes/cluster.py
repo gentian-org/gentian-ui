@@ -381,34 +381,34 @@ async def pending_admin_invitations(
     )
 
 
-# --- The security officers (iam.md 1.1c) ------------------------------------
+# --- The cluster roles held by name (iam.md 1.1c) ----------------------------
 #
-# Who holds cluster#security_officer is declared on the Cluster claim: the
-# administrators of the cluster's tenants, each by the subject of their account
-# in their tenant's realm. The director commits the choice (can_configure) and
-# answers who holds it (can_audit); the registrar answers who could, the
-# members of each tenant's admins group, for whoever configures the cluster.
-# The console relays both as the caller and decides nothing.
+# Who holds cluster#security_officer or cluster#auditor by name is declared on
+# the Cluster claim: an account of a tenant's realm, by its subject there. The
+# holder signs in to their own tenant. The director commits the choice
+# (can_configure) and answers who holds what (can_audit); the registrar
+# answers who could, the members of each tenant's admins group. The console
+# relays both as the caller and decides nothing.
 
 
-@router.get("/security-officers")
-async def security_officers(
+@router.get("/role-holders")
+async def role_holders(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Who holds the security officer role, as the claim declares it, each
-    with the address they sign in at."""
+    """Who holds which cluster role, as the claim declares it."""
     return await director.forward(
         settings,
         "GET",
-        _cluster_path(settings, "/platform-roles/security-officers"),
+        _cluster_path(settings, "/platform-roles/holders"),
         bearer_of(credentials),
     )
 
 
-@router.put("/security-officers/{tenant}/{subject}")
-async def set_security_officer(
+@router.put("/role-holders/{role}/{tenant}/{subject}")
+async def set_role_holder(
+    role: str,
     tenant: str,
     subject: str,
     body: dict,
@@ -416,30 +416,31 @@ async def set_security_officer(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """A tenant's administrator holds the role: one commit to the claim. The
-    body carries the login and the address the kernel realm shows."""
+    """An account of a tenant's realm holds the role: one commit to the
+    claim. The body carries the login and the address shown for it."""
     return await director.forward(
         settings,
         "PUT",
-        _cluster_path(settings, f"/platform-roles/security-officers/{tenant}/{subject}"),
+        _cluster_path(settings, f"/platform-roles/holders/{role}/{tenant}/{subject}"),
         bearer_of(credentials),
         json_body=body,
     )
 
 
-@router.delete("/security-officers/{tenant}/{subject}")
-async def remove_security_officer(
+@router.delete("/role-holders/{role}/{tenant}/{subject}")
+async def remove_role_holder(
+    role: str,
     tenant: str,
     subject: str,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """No longer: the entry goes, and with it the linked account."""
+    """No longer: the entry goes, and with it the tuple."""
     return await director.forward(
         settings,
         "DELETE",
-        _cluster_path(settings, f"/platform-roles/security-officers/{tenant}/{subject}"),
+        _cluster_path(settings, f"/platform-roles/holders/{role}/{tenant}/{subject}"),
         bearer_of(credentials),
     )
 

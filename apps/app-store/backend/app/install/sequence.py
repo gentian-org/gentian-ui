@@ -934,7 +934,7 @@ async def approve_privilege(
 async def request_privilege(ctx: Context, profile: str, privilege: str, note: str | None) -> dict[str, Any]:
     """Ask the security officer for one request the tenant cannot approve
     itself. The director has the operator record who asked, when and the
-    note on the app, where the platform console's Approvals page lists it.
+    note on the app, where the security officer's admin console lists it.
     Asked again after a decline, it is a new request and clears the no."""
     _privilege_path(privilege)
     answer = await director.ask_director(

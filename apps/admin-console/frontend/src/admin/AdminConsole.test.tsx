@@ -38,6 +38,16 @@ describe("AdminConsole", () => {
     expect(tabs({ ...base, isTenantAdmin: false, canApproveNodePrivilege: true })).toEqual(["Approvals"]);
   });
 
+  it("shows the Approvals tab in a tenant's own console to its security officer", () => {
+    const tenant = { ...base, tenant: "acme", realm: "acme", availableTenants: ["acme"] };
+    expect(tabs({ ...tenant, canApproveNodePrivilege: true })).toContain("Approvals");
+  });
+
+  it("shows the Cluster roles tab to whoever may read them", () => {
+    expect(tabs({ ...base, canAuditCluster: true })).toContain("Cluster roles");
+    expect(tabs(base)).not.toContain("Cluster roles");
+  });
+
   it("shows a person a backend older than isTenantAdmin let in every tenant tab, as before", () => {
     const { isTenantAdmin: _omitted, ...older } = base;
     const shown = tabs(older as AdminContext);

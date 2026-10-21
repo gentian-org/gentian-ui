@@ -65,8 +65,6 @@ async def context(
         "storeConfigured": settings.store_base is not None,
         "appStore": await _app_store_offered(settings, token),
         "adminConsoleUrl": settings.admin_console_url,
-        # Where the security officer answers what an app asks of the node.
-        "platformApprovalsUrl": settings.platform_approvals_url,
         # The tenant's country, which support offers are asked for by default.
         "tenantCountry": settings.country,
     }
