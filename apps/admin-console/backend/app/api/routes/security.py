@@ -165,3 +165,47 @@ async def set_security_policies(
         bearer_of(credentials),
         json_body=_nested(body),
     )
+
+
+# --- The platform's administrators entering the tenant (iam.md 1.1c) --------
+#
+# Whether the members of the platform's administrators' group may sign in to
+# this tenant as its administrators: the tenant's own switch on its manifest
+# (spec.platformAccess.adminsEnter), off by default, written by the tenant's
+# administrators through the director under can_administer. It is not the
+# tenant's operated_by consent, which covers the director and not the sign-in.
+
+
+@router.get("/platform-access")
+async def platform_access(
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Whether the platform's administrators may sign in to the tenant."""
+    return await director.forward(
+        settings,
+        "GET",
+        f"/v1/tenants/{_tenant(settings, tenant)}/platform-access",
+        bearer_of(credentials),
+    )
+
+
+@router.put("/platform-access")
+async def set_platform_access(
+    body: dict,
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """A WRITE of declared state: {"adminsEnter": true|false}. Answers a
+    commit, or the director's refusal as it came."""
+    return await director.forward(
+        settings,
+        "PUT",
+        f"/v1/tenants/{_tenant(settings, tenant)}/platform-access",
+        bearer_of(credentials),
+        json_body={"adminsEnter": bool(body.get("adminsEnter"))},
+    )

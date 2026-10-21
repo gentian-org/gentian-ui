@@ -1102,3 +1102,18 @@ export type AppState = {
 export function fetchAppStates() {
   return apiFetch<{ tenant: string; apps: AppState[] }>("/admin/apps/status");
 }
+
+// --- The platform's administrators entering the tenant (iam.md 1.1c) --------
+
+/** Whether the platform's administrators may sign in to the tenant as its administrators. */
+export function fetchPlatformAccess(tenant?: string) {
+  return apiFetch<{ tenant: string; adminsEnter: boolean }>(`/admin/platform-access${tenantQuery(tenant)}`);
+}
+
+/** The tenant's own switch: a commit to its manifest. */
+export function updatePlatformAccess(adminsEnter: boolean, tenant?: string) {
+  return apiFetch<{ status: string; commit?: string }>(`/admin/platform-access${tenantQuery(tenant)}`, {
+    method: "PUT",
+    body: JSON.stringify({ adminsEnter }),
+  });
+}

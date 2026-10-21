@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
+  fetchPlatformAccess,
   fetchSecurityPolicies,
+  updatePlatformAccess,
   updateSecurityPolicies,
   type SecurityPolicies,
 } from "@/api/admin";
@@ -284,6 +286,66 @@ export function SecurityPoliciesSection({ tenant }: SecurityPoliciesSectionProps
           {saveMutation.isPending ? "Saving…" : t("securityPolicies.savePolicies")}
         </button>
       </form>
+
+      <PlatformAccessCard tenant={tenant} />
     </section>
+  );
+}
+
+/**
+ * The tenant's own switch: whether the platform's administrators may sign in
+ * to this tenant as its administrators (spec.platformAccess.adminsEnter). Off
+ * by default; a commit to the tenant's manifest by the tenant's
+ * administrators. Not the tenant's operated_by consent, which covers what the
+ * cluster's administrators do through the director, not the sign-in.
+ */
+function PlatformAccessCard({ tenant }: { tenant: string }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const accessQuery = useQuery({
+    queryKey: ["admin", "platform-access", tenant],
+    queryFn: () => fetchPlatformAccess(tenant),
+    retry: false,
+  });
+  const mutation = useMutation({
+    mutationFn: (adminsEnter: boolean) => updatePlatformAccess(adminsEnter, tenant),
+    onSuccess: async (result, adminsEnter) => {
+      setError(null);
+      setNotice(
+        result.commit
+          ? adminsEnter
+            ? t("securityPolicies.platformAccessOnCommitted")
+            : t("securityPolicies.platformAccessOffCommitted")
+          : t("securityPolicies.platformAccessUnchanged"),
+      );
+      await queryClient.invalidateQueries({ queryKey: ["admin", "platform-access", tenant] });
+    },
+    onError: (err: Error) => {
+      setNotice(null);
+      setError(err.message);
+    },
+  });
+  if (accessQuery.isLoading || accessQuery.isError || !accessQuery.data) {
+    return null;
+  }
+  const on = accessQuery.data.adminsEnter;
+  return (
+    <div className="admin-console__card">
+      <h3 className="admin-console__subsection-title">{t("securityPolicies.platformAccessTitle")}</h3>
+      <p className="admin-console__hint">{t("securityPolicies.platformAccessBody")}</p>
+      <label className="admin-console__checkbox">
+        <input
+          type="checkbox"
+          checked={on}
+          disabled={mutation.isPending}
+          onChange={(e) => mutation.mutate(e.target.checked)}
+        />
+        {t("securityPolicies.platformAccessSwitch")}
+      </label>
+      {error ? <p className="admin-console__error">{error}</p> : null}
+      {notice ? <p className="admin-console__success">{notice}</p> : null}
+    </div>
   );
 }

@@ -80,6 +80,15 @@ export type ClusterTenant = {
   /** True while a purge is under way: its data is set to be deleted and the
    * tenant goes once the cluster has taken that in. */
   purging?: boolean;
+  /** The domain its people sign in under: its own, or <tenant>.<kernel domain>. */
+  loginDomain?: string;
+  /**
+   * True where the tenant's administrators let the platform's administrators
+   * sign in to it (spec.platformAccess.adminsEnter): the Enter action then
+   * leads to its desktop through the kernel realm. Absent from an older
+   * director, which is a no.
+   */
+  adminsEnter?: boolean;
 };
 
 export type ClusterTenantsResponse = {
@@ -409,5 +418,74 @@ export function setAppUpdateMode(tenant: string, profile: string, mode: string) 
   return apiFetch<{ status: string; commit?: string }>(
     `/cluster/tenants/${encodeURIComponent(tenant)}/apps/${encodeURIComponent(profile)}/update-mode`,
     { method: "PUT", body: JSON.stringify({ mode }) },
+  );
+}
+
+// --- The security officers (iam.md 1.1c) ------------------------------------
+
+/**
+ * One holder of cluster#security_officer, as the Cluster claim declares it: a
+ * tenant's administrator, by the subject of their account in the tenant's
+ * realm, with the login and address the kernel realm shows.
+ */
+export type SecurityOfficer = {
+  tenant: string;
+  subject: string;
+  username: string;
+  email?: string;
+  /** The kernel realm's identity provider for the tenant, tenant-<tenant>. */
+  identityProvider: string;
+  /** Where the person signs in: the platform's address, straight to that provider. */
+  signIn?: string;
+};
+
+export function fetchSecurityOfficers() {
+  return apiFetch<{ cluster: string; securityOfficers: SecurityOfficer[] }>("/cluster/security-officers");
+}
+
+/** Name a tenant's administrator a security officer: one commit to the claim. */
+export async function addSecurityOfficer(
+  tenant: string,
+  subject: string,
+  username: string,
+  email: string,
+): Promise<ClusterSettingsWriteResult> {
+  const body = await apiFetch<{ status: string; commit?: string }>(
+    `/cluster/security-officers/${encodeURIComponent(tenant)}/${encodeURIComponent(subject)}`,
+    { method: "PUT", body: JSON.stringify({ username, email }) },
+  );
+  return { ...body, changed: Boolean(body.commit) };
+}
+
+export async function removeSecurityOfficer(tenant: string, subject: string): Promise<ClusterSettingsWriteResult> {
+  const body = await apiFetch<{ status: string; commit?: string }>(
+    `/cluster/security-officers/${encodeURIComponent(tenant)}/${encodeURIComponent(subject)}`,
+    { method: "DELETE" },
+  );
+  return { ...body, changed: Boolean(body.commit) };
+}
+
+/** One administrator of a tenant, as the registrar lists them. */
+export type TenantAdministrator = {
+  id: string;
+  username: string;
+  email?: string;
+  name?: string;
+  enabled: boolean;
+};
+
+export type TenantAdministrators = {
+  tenant: string;
+  displayName?: string;
+  realm: string;
+  /** Absent where the realm could not be read; `unavailable` then says so. */
+  administrators?: TenantAdministrator[];
+  unavailable?: boolean;
+};
+
+/** Who could hold the role: every tenant's administrators, from the registrar. */
+export function fetchTenantAdministrators() {
+  return apiFetch<{ cluster: string; complete: boolean; tenants: TenantAdministrators[] }>(
+    "/cluster/tenant-administrators",
   );
 }
