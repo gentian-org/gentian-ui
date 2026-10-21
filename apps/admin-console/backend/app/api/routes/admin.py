@@ -38,6 +38,8 @@ class AdminContextResponse(BaseModel):
     tenant: str
     realm: str
     isPlatformAdmin: bool
+    # Whether this person administers the tenant. False only for the
+    # security officer let in for the Approvals screen (see admin_context).
     isTenantAdmin: bool
     availableTenants: list[str]
     kernelDomain: str
@@ -91,15 +93,21 @@ async def admin_context(
     tenant = settings.tenant_id
     tenant_rel = await _relations(settings, f"/v1/tenants/{tenant}/me", token)
     cluster_rel = await _relations(settings, f"/v1/clusters/{director.cluster(settings)}/me", token)
-    if not tenant_rel.get("can_administer"):
+    administers = bool(tenant_rel.get("can_administer"))
+    if not administers and not cluster_rel.get("can_approve"):
         # The edge let this person in, which needs only can_enter. The console
         # needs more, and says so as the refusal it is.
+        #
+        # The one widening: the cluster's security officer (can_approve) is
+        # let in without administering the tenant, to see the Approvals
+        # screen and nothing else of it -- isTenantAdmin false, and the
+        # director refuses them every other read and write all the same.
         raise HTTPException(status_code=403, detail="Tenant administrator privileges required")
     return AdminContextResponse(
         tenant=tenant,
         realm=settings.kernel_realm or tenant,
-        isPlatformAdmin=bool(cluster_rel.get("can_configure")),
-        isTenantAdmin=True,
+        isPlatformAdmin=administers and bool(cluster_rel.get("can_configure")),
+        isTenantAdmin=administers,
         availableTenants=[tenant],
         kernelDomain=settings.kernel_domain or "",
         canExpose=bool(tenant_rel.get("can_expose")),

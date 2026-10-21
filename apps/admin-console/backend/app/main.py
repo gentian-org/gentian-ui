@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from app.api.routes import (
     admin,
+    approvals,
     apps,
     audit,
     backups,
@@ -61,6 +62,8 @@ app.include_router(apps.router, prefix=settings.api_v1_str)
 app.include_router(perimeter.router, prefix=settings.api_v1_str)
 app.include_router(people.router, prefix=settings.api_v1_str)
 app.include_router(notifications.router, prefix=settings.api_v1_str)
+# Before admin.router: its catch-all would answer /admin/approvals first.
+app.include_router(approvals.router, prefix=settings.api_v1_str)
 app.include_router(admin.router, prefix=settings.api_v1_str)
 app.include_router(credentials.router, prefix=settings.api_v1_str)
 app.include_router(extensions.router, prefix=settings.api_v1_str)
