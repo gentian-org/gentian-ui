@@ -56,6 +56,13 @@ class AdminContextResponse(BaseModel):
     # offers approving; the director asks again on every approval, and
     # decides a podSecurity or clusterRoles request by another right.
     canApprovePrivilege: bool = False
+    # The director's answer to whether this person may answer the requests
+    # that weaken what protects the node -- podSecurity, clusterRoles, every
+    # kind that is not egress (cluster#can_approve, the security officer's).
+    # Which kind needs which is the operator's answer on each pending request
+    # (pendingPrivilegeApprovals), not decided here; the director asks again
+    # on every approval.
+    canApproveNodePrivilege: bool = False
     # Kept for the screens that read it. People are managed in Keycloak's own
     # console, which this component links to; it holds no store of its own.
     storeConfigured: bool = True
@@ -98,6 +105,7 @@ async def admin_context(
         canExpose=bool(tenant_rel.get("can_expose")),
         canGrant=bool(tenant_rel.get("can_grant")),
         canApprovePrivilege=bool(tenant_rel.get("can_approve_privilege")),
+        canApproveNodePrivilege=bool(cluster_rel.get("can_approve")),
     )
 
 

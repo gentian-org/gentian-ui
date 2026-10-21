@@ -8,6 +8,7 @@ import {
   fetchAppStates,
   fetchIntegrationsOverview,
   fetchPersonGroups,
+  type AdminContext,
   type AppState,
 } from "@/api/admin";
 import {
@@ -672,12 +673,15 @@ function IntegrationsPart({
  * (the app waits on them), and git holds each approval with who gave it and
  * why. Together they are everything the app asked for that needs an answer.
  *
- * An egress request is answered here, by whoever the director says may
- * (can_approve_privilege): one commit with the approver's reason. A
- * podSecurity or clusterRoles request is the cluster's security officer's,
- * and this page says so rather than offering what the director would refuse.
+ * Each request is answered here by whoever holds the right it needs, one
+ * commit with the approver's reason. Which right that is the operator says
+ * on the request (approvedBy): the tenant's administrator for egress
+ * (can_approve_privilege), the cluster's security officer for what weakens
+ * the node (cluster can_approve). The button follows the director's answer
+ * to that right; anyone else is told whose it is rather than offered what
+ * the director would refuse. The director asks again on the approval.
  */
-function PrivilegesPart({ row }: { row: AppRow }) {
+export function PrivilegesPart({ row }: { row: AppRow }) {
   const { t } = useTranslation();
   const grantsQuery = useQuery({
     queryKey: ["admin", "apps", "privileges"],
@@ -690,7 +694,10 @@ function PrivilegesPart({ row }: { row: AppRow }) {
     queryKey: ["admin", "context"],
     queryFn: () => fetchAdminContext(),
   });
-  const canApprove = contextQuery.data?.canApprovePrivilege === true;
+  const context = contextQuery.data;
+  const approvedBy = new Map(
+    (row.state?.pendingPrivilegeApprovals ?? []).map((p) => [p.privilege, p.approvedBy]),
+  );
   const install = row.state?.name ?? row.profile;
 
   return (
@@ -728,12 +735,10 @@ function PrivilegesPart({ row }: { row: AppRow }) {
                   </td>
                   <td>
                     <div>{t("apps.privilegeWaitingDetail")}</div>
-                    {privilege.startsWith("egress/") ? (
-                      canApprove ? (
-                        <ApprovePrivilege install={install} privilege={privilege} />
-                      ) : (
-                        <div className="admin-console__hint">{t("apps.privilegeApproveNotYours")}</div>
-                      )
+                    {mayApprove(approvedBy.get(privilege), context) ? (
+                      <ApprovePrivilege install={install} privilege={privilege} />
+                    ) : (approvedBy.get(privilege) ?? legacyApprover(privilege)) === "tenant" ? (
+                      <div className="admin-console__hint">{t("apps.privilegeApproveNotYours")}</div>
                     ) : (
                       <div className="admin-console__hint">{t("apps.privilegeApproveSecurityOfficer")}</div>
                     )}
@@ -775,6 +780,27 @@ function PrivilegesPart({ row }: { row: AppRow }) {
       <p className="admin-console__hint">{t("apps.privilegeDetailNotAvailable")}</p>
     </div>
   );
+}
+
+/**
+ * Whether the director would let this person answer a request that the
+ * operator says is answered by `approvedBy`. Nothing is inferred: a request
+ * without approvedBy (an older operator), a value this console does not know,
+ * or a context without the right (an older backend) is a no.
+ */
+function mayApprove(approvedBy: string | undefined, context: AdminContext | undefined): boolean {
+  if (approvedBy === "tenant") return context?.canApprovePrivilege === true;
+  if (approvedBy === "security-officer") return context?.canApproveNodePrivilege === true;
+  return false;
+}
+
+/**
+ * Whose a request is, for the wording alone, when an operator older than
+ * approvedBy did not say: the rule such an operator applied. It never offers
+ * the button; that waits for the operator's own answer.
+ */
+function legacyApprover(privilege: string): string {
+  return privilege.startsWith("egress/") ? "tenant" : "security-officer";
 }
 
 /**
