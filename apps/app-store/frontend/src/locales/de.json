@@ -433,6 +433,7 @@
     "kindPerimeterApprover": "genehmigt ein Perimeter-Freigeber",
     "kindSecurityOfficer": "genehmigt der Security Officer des Clusters",
     "noReason": "Die App nennt keinen Grund für diese Anfrage.",
+    "forAddon": "Angefragt vom Add-on <mono>{{addon}}</mono>.",
     "expired": "Eine frühere Genehmigung ist abgelaufen am",
     "approve": "Genehmigen…",
     "reasonLabel": "Warum Sie es genehmigen, in Ihren eigenen Worten",

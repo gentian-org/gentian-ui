@@ -40,12 +40,17 @@ export function Approvals({
       <p className="admin-console__lead">{t("approvals.lead")}</p>
       <ul className="store-approvals__list">
         {approvals.map((approval) => (
-          <li key={approval.privilege} className="store-notice store-approvals__item">
+          <li key={`${approval.addon ?? ""} ${approval.privilege}`} className="store-notice store-approvals__item">
             <p className="store-notice__title">
               <span className="admin-console__mono">{approval.privilege}</span>
               {" — "}
               {t(approval.approvedBy === "perimeter-approver" ? "approvals.kindPerimeterApprover" : "approvals.kindSecurityOfficer")}
             </p>
+            {approval.addon ? (
+              <p className="admin-console__meta">
+                <Trans i18nKey="approvals.forAddon" values={{ addon: approval.addon }} components={mono} />
+              </p>
+            ) : null}
             <p className="store-notice__text">{approval.reason ?? t("approvals.noReason")}</p>
             {approval.expiredAt ? (
               <p className="admin-console__hint">
@@ -53,9 +58,9 @@ export function Approvals({
               </p>
             ) : null}
             {mayApprove(approval) ? (
-              <Approve coordinate={coordinate} approval={approval} onChanged={onChanged} />
+              <Approve coordinate={askedOf(coordinate, approval)} approval={approval} onChanged={onChanged} />
             ) : (
-              <Request coordinate={coordinate} approval={approval} onChanged={onChanged} />
+              <Request coordinate={askedOf(coordinate, approval)} approval={approval} onChanged={onChanged} />
             )}
           </li>
         ))}
@@ -65,6 +70,14 @@ export function Approvals({
       <p className="admin-console__meta">{t("approvals.carriesOn")}</p>
     </div>
   );
+}
+
+/** The entry a request is approved or asked for under: the add-on's own, in
+ * the app's catalogue, for one an add-on makes; the app's otherwise. */
+function askedOf(coordinate: string, approval: PendingApproval): string {
+  if (!approval.addon) return coordinate;
+  const slash = coordinate.lastIndexOf("/");
+  return `${coordinate.slice(0, slash + 1)}${approval.addon}`;
 }
 
 /** The perimeter approver's own answer: a reason, then one commit. */
