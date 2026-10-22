@@ -13,6 +13,8 @@ export type Context = {
   tenant: string;
   name: string | null;
   mayInstall: boolean;
+  /** Whether the install's egress requests are this person's to approve (can_approve_privilege). Absent from an older backend: a no. */
+  mayApprovePrivilege?: boolean;
   storeConfigured: boolean;
   /** Whether the cluster offers an App Store at all; null when it could not be asked. */
   appStore: { available: boolean; reason: string | null } | null;
@@ -221,7 +223,7 @@ export type Installed = {
  */
 export type PendingApproval = {
   privilege: string;
-  approvedBy: "tenant" | "security-officer";
+  approvedBy: "perimeter-approver" | "security-officer";
   reason: string | null;
   requestedBy: string | null;
   requestedAt: string | null;

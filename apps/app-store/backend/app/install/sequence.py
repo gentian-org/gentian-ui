@@ -748,7 +748,7 @@ def state_view(entry: Any) -> dict[str, Any] | None:
     }
 
 
-APPROVER_KINDS = ("tenant", "security-officer")
+APPROVER_KINDS = ("perimeter-approver", "security-officer")
 
 
 def _approvals_view(entries: Any) -> list[dict[str, Any]]:

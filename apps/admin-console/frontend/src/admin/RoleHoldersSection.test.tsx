@@ -15,6 +15,17 @@ const holders = {
       subject: "7d0f3c2e",
       username: "it@acme.example",
       email: "it@acme.example",
+      scope: "cluster",
+      reason: "named in the security policy",
+    },
+    {
+      role: "perimeterApprover",
+      scope: "tenant:acme",
+      tenant: "acme",
+      subject: "0a1b2c3d",
+      username: "ciso@acme.example",
+      reason: "publishes for acme",
+      expiresAt: "2020-01-01T00:00:00Z",
     },
   ],
 };
@@ -23,10 +34,16 @@ const candidates = {
   complete: false,
   tenants: [
     {
+      tenant: "platform",
+      realm: "kernel",
+      platform: true,
+      people: [{ id: "p1", username: "ops@k.example", enabled: true }],
+    },
+    {
       tenant: "acme",
       displayName: "Acme AG",
       realm: "acme",
-      administrators: [
+      people: [
         { id: "7d0f3c2e", username: "it@acme.example", email: "it@acme.example", enabled: true },
         { id: "0a1b2c3d", username: "ciso@acme.example", enabled: true },
       ],
@@ -66,7 +83,7 @@ const grants = {
 function render(canEdit = true, withHolders: unknown = holders) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(["admin", "platform", "role-holders"], withHolders);
-  client.setQueryData(["admin", "platform", "tenant-administrators"], candidates);
+  client.setQueryData(["admin", "platform", "role-candidates"], candidates);
   client.setQueryData(["admin", "platform", "role-members"], members);
   client.setQueryData(["admin", "platform", "granted-privileges"], grants);
   return renderToString(
@@ -83,6 +100,10 @@ describe("RoleHoldersSection", () => {
     expect(html).toContain("Auditor");
     expect(html).toContain("it@acme.example");
     expect(html).toContain("7d0f3c2e");
+    expect(html).toContain("Perimeter approver");
+    expect(html).toContain("tenant:acme");
+    expect(html).toContain("named in the security policy");
+    expect(html).toContain("Expired");
     expect(html).toContain("Nobody holds this role by name");
   });
 
@@ -93,6 +114,13 @@ describe("RoleHoldersSection", () => {
     expect(picker).toContain("ciso@acme.example");
     expect(picker).not.toContain("it@acme.example");
     expect(picker).toContain("Acme AG (acme)");
+    expect(picker).toContain("ops@k.example");
+  });
+
+  it("asks for a reason and an optional expiry", () => {
+    const html = render();
+    expect(html).toContain('id="role-holder-reason"');
+    expect(html).toContain('id="role-holder-expires"');
   });
 
   it("says which realms could not be read", () => {

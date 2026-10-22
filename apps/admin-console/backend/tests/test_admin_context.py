@@ -310,6 +310,26 @@ def test_the_security_officer_is_let_in_for_the_approvals_screen_alone(monkeypat
     assert body["canApprovePrivilege"] is False and body["canExpose"] is False
 
 
+def test_the_perimeter_approver_is_let_in_for_the_approvals_screen_alone(monkeypatch):
+    """cluster#can_approve_perimeter without can_administer opens the console
+    the same way, for the egress requests on the Approvals screen."""
+    _director(
+        monkeypatch,
+        {
+            "/v1/tenants/platform/me": {"relations": {"can_enter": True}},
+            "/v1/clusters/demo/me": {"relations": {"can_approve_perimeter": True}},
+        },
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer petra"}
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["isTenantAdmin"] is False
+    assert body["canApprovePerimeter"] is True
+    assert body["canApproveNodePrivilege"] is False and body["isPlatformAdmin"] is False
+
+
 def test_a_cluster_administrator_who_is_not_a_security_officer_is_still_refused(monkeypatch):
     _director(
         monkeypatch,

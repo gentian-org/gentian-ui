@@ -54,9 +54,10 @@ class AdminContextResponse(BaseModel):
     # asks again on every write.
     canGrant: bool = False
     # The director's answer to whether this person may answer an app's egress
-    # request (can_approve_privilege). It decides whether the Apps screen
-    # offers approving; the director asks again on every approval, and
-    # decides a podSecurity or clusterRoles request by another right.
+    # request (can_approve_privilege, the tenant's perimeter approver's). It
+    # decides whether the Apps screen offers approving; the director asks
+    # again on every approval, and decides a podSecurity or clusterRoles
+    # request by another right.
     canApprovePrivilege: bool = False
     # The director's answer to whether this person may answer the requests
     # that weaken what protects the node -- podSecurity, clusterRoles, every
@@ -65,6 +66,11 @@ class AdminContextResponse(BaseModel):
     # (pendingPrivilegeApprovals), not decided here; the director asks again
     # on every approval.
     canApproveNodePrivilege: bool = False
+    # The director's answer to whether this person is the cluster's perimeter
+    # approver (cluster#can_approve_perimeter): they answer the egress
+    # requests of every tenant on the Approvals screen. The director asks
+    # again on every approval.
+    canApprovePerimeter: bool = False
     # The director's answer to whether this person may read who holds the
     # cluster's roles (cluster#can_audit). It decides whether the Cluster
     # roles screen is shown; changing them needs can_configure.
@@ -98,15 +104,17 @@ async def admin_context(
     tenant_rel = await _relations(settings, f"/v1/tenants/{tenant}/me", token)
     cluster_rel = await _relations(settings, f"/v1/clusters/{director.cluster(settings)}/me", token)
     administers = bool(tenant_rel.get("can_administer"))
-    if not administers and not cluster_rel.get("can_approve"):
+    if not administers and not (
+        cluster_rel.get("can_approve") or cluster_rel.get("can_approve_perimeter")
+    ):
         # The edge let this person in, which needs only can_enter. The console
         # needs more, and says so as the refusal it is.
         #
-        # The one widening: a security officer of the cluster (can_approve)
-        # who does not administer this tenant -- no longer one of its admins,
-        # or holding the role through the kernel realm's group -- is let in
-        # to see the Approvals screen and nothing else of it: isTenantAdmin
-        # false, and the director refuses them every other read and write.
+        # The one widening: a security officer (can_approve) or perimeter
+        # approver (can_approve_perimeter) of the cluster who does not
+        # administer this tenant is let in to see the Approvals screen and
+        # nothing else of it: isTenantAdmin false, and the director refuses
+        # them every other read and write.
         raise HTTPException(status_code=403, detail="Tenant administrator privileges required")
     return AdminContextResponse(
         tenant=tenant,
@@ -119,6 +127,7 @@ async def admin_context(
         canGrant=bool(tenant_rel.get("can_grant")),
         canApprovePrivilege=bool(tenant_rel.get("can_approve_privilege")),
         canApproveNodePrivilege=bool(cluster_rel.get("can_approve")),
+        canApprovePerimeter=bool(cluster_rel.get("can_approve_perimeter")),
         canAuditCluster=bool(cluster_rel.get("can_audit")),
     )
 

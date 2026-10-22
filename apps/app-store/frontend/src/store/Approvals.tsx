@@ -1,7 +1,7 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { approvePrivilege, requestPrivilege, type PendingApproval } from "@/api/store";
+import { approvePrivilege, fetchContext, requestPrivilege, type PendingApproval } from "@/api/store";
 import { DateText, ProblemNote } from "@/store/parts";
 
 const mono = { mono: <span className="admin-console__mono" /> };
@@ -11,11 +11,12 @@ const mono = { mono: <span className="admin-console__mono" /> };
  * the default posture, and who answers each request (store-contract.md §6.4
  * step 4).
  *
- * The operator says who answers -- the tenant's administrator for egress,
- * the cluster's security officer for what weakens the node -- and the
- * director decides again on every approval. This step offers what the
- * answer says: the tenant's own is approved here, with the person's reason;
- * the security officer's is asked for, and answered in their admin console.
+ * The operator says who answers -- the tenant's perimeter approver for
+ * egress, the cluster's security officer for what weakens the node -- and
+ * the director decides again on every approval. This step offers what the
+ * answer says: egress is approved here, with the person's reason, by whoever
+ * the director says may (can_approve_privilege); anything else is asked for,
+ * and answered in the approver's admin console.
  * Nothing here decides who may; a refusal is shown in the director's words.
  */
 export function Approvals({
@@ -29,7 +30,11 @@ export function Approvals({
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
+  const contextQuery = useQuery({ queryKey: ["context"], queryFn: fetchContext, retry: false });
+  const mayApprove = (approval: PendingApproval) =>
+    approval.approvedBy === "perimeter-approver" && contextQuery.data?.mayApprovePrivilege === true;
   const forOfficer = approvals.some((a) => a.approvedBy === "security-officer");
+  const forPerimeter = approvals.some((a) => a.approvedBy === "perimeter-approver" && !mayApprove(a));
   return (
     <div className="store-approvals" aria-live="polite">
       <p className="admin-console__lead">{t("approvals.lead")}</p>
@@ -39,7 +44,7 @@ export function Approvals({
             <p className="store-notice__title">
               <span className="admin-console__mono">{approval.privilege}</span>
               {" — "}
-              {t(approval.approvedBy === "tenant" ? "approvals.kindTenant" : "approvals.kindSecurityOfficer")}
+              {t(approval.approvedBy === "perimeter-approver" ? "approvals.kindPerimeterApprover" : "approvals.kindSecurityOfficer")}
             </p>
             <p className="store-notice__text">{approval.reason ?? t("approvals.noReason")}</p>
             {approval.expiredAt ? (
@@ -47,7 +52,7 @@ export function Approvals({
                 {t("approvals.expired")} <DateText value={approval.expiredAt} />
               </p>
             ) : null}
-            {approval.approvedBy === "tenant" ? (
+            {mayApprove(approval) ? (
               <Approve coordinate={coordinate} approval={approval} onChanged={onChanged} />
             ) : (
               <Request coordinate={coordinate} approval={approval} onChanged={onChanged} />
@@ -56,12 +61,13 @@ export function Approvals({
         ))}
       </ul>
       {forOfficer ? <p className="admin-console__meta">{t("approvals.officerHint")}</p> : null}
+      {forPerimeter ? <p className="admin-console__meta">{t("approvals.perimeterHint")}</p> : null}
       <p className="admin-console__meta">{t("approvals.carriesOn")}</p>
     </div>
   );
 }
 
-/** The tenant administrator's own answer: a reason, then one commit. */
+/** The perimeter approver's own answer: a reason, then one commit. */
 function Approve({
   coordinate,
   approval,
@@ -137,9 +143,9 @@ function Approve({
 }
 
 /**
- * Asking the security officer. Once asked, the request is shown as the
+ * Asking the approver. Once asked, the request is shown as the
  * cluster records it -- who, when, the note -- and the step waits. One the
- * officer declined is shown with their reason and can be asked for again:
+ * approver declined is shown with their reason and can be asked for again:
  * the same request, which the operator treats as new and which clears the
  * no. A request just made here is shown from the answer until the cluster
  * reports it.
@@ -176,7 +182,7 @@ function Request({
           <Trans i18nKey="approvals.requestedBy" values={{ who: recorded.by }} components={mono} /> <DateText value={recorded.at} />
         </p>
         {recorded.note ? <p className="store-problem__said">{recorded.note}</p> : null}
-        <p className="admin-console__hint">{t("approvals.waitingForOfficer")}</p>
+        <p className="admin-console__hint">{t("approvals.waitingForApprover")}</p>
       </>
     );
   }

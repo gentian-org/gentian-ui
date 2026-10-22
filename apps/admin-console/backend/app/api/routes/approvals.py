@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-"""The Approvals screen: what every tenant's apps ask of the node, and the
-security officer's answer.
+"""The Approvals screen: what every tenant's apps ask of the platform, and
+the answer of the security officer or the perimeter approver.
 
 A podSecurity waiver or a cluster role weakens what protects the node and
 every tenant on it, so it is approved at cluster scope (cluster#can_approve,
@@ -9,7 +9,8 @@ tenant's administrator asks (the App Store's install step; the director
 records the request on the app), and the list of what was asked is the
 usher's, across every tenant. The approval itself is the director's existing
 privilege route, for the request's tenant -- the one route that approves a
-privilege, decided by the kind.
+privilege, decided by the kind. An egress request is the perimeter
+approver's (approvedBy perimeter-approver), on the same list.
 
 A decline is the officer's no: the director's action on the app, which it
 authorises exactly as the approval of that kind, and which the operator
@@ -49,9 +50,9 @@ async def approvals(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Every tenant's requests of a privilege the security officer answers,
-    with the profile's reason and who asked. The usher decides who reads it
-    (can_approve or can_configure on the cluster)."""
+    """Every tenant's pending privilege requests, with who answers each, the
+    profile's reason and who asked. The usher decides who reads it
+    (can_approve, can_approve_perimeter or can_configure on the cluster)."""
     return await director.read(
         settings, f"/v1/clusters/{director.cluster(settings)}/approvals", bearer_of(credentials)
     )

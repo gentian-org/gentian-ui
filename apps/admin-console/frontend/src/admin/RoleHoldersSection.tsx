@@ -6,24 +6,33 @@ import {
   addRoleHolder,
   fetchGrantedPrivileges,
   fetchPlatformRoleMembers,
+  fetchRoleCandidates,
   fetchRoleHolders,
-  fetchTenantAdministrators,
   removeRoleHolder,
   type ClusterRole,
   type PlatformRoleMembers,
+  type RoleCandidates,
   type RoleHolder,
-  type TenantAdministrators,
 } from "@/api/cluster";
 import "./admin.css";
 
-const ROLES: ClusterRole[] = ["securityOfficer", "auditor"];
+const ROLES: ClusterRole[] = ["securityOfficer", "auditor", "perimeterApprover", "serviceAdmin", "sharedAppsAdmin"];
+/** The roles a non-platform tenant's administrator may hold; the rest are the platform tenant's people's. */
+const TENANT_ADMIN_ROLES: ClusterRole[] = ["securityOfficer", "auditor", "perimeterApprover"];
+
+/** Where a holder's role applies, as the director decides it. */
+function scopeOf(role: ClusterRole, entry: RoleCandidates) {
+  return role === "perimeterApprover" && !entry.platform ? `tenant:${entry.tenant}` : "cluster";
+}
 
 /**
  * Who holds a cluster role by name: an account of a tenant's realm, declared
- * on the Cluster claim. The holder signs in to their own tenant and works in
- * its admin console. The director answers the list (can_audit) and commits a
- * change (can_configure); the picker is the registrar's list of each tenant's
- * administrators. `canEdit` only decides which buttons are shown.
+ * on the Cluster claim with a reason and an optional expiry. The holder signs
+ * in to their own tenant and works in its admin console. The director answers
+ * the list (can_audit) and commits a change (can_configure); the picker is the
+ * registrar's list: the platform tenant's people, and every other tenant's
+ * administrators for the roles they may hold. `canEdit` only decides which
+ * buttons are shown.
  *
  * Beside them, read only: who holds each role through its kernel Keycloak
  * group (the registrar's answer; the groups are managed in Keycloak), and
@@ -37,8 +46,8 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
     queryFn: () => fetchRoleHolders(),
   });
   const candidatesQuery = useQuery({
-    queryKey: ["admin", "platform", "tenant-administrators"],
-    queryFn: () => fetchTenantAdministrators(),
+    queryKey: ["admin", "platform", "role-candidates"],
+    queryFn: () => fetchRoleCandidates(),
     enabled: canEdit,
     retry: false,
   });
@@ -54,6 +63,8 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
   });
   const [role, setRole] = useState<ClusterRole>("securityOfficer");
   const [choice, setChoice] = useState("");
+  const [reason, setReason] = useState("");
+  const [expires, setExpires] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -64,11 +75,12 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
   };
 
   const addMutation = useMutation({
-    mutationFn: (pick: { role: ClusterRole; tenant: string; id: string; username: string; email: string }) =>
-      addRoleHolder(pick.role, pick.tenant, pick.id, pick.username, pick.email),
+    mutationFn: (pick: Parameters<typeof addRoleHolder>[0]) => addRoleHolder(pick),
     onSuccess: async (result, pick) => {
       setError(null);
       setChoice("");
+      setReason("");
+      setExpires("");
       const values = { login: pick.username, tenant: pick.tenant };
       setNotice(t(result.changed ? "clusterRoles.addedCommitted" : "clusterRoles.addedAlready", values));
       await refresh();
@@ -94,11 +106,13 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
 
   const holders = holdersQuery.data.roleHolders ?? [];
   const held = new Set(holders.filter((h) => h.role === role).map((h) => `${h.tenant}/${h.subject}`));
-  const tenants: TenantAdministrators[] = candidatesQuery.data?.tenants ?? [];
+  const tenants: RoleCandidates[] = (candidatesQuery.data?.tenants ?? []).filter(
+    (entry) => entry.platform || TENANT_ADMIN_ROLES.includes(role),
+  );
   const candidates = tenants.flatMap((entry) =>
-    (entry.administrators ?? [])
+    (entry.people ?? [])
       .filter((a) => !held.has(`${entry.tenant}/${a.id}`))
-      .map((a) => ({ key: `${entry.tenant}/${a.id}`, tenant: entry.tenant, admin: a })),
+      .map((a) => ({ key: `${entry.tenant}/${a.id}`, tenant: entry.tenant, scope: scopeOf(role, entry), admin: a })),
   );
   const picked = candidates.find((c) => c.key === choice);
   const unreadable = tenants.filter((entry) => entry.unavailable).map((entry) => entry.tenant);
@@ -136,6 +150,9 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
                       <th>{t("clusterRoles.tenant")}</th>
                       <th>{t("clusterRoles.login")}</th>
                       <th>{t("clusterRoles.email")}</th>
+                      <th>{t("clusterRoles.scope")}</th>
+                      <th>{t("clusterRoles.reason")}</th>
+                      <th>{t("clusterRoles.expires")}</th>
                       {canEdit ? <th /> : null}
                     </tr>
                   </thead>
@@ -148,6 +165,19 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
                           <div className="admin-console__card-meta admin-console__mono">{holder.subject}</div>
                         </td>
                         <td>{holder.email || "—"}</td>
+                        <td className="admin-console__mono">{holder.scope || "cluster"}</td>
+                        <td>{holder.reason || "—"}</td>
+                        <td>
+                          {holder.expiresAt ? new Date(holder.expiresAt).toLocaleString() : "—"}
+                          {holder.expiresAt && new Date(holder.expiresAt).getTime() < Date.now() ? (
+                            <>
+                              {" "}
+                              <span className="admin-console__badge admin-console__badge--warn">
+                                {t("clusterRoles.expired")}
+                              </span>
+                            </>
+                          ) : null}
+                        </td>
                         {canEdit ? (
                           <td>
                             <button
@@ -227,21 +257,23 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
         <>
           <h3 className="admin-console__subsection-title">{t("clusterRoles.add")}</h3>
           {candidatesQuery.isLoading ? (
-            <p className="admin-console__loading">{t("clusterRoles.loadingAdministrators")}</p>
+            <p className="admin-console__loading">{t("clusterRoles.loadingCandidates")}</p>
           ) : candidatesQuery.isError ? (
-            <p className="admin-console__empty">{t("clusterRoles.administratorsUnavailable")}</p>
+            <p className="admin-console__empty">{t("clusterRoles.candidatesUnavailable")}</p>
           ) : (
             <form
               className="admin-console__form"
               onSubmit={(event) => {
                 event.preventDefault();
-                if (!picked) return;
+                if (!picked || !reason.trim()) return;
                 addMutation.mutate({
                   role,
                   tenant: picked.tenant,
-                  id: picked.admin.id,
+                  subject: picked.admin.id,
                   username: picked.admin.username,
                   email: picked.admin.email ?? "",
+                  reason: reason.trim(),
+                  ...(expires ? { expiresAt: new Date(expires).toISOString() } : {}),
                 });
               }}
             >
@@ -263,7 +295,7 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
                 </select>
               </div>
               <div className="admin-console__field">
-                <label htmlFor="role-holder-pick">{t("clusterRoles.administrator")}</label>
+                <label htmlFor="role-holder-pick">{t("clusterRoles.person")}</label>
                 <select id="role-holder-pick" value={choice} onChange={(e) => setChoice(e.target.value)}>
                   <option value="">{t("clusterRoles.choose")}</option>
                   {tenants
@@ -289,6 +321,26 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
                     ))}
                 </select>
               </div>
+              {picked ? (
+                <p className="admin-console__hint">
+                  {t("clusterRoles.scopeIs")} <span className="admin-console__mono">{picked.scope}</span>
+                </p>
+              ) : null}
+              <div className="admin-console__field">
+                <label htmlFor="role-holder-reason">{t("clusterRoles.reason")}</label>
+                <textarea
+                  id="role-holder-reason"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  required
+                  maxLength={1000}
+                  rows={2}
+                />
+              </div>
+              <div className="admin-console__field">
+                <label htmlFor="role-holder-expires">{t("clusterRoles.expiresOptional")}</label>
+                <input id="role-holder-expires" type="date" value={expires} onChange={(e) => setExpires(e.target.value)} />
+              </div>
               {candidates.length === 0 ? <p className="admin-console__empty">{t("clusterRoles.noCandidates")}</p> : null}
               {unreadable.length > 0 ? (
                 <p className="admin-console__hint">
@@ -299,7 +351,7 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
                 <button
                   type="submit"
                   className="admin-console__btn admin-console__btn--primary"
-                  disabled={!picked || addMutation.isPending}
+                  disabled={!picked || !reason.trim() || addMutation.isPending}
                 >
                   {t("clusterRoles.addButton")}
                 </button>

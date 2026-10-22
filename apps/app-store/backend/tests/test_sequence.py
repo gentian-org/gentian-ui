@@ -568,7 +568,7 @@ WAITING = {
     "message": "waiting for approval of egress/smtp, podSecurity/run-as-root",
     "pendingPrivileges": ["egress/smtp", "podSecurity/run-as-root"],
     "pendingPrivilegeApprovals": [
-        {"privilege": "egress/smtp", "approvedBy": "tenant", "reason": "sends mail through the relay"},
+        {"privilege": "egress/smtp", "approvedBy": "perimeter-approver", "reason": "sends mail through the relay"},
         {"privilege": "podSecurity/run-as-root", "approvedBy": "security-officer", "reason": "writes its cache as root"},
     ],
 }
@@ -594,7 +594,7 @@ def test_an_app_that_waits_on_a_person_stands_at_approvals_until_none_is_pending
     assert view["waitsForPerson"] is False and view["waitSeconds"] == 5
     assert view["rollout"]["name"] == APP
     assert [(p["privilege"], p["approvedBy"], p["reason"]) for p in view["rollout"]["pendingPrivilegeApprovals"]] == [
-        ("egress/smtp", "tenant", "sends mail through the relay"),
+        ("egress/smtp", "perimeter-approver", "sends mail through the relay"),
         ("podSecurity/run-as-root", "security-officer", "writes its cache as root"),
     ]
 
@@ -655,8 +655,8 @@ def test_a_grant_that_ran_out_and_an_approver_this_app_does_not_know(runner, sto
         **WAITING,
         "pendingPrivilegeApprovals": [
             {"privilege": "podSecurity/run-as-root", "approvedBy": "security-officer", "expiredAt": "2026-10-20T00:00:00Z"},
-            {"privilege": "egress/smtp", "approvedBy": "somebody-else"},
-            {"approvedBy": "tenant"},
+            {"privilege": "egress/smtp", "approvedBy": "tenant"},
+            {"approvedBy": "perimeter-approver"},
         ],
     }
     view = runner.step()
@@ -712,7 +712,7 @@ def test_a_reload_shows_the_approvals_without_an_operation(runner, store, cluste
     sequence.reset()
     state = runner.api.get(f"/api/v1/apps/{PAID}/state", headers=ALICE).json()
     assert state["operation"] is None and state["stage"] == "installing"
-    assert [p["approvedBy"] for p in state["state"]["pendingPrivilegeApprovals"]] == ["tenant", "security-officer"]
+    assert [p["approvedBy"] for p in state["state"]["pendingPrivilegeApprovals"]] == ["perimeter-approver", "security-officer"]
 
 
 def test_the_directors_refusal_of_an_approval_is_said_in_its_words(runner, store, cluster, clock):

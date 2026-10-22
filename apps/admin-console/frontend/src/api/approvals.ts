@@ -2,8 +2,9 @@
 import { apiFetch } from "@/api/client";
 
 /**
- * One privilege awaiting the cluster's security officer, as the operator
- * lists it across every tenant (gentian-os internal/applifecycle,
+ * One pending privilege, awaiting the cluster's security officer or the
+ * tenant's perimeter approver (approvedBy), as the operator lists it across
+ * every tenant (gentian-os internal/applifecycle,
  * privilege_requests.go): the app, what it asks, the profile's reason, and
  * the request its tenant's administrator made.
  */
@@ -13,7 +14,7 @@ export type Approval = {
   /** The Component's name: what the approval names. */
   install: string;
   privilege: string;
-  approvedBy: "tenant" | "security-officer";
+  approvedBy: "perimeter-approver" | "security-officer" | (string & {});
   reason?: string | null;
   requestedBy?: string | null;
   requestedAt?: string | null;

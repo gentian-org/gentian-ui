@@ -421,22 +421,26 @@ export function setAppUpdateMode(tenant: string, profile: string, mode: string) 
   );
 }
 
-// --- The security officers (iam.md 1.1c) ------------------------------------
+// --- The cluster roles held by name (iam.md 1.1c) ---------------------------
 
-/** A cluster role a tenant's account can hold by name. */
-export type ClusterRole = "auditor" | "securityOfficer";
+/** A cluster role an account can hold by name. */
+export type ClusterRole = "securityOfficer" | "auditor" | "perimeterApprover" | "serviceAdmin" | "sharedAppsAdmin";
 
 /**
  * One holder of a cluster role, as the Cluster claim declares it: an account
  * of a tenant's realm, by its subject there. The holder signs in to their own
- * tenant.
+ * tenant. `scope` is "cluster" or "tenant:<t>"; an entry from an older
+ * cluster may lack it (and the reason), which is "cluster".
  */
 export type RoleHolder = {
   role: ClusterRole;
+  scope?: string;
   tenant: string;
   subject: string;
   username: string;
   email?: string;
+  reason?: string;
+  expiresAt?: string;
 };
 
 export function fetchRoleHolders() {
@@ -447,19 +451,16 @@ function roleHolderPath(role: string, tenant: string, subject: string) {
   return `/cluster/role-holders/${encodeURIComponent(role)}/${encodeURIComponent(tenant)}/${encodeURIComponent(subject)}`;
 }
 
-/** Give a tenant's account a cluster role: one commit to the claim. */
+/** Give an account a cluster role: one commit to the claim. The director fills in the scope. */
 export async function addRoleHolder(
-  role: ClusterRole,
-  tenant: string,
-  subject: string,
-  username: string,
-  email: string,
+  holder: Pick<RoleHolder, "role" | "tenant" | "subject" | "username" | "email" | "reason" | "expiresAt">,
 ): Promise<ClusterSettingsWriteResult> {
-  const body = await apiFetch<{ status: string; commit?: string }>(roleHolderPath(role, tenant, subject), {
+  const { role, tenant, subject, ...body } = holder;
+  const answer = await apiFetch<{ status: string; commit?: string }>(roleHolderPath(role, tenant, subject), {
     method: "PUT",
-    body: JSON.stringify({ username, email }),
+    body: JSON.stringify(body),
   });
-  return { ...body, changed: Boolean(body.commit) };
+  return { ...answer, changed: Boolean(answer.commit) };
 }
 
 export async function removeRoleHolder(holder: RoleHolder): Promise<ClusterSettingsWriteResult> {
@@ -470,8 +471,8 @@ export async function removeRoleHolder(holder: RoleHolder): Promise<ClusterSetti
   return { ...body, changed: Boolean(body.commit) };
 }
 
-/** One administrator of a tenant, as the registrar lists them. */
-export type TenantAdministrator = {
+/** One person of a tenant's realm, as the registrar lists them. */
+export type RolePerson = {
   id: string;
   username: string;
   email?: string;
@@ -479,20 +480,23 @@ export type TenantAdministrator = {
   enabled: boolean;
 };
 
-export type TenantAdministrators = {
+/**
+ * One tenant's candidates: every person of the platform tenant (`platform`),
+ * the administrators of any other.
+ */
+export type RoleCandidates = {
   tenant: string;
   displayName?: string;
   realm: string;
+  platform?: boolean;
   /** Absent where the realm could not be read; `unavailable` then says so. */
-  administrators?: TenantAdministrator[];
+  people?: RolePerson[];
   unavailable?: boolean;
 };
 
-/** Who could hold the role: every tenant's administrators, from the registrar. */
-export function fetchTenantAdministrators() {
-  return apiFetch<{ cluster: string; complete: boolean; tenants: TenantAdministrators[] }>(
-    "/cluster/tenant-administrators",
-  );
+/** Who could hold a role, from the registrar. */
+export function fetchRoleCandidates() {
+  return apiFetch<{ cluster: string; complete: boolean; tenants: RoleCandidates[] }>("/cluster/role-candidates");
 }
 
 /** The members of the kernel Keycloak group one cluster role is held through. */
@@ -500,7 +504,7 @@ export type PlatformRoleMembers = {
   role: string;
   group: string;
   /** Null where the group could not be read; `unavailable` then says so. */
-  members: TenantAdministrator[] | null;
+  members: RolePerson[] | null;
   unavailable?: boolean;
 };
 

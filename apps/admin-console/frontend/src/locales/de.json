@@ -1044,7 +1044,7 @@
     "privilegeApproveConfirm": "{{privilege}} genehmigen",
     "privilegeApproveCancel": "Abbrechen",
     "privilegeApproveFailed": "Nicht genehmigt:",
-    "privilegeApproveNotYours": "Genehmigen ist Sache der Administratorin oder des Administrators des Mandanten.",
+    "privilegeApproveNotYours": "Ein Perimeter-Freigeber genehmigt dies.",
     "privilegeApproveSecurityOfficer": "Genehmigen ist Sache der Sicherheitsverantwortlichen des Clusters: es schwächt, was den Knoten schützt, und damit jeden Mandanten darauf."
   },
   "perimeter": {
@@ -1116,7 +1116,7 @@
   },
   "clusterRoles": {
     "title": "Cluster-Rollen",
-    "lead": "Wer eine Rolle auf dem ganzen Cluster namentlich innehat: ein Konto eines seiner Mandanten. Ein Sicherheitsbeauftragter genehmigt, was den Node schwächt; ein Auditor liest. Jeder meldet sich bei seinem eigenen Mandanten an und arbeitet in dessen Admin-Konsole.",
+    "lead": "Wer eine Rolle auf dem ganzen Cluster namentlich innehat: ein Konto eines seiner Mandanten, mit der Begründung, aus der sie vergeben wurde, und gegebenenfalls bis wann. Ein Sicherheitsbeauftragter genehmigt, was den Node schwächt; ein Perimeter-Freigeber genehmigt öffentliche Adressen und ausgehende Verbindungen; ein Auditor liest; ein Dienst-Administrator betreibt die Dienste der Plattform, ein Administrator der gemeinsamen Apps deren gemeinsame Apps. Jeder meldet sich bei seinem eigenen Mandanten an und arbeitet in dessen Admin-Konsole.",
     "loading": "Lese, wer die Rollen innehat…",
     "unavailable": "Die Cluster-Rollen konnten nicht gelesen werden.",
     "nobodyYet": "Niemand hat diese Rolle namentlich inne.",
@@ -1128,12 +1128,9 @@
     "remove": "Entfernen",
     "add": "Rolle vergeben",
     "role": "Rolle",
-    "loadingAdministrators": "Lese die Administratoren der Mandanten…",
-    "administratorsUnavailable": "Die Administratoren der Mandanten konnten nicht gelesen werden.",
-    "administrator": "Administrator",
-    "choose": "Administrator wählen…",
-    "noCandidates": "Jeder Mandanten-Administrator hat diese Rolle bereits inne, oder noch kein Mandant hat einen.",
-    "someRealmsUnread": "Der Realm von {{tenants}} konnte nicht gelesen werden; seine Administratoren fehlen in der Liste.",
+    "choose": "Person wählen…",
+    "noCandidates": "Alle, die diese Rolle innehaben dürfen, haben sie bereits, oder es gibt niemanden zur Auswahl.",
+    "someRealmsUnread": "Der Realm von {{tenants}} konnte nicht gelesen werden; seine Personen fehlen in der Liste.",
     "addButton": "Rolle vergeben",
     "addedCommitted": "Committet: {{login}} von {{tenant}} hat die Rolle inne, sobald der Cluster es übernommen hat.",
     "addedAlready": "{{login}} von {{tenant}} hat die Rolle bereits inne; nichts wurde committet.",
@@ -1156,14 +1153,22 @@
     "reason": "Begründung",
     "approvedBy": "Genehmigt von",
     "approvedAt": "Wann",
-    "expires": "Läuft ab"
+    "expires": "Läuft ab",
+    "role_perimeterApprover": "Perimeter-Freigeber",
+    "loadingCandidates": "Lese, wer die Rolle innehaben könnte…",
+    "candidatesUnavailable": "Wer die Rolle innehaben könnte, konnte nicht gelesen werden.",
+    "person": "Person",
+    "scope": "Geltungsbereich",
+    "scopeIs": "Die Rolle gilt für:",
+    "expiresOptional": "Bis (optional)",
+    "expired": "Abgelaufen"
   },
   "approvals": {
     "title": "Genehmigungen",
-    "lead": "Was die Apps aller Mandanten über die Standardhaltung hinaus vom Node verlangen — Pod-Security-Ausnahmen und Cluster-Rollen — und wer darum gebeten hat. Die Genehmigung ist Sache des Security Officers: sie schwächt, was den Node schützt, und damit jeden Mandanten darauf.",
+    "lead": "Was die Apps aller Mandanten über die Standardhaltung hinaus von der Plattform verlangen, und wer darum gebeten hat. Pod-Security-Ausnahmen und Cluster-Rollen sind Sache des Security Officers: sie schwächen, was den Node schützt, und damit jeden Mandanten darauf. Ausgehende Verbindungen sind Sache des Perimeter-Freigebers.",
     "reading": "Wird gelesen…",
     "unavailable": "Die Liste ist nicht verfügbar:",
-    "none": "Nichts wartet auf den Security Officer.",
+    "none": "Nichts wartet auf eine Genehmigung.",
     "tenant": "Mandant",
     "app": "App",
     "privilege": "Privileg",
@@ -1189,6 +1194,7 @@
     "declineReasonHint": "Mindestens zehn Zeichen. Nichts wird committet: die App wartet weiter, und wer gefragt hat, sieht Ihren Grund und kann erneut anfragen. Eine spätere Genehmigung gilt.",
     "declineConfirm": "{{privilege}} ablehnen",
     "declineFailed": "Nicht abgelehnt:",
-    "declined": "Abgelehnt. Die App wartet weiter; der Mandant sieht Ihren Grund."
+    "declined": "Abgelehnt. Die App wartet weiter; der Mandant sieht Ihren Grund.",
+    "notYoursPerimeter": "Ein Perimeter-Freigeber genehmigt dies."
   }
 }

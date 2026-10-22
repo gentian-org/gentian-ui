@@ -14,16 +14,16 @@ const state: AppState = {
   phase: "installing",
   pendingPrivileges: ["egress/smtp-relay", "podSecurity/run-as-root"],
   pendingPrivilegeApprovals: [
-    { privilege: "egress/smtp-relay", approvedBy: "tenant" },
+    { privilege: "egress/smtp-relay", approvedBy: "perimeter-approver" },
     { privilege: "podSecurity/run-as-root", approvedBy: "security-officer" },
   ],
 };
 
-const tenantAdmin: Partial<AdminContext> = { canApprovePrivilege: true, canApproveNodePrivilege: false };
+const perimeterApprover: Partial<AdminContext> = { canApprovePrivilege: true, canApproveNodePrivilege: false };
 const securityOfficer: Partial<AdminContext> = { canApprovePrivilege: false, canApproveNodePrivilege: true };
 
 const approve = "Approve…";
-const notYours = "Approving it is the tenant administrator&#x27;s.";
+const notYours = "A perimeter approver approves this.";
 const securityOfficersHint = "Approving it is the cluster&#x27;s security officer&#x27;s";
 
 function render(appState: AppState, context: Partial<AdminContext>) {
@@ -53,15 +53,15 @@ describe("PrivilegesPart", () => {
     expect(rowOf(html, "egress/smtp-relay")).toContain(notYours);
   });
 
-  it("does not offer a tenant administrator the button on a podSecurity request", () => {
-    const html = render(state, tenantAdmin);
+  it("does not offer a perimeter approver the button on a podSecurity request", () => {
+    const html = render(state, perimeterApprover);
     const row = rowOf(html, "podSecurity/run-as-root");
     expect(row).not.toContain(approve);
     expect(row).toContain(securityOfficersHint);
   });
 
-  it("leaves egress as it was: the tenant administrator's button", () => {
-    expect(rowOf(render(state, tenantAdmin), "egress/smtp-relay")).toContain(approve);
+  it("offers egress to the tenant's perimeter approver", () => {
+    expect(rowOf(render(state, perimeterApprover), "egress/smtp-relay")).toContain(approve);
     const neither = render(state, {});
     expect(rowOf(neither, "egress/smtp-relay")).not.toContain(approve);
     expect(rowOf(neither, "egress/smtp-relay")).toContain(notYours);
@@ -71,7 +71,7 @@ describe("PrivilegesPart", () => {
     const refused: AppState = {
       ...state,
       pendingPrivilegeApprovals: [
-        { privilege: "egress/smtp-relay", approvedBy: "tenant" },
+        { privilege: "egress/smtp-relay", approvedBy: "perimeter-approver" },
         {
           privilege: "podSecurity/run-as-root",
           approvedBy: "security-officer",
@@ -81,7 +81,7 @@ describe("PrivilegesPart", () => {
         },
       ],
     };
-    const html = render(refused, tenantAdmin);
+    const html = render(refused, perimeterApprover);
     const row = rowOf(html, "podSecurity/run-as-root");
     expect(row).toContain("Declined by");
     expect(row).toContain("sam@example.com");
