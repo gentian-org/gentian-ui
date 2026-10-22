@@ -126,6 +126,9 @@ async def of_app(ctx: Context, coordinate: str) -> dict[str, Any]:
         "storeProblem": store_problem,
         "acquisition": acquisition_view(ctx.tenant, acquisition) if acquisition else None,
         "operation": operation.view() if operation else None,
+        # This session's add-on sequences inside the app, so a page loaded
+        # again picks each up where it stands.
+        "addonOperations": [op.view() for op in sequence.of_base(ctx.session, profile)],
     }
 
 

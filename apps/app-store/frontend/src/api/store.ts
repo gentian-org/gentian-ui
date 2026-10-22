@@ -287,6 +287,8 @@ export type Stage =
 export type Operation = {
   coordinate: string;
   mode: "install" | "update";
+  /** For an add-on: the profile of the installed app it is pinned inside. Absent from an older backend. */
+  addonOf?: string | null;
   forEveryone: boolean;
   stage: Stage;
   failedStage: Stage | null;
@@ -338,6 +340,8 @@ export type AppStateAnswer = {
   storeProblem: Problem | null;
   acquisition: AcquisitionView | null;
   operation: Operation | null;
+  /** This session's add-on sequences inside the app. Absent from an older backend. */
+  addonOperations?: Operation[];
 };
 
 export type OverviewRow = {
@@ -457,6 +461,8 @@ export type StartRequest = {
   expectedDigest: string;
   version?: string;
   acquisitionId?: string;
+  /** For an add-on: the coordinate of the installed app it goes in. */
+  addonOf?: string;
 };
 
 export const startOperation = (coordinate: string, body: StartRequest) =>
@@ -496,6 +502,12 @@ export const requestPrivilege = (coordinate: string, privilege: string, note: st
   apiFetch<RequestOutcome>(`${privilegePath(coordinate, privilege)}/request`, {
     method: "POST",
     body: JSON.stringify(note ? { note } : {}),
+  });
+
+/** Switch one add-on off inside an installed app; its data stays. */
+export const removeAddon = (coordinate: string, addon: string) =>
+  apiFetch<{ status: string | null; commit: string | null }>(`/apps/${appPath(coordinate)}/addons/${appPath(addon)}`, {
+    method: "DELETE",
   });
 
 export const stopOperation = (coordinate: string) =>

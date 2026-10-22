@@ -992,3 +992,49 @@ a.admin-console__btn {
 .store-approvals__item {
   margin: 0;
 }
+
+/* An app's add-ons, in its install panel: ticked before Install, or each
+   switched on and off in place once the app is there. */
+.store-addons {
+  margin: 0.75rem 0;
+  min-width: 0;
+}
+
+.store-addons__list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.store-addon {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r1);
+}
+
+.store-addon__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.store-addon__main {
+  min-width: 0;
+}
+
+.store-addon__main .admin-console__card-title,
+.store-addon__main .admin-console__meta {
+  margin: 0;
+}
+
+.store-addon__act {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
