@@ -332,7 +332,7 @@ function PlatformAccessCard({ tenant }: { tenant: string }) {
   }
   const on = accessQuery.data.adminsEnter;
   return (
-    <div className="admin-console__card">
+    <div className="admin-console__form admin-console__form--wide">
       <h3 className="admin-console__subsection-title">{t("securityPolicies.platformAccessTitle")}</h3>
       <p className="admin-console__hint">{t("securityPolicies.platformAccessBody")}</p>
       <label className="admin-console__checkbox">

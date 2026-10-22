@@ -169,7 +169,7 @@ export function AppsSection({
                   </td>
                   <td>
                     <button
-                      className="admin-console__btn admin-console__btn--quiet"
+                      className="admin-console__btn"
                       type="button"
                       aria-haspopup="dialog"
                       onClick={() => setOpen(row.profile)}

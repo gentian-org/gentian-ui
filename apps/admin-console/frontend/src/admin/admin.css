@@ -655,9 +655,9 @@
 }
 
 .admin-console__btn--quiet {
-  border-color: transparent;
+  border-color: var(--gtn-border-strong);
   background: transparent;
-  color: var(--gtn-ink-3);
+  color: var(--gtn-ink-2);
 }
 
 .admin-console__btn--quiet:hover:not(:disabled) {
