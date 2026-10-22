@@ -53,6 +53,11 @@ chart/      Helm. Two Deployments and two Services, named from fullnameOverride 
   show the usher's progress. Every step is asked with the person's own token
   and is safe to repeat; a page loaded in the middle shows where things
   stand, derived from the store, the director and the usher.
+* **Add-ons**: each is a store entry of its own, ticked before Install or
+  switched on and off on its app's page. Its sequence is the app's up to the
+  install, which it skips: its build is pinned in the app's add-ons
+  (`PUT .../apps/{app}/addons`), and it waits on the app's rollout and
+  approvals. Removing it sends the list without it.
 * **Reviews and the company** (`backend/app/api/routes/account.py`): a
   signed-in person writes, changes and withdraws their own review of an
   entry, and says which company they are with -- its size and industry are

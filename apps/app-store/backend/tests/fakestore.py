@@ -40,6 +40,9 @@ SVG = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
 
 PAID = "gentian/nextcloud-base-ee"
 FREE = "gentian/xwiki-ce"
+# An add-on of PAID: an entry of its own, acquired as an app is.
+ADDON = "gentian/nextcloud-office-ee"
+ADDON_DIGEST = "sha256:0b1c2d3e4f5a69788796a5f4e3d2c1b00b1c2d3e4f5a69788796a5f4e3d2c1b0"
 
 
 @dataclass
@@ -432,6 +435,16 @@ class FakeStore:
                 acquisition["checkoutUrl"] = self.checkout_url
         elif coordinate == PAID:
             acquisition = self.confirmed()
+        elif coordinate == ADDON and self.checkout:
+            acquisition = self.addon_acquisition()
+            acquisition.update(
+                status="pending",
+                confirmation=None,
+                checkoutUrl=f"{BASE}/checkout/{acquisition['id']}",
+                checkoutExpiresAt="2026-10-01T10:14:03Z",
+            )
+        elif coordinate == ADDON:
+            acquisition = self.addon_acquisition()
         else:
             return self._problem(404, "NotFound")
         self.acquisitions[acquisition["id"]] = acquisition
@@ -451,11 +464,25 @@ class FakeStore:
             confirmation["metering"] = dict(self.metering)
         return acquisition
 
+    def addon_acquisition(self) -> dict:
+        """The add-on's acquisition, confirmed: its own build, in the same
+        repository as its base's."""
+        acquisition = self.contract.example("AcquisitionConfirmed")
+        acquisition["id"] = "acq_01JA2P7K"
+        acquisition["coordinate"] = ADDON
+        confirmation = acquisition["confirmation"]
+        confirmation.update(coordinate=ADDON, digest=ADDON_DIGEST, addons=[])
+        return acquisition
+
     def complete_checkout(self) -> None:
         """The person paid, at the store, in the other window."""
         for acquisition_id, acquisition in list(self.acquisitions.items()):
             if acquisition["status"] == "pending":
-                self.acquisitions[acquisition_id] = self.confirmed()
+                self.acquisitions[acquisition_id] = (
+                    self.addon_acquisition()
+                    if acquisition["coordinate"] == ADDON
+                    else self.confirmed()
+                )
 
     # ── the issuer ──────────────────────────────────────────────────────────
 

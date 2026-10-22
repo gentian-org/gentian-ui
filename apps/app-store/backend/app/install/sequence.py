@@ -15,6 +15,11 @@ person's own token:
     rollout      usher      GET  /v1/tenants/{t}/apps/status
     tile         desktop    PUT  /api/v1/tenant-tiles/{app}   (once ready; never fails the install)
 
+An add-on is an entry of its own, acquired as an app is, and installed inside
+the app it extends: its sequence is the same up to the install, which it
+skips -- its build is pinned in the base's add-ons instead -- and the rollout
+it watches, approvals included, is the base's.
+
 How it runs
 -----------
 One step per request. The screen asks for the next step, shows what came of
@@ -139,6 +144,8 @@ class Operation:
     mode: str  # install | update
     for_everyone: bool
     expected_digest: str
+    # For an add-on: the profile of the installed app it is pinned inside.
+    addon_of: str | None = None
     version: str | None = None
     acquisition_id: str | None = None
     idempotency_key: str = field(default_factory=lambda: uuid.uuid4().hex)
@@ -175,6 +182,11 @@ class Operation:
     def profile(self) -> str:
         return patterns.app_of(self.coordinate)
 
+    @property
+    def base(self) -> str:
+        """The installed app this sequence pins builds in, and watches."""
+        return self.addon_of or self.profile
+
     def view(self) -> dict[str, Any]:
         """Everything a browser is told of this operation. No credential."""
         build = None
@@ -191,6 +203,7 @@ class Operation:
         return {
             "coordinate": self.coordinate,
             "mode": self.mode,
+            "addonOf": self.addon_of,
             "forEveryone": self.for_everyone,
             "stage": self.stage,
             "failedStage": self.failed_stage,
@@ -248,6 +261,12 @@ def drop(session: str, coordinate: str) -> None:
     _operations.pop((session, coordinate), None)
 
 
+def of_base(session: str, profile: str) -> list[Operation]:
+    """This session's add-on sequences inside one app."""
+    _sweep()
+    return [op for (s, _), op in _operations.items() if s == session and op.addon_of == profile]
+
+
 def drop_session(session: str) -> None:
     for key in [k for k in _operations if k[0] == session]:
         del _operations[key]
@@ -262,6 +281,7 @@ def start(
     expected_digest: str,
     version: str | None,
     acquisition_id: str | None,
+    addon_of: str | None = None,
 ) -> Operation:
     """A new place in the sequence for this session and coordinate, replacing
     any there was. With `acquisition_id` the acquisition is read, never made
@@ -279,6 +299,7 @@ def start(
         acquisition_id=(
             patterns.acquisition_id(acquisition_id) if acquisition_id is not None else None
         ),
+        addon_of=patterns.name(addon_of, "app") if addon_of is not None else None,
     )
     _operations[(session, coordinate)] = operation
     return operation
@@ -504,7 +525,8 @@ async def _credential(ctx: Context, op: Operation, _answer: dict[str, Any]) -> N
     pending = next((r for r in op.repositories if r.credential in ("pending", "waiting")), None)
     if pending is None:
         _forget_credentials(op)
-        op.stage = "install"
+        # An add-on is not installed on its own: its build goes in the base.
+        op.stage = "addons" if op.addon_of else "install"
         return
     if op.credential_deadline is None:
         op.credential_deadline = clock() + CREDENTIAL_WINDOW_SECONDS
@@ -579,7 +601,8 @@ async def _install(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None
 
 
 async def _addons(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None:
-    """Pin the add-ons the acquisition includes, inside the app just pinned.
+    """Pin the add-ons the acquisition includes, inside the app just pinned --
+    or, for an add-on's own sequence, the add-on itself, inside its base.
 
     The director replaces the list whole, so what is sent is what the app
     already activates -- by name, which leaves each as it is -- with the
@@ -589,6 +612,18 @@ async def _addons(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None:
     confirmation = op.confirmation
     if confirmation is None:
         raise Refusal(status=409, source="app", code="no-confirmation")
+    _forget_credentials(op)
+    items = [confirmation, *confirmation.addons] if op.addon_of else confirmation.addons
+    pinned = {patterns.app_of(a.coordinate): a for a in items}
+    active = await _active_addons(ctx, op.base)
+    entries: list[Any] = [name for name in active if name not in pinned]
+    entries += [{"coordinate": a.coordinate, "digest": a.digest} for a in pinned.values()]
+    op.addons = await _put_addons(ctx, op.base, entries)
+    op.stage = _after_install(op)
+
+
+async def _active_addons(ctx: Context, profile: str) -> list[str]:
+    """The add-ons an installed app activates now, as git says."""
     tenant = patterns.name(ctx.tenant, "tenant")
     listed = await director.ask_director(
         ctx.settings, "GET", f"/v1/tenants/{tenant}/apps", ctx.cluster_token
@@ -599,28 +634,36 @@ async def _addons(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None:
         (
             a
             for a in listed.body.get("apps") or []
-            if isinstance(a, dict) and a.get("profile") == op.profile
+            if isinstance(a, dict) and a.get("profile") == profile
         ),
         None,
     )
     if entry is None:
         raise Refusal(status=409, source="director", code="not-installed")
-    pinned = {patterns.app_of(a.coordinate): a for a in confirmation.addons}
-    entries: list[Any] = [
-        name for name in entry.get("addons") or [] if isinstance(name, str) and name not in pinned
-    ]
-    entries += [{"coordinate": a.coordinate, "digest": a.digest} for a in pinned.values()]
+    return [name for name in entry.get("addons") or [] if isinstance(name, str)]
+
+
+async def _put_addons(ctx: Context, profile: str, entries: list[Any]) -> dict[str, Any]:
     answer = await director.ask_director(
         ctx.settings,
         "PUT",
-        f"/v1/tenants/{tenant}/apps/{op.profile}/addons",
+        f"/v1/tenants/{patterns.name(ctx.tenant, 'tenant')}/apps/{profile}/addons",
         ctx.cluster_token,
         json_body={"addons": entries},
     )
     if answer.status not in (200, 202) or not isinstance(answer.body, dict):
         raise answer.refusal()
-    op.addons = {"status": answer.body.get("status"), "commit": answer.body.get("commit")}
-    op.stage = _after_install(op)
+    return {"status": answer.body.get("status"), "commit": answer.body.get("commit")}
+
+
+async def remove_addon(ctx: Context, profile: str, addon: str) -> dict[str, Any]:
+    """Switch one add-on off inside an installed app: the list without it.
+    What stays is sent by name, which keeps each one's pin; the add-on that
+    leaves takes its pin with it. Its data is the base's, and is not touched."""
+    active = await _active_addons(ctx, profile)
+    if addon not in active:
+        return {"status": "no_change", "commit": None}
+    return await _put_addons(ctx, profile, [name for name in active if name != addon])
 
 
 def _after_install(op: Operation) -> str:
@@ -671,13 +714,14 @@ async def _metering_timeout(_ctx: Context, op: Operation, answer: dict[str, Any]
 
 
 async def _rollout(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None:
-    state = await app_state(ctx, op.profile)
+    state = await app_state(ctx, op.base)
     op.rollout = state
     phase = state["phase"] if state else None
     if phase == "ready":
         # The app is there. Its tile is given the store's picture once, and
-        # whatever comes of that, the install is done.
-        if op.tile is None:
+        # whatever comes of that, the install is done. An add-on's tile is
+        # its base's.
+        if op.tile is None and not op.addon_of:
             op.tile = await tile.copy_to_desktop(ctx, op.coordinate, op.profile)
         op.stage = "done"
     elif phase == "failing":

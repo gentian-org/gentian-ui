@@ -452,5 +452,20 @@
     "officerHint": "Ein Security Officer dieses Clusters genehmigt dies in seiner Admin-Konsole.",
     "perimeterHint": "Ein Perimeter-Freigeber genehmigt dies.",
     "carriesOn": "Diese Seite fragt den Cluster alle paar Sekunden und geht von selbst zum Ausrollen über, sobald nichts mehr wartet."
+  },
+  "addons": {
+    "chooseTitle": "Add-ons, die mit installiert werden",
+    "withTheApp": "Mit den Add-ons: {{addons}}. Jedes wird beim Store erworben und danach in der App eingeschaltet, eines nach dem anderen.",
+    "pinning": "Das Add-on wird in {{app}} eingeschaltet …",
+    "doneTitle": "{{addon}} ist in {{app}} eingeschaltet",
+    "doneBody": "Im Deployment-Repository festgeschrieben. Es wirkt, sobald {{app}} die Änderung übernommen hat; das kann einige Minuten dauern.",
+    "on": "Ein",
+    "install": "Installieren",
+    "queued": "Wartet, bis es an der Reihe ist",
+    "remove": "Entfernen",
+    "removeBody": "{{addon}} in {{app}} ausschalten? Beim Store wird nichts gekündigt, und es werden keine Daten gelöscht.",
+    "removeAction": "Ausschalten",
+    "installedFromApp": "Ein Add-on wird in seiner App installiert, von der Seite dieser App aus.",
+    "openApp": "Die App öffnen"
   }
 }

@@ -452,5 +452,20 @@
     "officerHint": "A security officer of this cluster approves this in their admin console.",
     "perimeterHint": "A perimeter approver approves this.",
     "carriesOn": "This page asks the cluster every few seconds and goes on to the rollout by itself once nothing is waiting."
+  },
+  "addons": {
+    "chooseTitle": "Add-ons to install with it",
+    "withTheApp": "With the add-ons: {{addons}}. Each is acquired at the store and switched on in the app after it, one at a time.",
+    "pinning": "Switching the add-on on in {{app}}…",
+    "doneTitle": "{{addon}} is on in {{app}}",
+    "doneBody": "Committed to the deployments repository. It takes effect once {{app}} has picked the change up, which can take a few minutes.",
+    "on": "On",
+    "install": "Install",
+    "queued": "Waiting its turn",
+    "remove": "Remove",
+    "removeBody": "Switch {{addon}} off in {{app}}? Nothing is cancelled at the store, and no data is deleted.",
+    "removeAction": "Switch it off",
+    "installedFromApp": "An add-on is installed inside its app, from that app’s page.",
+    "openApp": "Open the app"
   }
 }

@@ -11,7 +11,7 @@ import json
 
 import pytest
 from conftest import ALICE, BOB
-from fakestore import FREE, PAID, REGISTRY_TOKEN, ROTATED_TOKEN, STORE_TOKEN
+from fakestore import ADDON, FREE, PAID, REGISTRY_TOKEN, ROTATED_TOKEN, STORE_TOKEN
 from test_sign_in import sign_in
 
 from app.install import sequence
@@ -486,6 +486,120 @@ def test_addons_are_pinned_after_the_app_and_nothing_active_is_switched_off(runn
         ]
     }
     assert view["addons"] == {"status": "updated", "commit": "c0ffee3"}
+
+
+# ── an add-on, in an installed app ──────────────────────────────────────────
+
+
+def install_addon(runner, **body) -> dict:
+    body.setdefault("expectedDigest", ADDON_DIGEST)
+    body.setdefault("addonOf", PAID)
+    return runner.install(ADDON, **body)
+
+
+def test_an_addon_is_acquired_and_pinned_inside_its_app_not_installed_apart(runner, store, cluster):
+    runner.install()
+    cluster.apps["nextcloud-base-ee"]["addons"] = ["nextcloud-talk-ee"]
+    cluster.calls.clear()
+
+    view = install_addon(runner)
+    assert view["stage"] == "done"
+    assert view["addonOf"] == "nextcloud-base-ee"
+    # Acquired as an entry of its own, at the store.
+    assert store.calls_to("POST", "/v1/acquisitions")[-1].json == {"coordinate": ADDON}
+    # Its repository is the base's: declared again harmlessly, its credential
+    # set; then the base's list, with what was active kept by name. Nothing
+    # is installed under the add-on's own name.
+    assert cluster.order() == [
+        f"director PUT /v1/tenants/acme/repositories/{REPOSITORY}",
+        f"custodian PUT /v1/credentials/repository-{REPOSITORY}",
+        "director PUT /v1/tenants/acme/apps/nextcloud-base-ee/addons",
+    ]
+    assert cluster.of("director", "PUT")[-1].json == {
+        "addons": ["nextcloud-talk-ee", {"coordinate": ADDON, "digest": ADDON_DIGEST}]
+    }
+    assert view["addons"] == {"status": "updated", "commit": "c0ffee3"}
+    # The rollout it watched is the base's, and the tile is the base's too.
+    assert view["rollout"]["phase"] == "ready"
+    assert view["tile"] is None
+    # A page loaded again finds the add-on's sequence beside its app.
+    state = runner.api.get(f"/api/v1/apps/{PAID}/state", headers=ALICE).json()
+    assert [op["coordinate"] for op in state["addonOperations"]] == [ADDON]
+    assert state["installed"]["addons"] == ["nextcloud-talk-ee", "nextcloud-office-ee"]
+
+
+def test_a_paid_addon_opens_its_own_checkout(runner, store, cluster):
+    runner.install()
+    store.checkout = True
+    cluster.calls.clear()
+    view = install_addon(runner)
+    assert view["stage"] == "checkout"
+    assert view["checkout"]["url"] == "https://store.example/checkout/acq_01JA2P7K"
+    assert cluster.order() == []
+    store.complete_checkout()
+    view = runner.run(runner.step(ADDON), ADDON)
+    assert view["stage"] == "done"
+    assert cluster.order()[-1] == "director PUT /v1/tenants/acme/apps/nextcloud-base-ee/addons"
+
+
+def test_an_addon_waits_on_its_apps_approvals(runner, store, cluster):
+    runner.install()
+    cluster.states["nextcloud-base-ee"] = {
+        "profile": "nextcloud-base-ee",
+        "name": "nextcloud-base-ee",
+        "phase": "installing",
+        "ready": False,
+        "pendingPrivileges": ["egress/smtp"],
+        "pendingPrivilegeApprovals": [
+            {"privilege": "egress/smtp", "approvedBy": "perimeter-approver"}
+        ],
+    }
+    view = runner.start(ADDON, expectedDigest=ADDON_DIGEST, addonOf=PAID)
+    while view["stage"] not in ("approvals", "failed", "done"):
+        view = runner.step(ADDON)
+    # The same step an app's own install stands at: the base's requests,
+    # answered here, the add-on's sequence waiting until none is pending.
+    assert view["stage"] == "approvals"
+    assert view["rollout"]["pendingPrivilegeApprovals"][0]["privilege"] == "egress/smtp"
+
+
+def test_an_addon_needs_its_app_installed(runner, store, cluster):
+    view = install_addon(runner)
+    assert view["stage"] == "failed"
+    assert view["error"]["code"] == "not-installed"
+    assert "director PUT /v1/tenants/acme/apps/nextcloud-base-ee/addons" not in cluster.order()
+
+
+def test_an_addon_is_not_updated_from_here(runner):
+    answer = runner.api.post(
+        f"/api/v1/apps/{ADDON}/operation",
+        json={
+            "mode": "update",
+            "expectedDigest": ADDON_DIGEST,
+            "acquisitionId": "acq_01JA2P7K",
+            "addonOf": PAID,
+        },
+        headers=ALICE,
+    )
+    assert answer.status_code == 400
+
+
+def test_an_addon_is_removed_and_the_rest_stay_by_name(runner, store, cluster):
+    runner.install()
+    cluster.apps["nextcloud-base-ee"]["addons"] = ["nextcloud-talk-ee", "nextcloud-office-ee"]
+    cluster.calls.clear()
+    answer = runner.api.delete(f"/api/v1/apps/{PAID}/addons/{ADDON}", headers=ALICE)
+    assert answer.status_code == 200, answer.text
+    assert answer.json() == {"status": "updated", "commit": "c0ffee3"}
+    assert cluster.order() == ["director PUT /v1/tenants/acme/apps/nextcloud-base-ee/addons"]
+    assert cluster.calls[-1].json == {"addons": ["nextcloud-talk-ee"]}
+    assert cluster.calls[-1].bearer == "Bearer alice.s1"
+
+    # Removing one that is not on writes nothing.
+    cluster.calls.clear()
+    answer = runner.api.delete(f"/api/v1/apps/{PAID}/addons/{ADDON}", headers=ALICE)
+    assert answer.json() == {"status": "no_change", "commit": None}
+    assert cluster.order() == []
 
 
 def test_an_update_moves_the_pin_and_says_nothing_of_who_the_app_is_for(runner, store, cluster):

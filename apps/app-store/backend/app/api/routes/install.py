@@ -7,7 +7,7 @@ module decides nothing about who may do what, and no answer of it carries a
 credential.
 
 Uninstalling and purging are not here. An installed app is administered in
-the Admin Console's Apps tab.
+the Admin Console's Apps tab; its add-ons are switched on and off here.
 """
 
 from typing import Any, Literal
@@ -54,6 +54,9 @@ class StartBody(BaseModel):
     # The tenant's live acquisition of the entry, when it has one: it is then
     # read, and nothing is acquired again.
     acquisitionId: str | None = None
+    # For an add-on: the coordinate of the installed app it goes in. The
+    # add-on's build is then pinned inside that app, not installed apart.
+    addonOf: str | None = None
 
 
 @router.post("/apps/{catalogue}/{app}/operation")
@@ -70,6 +73,13 @@ async def start(
             code="invalid-request",
             detail="An update names the acquisition it is for.",
         )
+    if body.mode == "update" and body.addonOf is not None:
+        raise Refusal(
+            status=400,
+            source="app",
+            code="invalid-request",
+            detail="An add-on is installed or removed, not updated, from here.",
+        )
     operation = sequence.start(
         ctx.session,
         _coordinate(catalogue, app),
@@ -78,6 +88,7 @@ async def start(
         expected_digest=body.expectedDigest,
         version=body.version,
         acquisition_id=body.acquisitionId,
+        addon_of=patterns.app_of(body.addonOf) if body.addonOf is not None else None,
     )
     await sequence.advance(ctx, operation)
     return operation.view()
@@ -123,6 +134,19 @@ async def stop(catalogue: str, app: str, ctx: Context = Depends(context)) -> dic
     coordinate = _coordinate(catalogue, app)
     sequence.drop(ctx.session, coordinate)
     return await state.of_app(ctx, coordinate)
+
+
+@router.delete("/apps/{catalogue}/{app}/addons/{addon_catalogue}/{addon}")
+async def remove_addon(
+    catalogue: str, app: str, addon_catalogue: str, addon: str, ctx: Context = Depends(context)
+) -> dict[str, Any]:
+    """Switch one add-on off inside an installed app. Nothing is cancelled at
+    the store, and the app's data stays."""
+    return await sequence.remove_addon(
+        ctx,
+        patterns.app_of(_coordinate(catalogue, app)),
+        patterns.app_of(_coordinate(addon_catalogue, addon)),
+    )
 
 
 class ApproveBody(BaseModel):
