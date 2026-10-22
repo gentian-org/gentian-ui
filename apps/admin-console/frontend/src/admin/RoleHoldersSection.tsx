@@ -4,10 +4,13 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   addRoleHolder,
+  fetchGrantedPrivileges,
+  fetchPlatformRoleMembers,
   fetchRoleHolders,
   fetchTenantAdministrators,
   removeRoleHolder,
   type ClusterRole,
+  type PlatformRoleMembers,
   type RoleHolder,
   type TenantAdministrators,
 } from "@/api/cluster";
@@ -21,6 +24,10 @@ const ROLES: ClusterRole[] = ["securityOfficer", "auditor"];
  * its admin console. The director answers the list (can_audit) and commits a
  * change (can_configure); the picker is the registrar's list of each tenant's
  * administrators. `canEdit` only decides which buttons are shown.
+ *
+ * Beside them, read only: who holds each role through its kernel Keycloak
+ * group (the registrar's answer; the groups are managed in Keycloak), and
+ * every tenant's granted privilege exceptions (the director's answer).
  */
 export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
   const { t } = useTranslation();
@@ -33,6 +40,16 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
     queryKey: ["admin", "platform", "tenant-administrators"],
     queryFn: () => fetchTenantAdministrators(),
     enabled: canEdit,
+    retry: false,
+  });
+  const membersQuery = useQuery({
+    queryKey: ["admin", "platform", "role-members"],
+    queryFn: () => fetchPlatformRoleMembers(),
+    retry: false,
+  });
+  const grantsQuery = useQuery({
+    queryKey: ["admin", "platform", "granted-privileges"],
+    queryFn: () => fetchGrantedPrivileges(),
     retry: false,
   });
   const [role, setRole] = useState<ClusterRole>("securityOfficer");
@@ -85,6 +102,10 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
   );
   const picked = candidates.find((c) => c.key === choice);
   const unreadable = tenants.filter((entry) => entry.unavailable).map((entry) => entry.tenant);
+  const groups: PlatformRoleMembers[] = membersQuery.data?.roles ?? [];
+  const shownRoles: string[] = [...ROLES, ...groups.map((g) => g.role).filter((r) => !(ROLES as string[]).includes(r))];
+  const roleOrder = shownRoles.filter((r, i) => shownRoles.indexOf(r) === i);
+  const grants = grantsQuery.data?.privileges ?? [];
 
   return (
     <section>
@@ -98,12 +119,14 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
       {error ? <p className="admin-console__error">{error}</p> : null}
       {notice ? <p className="admin-console__success">{notice}</p> : null}
 
-      {ROLES.map((r) => {
+      {membersQuery.isError ? <p className="admin-console__hint">{t("clusterRoles.membersUnavailable")}</p> : null}
+      {roleOrder.map((r) => {
         const ofRole = holders.filter((h) => h.role === r);
+        const named = (ROLES as string[]).includes(r);
         return (
           <div key={r}>
-            <h3 className="admin-console__subsection-title">{t(`clusterRoles.role_${r}`)}</h3>
-            {ofRole.length === 0 ? (
+            <h3 className="admin-console__subsection-title">{t(`clusterRoles.role_${r}`, { defaultValue: r })}</h3>
+            {!named ? null : ofRole.length === 0 ? (
               <p className="admin-console__empty">{t("clusterRoles.nobodyYet")}</p>
             ) : (
               <div className="admin-console__table-wrap">
@@ -143,9 +166,62 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
                 </table>
               </div>
             )}
+            {groups
+              .filter((g) => g.role === r)
+              .map((g) => (
+                <div key={g.group}>
+                  <p className="admin-console__card-meta">
+                    {t("clusterRoles.throughGroup", { group: g.group })}{" "}
+                    {g.unavailable
+                      ? t("clusterRoles.groupUnavailable")
+                      : (g.members ?? []).length === 0
+                        ? t("clusterRoles.groupEmpty")
+                        : (g.members ?? []).map((m) => m.username + (m.email && m.email !== m.username ? ` <${m.email}>` : "")).join(", ")}
+                  </p>
+                </div>
+              ))}
           </div>
         );
       })}
+      {groups.length > 0 ? <p className="admin-console__hint">{t("clusterRoles.groupManaged")}</p> : null}
+
+      <h3 className="admin-console__subsection-title">{t("clusterRoles.grantedTitle")}</h3>
+      {grantsQuery.isLoading ? (
+        <p className="admin-console__loading">{t("clusterRoles.grantedLoading")}</p>
+      ) : grantsQuery.isError ? (
+        <p className="admin-console__empty">{t("clusterRoles.grantedUnavailable")}</p>
+      ) : grants.length === 0 ? (
+        <p className="admin-console__empty">{t("clusterRoles.grantedNone")}</p>
+      ) : (
+        <div className="admin-console__table-wrap">
+          <table className="admin-console__table">
+            <thead>
+              <tr>
+                <th>{t("clusterRoles.tenant")}</th>
+                <th>{t("clusterRoles.app")}</th>
+                <th>{t("clusterRoles.exception")}</th>
+                <th>{t("clusterRoles.reason")}</th>
+                <th>{t("clusterRoles.approvedBy")}</th>
+                <th>{t("clusterRoles.approvedAt")}</th>
+                <th>{t("clusterRoles.expires")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {grants.map((g) => (
+                <tr key={`${g.tenant}/${g.install}/${g.privilege}`}>
+                  <td className="admin-console__mono">{g.tenant}</td>
+                  <td className="admin-console__mono">{g.install}</td>
+                  <td className="admin-console__mono">{g.privilege}</td>
+                  <td>{g.reason}</td>
+                  <td className="admin-console__mono">{g.approver}</td>
+                  <td>{g.approvedAt ? new Date(g.approvedAt).toLocaleString() : "—"}</td>
+                  <td>{g.expiresAt ? new Date(g.expiresAt).toLocaleString() : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {canEdit ? (
         <>

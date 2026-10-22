@@ -459,3 +459,33 @@ async def tenant_administrators(
         _cluster_path(settings, "/tenant-administrators"),
         bearer_of(credentials),
     )
+
+
+@router.get("/platform-role-members")
+async def platform_role_members(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Who holds each cluster role through its kernel Keycloak group, read by
+    the registrar under can_audit on the cluster. Read only: the groups are
+    managed in Keycloak."""
+    return await director.forward_to(
+        director.registrar_url(settings),
+        "GET",
+        _cluster_path(settings, "/platform-role-members"),
+        bearer_of(credentials),
+    )
+
+
+@router.get("/privileges")
+async def granted_privileges(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Every tenant's approved privilege exceptions in one list, as git has
+    them: the director's answer under can_audit on the cluster."""
+    return await director.forward(
+        settings, "GET", _cluster_path(settings, "/privileges"), bearer_of(credentials)
+    )
