@@ -430,7 +430,7 @@
   },
   "approvals": {
     "lead": "The app asks for more than an app gets by default. Each request is answered by the person it belongs to; the install waits until every one is approved.",
-    "kindTenant": "approved by this tenant's administrator",
+    "kindPerimeterApprover": "approved by a perimeter approver",
     "kindSecurityOfficer": "approved by the cluster's security officer",
     "noReason": "The app gives no reason for this request.",
     "expired": "A previous approval ran out on",
@@ -442,14 +442,15 @@
     "approvedAlready": "Approved already; nothing was committed.",
     "cancel": "Cancel",
     "request": "Request approval…",
-    "noteLabel": "A note for the security officer (optional)",
+    "noteLabel": "A note for the approver (optional)",
     "requestConfirm": "Request approval of {{privilege}}",
     "requestedBy": "Requested by <mono>{{who}}</mono> on",
-    "waitingForOfficer": "Waiting for the security officer. This page carries on by itself once they have answered.",
+    "waitingForApprover": "Waiting for the approver. This page carries on by itself once they have answered.",
     "declinedBy": "Declined by <mono>{{who}}</mono> on",
     "declinedWaits": "The install keeps waiting. You can ask again, with what has changed, or uninstall the app.",
     "requestAgain": "Request again…",
     "officerHint": "A security officer of this cluster approves this in their admin console.",
+    "perimeterHint": "A perimeter approver approves this.",
     "carriesOn": "This page asks the cluster every few seconds and goes on to the rollout by itself once nothing is waiting."
   }
 }

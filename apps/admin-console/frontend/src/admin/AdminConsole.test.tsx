@@ -28,10 +28,15 @@ function tabs(context: AdminContext): string[] {
 }
 
 describe("AdminConsole", () => {
-  it("shows the Approvals tab to the security officer and to nobody else", () => {
+  it("shows the Approvals tab to the security officer, the perimeter approver and the cluster's administrator", () => {
     expect(tabs({ ...base, canApproveNodePrivilege: true })).toContain("Approvals");
+    expect(tabs({ ...base, canApprovePerimeter: true })).toContain("Approvals");
+    expect(tabs({ ...base, isPlatformAdmin: true })).toContain("Approvals");
     expect(tabs(base)).not.toContain("Approvals");
-    expect(tabs({ ...base, isPlatformAdmin: true })).not.toContain("Approvals");
+  });
+
+  it("shows a perimeter approver who does not administer the tenant the Approvals tab alone", () => {
+    expect(tabs({ ...base, isTenantAdmin: false, canApprovePerimeter: true })).toEqual(["Approvals"]);
   });
 
   it("shows a security officer who does not administer the tenant the Approvals tab alone", () => {

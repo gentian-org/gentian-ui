@@ -16,6 +16,7 @@ def test_whether_a_person_may_install_is_the_directors_answer(api, store, cluste
         "tenant": "acme",
         "name": None,
         "mayInstall": True,
+        "mayApprovePrivilege": False,
         "storeConfigured": True,
         "appStore": {"available": True, "reason": None},
         "adminConsoleUrl": "https://admin.acme.example/",
@@ -26,6 +27,11 @@ def test_whether_a_person_may_install_is_the_directors_answer(api, store, cluste
     assert [c.bearer for c in me] == ["Bearer alice.s1"]
     # And the store was asked nothing for it.
     assert store.calls == []
+
+
+def test_whether_a_person_may_approve_egress_is_the_directors_answer(api, store, cluster):
+    cluster.relations["can_approve_privilege"] = True
+    assert api.get("/api/v1/context", headers=ALICE).json()["mayApprovePrivilege"] is True
 
 
 def test_a_person_who_may_not_install_is_told_so(api, store, cluster):

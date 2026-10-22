@@ -84,7 +84,8 @@ const TABS: {
   /** Shown only to those the director says may publish for the tenant. */
   approverOnly?: boolean;
   /**
-   * Shown only to the cluster's security officer (cluster can_approve), and
+   * Shown only to the cluster's security officer (cluster can_approve), its
+   * perimeter approver (can_approve_perimeter) and its administrator, and
    * the one tab a person who does not administer the tenant is shown: the
    * console lets them in for this screen alone (/admin/context).
    */
@@ -97,8 +98,8 @@ const TABS: {
   // employee opens this console to do. A tenant administrator sees their own
   // tenant's screens and has no business listing the others.
   { id: "tenants", labelKey: "tabTenants", platformOnly: true },
-  // What every tenant's apps ask of the node, for the security officer who
-  // answers it, in the console of their own tenant; the usher decides who
+  // What every tenant's apps ask of the platform, for the security officer
+  // and the perimeter approver who answer it, in the console of their own tenant; the usher decides who
   // reads the list and the director decides each approval.
   { id: "approvals", labelKey: "tabApprovals", officerOnly: true },
   { id: "members", labelKey: "tabMembers" },
@@ -192,8 +193,9 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
     );
   }
 
-  const { realm, isPlatformAdmin, canExpose, canApproveNodePrivilege, canAuditCluster } = contextQuery.data;
-  // False only for the security officer let in for the Approvals screen; a
+  const { realm, isPlatformAdmin, canExpose, canApproveNodePrivilege, canApprovePerimeter, canAuditCluster } =
+    contextQuery.data;
+  // False only for the approver let in for the Approvals screen; a
   // backend older than that field answered nobody who did not administer.
   const administers = contextQuery.data.isTenantAdmin !== false;
   const shown = TABS.filter(
@@ -202,7 +204,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
       (administers || entry.officerOnly) &&
       (!entry.platformOnly || isPlatformAdmin) &&
       (!entry.approverOnly || canExpose === true) &&
-      (!entry.officerOnly || canApproveNodePrivilege === true) &&
+      (!entry.officerOnly || canApproveNodePrivilege === true || canApprovePerimeter === true || isPlatformAdmin) &&
       (!entry.auditorOnly || canAuditCluster === true),
   );
   // Members first, as it always was, for whoever has it; the officer let in

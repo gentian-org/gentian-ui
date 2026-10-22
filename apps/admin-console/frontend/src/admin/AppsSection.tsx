@@ -675,7 +675,7 @@ function IntegrationsPart({
  *
  * Each request is answered here by whoever holds the right it needs, one
  * commit with the approver's reason. Which right that is the operator says
- * on the request (approvedBy): the tenant's administrator for egress
+ * on the request (approvedBy): the tenant's perimeter approver for egress
  * (can_approve_privilege), the cluster's security officer for what weakens
  * the node (cluster can_approve). The button follows the director's answer
  * to that right; anyone else is told whose it is rather than offered what
@@ -759,7 +759,7 @@ export function PrivilegesPart({ row }: { row: AppRow }) {
                     )}
                     {mayApprove(approvedBy.get(privilege), context) ? (
                       <ApprovePrivilege install={install} privilege={privilege} />
-                    ) : (approvedBy.get(privilege) ?? legacyApprover(privilege)) === "tenant" ? (
+                    ) : (approvedBy.get(privilege) ?? legacyApprover(privilege)) === "perimeter-approver" ? (
                       <div className="admin-console__hint">{t("apps.privilegeApproveNotYours")}</div>
                     ) : (
                       <div className="admin-console__hint">{t("apps.privilegeApproveSecurityOfficer")}</div>
@@ -811,7 +811,7 @@ export function PrivilegesPart({ row }: { row: AppRow }) {
  * or a context without the right (an older backend) is a no.
  */
 function mayApprove(approvedBy: string | undefined, context: AdminContext | undefined): boolean {
-  if (approvedBy === "tenant") return context?.canApprovePrivilege === true;
+  if (approvedBy === "perimeter-approver") return context?.canApprovePrivilege === true;
   if (approvedBy === "security-officer") return context?.canApproveNodePrivilege === true;
   return false;
 }
@@ -822,7 +822,7 @@ function mayApprove(approvedBy: string | undefined, context: AdminContext | unde
  * the button; that waits for the operator's own answer.
  */
 function legacyApprover(privilege: string): string {
-  return privilege.startsWith("egress/") ? "tenant" : "security-officer";
+  return privilege.startsWith("egress/") ? "perimeter-approver" : "security-officer";
 }
 
 /**

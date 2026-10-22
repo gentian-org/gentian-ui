@@ -30,6 +30,15 @@ const approvals: Approval[] = [
   },
 ];
 
+// An egress request: the perimeter approver's.
+const egress: Approval = {
+  tenant: "acme",
+  profile: "crm",
+  install: "crm",
+  privilege: "egress/smtp-relay",
+  approvedBy: "perimeter-approver",
+};
+
 // One the officer said no to: still listed, still pending, with the no.
 const declined: Approval = {
   tenant: "acme",
@@ -78,6 +87,21 @@ describe("ApprovalsSection", () => {
     expect(administrator).toContain("security officer");
   });
 
+  it("shows each approver the requests they answer, and the cluster's administrator all", () => {
+    const officer = render([...approvals, egress], { canApproveNodePrivilege: true });
+    expect(officer).toContain("podSecurity/run-as-root");
+    expect(officer).not.toContain("egress/smtp-relay");
+    const perimeter = render([...approvals, egress], { canApprovePerimeter: true });
+    expect(perimeter).toContain("egress/smtp-relay");
+    expect(perimeter).not.toContain("podSecurity/run-as-root");
+    expect(perimeter).toContain("Approve…");
+    const administrator = render([...approvals, egress], { isPlatformAdmin: true });
+    expect(administrator).toContain("egress/smtp-relay");
+    expect(administrator).toContain("podSecurity/run-as-root");
+    expect(administrator).toContain("A perimeter approver approves this.");
+    expect(administrator).not.toContain("Approve…");
+  });
+
   it("shows a declined request as declined, by whom and why, and still offers the answer", () => {
     const html = render([declined], { canApproveNodePrivilege: true });
     expect(html).toContain("Declined by");
@@ -89,6 +113,6 @@ describe("ApprovalsSection", () => {
   });
 
   it("says so when nothing waits", () => {
-    expect(render([], { canApproveNodePrivilege: true })).toContain("Nothing is waiting for the security officer.");
+    expect(render([], { canApproveNodePrivilege: true })).toContain("Nothing is waiting for an approval.");
   });
 });

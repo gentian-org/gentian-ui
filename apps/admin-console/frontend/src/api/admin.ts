@@ -29,8 +29,8 @@ export type AdminContext = {
   canGrant?: boolean;
   /**
    * The director's answer to whether this person may answer an app's egress
-   * request (can_approve_privilege). Absent from a backend older than the
-   * Approve button, which is a no.
+   * request (can_approve_privilege, the tenant's perimeter approver's). Absent
+   * from a backend older than the Approve button, which is a no.
    */
   canApprovePrivilege?: boolean;
   /**
@@ -40,6 +40,12 @@ export type AdminContext = {
    * older than the security officer's Approve button, which is a no.
    */
   canApproveNodePrivilege?: boolean;
+  /**
+   * Whether this person is the cluster's perimeter approver
+   * (cluster#can_approve_perimeter): they answer every tenant's egress
+   * requests on the Approvals screen. Absent from an older backend: a no.
+   */
+  canApprovePerimeter?: boolean;
   /** Whether this person may read who holds the cluster's roles (cluster#can_audit). */
   canAuditCluster?: boolean;
 };
@@ -1071,14 +1077,14 @@ export function fetchSettingsTemplates(tenant?: string) {
 }
 
 /**
- * Who answers one pending request: the tenant's administrator
+ * Who answers one pending request: the tenant's perimeter approver
  * (can_approve_privilege) or the cluster's security officer (cluster
  * can_approve). Any other value is a kind of answer this console does not
  * know, and it offers no button for it.
  */
 export type PendingPrivilegeApproval = {
   privilege: string;
-  approvedBy: "tenant" | "security-officer" | (string & {});
+  approvedBy: "perimeter-approver" | "security-officer" | (string & {});
   /**
    * The approver's no, when one was said: who, when and why. The request is
    * still pending -- the app keeps waiting -- until somebody approves, or

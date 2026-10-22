@@ -1044,7 +1044,7 @@
     "privilegeApproveConfirm": "Approve {{privilege}}",
     "privilegeApproveCancel": "Cancel",
     "privilegeApproveFailed": "Not approved:",
-    "privilegeApproveNotYours": "Approving it is the tenant administrator's.",
+    "privilegeApproveNotYours": "A perimeter approver approves this.",
     "privilegeApproveSecurityOfficer": "Approving it is the cluster's security officer's: it weakens what protects the node, and every tenant on it."
   },
   "perimeter": {
@@ -1116,7 +1116,7 @@
   },
   "clusterRoles": {
     "title": "Cluster roles",
-    "lead": "Who holds a role on the whole cluster by name: an account of one of its tenants. A security officer approves what weakens the node; an auditor reads. Each signs in to their own tenant and works in its admin console.",
+    "lead": "Who holds a role on the whole cluster by name: an account of one of its tenants, with the reason it was given and, if set, until when. A security officer approves what weakens the node; a perimeter approver approves public addresses and egress; an auditor reads; a service or shared-apps administrator runs the platform's services or shared apps. Each signs in to their own tenant and works in its admin console.",
     "loading": "Reading who holds the roles…",
     "unavailable": "The cluster roles could not be read.",
     "nobodyYet": "Nobody holds this role by name.",
@@ -1128,12 +1128,9 @@
     "remove": "Remove",
     "add": "Give a role",
     "role": "Role",
-    "loadingAdministrators": "Reading the tenants' administrators…",
-    "administratorsUnavailable": "The tenants' administrators could not be read.",
-    "administrator": "Administrator",
-    "choose": "Choose an administrator…",
-    "noCandidates": "Every tenant administrator already holds this role, or no tenant has one yet.",
-    "someRealmsUnread": "The realm of {{tenants}} could not be read; its administrators are missing from the list.",
+    "choose": "Choose a person…",
+    "noCandidates": "Everybody who may hold this role holds it already, or there is nobody to choose.",
+    "someRealmsUnread": "The realm of {{tenants}} could not be read; its people are missing from the list.",
     "addButton": "Give the role",
     "addedCommitted": "Committed: {{login}} of {{tenant}} holds the role once the cluster has taken it in.",
     "addedAlready": "{{login}} of {{tenant}} holds the role already; nothing was committed.",
@@ -1156,14 +1153,23 @@
     "reason": "Reason",
     "approvedBy": "Approved by",
     "approvedAt": "When",
-    "expires": "Expires"
+    "expires": "Expires",
+    "role_perimeterApprover": "Perimeter approver",
+    "loadingCandidates": "Reading who could hold the role…",
+    "candidatesUnavailable": "Who could hold the role could not be read.",
+    "person": "Person",
+    "scope": "Scope",
+    "scopeIs": "The role applies to:",
+    "expiresOptional": "Until (optional)",
+    "expired": "Expired",
+    "notAdministrator": "Not in effect: no longer an administrator of {{tenant}}"
   },
   "approvals": {
     "title": "Approvals",
-    "lead": "What the apps of every tenant ask of the node beyond the default posture — pod-security waivers and cluster roles — and who asked for it. Approving one is the security officer's: it weakens what protects the node, and every tenant on it.",
+    "lead": "What the apps of every tenant ask of the platform beyond the default posture, and who asked for it. Pod-security waivers and cluster roles are the security officer's: they weaken what protects the node, and every tenant on it. Egress is the perimeter approver's.",
     "reading": "Reading…",
     "unavailable": "The list is not available:",
-    "none": "Nothing is waiting for the security officer.",
+    "none": "Nothing is waiting for an approval.",
     "tenant": "Tenant",
     "app": "App",
     "privilege": "Privilege",
@@ -1189,6 +1195,7 @@
     "declineReasonHint": "At least ten characters. Nothing is committed: the app keeps waiting, and whoever asked is shown your reason and may ask again. An approval later stands.",
     "declineConfirm": "Decline {{privilege}}",
     "declineFailed": "Not declined:",
-    "declined": "Declined. The app keeps waiting; the tenant sees your reason."
+    "declined": "Declined. The app keeps waiting; the tenant sees your reason.",
+    "notYoursPerimeter": "A perimeter approver approves this."
   }
 }

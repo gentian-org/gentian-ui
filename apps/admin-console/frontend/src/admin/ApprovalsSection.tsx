@@ -10,12 +10,14 @@ const mono = { mono: <span className="admin-console__mono" /> };
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /**
- * What every tenant's apps ask of the node, for the cluster's security
- * officer: pod-security waivers and cluster roles, each with the profile's
- * reason and the request its tenant's administrator made. The list is the
- * usher's, read under cluster can_approve or can_configure; the buttons
- * follow the director's answer to can_approve (adminContext.
- * canApproveNodePrivilege), and the director decides again on the answer.
+ * What every tenant's apps ask of the platform, each with the profile's
+ * reason and the request its tenant's administrator made: pod-security
+ * waivers and cluster roles for the cluster's security officer
+ * (approvedBy security-officer, cluster can_approve), egress for the
+ * cluster's perimeter approver (approvedBy perimeter-approver, cluster
+ * can_approve_perimeter). The list is the usher's; each approver sees the
+ * requests they answer, the cluster's administrator sees all. The buttons
+ * follow the director's answer to the right, and the director decides again.
  * A decline is the same right: it commits nothing and the app keeps
  * waiting, but whoever asked is told why.
  */
@@ -23,8 +25,14 @@ export function ApprovalsSection() {
   const { t } = useTranslation();
   const approvalsQuery = useQuery({ queryKey: ["admin", "approvals"], queryFn: () => fetchApprovals() });
   const contextQuery = useQuery({ queryKey: ["admin", "context"], queryFn: () => fetchAdminContext() });
-  const mayApprove = contextQuery.data?.canApproveNodePrivilege === true;
-  const approvals = approvalsQuery.data?.approvals ?? [];
+  const context = contextQuery.data;
+  const mayApprove = (approval: Approval) =>
+    approval.approvedBy === "security-officer"
+      ? context?.canApproveNodePrivilege === true
+      : approval.approvedBy === "perimeter-approver" && context?.canApprovePerimeter === true;
+  const approvals = (approvalsQuery.data?.approvals ?? []).filter(
+    (approval) => context?.isPlatformAdmin === true || mayApprove(approval),
+  );
 
   return (
     <section className="admin-console__section">
@@ -95,10 +103,12 @@ export function ApprovalsSection() {
                     ) : null}
                   </td>
                   <td>
-                    {mayApprove ? (
+                    {mayApprove(approval) ? (
                       <AnswerRequest approval={approval} />
                     ) : (
-                      <div className="admin-console__hint">{t("approvals.notYours")}</div>
+                      <div className="admin-console__hint">
+                        {t(approval.approvedBy === "perimeter-approver" ? "approvals.notYoursPerimeter" : "approvals.notYours")}
+                      </div>
                     )}
                   </td>
                 </tr>

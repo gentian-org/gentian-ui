@@ -430,7 +430,7 @@
   },
   "approvals": {
     "lead": "Die App verlangt mehr, als eine App standardmäßig bekommt. Jede Anfrage beantwortet die Person, der sie zusteht; die Installation wartet, bis alle genehmigt sind.",
-    "kindTenant": "genehmigt die Administration dieses Mandanten",
+    "kindPerimeterApprover": "genehmigt ein Perimeter-Freigeber",
     "kindSecurityOfficer": "genehmigt der Security Officer des Clusters",
     "noReason": "Die App nennt keinen Grund für diese Anfrage.",
     "expired": "Eine frühere Genehmigung ist abgelaufen am",
@@ -442,14 +442,15 @@
     "approvedAlready": "Bereits genehmigt; nichts wurde committet.",
     "cancel": "Abbrechen",
     "request": "Genehmigung anfragen…",
-    "noteLabel": "Eine Notiz für den Security Officer (optional)",
+    "noteLabel": "Eine Notiz für die genehmigende Person (optional)",
     "requestConfirm": "Genehmigung von {{privilege}} anfragen",
     "requestedBy": "Angefragt von <mono>{{who}}</mono> am",
-    "waitingForOfficer": "Wartet auf den Security Officer. Diese Seite fährt von selbst fort, sobald er geantwortet hat.",
+    "waitingForApprover": "Wartet auf die genehmigende Person. Diese Seite fährt von selbst fort, sobald sie geantwortet hat.",
     "declinedBy": "Abgelehnt von <mono>{{who}}</mono> am",
     "declinedWaits": "Die Installation wartet weiter. Sie können erneut anfragen, mit dem, was sich geändert hat, oder die App deinstallieren.",
     "requestAgain": "Erneut anfragen…",
     "officerHint": "Ein Security Officer dieses Clusters genehmigt dies in seiner Admin-Konsole.",
+    "perimeterHint": "Ein Perimeter-Freigeber genehmigt dies.",
     "carriesOn": "Diese Seite fragt den Cluster alle paar Sekunden und geht von selbst zum Ausrollen über, sobald nichts mehr wartet."
   }
 }

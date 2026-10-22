@@ -79,7 +79,12 @@ def test_naming_one_is_a_commit_by_role_tenant_and_subject(monkeypatch):
     _fake_client(monkeypatch, 202, {"status": "updated", "commit": "a1b2c3d4"}, seen)
     r = TestClient(_app(_settings())).put(
         "/api/v1/cluster/role-holders/auditor/acme/7d0f",
-        json={"username": "it@acme.example", "email": "it@acme.example"},
+        json={
+            "username": "it@acme.example",
+            "email": "it@acme.example",
+            "reason": "audit 2026",
+            "expiresAt": "2027-01-01T00:00:00Z",
+        },
         headers={"Authorization": "Bearer t"},
     )
     assert r.status_code == 202 and r.json()["commit"] == "a1b2c3d4"
@@ -87,7 +92,12 @@ def test_naming_one_is_a_commit_by_role_tenant_and_subject(monkeypatch):
     assert seen["url"] == (
         "http://director.test:8080/v1/clusters/demo/platform-roles/holders/auditor/acme/7d0f"
     )
-    assert seen["json"] == {"username": "it@acme.example", "email": "it@acme.example"}
+    assert seen["json"] == {
+        "username": "it@acme.example",
+        "email": "it@acme.example",
+        "reason": "audit 2026",
+        "expiresAt": "2027-01-01T00:00:00Z",
+    }
 
 
 def test_a_refusal_comes_back_as_it_was(monkeypatch):
@@ -110,15 +120,15 @@ def test_who_could_be_chosen_is_the_registrars_answer(monkeypatch):
         {
             "cluster": "demo",
             "complete": True,
-            "tenants": [{"tenant": "acme", "administrators": []}],
+            "tenants": [{"tenant": "platform", "platform": True, "people": []}],
         },
         seen,
     )
     r = TestClient(_app(_settings())).get(
-        "/api/v1/cluster/tenant-administrators", headers={"Authorization": "Bearer t"}
+        "/api/v1/cluster/role-candidates", headers={"Authorization": "Bearer t"}
     )
     assert r.status_code == 200 and r.json()["complete"] is True
-    assert seen["url"] == "http://registrar.test:8080/v1/clusters/demo/tenant-administrators"
+    assert seen["url"] == "http://registrar.test:8080/v1/clusters/demo/role-candidates"
 
 
 def test_the_tenants_switch_is_read_and_written_as_declared_state(monkeypatch):

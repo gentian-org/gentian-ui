@@ -62,6 +62,10 @@ async def context(
         "tenant": tenant,
         "name": user.get("name") or user.get("preferred_username"),
         "mayInstall": relations.get("can_install_app") is True,
+        # Whether the install's egress requests are this person's to approve
+        # (can_approve_privilege, the tenant's perimeter approver's). It
+        # decides a button; the director asks again on the approval.
+        "mayApprovePrivilege": relations.get("can_approve_privilege") is True,
         "storeConfigured": settings.store_base is not None,
         "appStore": await _app_store_offered(settings, token),
         "adminConsoleUrl": settings.admin_console_url,

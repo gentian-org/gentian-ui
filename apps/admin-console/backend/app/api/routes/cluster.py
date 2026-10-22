@@ -383,12 +383,13 @@ async def pending_admin_invitations(
 
 # --- The cluster roles held by name (iam.md 1.1c) ----------------------------
 #
-# Who holds cluster#security_officer or cluster#auditor by name is declared on
-# the Cluster claim: an account of a tenant's realm, by its subject there. The
-# holder signs in to their own tenant. The director commits the choice
-# (can_configure) and answers who holds what (can_audit); the registrar
-# answers who could, the members of each tenant's admins group. The console
-# relays both as the caller and decides nothing.
+# Who holds a cluster role by name is declared on the Cluster claim: an
+# account of a tenant's realm, by its subject there, with a reason and an
+# optional expiry. The holder signs in to their own tenant. The director
+# commits the choice (can_configure) and answers who holds what (can_audit);
+# the registrar answers who could: the platform tenant's people and every
+# other tenant's administrators. The console relays both as the caller and
+# decides nothing.
 
 
 @router.get("/role-holders")
@@ -417,7 +418,8 @@ async def set_role_holder(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """An account of a tenant's realm holds the role: one commit to the
-    claim. The body carries the login and the address shown for it."""
+    claim. The body carries the login, the address shown for it, the
+    reason and an optional expiry."""
     return await director.forward(
         settings,
         "PUT",
@@ -445,18 +447,19 @@ async def remove_role_holder(
     )
 
 
-@router.get("/tenant-administrators")
-async def tenant_administrators(
+@router.get("/role-candidates")
+async def role_candidates(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Who could hold it: every tenant's administrators, read by the registrar
-    from each tenant's realm, under can_configure on the cluster."""
+    """Who could hold it: the platform tenant's people and every other
+    tenant's administrators, read by the registrar from each tenant's realm,
+    under can_configure on the cluster."""
     return await director.forward_to(
         director.registrar_url(settings),
         "GET",
-        _cluster_path(settings, "/tenant-administrators"),
+        _cluster_path(settings, "/role-candidates"),
         bearer_of(credentials),
     )
 
