@@ -19,6 +19,15 @@ const holders = {
       reason: "named in the security policy",
     },
     {
+      role: "auditor",
+      scope: "cluster",
+      tenant: "acme",
+      subject: "9e8f",
+      username: "former@acme.example",
+      reason: "the old auditor",
+      notInEffect: "no longer an administrator of acme",
+    },
+    {
       role: "perimeterApprover",
       scope: "tenant:acme",
       tenant: "acme",
@@ -104,6 +113,7 @@ describe("RoleHoldersSection", () => {
     expect(html).toContain("tenant:acme");
     expect(html).toContain("named in the security policy");
     expect(html).toContain("Expired");
+    expect(html).toContain("Not in effect: no longer an administrator of acme");
     expect(html).toContain("Nobody holds this role by name");
   });
 

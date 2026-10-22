@@ -441,6 +441,11 @@ export type RoleHolder = {
   email?: string;
   reason?: string;
   expiresAt?: string;
+  /**
+   * Why the entry grants nothing, as the director says: "expired", or "no
+   * longer an administrator of <t>". Absent while it is in effect.
+   */
+  notInEffect?: string;
 };
 
 export function fetchRoleHolders() {

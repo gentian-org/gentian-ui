@@ -163,6 +163,11 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
                         <td>
                           {holder.username}
                           <div className="admin-console__card-meta admin-console__mono">{holder.subject}</div>
+                          {holder.notInEffect && holder.notInEffect !== "expired" ? (
+                            <span className="admin-console__badge admin-console__badge--warn">
+                              {t("clusterRoles.notAdministrator", { tenant: holder.tenant })}
+                            </span>
+                          ) : null}
                         </td>
                         <td>{holder.email || "—"}</td>
                         <td className="admin-console__mono">{holder.scope || "cluster"}</td>

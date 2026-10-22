@@ -1161,7 +1161,8 @@
     "scope": "Geltungsbereich",
     "scopeIs": "Die Rolle gilt für:",
     "expiresOptional": "Bis (optional)",
-    "expired": "Abgelaufen"
+    "expired": "Abgelaufen",
+    "notAdministrator": "Nicht wirksam: nicht mehr Administrator von {{tenant}}"
   },
   "approvals": {
     "title": "Genehmigungen",

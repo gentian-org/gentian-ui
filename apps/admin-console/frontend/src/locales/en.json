@@ -1161,7 +1161,8 @@
     "scope": "Scope",
     "scopeIs": "The role applies to:",
     "expiresOptional": "Until (optional)",
-    "expired": "Expired"
+    "expired": "Expired",
+    "notAdministrator": "Not in effect: no longer an administrator of {{tenant}}"
   },
   "approvals": {
     "title": "Approvals",
