@@ -223,6 +223,12 @@ export type Installed = {
  */
 export type PendingApproval = {
   privilege: string;
+  /**
+   * The add-on that asks, when it is not the app itself: an add-on that runs
+   * as a Component of its own is approved under its own name. Absent from an
+   * older backend.
+   */
+  addon?: string | null;
   approvedBy: "perimeter-approver" | "security-officer";
   reason: string | null;
   requestedBy: string | null;

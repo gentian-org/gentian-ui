@@ -433,6 +433,7 @@
     "kindPerimeterApprover": "approved by a perimeter approver",
     "kindSecurityOfficer": "approved by the cluster's security officer",
     "noReason": "The app gives no reason for this request.",
+    "forAddon": "Asked for by the add-on <mono>{{addon}}</mono>.",
     "expired": "A previous approval ran out on",
     "approve": "Approve…",
     "reasonLabel": "Why you approve it, in your own words",

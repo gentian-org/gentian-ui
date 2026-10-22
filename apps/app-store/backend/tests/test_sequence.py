@@ -563,6 +563,63 @@ def test_an_addon_waits_on_its_apps_approvals(runner, store, cluster):
     assert view["rollout"]["pendingPrivilegeApprovals"][0]["privilege"] == "egress/smtp"
 
 
+def test_an_addons_own_requests_are_shown_and_approved_under_its_name(runner, store, cluster):
+    runner.install()
+    cluster.states["nextcloud-base-ee"] = {
+        "profile": "nextcloud-base-ee",
+        "name": "nextcloud-base-ee",
+        "phase": "ready",
+        "ready": True,
+        "addons": [
+            {
+                "profile": "nextcloud-office-ee",
+                "name": "nextcloud-office-ee",
+                "phase": "installing",
+                "ready": False,
+                "pendingPrivileges": ["egress/wopi"],
+                "pendingPrivilegeApprovals": [
+                    {"privilege": "egress/wopi", "approvedBy": "perimeter-approver"}
+                ],
+            },
+            # Another add-on's request is not this install's to wait on.
+            {
+                "profile": "nextcloud-talk-ee",
+                "name": "nextcloud-talk-ee",
+                "phase": "installing",
+                "ready": False,
+                "pendingPrivilegeApprovals": [
+                    {"privilege": "egress/turn", "approvedBy": "perimeter-approver"}
+                ],
+            },
+        ],
+    }
+    view = runner.start(ADDON, expectedDigest=ADDON_DIGEST, addonOf=PAID)
+    while view["stage"] not in ("approvals", "failed", "done"):
+        view = runner.step(ADDON)
+    # The base is up; the add-on waits on its own request, which says whose it is.
+    assert view["stage"] == "approvals"
+    assert [(a["privilege"], a["addon"]) for a in view["rollout"]["pendingPrivilegeApprovals"]] == [
+        ("egress/wopi", "nextcloud-office-ee")
+    ]
+    # Approved under the add-on's own Component, not the app's.
+    answer = runner.api.post(
+        f"/api/v1/apps/{ADDON}/privileges/egress/wopi/approve",
+        json={"reason": "the office server is ours"},
+        headers=ALICE,
+    )
+    assert answer.status_code == 200, answer.text
+    assert cluster.approved == [
+        ("nextcloud-office-ee/egress/wopi", {"reason": "the office server is ours"})
+    ]
+    cluster.states["nextcloud-base-ee"]["addons"][0] = {
+        "profile": "nextcloud-office-ee",
+        "name": "nextcloud-office-ee",
+        "phase": "ready",
+        "ready": True,
+    }
+    assert runner.step(ADDON)["stage"] == "done"
+
+
 def test_an_addon_needs_its_app_installed(runner, store, cluster):
     view = install_addon(runner)
     assert view["stage"] == "failed"

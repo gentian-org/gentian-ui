@@ -715,9 +715,24 @@ async def _metering_timeout(_ctx: Context, op: Operation, answer: dict[str, Any]
 
 async def _rollout(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None:
     state = await app_state(ctx, op.base)
+    if state and op.addon_of:
+        # An add-on's install waits on the base and on the add-on itself,
+        # not on other add-ons of the same app.
+        own = state["addons"].get(op.profile)
+        approvals = [
+            a for a in state["pendingPrivilegeApprovals"] if a.get("addon") in (None, op.profile)
+        ]
+        state = {**state, "pendingPrivilegeApprovals": approvals}
+        if own is not None and state["phase"] == "ready":
+            state = {
+                **state,
+                "phase": own["phase"],
+                "ready": own["ready"],
+                "message": own["message"],
+            }
     op.rollout = state
     phase = state["phase"] if state else None
-    if phase == "ready":
+    if phase == "ready" and not (state and state["pendingPrivilegeApprovals"]):
         # The app is there. Its tile is given the store's picture once, and
         # whatever comes of that, the install is done. An add-on's tile is
         # its base's.
@@ -777,6 +792,18 @@ def state_view(entry: Any) -> dict[str, Any] | None:
         return value[:2000] if isinstance(value, str) and value else None
 
     privileges = entry.get("pendingPrivileges")
+    approvals = _approvals_view(entry.get("pendingPrivilegeApprovals"))
+    # An add-on that runs as a Component of its own waits under its own
+    # name. Its requests are the app's to show, each saying which add-on
+    # asks, which is the app the approval is made for.
+    addons: dict[str, dict[str, Any]] = {}
+    raw_addons = entry.get("addons")
+    for addon in raw_addons if isinstance(raw_addons, list) else []:
+        view = state_view(addon)
+        if view is None or not isinstance(addon.get("profile"), str):
+            continue
+        addons[addon["profile"]] = view
+        approvals += [{**a, "addon": addon["profile"]} for a in view["pendingPrivilegeApprovals"]]
     return {
         "phase": text("phase"),
         "ready": entry.get("ready") is True,
@@ -788,7 +815,8 @@ def state_view(entry: Any) -> dict[str, Any] | None:
         "pendingPrivileges": [p for p in privileges if isinstance(p, str)]
         if isinstance(privileges, list)
         else [],
-        "pendingPrivilegeApprovals": _approvals_view(entry.get("pendingPrivilegeApprovals")),
+        "pendingPrivilegeApprovals": approvals,
+        "addons": addons,
     }
 
 
@@ -831,6 +859,10 @@ async def app_states(ctx: Context) -> dict[str, dict[str, Any]]:
         view = state_view(entry)
         if view is not None and isinstance(entry.get("profile"), str):
             out[entry["profile"]] = view
+            # An add-on is looked up by its own profile too: its install
+            # name, for an approval, and its own state, for its install.
+            for profile, addon in view["addons"].items():
+                out.setdefault(profile, addon)
     return out
 
 
