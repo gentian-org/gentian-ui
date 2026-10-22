@@ -141,3 +141,57 @@ def test_the_tenants_switch_is_read_and_written_as_declared_state(monkeypatch):
     # Only the switch travels, as a boolean, whatever else the body carried.
     assert seen["json"] == {"adminsEnter": True}
     assert seen["method"] == "PUT"
+
+
+def test_the_group_members_are_the_registrars_answer(monkeypatch):
+    seen: dict = {}
+    members = {
+        "cluster": "demo",
+        "complete": True,
+        "roles": [
+            {
+                "role": "securityOfficer",
+                "group": "gentian:platform:security",
+                "members": [{"id": "u1", "username": "sam@k.example", "enabled": True}],
+            }
+        ],
+    }
+    _fake_client(monkeypatch, 200, members, seen)
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/cluster/platform-role-members", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 200 and r.json() == members
+    assert seen["method"] == "GET"
+    assert seen["url"] == "http://registrar.test:8080/v1/clusters/demo/platform-role-members"
+    assert seen["auth"] == "Bearer t"
+
+
+def test_the_granted_exceptions_are_the_directors_answer(monkeypatch):
+    seen: dict = {}
+    grants = {
+        "cluster": "demo",
+        "privileges": [
+            {
+                "tenant": "acme",
+                "install": "wiki",
+                "privilege": "podSecurity/run-as-root",
+                "approver": "sam",
+                "approvedAt": "2026-10-21T09:00:00Z",
+                "reason": "reviewed",
+            }
+        ],
+    }
+    _fake_client(monkeypatch, 200, grants, seen)
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/cluster/privileges", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 200 and r.json() == grants
+    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/privileges"
+    assert seen["auth"] == "Bearer t"
+
+    # A refusal comes back as it was.
+    _fake_client(monkeypatch, 403, {"error": "can_audit on cluster:demo refused"}, seen)
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/cluster/privileges", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 403

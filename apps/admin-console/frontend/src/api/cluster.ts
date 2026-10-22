@@ -494,3 +494,35 @@ export function fetchTenantAdministrators() {
     "/cluster/tenant-administrators",
   );
 }
+
+/** The members of the kernel Keycloak group one cluster role is held through. */
+export type PlatformRoleMembers = {
+  role: string;
+  group: string;
+  /** Null where the group could not be read; `unavailable` then says so. */
+  members: TenantAdministrator[] | null;
+  unavailable?: boolean;
+};
+
+/** Who holds each cluster role through its group, from the registrar. Read only. */
+export function fetchPlatformRoleMembers() {
+  return apiFetch<{ cluster: string; complete: boolean; roles: PlatformRoleMembers[] }>(
+    "/cluster/platform-role-members",
+  );
+}
+
+/** One approved privilege exception of one tenant's app, as git has it. */
+export type GrantedPrivilege = {
+  tenant: string;
+  install: string;
+  privilege: string;
+  approver: string;
+  approvedAt: string;
+  reason: string;
+  expiresAt?: string;
+};
+
+/** Every tenant's approved privilege exceptions, from the director. */
+export function fetchGrantedPrivileges() {
+  return apiFetch<{ cluster: string; privileges: GrantedPrivilege[] }>("/cluster/privileges");
+}
