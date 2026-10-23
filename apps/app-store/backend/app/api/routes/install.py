@@ -160,12 +160,21 @@ class ApproveBody(BaseModel):
 
 @router.post("/apps/{catalogue}/{app}/privileges/{kind}/{name}/approve")
 async def approve_privilege(
-    catalogue: str, app: str, kind: str, name: str, body: ApproveBody, ctx: Context = Depends(context)
+    catalogue: str,
+    app: str,
+    kind: str,
+    name: str,
+    body: ApproveBody,
+    ctx: Context = Depends(context),
 ) -> dict[str, Any]:
     """Approve one request the app waits for (store-contract.md §6.4 step 4).
     The director decides whether this person may, by the kind."""
     return await sequence.approve_privilege(
-        ctx, patterns.app_of(_coordinate(catalogue, app)), f"{kind}/{name}", body.reason.strip(), body.expiresAt
+        ctx,
+        patterns.app_of(_coordinate(catalogue, app)),
+        f"{kind}/{name}",
+        body.reason.strip(),
+        body.expiresAt,
     )
 
 
@@ -178,12 +187,20 @@ class RequestBody(BaseModel):
 
 @router.post("/apps/{catalogue}/{app}/privileges/{kind}/{name}/request")
 async def request_privilege(
-    catalogue: str, app: str, kind: str, name: str, body: RequestBody, ctx: Context = Depends(context)
+    catalogue: str,
+    app: str,
+    kind: str,
+    name: str,
+    body: RequestBody,
+    ctx: Context = Depends(context),
 ) -> dict[str, Any]:
     """Ask the security officer for one request the tenant cannot approve
     itself; the security officer's admin console lists it."""
     return await sequence.request_privilege(
-        ctx, patterns.app_of(_coordinate(catalogue, app)), f"{kind}/{name}", (body.note or "").strip() or None
+        ctx,
+        patterns.app_of(_coordinate(catalogue, app)),
+        f"{kind}/{name}",
+        (body.note or "").strip() or None,
     )
 
 

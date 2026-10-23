@@ -58,7 +58,7 @@ from urllib.parse import urlencode, urlsplit
 from app.core.config import Settings
 from app.core.problems import Refusal
 from app.store import client as store_client
-from app.store import models
+from app.store import models, tenant_sign_in
 from app.store.client import USER_AGENT, Store, assert_public, fetch, not_the_format, origin_of
 
 PENDING_TTL_SECONDS = 600
@@ -91,6 +91,9 @@ class Pending:
     # Where in this app the browser goes once the sign-in is done: the page
     # it left, so what the person was doing carries on. A path of this app.
     return_to: str | None = None
+    # Asked with prompt=none (app/store/tenant_sign_in.py): an error at the
+    # issuer sends the browser on to the visible sign-in.
+    silent: bool = False
 
 
 @dataclass
@@ -171,9 +174,27 @@ def return_to(state: str | None) -> str | None:
     return pending.return_to if pending else None
 
 
-async def begin(settings: Settings, store: Store, session: str, back_to: str | None = None) -> str:
+def was_silent(state: str | None, session: str) -> bool:
+    """Whether a pending sign-in of this session asked with prompt=none,
+    looked at before it is completed."""
+    pending = _pending.get(state or "")
+    return bool(pending and pending.silent and secrets.compare_digest(pending.session, session))
+
+
+async def begin(
+    settings: Settings,
+    store: Store,
+    session: str,
+    back_to: str | None = None,
+    *,
+    silent: bool = True,
+) -> str:
     """Start a sign-in for one cluster session: the address to send the
-    person's browser to. `state` and the verifier stay here."""
+    person's browser to. `state` and the verifier stay here.
+
+    Where the store signs people in through the tenant's own realm, the
+    request names the store's provider for this tenant, and `silent` asks
+    with prompt=none first (app/store/tenant_sign_in.py)."""
     redirect_uri, tenant_url = settings.redirect_uri, settings.tenant_url
     if not redirect_uri or not tenant_url:
         raise Refusal(
@@ -217,6 +238,8 @@ async def begin(settings: Settings, store: Store, session: str, back_to: str | N
     if len(_pending) >= MAX_PENDING:
         raise Refusal(status=503, source="app", code="busy")
 
+    idp_hint = tenant_sign_in.hint(settings, meta)
+    silent = silent and idp_hint is not None
     state = secrets.token_urlsafe(32)
     verifier = secrets.token_urlsafe(64)
     _pending[state] = Pending(
@@ -228,6 +251,7 @@ async def begin(settings: Settings, store: Store, session: str, back_to: str | N
         redirect_uri=redirect_uri,
         created=clock(),
         return_to=return_path(back_to),
+        silent=silent,
     )
     query = urlencode(
         {
@@ -239,6 +263,8 @@ async def begin(settings: Settings, store: Store, session: str, back_to: str | N
             "code_challenge": _challenge(verifier),
             "code_challenge_method": "S256",
             "tenant_url": tenant_url,
+            **({"kc_idp_hint": idp_hint} if idp_hint else {}),
+            **({"prompt": "none"} if silent else {}),
         }
     )
     separator = "&" if urlsplit(authorization_endpoint).query else "?"
