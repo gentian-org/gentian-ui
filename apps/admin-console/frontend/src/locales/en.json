@@ -811,6 +811,7 @@
     "conditionReason": "Reason",
     "conditionMessage": "Message",
     "accessTitle": "Access",
+    "accessPlatformManaged": "The platform places and manages this app in every tenant. Who may open it is decided for the cluster, not here.",
     "everyoneIsOn": "This app is for everyone: every member of this tenant has access by default, and people invited later get it pre-selected.",
     "everyoneIsOff": "This app is not for everyone: access is given per person, below.",
     "everyoneSwitchOn": "Make it for everyone",
