@@ -20,7 +20,7 @@ direction, no credential, no database and no Kubernetes access.
 backend/    FastAPI. Reads the store's catalogue and serves it to the bundle; runs the
             sign-in to the store and keeps its token; drives acquire → declare the
             repository → set its credential → install, one step per request.
-frontend/   React. Browse, an app's page, Installed and acquired. The design tokens and
+frontend/   React. The catalogue, and an app's details on top of it. The design tokens and
             the console kit's styles are the Admin Console's.
 chart/      Helm. Two Deployments and two Services, named from fullnameOverride so the
             profile can route to them.
@@ -53,9 +53,9 @@ chart/      Helm. Two Deployments and two Services, named from fullnameOverride 
   show the usher's progress. Every step is asked with the person's own token
   and is safe to repeat; a page loaded in the middle shows where things
   stand, derived from the store, the director and the usher.
-* **Add-ons**: each is a store entry of its own, ticked before Install or
-  switched on and off on its app's page. Its sequence is the app's up to the
-  install, which it skips: its build is pinned in the app's add-ons
+* **Add-ons**: each is a store entry of its own, ticked in its app's
+  details and taken by Install, with the app or beside it once it is there.
+  Its sequence is the app's up to the install, which it skips: its build is pinned in the app's add-ons
   (`PUT .../apps/{app}/addons`), and it waits on the app's rollout and
   approvals. Removing it sends the list without it.
 * **Reviews and the company** (`backend/app/api/routes/account.py`): a
@@ -73,7 +73,7 @@ chart/      Helm. Two Deployments and two Services, named from fullnameOverride 
   repository credentials.
 * **Support** (`backend/app/api/routes/account.py`, store API 1.3,
   `support`): the partners that offer support for an app, as the store lists
-  them, on the app's page. A partner's contact address opens in a separate
+  them, in the app's details. A partner's contact address opens in a separate
   window; a signed-in person may send a request for an offer the store takes
   requests for, with an optional message, and the store says it received it.
   The form says what is passed on: the person's name, e-mail address,
@@ -81,9 +81,16 @@ chart/      Helm. Two Deployments and two Services, named from fullnameOverride 
   country (`TENANT_COUNTRY`) by default; a switch on the page asks for
   another, or for none ("All countries"), and holds for the browser session.
   With no country the store lists what it has.
-* **Installed and acquired**: what the tenant has acquired joined with what
-  is installed; update when the store's newest build is not the one pinned;
-  replace a repository credential, behind a confirmation.
+* **What the tenant has, per app** (`backend/app/api/routes/install.py`):
+  each tile of the catalogue says Install, Buy, Continue or Installed, from
+  what the tenant has acquired joined with what is installed (`/overview`).
+  An app's details show its acquisition and the installation's state;
+  update when the store's newest build is not the one pinned; replace a
+  repository credential, behind a confirmation.
+* **The scorecard** (store API 1.6): the edition, the store's maturity
+  score (0 to 10, as the store defines it), the customization grade and
+  highest rung the profile declares, the reviews' average and the
+  installation count. What the store does not say is said to be missing.
 
 Nothing is uninstalled or purged here. An installed app is administered in
 the Admin Console's Apps tab.

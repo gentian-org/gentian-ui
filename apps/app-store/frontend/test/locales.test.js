@@ -60,7 +60,6 @@ for (const language of LANGUAGES) {
     const entries = catalogue(language);
     const families = {
       edition: ["ce", "pe", "me", "ee"],
-      trustTier: ["platform", "certified", "experimental"],
       stage: ["not-installed", "checkout", "acquired", "installing", "ready", "failing", "installed"],
       acquisition: ["pending", "confirmed", "cancelled", "failed"],
       steps: ["acquire", "checkout", "declare", "credential", "install", "addons", "rollout"],
@@ -69,7 +68,7 @@ for (const language of LANGUAGES) {
       // The definition's open enumerations: the values it names. One it does
       // not name falls back, in the component.
       reportKind: ["security", "quality", "accessibility", "privacy", "license", "other"],
-      links: ["homepage", "documentation", "source", "support", "license", "privacy", "terms", "subscription", "donate"],
+      links: ["homepage", "documentation", "source", "support", "license", "privacy", "terms", "subscription", "donate", "video"],
       score: ["features", "easeOfUse", "easeOfSetup", "support", "value"],
       standing: ["no-reports-for-tenant", "tenant-not-claimed", "reports-stale", "tenant-blocked"],
       problemSource: ["store", "director", "custodian", "usher", "app"],

@@ -7,7 +7,7 @@ API, the file a store is built to and this app calls:
 |---|---|
 | Repository | `gentian-org/gentian-os` |
 | Path | `docs/plans/artefacts/store-api.openapi.yaml` |
-| Copied from commit | `684ff07e91ab60ce3a40cd86ae4ccc99dde0d7f9` (the file's own last change: the same commit; branch `fix/12-store-api-support`, for `test-cb`) |
+| Copied from commit | `9fcde1b9` (version 1.6, the file's own last change: the same commit; branch `fix/403-app-store-role-mgmt`, for `develop`) |
 
 It is copied byte for byte and is not edited here. The definition is changed
 in gentian-os; this copy is replaced when it is, and the row above with it.

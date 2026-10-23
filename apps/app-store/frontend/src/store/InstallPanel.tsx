@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { problemOf, type Problem } from "@/api/client";
 import { Link } from "@tanstack/react-router";
@@ -25,7 +25,7 @@ import {
 import i18n from "@/lib/i18n";
 import { Approvals } from "@/store/Approvals";
 import { coordinateParams } from "@/store/BrowsePage";
-import { ExternalLink, giveBackLink, PriceText, ProblemNote, shortDigest, StoreSignIn } from "@/store/parts";
+import { ExternalLink, PriceText, ProblemNote, shortDigest, StoreSignIn } from "@/store/parts";
 import { useStoreSession } from "@/store/session";
 import { StoreMarkdown } from "@/store/StoreMarkdown";
 
@@ -660,86 +660,471 @@ const nameOf = (coordinate: string) => coordinate.split("/", 2)[1] ?? coordinate
 const PINNED: Stage[] = ["metering", "metering-timeout", "approvals", "rollout", "failing", "done"];
 
 /**
- * The add-ons of an app that is not installed yet, to tick before Install:
- * each is installed with the app, after it.
+ * Replacing a repository's credential, behind a confirmation.
+ *
+ * For when a credential may have leaked. The store mints a new one and this
+ * app hands it to the custodian; the one it replaces keeps working for a day
+ * and is refused after that. It is asked for by a person and never on a
+ * schedule.
  */
-function AddonChoice({
-  addons,
-  chosen,
-  onChange,
+function ReplaceCredentialDialog({
+  app,
+  repositories,
+  storeName,
+  onConfirm,
+  onClose,
 }: {
-  addons: AppDetail["addons"];
-  chosen: string[];
-  onChange: (chosen: string[]) => void;
+  app: string;
+  repositories: { name: string; url: string }[];
+  storeName: string;
+  onConfirm: () => void;
+  onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => dialog?.close();
+  }, []);
   return (
-    <fieldset className="admin-console__fieldset admin-console__fieldset--plain store-addons">
-      <legend className="admin-console__group-title">{t("addons.chooseTitle")}</legend>
-      {addons.map((addon) => (
-        <label key={addon.coordinate} className="admin-console__checkbox">
-          <input
-            type="checkbox"
-            checked={chosen.includes(addon.coordinate)}
-            onChange={(event) =>
-              onChange(
-                event.target.checked
-                  ? [...chosen, addon.coordinate]
-                  : chosen.filter((coordinate) => coordinate !== addon.coordinate),
-              )
-            }
-          />
-          <span>
-            {addon.name}
-            {addon.summary ? <span className="admin-console__meta">{" — "}{addon.summary}</span> : null}
-          </span>
-        </label>
-      ))}
-    </fieldset>
+    <dialog
+      ref={ref}
+      className="admin-console__dialog"
+      aria-labelledby="replace-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <form
+        className="admin-console__dialog-body"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onConfirm();
+        }}
+      >
+        <h3 id="replace-title" className="admin-console__dialog-title">
+          <Trans i18nKey="credential.replaceTitle" values={{ app }} components={mono} />
+        </h3>
+        <p className="admin-console__lead">{t("credential.replaceBody", { store: storeName })}</p>
+        <ul className="store-links">
+          {repositories.map((repository) => (
+            <li key={repository.name}>
+              <span className="admin-console__mono">{repository.url}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="admin-console__hint">{t("credential.rotatedOverlap")}</p>
+        <div className="admin-console__dialog-footer">
+          <button type="button" className="admin-console__btn admin-console__btn--quiet" onClick={onClose}>
+            {t("install.cancel")}
+          </button>
+          <button type="submit" className="admin-console__btn admin-console__btn--danger">
+            {t("credential.replaceAction")}
+          </button>
+        </div>
+      </form>
+    </dialog>
   );
 }
 
 /**
- * One add-on of an installed app: whether the app has it on, and the one act
- * that changes that. Installing is the add-on's own sequence -- acquired at
- * the store, checkout and approvals included -- shown in place.
+ * Everything about having one app, shared by the parts of its details that
+ * show it: the Install button, the installation's status and the add-ons.
  */
-function AddonRow({
-  addon,
-  base,
-  on,
-  answered,
-  queued,
-  autoStart,
-  storeName,
-  onSettled,
-}: {
-  addon: AppDetail["addons"][number];
-  base: AppDetail;
-  on: boolean;
-  answered: Operation | null;
-  /** Ticked with the app's install, and not gone in yet. */
-  queued: boolean;
-  /** Its turn: start without being asked. */
-  autoStart: boolean;
+type InstallModel = {
+  detail: AppDetail;
   storeName: string;
-  /** Its build is pinned, or it stopped: the next one may go. */
-  onSettled: (coordinate: string) => void;
+  state: AppStateAnswer | undefined;
+  stateQuery: UseQueryResult<AppStateAnswer>;
+  sequence: ReturnType<typeof useSequence>;
+  /** The add-ons ticked and not gone in yet, and those still to go in. */
+  chosen: string[];
+  setChosen: (chosen: string[]) => void;
+  queued: string[];
+  settled: (addon: string) => void;
+  /** The app's own build and add-ons are pinned: an add-on may go in beside them. */
+  appPinned: boolean;
+  activeAddons: string[];
+  signedIn: boolean;
+  refused: boolean;
+  ask: (mode: "install" | "update") => void;
+  installAddons: () => void;
+};
+
+const InstallContext = createContext<InstallModel | null>(null);
+
+function useInstall(): InstallModel {
+  const model = useContext(InstallContext);
+  if (!model) throw new Error("useInstall outside an InstallScope");
+  return model;
+}
+
+/**
+ * What the tenant has of one app, and getting it: asked of the cluster and
+ * the store once, and shown by the parts of the details placed inside.
+ * `autoInstall` asks for the install as soon as it is known the app is not
+ * installed: the details were opened by a tile's Install or Buy.
+ */
+export function InstallScope({
+  detail,
+  storeName,
+  autoInstall,
+  children,
+}: {
+  detail: AppDetail;
+  storeName: string;
+  autoInstall?: boolean;
+  children: ReactNode;
 }) {
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
   const { session } = useStoreSession();
-  const signedIn = session?.signedIn === true;
-  const detailQuery = useQuery({
-    queryKey: ["store", "app", addon.coordinate],
-    queryFn: () => fetchApp(addon.coordinate),
+  const coordinate = detail.coordinate;
+  const latest = detail.versions[0];
+
+  const stateQuery = useQuery({
+    queryKey: ["state", coordinate],
+    queryFn: () => fetchAppState(coordinate),
     retry: false,
   });
-  const sequence = useSequence(addon.coordinate, base.coordinate, answered);
+
+  const [dialog, setDialog] = useState<"install" | "update" | null>(null);
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [queued, setQueued] = useState<string[]>([]);
+  const sequence = useSequence(coordinate, coordinate, stateQuery.data?.operation ?? null);
+  const { operation, start, setStepError, setWantsSignIn } = sequence;
+
+  const state = stateQuery.data;
+  const standing = session?.signedIn ? session.standing : null;
+  const refused = standing !== null && !standing.served;
+  const signedIn = session?.signedIn === true;
+  const installed = state?.installed ?? null;
+  const appPinned = (installed !== null || Boolean(operation?.install)) && (!operation || PINNED.includes(operation.stage));
+  const activeAddons = installed?.addons ?? [];
+
+  const begin = (mode: "install" | "update", everyone: boolean) => {
+    setDialog(null);
+    setStepError(null);
+    if (mode === "install") {
+      setQueued(chosen);
+      setChosen([]);
+    }
+    start.mutate({
+      mode,
+      forEveryone: everyone,
+      expectedDigest: latest.digest,
+      ...(mode === "update" ? { version: latest.version } : {}),
+      ...(state?.acquisition ? { acquisitionId: state.acquisition.id } : {}),
+    });
+  };
+
+  const ask = (mode: "install" | "update") => {
+    if (!signedIn) {
+      setWantsSignIn(true);
+      return;
+    }
+    setDialog(mode);
+  };
+
+  // The add-ons ticked beside an installed app go in one at a time, as the
+  // director replaces the list whole.
+  const installAddons = () => {
+    if (!signedIn) {
+      setWantsSignIn(true);
+      return;
+    }
+    setQueued((now) => [...now, ...chosen.filter((c) => !now.includes(c) && !activeAddons.includes(nameOf(c)))]);
+    setChosen([]);
+  };
+
+  const settled = useCallback((addon: string) => setQueued((now) => now.filter((c) => c !== addon)), []);
+
+  // Opened by a tile's Install or Buy: asked once, when it is known that the
+  // app is not installed and nothing is under way. Not before the store
+  // session is known, so a person signed in is not asked to sign in.
+  const asked = useRef(false);
+  const sessionKnown = session !== undefined;
+  useEffect(() => {
+    if (!autoInstall || asked.current || !state || !sessionKnown || operation || state.installed || detail.addonOf) return;
+    asked.current = true;
+    ask("install");
+  });
+
+  const model: InstallModel = {
+    detail,
+    storeName,
+    state,
+    stateQuery,
+    sequence,
+    chosen,
+    setChosen,
+    queued,
+    settled,
+    appPinned,
+    activeAddons,
+    signedIn,
+    refused,
+    ask,
+    installAddons,
+  };
+
+  return (
+    <InstallContext.Provider value={model}>
+      {children}
+      {dialog ? (
+        <InstallDialog
+          detail={detail}
+          version={latest}
+          update={dialog === "update"}
+          addons={dialog === "install" ? detail.addons.filter((a) => chosen.includes(a.coordinate)).map((a) => a.name) : []}
+          onClose={() => setDialog(null)}
+          onConfirm={(everyone) => begin(dialog, everyone)}
+        />
+      ) : null}
+    </InstallContext.Provider>
+  );
+}
+
+/**
+ * The one button that gets the app: Install, or Buy for one that is sold
+ * and not acquired yet. Greyed out once the app is installed, and blue
+ * again when an add-on it does not have yet is ticked.
+ */
+export function InstallButton() {
+  const { t } = useTranslation();
+  const { detail, state, sequence, chosen, activeAddons, appPinned, refused, ask, installAddons } = useInstall();
+  if (detail.addonOf) return null;
+  const operation = sequence.operation;
+  const installed = state?.installed ?? null;
+  const newAddons = chosen.filter((c) => !activeAddons.includes(nameOf(c)));
+
+  if (installed) {
+    const more = newAddons.length > 0 && appPinned;
+    return (
+      <button
+        type="button"
+        className={`admin-console__btn store-install__action${more ? " admin-console__btn--primary" : ""}`}
+        disabled={!more || sequence.busy || refused}
+        onClick={installAddons}
+      >
+        {more ? t("install.installAction") : t("install.installed")}
+      </button>
+    );
+  }
+  const stage = state?.stage;
+  const label =
+    stage === "checkout"
+      ? t("install.continue")
+      : stage === "acquired" || detail.price.model === "free"
+        ? t("install.installAction")
+        : t("install.buyAction");
+  return (
+    <button
+      type="button"
+      className="admin-console__btn admin-console__btn--primary store-install__action"
+      disabled={!state || Boolean(operation) || sequence.busy || refused}
+      onClick={() => ask("install")}
+    >
+      {label}
+    </button>
+  );
+}
+
+/**
+ * How the installation stands: a sequence under way, with the approvals it
+ * waits for, or what the cluster and the store say of the app.
+ */
+export function InstallStatus() {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { detail, storeName, state, stateQuery, sequence, signedIn, refused, ask } = useInstall();
+  const { operation, advance, stop, busy, stepError, setStepError, wantsSignIn } = sequence;
+  const contextQuery = useQuery({ queryKey: ["context"], queryFn: fetchContext, retry: false });
+  const credential = useMutation({ mutationFn: ({ id, rotate }: { id: string; rotate: boolean }) => setCredential(id, rotate) });
+  const [replacing, setReplacing] = useState(false);
+  const coordinate = detail.coordinate;
+  const latest = detail.versions[0];
+
+  if (operation) {
+    return (
+      <Progress
+        detail={detail}
+        operation={operation}
+        storeName={storeName}
+        // An add-on's sequence, looked at from the add-on's own details.
+        base={operation.addonOf && detail.addonOf ? { coordinate: detail.addonOf, name: detail.addonOf } : undefined}
+        busy={busy}
+        error={stepError}
+        onAdvance={(request) => {
+          setStepError(null);
+          advance.mutate(request);
+        }}
+        onStop={() => stop.mutate()}
+      />
+    );
+  }
+  if (stateQuery.isLoading) return <p className="admin-console__loading">{t("install.loadingState")}</p>;
+  if (!state) return <ProblemNote error={stateQuery.error} />;
+  if (detail.addonOf) {
+    // An add-on goes in its app, and is installed from that app's details.
+    return (
+      <p className="admin-console__lead">
+        {t("addons.installedFromApp")}{" "}
+        <Link to="/app/$catalogue/$app" params={coordinateParams(detail.addonOf)} className="admin-console__btn-link">
+          {t("addons.openApp")}
+        </Link>
+      </p>
+    );
+  }
+
+  const installed = state.installed;
+  const acquisition = state.acquisition;
+  const updateAvailable = installed !== null && installed.digest !== null && installed.digest !== latest.digest;
+  return (
+    <>
+      {Object.entries(state.clusterProblems).map(([service, problem]) => (
+        <ProblemNote key={service} problem={problem} />
+      ))}
+      {state.storeProblem ? <ProblemNote problem={state.storeProblem} /> : null}
+
+      {installed ? (
+        <>
+          <p className="store-install__status">
+            <span className={`admin-console__badge admin-console__badge--${state.stage === "ready" ? "ok" : state.stage === "failing" ? "danger" : "info"}`}>
+              {t(`stage.${state.stage}`)}
+            </span>
+            {installed.forEveryone ? <span className="admin-console__chip">{t("install.forEveryone")}</span> : null}
+          </p>
+          {installed.digest ? (
+            <p className="admin-console__meta">
+              {t("install.pinnedBuild")} <span className="admin-console__mono" title={installed.digest}>{shortDigest(installed.digest)}</span>
+            </p>
+          ) : (
+            <p className="admin-console__meta">{t("install.notPinned")}</p>
+          )}
+          {state.stage !== "ready" ? <ClusterState state={state.state} /> : null}
+          {state.stage === "installing" && (state.state?.pendingPrivilegeApprovals?.length ?? 0) > 0 ? (
+            // The same step as in a sequence under way: details opened
+            // again show what the app waits on and let the person act.
+            <Approvals
+              coordinate={coordinate}
+              approvals={state.state?.pendingPrivilegeApprovals ?? []}
+              onChanged={() => void queryClient.invalidateQueries({ queryKey: ["state", coordinate] })}
+            />
+          ) : null}
+          {state.stage === "ready" ? <p className="admin-console__meta">{t("install.doneTile")}</p> : null}
+          {state.stage === "failing" && acquisition && acquisition.repositories.length > 0 ? (
+            <div className="admin-console__actions">
+              <button
+                type="button"
+                className="admin-console__btn"
+                disabled={credential.isPending}
+                onClick={() => credential.mutate({ id: acquisition.id, rotate: false })}
+              >
+                {t("credential.setAgain")}
+              </button>
+            </div>
+          ) : null}
+          {updateAvailable && !state.mayUpdate ? (
+            <div className="store-notice" role="note">
+              <p className="store-notice__title">{t("install.updateAvailable", { version: latest.version })}</p>
+              <p className="store-notice__text">
+                {installed.updateMode === "latest" ? t("install.updateByPlatform") : t("install.updateByCluster")}
+              </p>
+            </div>
+          ) : null}
+          {updateAvailable && state.mayUpdate ? (
+            <div className="store-notice" role="note">
+              <p className="store-notice__title">{t("install.updateAvailable", { version: latest.version })}</p>
+              {acquisition ? (
+                <div className="admin-console__actions">
+                  <button type="button" className="admin-console__btn admin-console__btn--primary" disabled={busy || refused} onClick={() => ask("update")}>
+                    {t("install.updateAction")}
+                  </button>
+                </div>
+              ) : (
+                <p className="store-notice__text">{signedIn ? t("install.updateNeedsAcquisition") : t("install.updateNeedsSignIn")}</p>
+              )}
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <>
+          {state.stage === "acquired" ? <p className="admin-console__lead">{t("install.acquiredNotInstalled")}</p> : null}
+          {state.stage === "checkout" ? <p className="admin-console__lead">{t("install.checkoutOpen", { store: storeName })}</p> : null}
+          {refused ? <p className="admin-console__hint">{t("install.refusedByStore")}</p> : null}
+          {state.stage === "not-installed" ? <p className="admin-console__meta">{t("install.twoWays")}</p> : null}
+        </>
+      )}
+
+      {/* The tenant's acquisition at the store, and its repository credential. */}
+      {acquisition ? (
+        <p className="admin-console__meta">
+          {t("install.acquisition")} {t(`acquisition.${acquisition.status}`)}
+          {acquisition.version ? ` · ${acquisition.version}` : ""}
+        </p>
+      ) : null}
+      {acquisition && acquisition.status === "confirmed" && acquisition.repositories.length > 0 ? (
+        <div className="admin-console__actions">
+          <button type="button" className="admin-console__btn admin-console__btn--quiet" disabled={credential.isPending} onClick={() => setReplacing(true)}>
+            {t("credential.replaceAction")}
+          </button>
+        </div>
+      ) : null}
+      {credential.data ? <CredentialOutcomeNote outcome={credential.data} /> : null}
+      {credential.error ? <ProblemNote error={credential.error} /> : null}
+      {replacing && acquisition ? (
+        <ReplaceCredentialDialog
+          app={detail.name}
+          repositories={acquisition.repositories}
+          storeName={storeName}
+          onClose={() => setReplacing(false)}
+          onConfirm={() => {
+            setReplacing(false);
+            credential.mutate({ id: acquisition.id, rotate: true });
+          }}
+        />
+      ) : null}
+
+      {installed ? (
+        <p className="admin-console__meta">
+          {t("install.administeredInConsole")}{" "}
+          <ExternalLink href={contextQuery.data?.adminConsoleUrl}>{t("install.openAdminConsole")}</ExternalLink>
+        </p>
+      ) : null}
+
+      {wantsSignIn && !signedIn ? <StoreSignIn reason={t("session.neededToAcquire", { store: storeName })} storeName={storeName} /> : null}
+      {stepError ? <ProblemNote error={stepError} /> : null}
+    </>
+  );
+}
+
+/**
+ * One add-on of the app: ticked to go in, on, or going in -- its own
+ * sequence, acquired at the store, checkout and approvals included, shown
+ * in place. Its Details open in place too.
+ */
+function AddonRow({ addon }: { addon: AppDetail["addons"][number] }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const model = useInstall();
+  const { detail: base, storeName, state, chosen, setChosen, queued, appPinned, activeAddons, settled, signedIn, refused } = model;
+  const coordinate = addon.coordinate;
+  const on = activeAddons.includes(nameOf(coordinate));
+  const isQueued = queued.includes(coordinate);
+  const autoStart = appPinned && queued[0] === coordinate;
+  const answered = state?.addonOperations?.find((op) => op.coordinate === coordinate) ?? null;
+  const [open, setOpen] = useState(false);
+  const detailQuery = useQuery({
+    queryKey: ["store", "app", coordinate],
+    queryFn: () => fetchApp(coordinate),
+    retry: false,
+  });
+  const sequence = useSequence(coordinate, base.coordinate, answered);
   const { operation, start, advance, stop, busy, stepError, setStepError } = sequence;
   const [confirmRemove, setConfirmRemove] = useState(false);
   const remove = useMutation({
-    mutationFn: () => removeAddon(base.coordinate, addon.coordinate),
+    mutationFn: () => removeAddon(base.coordinate, coordinate),
     onSuccess: () => {
       setConfirmRemove(false);
       void queryClient.invalidateQueries({ queryKey: ["state", base.coordinate] });
@@ -754,7 +1139,7 @@ function AddonRow({
     start.mutate({ mode: "install", forEveryone: false, expectedDigest: latest.digest, addonOf: base.coordinate });
   }, [latest, start, setStepError, base.coordinate]);
 
-  // Ticked before Install: started once, when its turn comes.
+  // Ticked: started once, when its turn comes.
   const started = useRef(false);
   useEffect(() => {
     if (!autoStart || started.current || operation || on || !latest) return;
@@ -766,50 +1151,61 @@ function AddonRow({
   useEffect(() => {
     if (!autoStart) return;
     if ((operation && (operation.addons || operation.stage === "failed")) || stepError || (on && !operation)) {
-      onSettled(addon.coordinate);
+      settled(coordinate);
     }
-  }, [autoStart, operation, stepError, on, onSettled, addon.coordinate]);
+  }, [autoStart, operation, stepError, on, settled, coordinate]);
 
+  const ticked = on || isQueued || chosen.includes(coordinate);
+  const description = detail?.description || addon.summary;
   return (
     <li className="store-addon">
       <div className="store-addon__head">
-        <div className="store-addon__main">
-          <p className="admin-console__card-title">
-            <Link to="/app/$catalogue/$app" params={coordinateParams(addon.coordinate)} className="admin-console__btn-link">
-              {addon.name}
-            </Link>
-          </p>
-          {detail ? (
-            <p className="admin-console__meta">
-              <PriceText price={detail.price} />
-            </p>
+        <label className="admin-console__checkbox store-addon__main">
+          <input
+            type="checkbox"
+            checked={ticked}
+            disabled={on || isQueued || Boolean(operation) || refused}
+            onChange={(event) =>
+              setChosen(event.target.checked ? [...chosen, coordinate] : chosen.filter((c) => c !== coordinate))
+            }
+          />
+          <span>
+            <span className="admin-console__card-title">{addon.name}</span>
+            {detail ? (
+              <span className="admin-console__meta">
+                {" — "}
+                <PriceText price={detail.price} />
+              </span>
+            ) : null}
+            {addon.summary ? <span className="admin-console__meta store-addon__summary">{addon.summary}</span> : null}
+          </span>
+        </label>
+        <div className="store-addon__act">
+          {on && !operation ? <span className="admin-console__badge admin-console__badge--ok">{t("addons.on")}</span> : null}
+          {isQueued && !operation ? <span className="admin-console__chip">{t("addons.queued")}</span> : null}
+          <button type="button" className="admin-console__btn admin-console__btn--quiet" aria-expanded={open} onClick={() => setOpen(!open)}>
+            {t("app.details")}
+          </button>
+        </div>
+      </div>
+
+      {open ? (
+        <div className="store-addon__details">
+          {description ? <StoreMarkdown source={description} /> : null}
+          {on && !operation ? (
+            <div className="admin-console__actions">
+              <button
+                type="button"
+                className="admin-console__btn admin-console__btn--quiet"
+                disabled={remove.isPending}
+                onClick={() => setConfirmRemove(true)}
+              >
+                {t("addons.remove")}
+              </button>
+            </div>
           ) : null}
         </div>
-        {operation ? null : on ? (
-          <div className="store-addon__act">
-            <span className="admin-console__badge admin-console__badge--ok">{t("addons.on")}</span>
-            <button
-              type="button"
-              className="admin-console__btn admin-console__btn--quiet"
-              disabled={remove.isPending}
-              onClick={() => setConfirmRemove(true)}
-            >
-              {t("addons.remove")}
-            </button>
-          </div>
-        ) : (
-          <div className="store-addon__act">
-            <button
-              type="button"
-              className="admin-console__btn"
-              disabled={busy || !latest || queued}
-              onClick={() => (signedIn ? begin() : sequence.setWantsSignIn(true))}
-            >
-              {queued ? t("addons.queued") : t("addons.install")}
-            </button>
-          </div>
-        )}
-      </div>
+      ) : null}
 
       {confirmRemove && !operation ? (
         <div className="admin-console__warning" role="alert">
@@ -850,254 +1246,22 @@ function AddonRow({
 }
 
 /**
- * Everything about having this app: whether the tenant has it, getting it,
- * and how the cluster is doing with it.
+ * The app's add-ons, each to tick before Install: with an app that is not
+ * installed they go in after it; beside one that is, Install takes them.
  */
-export function InstallPanel({ detail, storeName }: { detail: AppDetail; storeName: string }) {
+export function AddonSection() {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const { session } = useStoreSession();
-  const coordinate = detail.coordinate;
-  const latest = detail.versions[0];
-
-  const stateQuery = useQuery({
-    queryKey: ["state", coordinate],
-    queryFn: () => fetchAppState(coordinate),
-    retry: false,
-  });
-  const contextQuery = useQuery({ queryKey: ["context"], queryFn: fetchContext, retry: false });
-
-  const [dialog, setDialog] = useState<"install" | "update" | null>(null);
-  // The add-ons ticked before Install, and those still to go in after it.
-  const [chosen, setChosen] = useState<string[]>([]);
-  const [queued, setQueued] = useState<string[]>([]);
-  const sequence = useSequence(coordinate, coordinate, stateQuery.data?.operation ?? null);
-  const { operation, start, advance, stop, busy, stepError, setStepError, wantsSignIn, setWantsSignIn } = sequence;
-  const credential = useMutation({ mutationFn: (id: string) => setCredential(id, false) });
-
-  const state = stateQuery.data;
-  const standing = session?.signedIn ? session.standing : null;
-  const refused = standing !== null && !standing.served;
-  const signedIn = session?.signedIn === true;
-
-  const begin = (mode: "install" | "update", everyone: boolean) => {
-    setDialog(null);
-    setStepError(null);
-    if (mode === "install") setQueued(chosen);
-    start.mutate({
-      mode,
-      forEveryone: everyone,
-      expectedDigest: latest.digest,
-      ...(mode === "update" ? { version: latest.version } : {}),
-      ...(state?.acquisition ? { acquisitionId: state.acquisition.id } : {}),
-    });
-  };
-
-  const ask = (mode: "install" | "update") => {
-    if (!signedIn) {
-      setWantsSignIn(true);
-      return;
-    }
-    setDialog(mode);
-  };
-
-  const settled = useCallback((addon: string) => setQueued((now) => now.filter((c) => c !== addon)), []);
-
-  // The app's add-ons are offered once git has the app and its own sequence
-  // has pinned what it pins: one at a time, as the director replaces the list whole.
-  const installed = state?.installed ?? null;
-  const appPinned = (installed !== null || Boolean(operation?.install)) && (!operation || PINNED.includes(operation.stage));
-  const activeAddons = installed?.addons ?? [];
-  const addonOperations = state?.addonOperations ?? [];
-  const addonsSection =
-    detail.addons.length > 0 && appPinned ? (
-      <section className="store-addons">
-        <h3 className="admin-console__group-title">{t("app.addons")}</h3>
-        <ul className="store-addons__list">
-          {detail.addons.map((addon) => (
-            <AddonRow
-              key={addon.coordinate}
-              addon={addon}
-              base={detail}
-              on={activeAddons.includes(nameOf(addon.coordinate))}
-              answered={addonOperations.find((op) => op.coordinate === addon.coordinate) ?? null}
-              queued={queued.includes(addon.coordinate)}
-              autoStart={queued[0] === addon.coordinate}
-              storeName={storeName}
-              onSettled={settled}
-            />
-          ))}
-        </ul>
-      </section>
-    ) : null;
-
-  let body: React.ReactNode;
-  if (operation) {
-    body = (
-      <Progress
-        detail={detail}
-        operation={operation}
-        storeName={storeName}
-        // An add-on's sequence, looked at from the add-on's own page.
-        base={operation.addonOf && detail.addonOf ? { coordinate: detail.addonOf, name: detail.addonOf } : undefined}
-        busy={busy}
-        error={stepError}
-        onAdvance={(request) => {
-          setStepError(null);
-          advance.mutate(request);
-        }}
-        onStop={() => stop.mutate()}
-      />
-    );
-  } else if (stateQuery.isLoading) {
-    body = <p className="admin-console__loading">{t("install.loadingState")}</p>;
-  } else if (!state) {
-    body = <ProblemNote error={stateQuery.error} />;
-  } else if (detail.addonOf) {
-    // An add-on goes in its app, and is installed from that app's page.
-    body = (
-      <p className="admin-console__lead">
-        {t("addons.installedFromApp")}{" "}
-        <Link to="/app/$catalogue/$app" params={coordinateParams(detail.addonOf)} className="admin-console__btn-link">
-          {t("addons.openApp")}
-        </Link>
-      </p>
-    );
-  } else {
-    const updateAvailable = installed !== null && installed.digest !== null && installed.digest !== latest.digest;
-    body = (
-      <>
-        {Object.entries(state.clusterProblems).map(([service, problem]) => (
-          <ProblemNote key={service} problem={problem} />
-        ))}
-        {state.storeProblem ? <ProblemNote problem={state.storeProblem} /> : null}
-
-        {installed ? (
-          <>
-            <p className="store-install__status">
-              <span className={`admin-console__badge admin-console__badge--${state.stage === "ready" ? "ok" : state.stage === "failing" ? "danger" : "info"}`}>
-                {t(`stage.${state.stage}`)}
-              </span>
-              {installed.forEveryone ? <span className="admin-console__chip">{t("install.forEveryone")}</span> : null}
-            </p>
-            {installed.digest ? (
-              <p className="admin-console__meta">
-                {t("install.pinnedBuild")} <span className="admin-console__mono" title={installed.digest}>{shortDigest(installed.digest)}</span>
-              </p>
-            ) : (
-              <p className="admin-console__meta">{t("install.notPinned")}</p>
-            )}
-            {state.stage !== "ready" ? <ClusterState state={state.state} /> : null}
-            {state.stage === "installing" && (state.state?.pendingPrivilegeApprovals?.length ?? 0) > 0 ? (
-              // The same step as in a sequence under way: a page opened
-              // again shows what the app waits on and lets the person act.
-              <Approvals
-                coordinate={coordinate}
-                approvals={state.state?.pendingPrivilegeApprovals ?? []}
-                onChanged={() => void queryClient.invalidateQueries({ queryKey: ["state", coordinate] })}
-              />
-            ) : null}
-            {state.stage === "ready" ? <p className="admin-console__meta">{t("install.doneTile")}</p> : null}
-            {state.stage === "failing" && state.acquisition && state.acquisition.repositories.length > 0 ? (
-              <div className="admin-console__actions">
-                <button
-                  type="button"
-                  className="admin-console__btn"
-                  disabled={credential.isPending}
-                  onClick={() => state.acquisition && credential.mutate(state.acquisition.id)}
-                >
-                  {t("credential.setAgain")}
-                </button>
-              </div>
-            ) : null}
-            {credential.data ? <CredentialOutcomeNote outcome={credential.data} /> : null}
-            {credential.error ? <ProblemNote error={credential.error} /> : null}
-            {updateAvailable && !state.mayUpdate ? (
-              <div className="store-notice" role="note">
-                <p className="store-notice__title">{t("install.updateAvailable", { version: latest.version })}</p>
-                <p className="store-notice__text">
-                  {installed.updateMode === "latest" ? t("install.updateByPlatform") : t("install.updateByCluster")}
-                </p>
-              </div>
-            ) : null}
-            {updateAvailable && state.mayUpdate ? (
-              <div className="store-notice" role="note">
-                <p className="store-notice__title">{t("install.updateAvailable", { version: latest.version })}</p>
-                {state.acquisition ? (
-                  <div className="admin-console__actions">
-                    <button type="button" className="admin-console__btn admin-console__btn--primary" disabled={busy || refused} onClick={() => ask("update")}>
-                      {t("install.updateAction")}
-                    </button>
-                  </div>
-                ) : (
-                  <p className="store-notice__text">{signedIn ? t("install.updateNeedsAcquisition") : t("install.updateNeedsSignIn")}</p>
-                )}
-              </div>
-            ) : null}
-            <p className="admin-console__meta">
-              {t("install.administeredInConsole")}{" "}
-              <ExternalLink href={contextQuery.data?.adminConsoleUrl}>{t("install.openAdminConsole")}</ExternalLink>
-            </p>
-          </>
-        ) : (
-          <>
-            {state.stage === "acquired" ? <p className="admin-console__lead">{t("install.acquiredNotInstalled")}</p> : null}
-            {state.stage === "checkout" ? <p className="admin-console__lead">{t("install.checkoutOpen", { store: storeName })}</p> : null}
-            {detail.addons.length > 0 ? <AddonChoice addons={detail.addons} chosen={chosen} onChange={setChosen} /> : null}
-            <div className="admin-console__actions">
-              <button
-                type="button"
-                className="admin-console__btn admin-console__btn--primary"
-                disabled={busy || refused}
-                onClick={() => ask("install")}
-              >
-                {state.stage === "checkout" ? t("install.continue") : t("install.installAction")}
-              </button>
-            </div>
-            {refused ? <p className="admin-console__hint">{t("install.refusedByStore")}</p> : null}
-            {state.stage === "not-installed" ? <p className="admin-console__meta">{t("install.twoWays")}</p> : null}
-          </>
-        )}
-
-        {wantsSignIn && !signedIn ? <StoreSignIn reason={t("session.neededToAcquire", { store: storeName })} storeName={storeName} /> : null}
-        {stepError ? <ProblemNote error={stepError} /> : null}
-      </>
-    );
-  }
-
-  // A community or maintained edition is not sold: where the panel of an
-  // enterprise edition has its price, theirs says where to give back.
-  const giveBack = giveBackLink(detail.edition, detail.links);
-
+  const { detail, state } = useInstall();
+  if (detail.addons.length === 0) return null;
   return (
-    <aside className={`store-install store-install--${detail.edition}`}>
-      <h2 className="admin-console__subsection-title">{t("install.heading")}</h2>
-      {body}
-      {addonsSection}
-      {giveBack ? (
-        <div className="store-giveback">
-          <a
-            className="admin-console__btn store-giveback__btn"
-            href={giveBack.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={giveBack.label ?? undefined}
-          >
-            {giveBack.rel === "donate" ? t("install.donate") : t("install.supportProject")}
-          </a>
-          {giveBack.label ? <p className="admin-console__meta store-giveback__label">{giveBack.label}</p> : null}
-        </div>
-      ) : null}
-      {dialog ? (
-        <InstallDialog
-          detail={detail}
-          version={latest}
-          update={dialog === "update"}
-          addons={dialog === "install" ? detail.addons.filter((a) => chosen.includes(a.coordinate)).map((a) => a.name) : []}
-          onClose={() => setDialog(null)}
-          onConfirm={(everyone) => begin(dialog, everyone)}
-        />
-      ) : null}
-    </aside>
+    <section className="admin-console__subsection store-addons">
+      <h2 className="admin-console__subsection-title">{t("app.addons")}</h2>
+      <p className="admin-console__meta">{state?.installed ? t("addons.tickToAdd") : t("addons.chooseTitle")}</p>
+      <ul className="store-addons__list">
+        {detail.addons.map((addon) => (
+          <AddonRow key={addon.coordinate} addon={addon} />
+        ))}
+      </ul>
+    </section>
   );
 }

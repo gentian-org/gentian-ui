@@ -366,8 +366,63 @@ a.admin-console__btn {
   color: var(--gtn-ink-4);
 }
 
+.store-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.store-card__actions [aria-disabled="true"] {
+  opacity: 0.6;
+}
+
 .store-chip--after {
   margin-left: 0.4rem;
+}
+
+/* ── An app's details, on top of the catalogue ─────────────────────────── */
+
+.admin-console__dialog.store-details {
+  width: min(72rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+}
+
+.store-details__bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem 0.75rem;
+  background: var(--gtn-paper-1);
+  border-bottom: 1px solid var(--gtn-border-faint);
+}
+
+.store-details__body {
+  padding: 0 1.25rem 1.25rem;
+}
+
+.store-install__actions {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
+.store-scorecard__list {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.4rem 0.75rem;
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.store-scorecard__list dt {
+  color: var(--gtn-ink-4);
+}
+
+.store-scorecard__list dd {
+  margin: 0;
+  color: var(--gtn-ink-2);
 }
 
 /* ── An app's page ───────────────────────────────────────────────────────── */
@@ -993,8 +1048,8 @@ a.admin-console__btn {
   margin: 0;
 }
 
-/* An app's add-ons, in its install panel: ticked before Install, or each
-   switched on and off in place once the app is there. */
+/* An app's add-ons, in its details: ticked before Install, beside an app
+   that is not there yet or one that is; each one's Details open in place. */
 .store-addons {
   margin: 0.75rem 0;
   min-width: 0;
@@ -1037,4 +1092,13 @@ a.admin-console__btn {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.store-addon__summary {
+  display: block;
+}
+
+.store-addon__details {
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--gtn-border-faint);
 }

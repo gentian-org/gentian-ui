@@ -398,3 +398,37 @@ def test_there_is_no_cors(api, store):
         headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "POST"},
     )
     assert not [h for h in preflight.headers if h.lower().startswith("access-control-")]
+
+
+def test_the_scorecard_travels_as_the_store_said_it(api, store):
+    """Store API 1.6: a maturity score, an installation count and the
+    customization grade and rungs, handed on as the store said them."""
+    detail = api.get("/api/v1/store/apps/gentian/nextcloud-base-ee", headers=ALICE).json()
+    assert detail["maturityScore"] == 7 and detail["installations"] == 120
+    assert detail["customization"] == {"grade": "A", "rungs": ["L0", "L1", "L3", "L4"]}
+    video = {
+        "rel": "video",
+        "label": "Getting started",
+        "url": "https://www.youtube.com/watch?v=example",
+    }
+    assert video in detail["links"]
+
+
+def test_a_store_before_the_scorecard_is_read_without_one(api, store, monkeypatch):
+    detail = store.contract.example("AppDetail")
+    for key in ("maturityScore", "installations", "customization"):
+        detail.pop(key)
+    monkeypatch.setattr(store.contract, "example", lambda name: detail)
+    answer = api.get("/api/v1/store/apps/gentian/nextcloud-base-ee", headers=ALICE).json()
+    assert answer["maturityScore"] is None and answer["installations"] is None
+    assert answer["customization"] is None
+
+
+def test_a_score_outside_zero_to_ten_is_not_the_format(api, store, monkeypatch):
+    detail = store.contract.example("AppDetail")
+    detail["maturityScore"] = 11
+    monkeypatch.setattr(store.contract, "example", lambda name: detail)
+    answer = api.get("/api/v1/store/apps/gentian/nextcloud-base-ee", headers=ALICE)
+    assert answer.status_code >= 500
+    # Answered outside the definition on purpose.
+    store.violations.clear()

@@ -7,10 +7,7 @@
   },
   "shell": {
     "loading": "App Store wird geladen …",
-    "sections": "Bereiche des App Store",
     "storeAwayClusterStays": "Was auf diesem Cluster installiert ist, ist davon nicht betroffen und wird weiterhin angezeigt.",
-    "tabBrowse": "Stöbern",
-    "tabInstalled": "Installiert und erworben",
     "tenant": "Mandant: {{tenant}}",
     "theStore": "der Store",
     "title": "App Store"
@@ -29,7 +26,6 @@
   },
   "session": {
     "endedSignInAgain": "Ihre Anmeldung bei {{store}} ist beendet. Melden Sie sich erneut an, um fortzufahren; nichts von dem, was getan wurde, geht verloren.",
-    "neededForAcquisitions": "Was dieser Mandant erworben hat, wird bei {{store}} geführt. Melden Sie sich dort mit Ihrem Konto beim Store an, um es zu sehen. Es ist ein anderes Konto als das, mit dem Sie an diesem Cluster angemeldet sind.",
     "neededToAcquire": "Eine App wird bei {{store}} erworben, mit Ihrem Konto dort. Es ist ein anderes Konto als das, mit dem Sie an diesem Cluster angemeldet sind.",
     "openSignIn": "Anmeldung bei {{store}} öffnen",
     "opensAt": "Die Anmeldung öffnet sich in einem eigenen Fenster, bei",
@@ -82,11 +78,6 @@
     "me": "Gepflegt",
     "pe": "Privat"
   },
-  "trustTier": {
-    "certified": "zertifiziert",
-    "experimental": "experimentell",
-    "platform": "Plattform"
-  },
   "price": {
     "free": "Kostenlos",
     "oneTime": "{{amount}}, einmalig",
@@ -103,10 +94,8 @@
   "app": {
     "addonOf": "Ein Add-on von",
     "addons": "Add-ons",
-    "backToCatalogue": "Zurück zum Katalog",
     "latestVersion": "Version {{version}}",
     "license": "Lizenz:",
-    "links": "Links",
     "listPrice": "Dies ist der Listenpreis. Was diesem Mandanten berechnet wird, sagt der Checkout beim Store.",
     "loading": "App wird geladen …",
     "moreReviews": "Weitere Bewertungen",
@@ -115,18 +104,15 @@
     "releaseNotes": "Versionshinweise",
     "reports": "Prüfungen und Berichte",
     "reportsLead": "Dokumente, die jemand über diese App geschrieben hat. Der Store nennt, wer sie ausgestellt hat; er bürgt nicht für sie, und nichts auf dem Cluster liest sie.",
-    "requiresCpu": "CPU {{quantity}}",
-    "requiresMemory": "Arbeitsspeicher {{quantity}}",
-    "requiresPlatform": "Gentian OS {{range}}",
-    "requiresStorage": "Speicher {{quantity}}",
     "reviewCount_one": "{{count}} Bewertung",
     "reviewCount_other": "{{count}} Bewertungen",
     "reviewRating": "{{rating}} von 5",
     "reviewSummary_one": "{{average}} von 5, aus {{count}} Bewertung",
     "reviewSummary_other": "{{average}} von 5, aus {{count}} Bewertungen",
     "reviews": "Bewertungen",
-    "screenshots": "Bildschirmfotos",
-    "versions": "Versionen"
+    "details": "Details",
+    "close": "Schließen",
+    "resources": "Ressourcen"
   },
   "score": {
     "easeOfSetup": "Einfachheit der Einrichtung",
@@ -206,7 +192,8 @@
     "source": "Quellcode",
     "subscription": "Abonnement",
     "support": "Support",
-    "terms": "Bedingungen"
+    "terms": "Bedingungen",
+    "video": "Video-Anleitung"
   },
   "stage": {
     "acquired": "Erworben, nicht installiert",
@@ -262,7 +249,6 @@
     "doneTitle": "{{app}} läuft",
     "failingLead": "Der Cluster meldet, dass die App nicht starten kann. In seinen eigenen Worten:",
     "forEveryone": "für alle",
-    "heading": "Auf diesem Cluster",
     "installAction": "Installieren",
     "installBody": "Build <mono>{{digest}}</mono> von <mono>{{coordinate}}</mono>. Die Installation ist ein Commit im Deployments-Repository mit Ihnen als Autor; der Cluster hat die App, sobald dieser synchronisiert ist.",
     "installEveryone": "Für alle installieren",
@@ -306,7 +292,11 @@
     "meteringNotArrivedTitle": "Der Cluster hat die Nutzungs-Zugangsdaten der App noch nicht angelegt",
     "meteringNotArrivedBody": "Die App ist installiert und wird nach Nutzung abgerechnet, aber der Cluster fragt den Schlüssel, mit dem sie ihre Nutzung meldet, noch nicht ab. Fahren Sie fort, um es erneut zu versuchen.",
     "updateByPlatform": "Die Plattform bringt diese App im Aktualisierungsfenster des Clusters auf den neuesten Build.",
-    "updateByCluster": "Die Cluster-Administration bringt diese App auf neuere Builds."
+    "updateByCluster": "Die Cluster-Administration bringt diese App auf neuere Builds.",
+    "installed": "Installiert",
+    "buyAction": "Kaufen",
+    "supportAction": "Support",
+    "acquisition": "Beim Store:"
   },
   "refused": {
     "addons-403": "Der Cluster hat abgelehnt: Sie dürfen in diesem Mandanten nicht installieren. Die App selbst ist installiert.",
@@ -325,18 +315,6 @@
     "install-502": "Der Cluster konnte den Build nicht prüfen: Sein Katalog war nicht lesbar oder liefert einen anderen Build als den, den der Store genannt hat. Es wurde nichts installiert.",
     "install-503": "Der Cluster kann gerade nicht in sein Deployments-Repository schreiben. Es wurde nichts installiert.",
     "metering-403": "Der Cluster hat abgelehnt: Sie dürfen die Zugangsdaten dieser App nicht setzen."
-  },
-  "installed": {
-    "colAcquisition": "Beim Store",
-    "colApp": "App",
-    "colBuild": "Installierter Build",
-    "colState": "Auf dem Cluster",
-    "lead": "Was dieser Mandant beim Store erworben hat, neben dem, was auf diesem Cluster installiert ist und wie es ihm geht.",
-    "loading": "Cluster und Store werden gefragt …",
-    "notPinned": "kein festgelegter Build",
-    "nothing": "Nichts ist installiert, und nichts wurde erworben.",
-    "nothingInstalled": "Nichts ist installiert.",
-    "title": "Installiert und erworben"
   },
   "credential": {
     "noRepository": "Dieser Erwerb nennt kein Repository, es gibt also keine Zugangsdaten zu setzen.",
@@ -461,12 +439,26 @@
     "doneTitle": "{{addon}} ist in {{app}} eingeschaltet",
     "doneBody": "Im Deployment-Repository festgeschrieben. Es wirkt, sobald {{app}} die Änderung übernommen hat; das kann einige Minuten dauern.",
     "on": "Ein",
-    "install": "Installieren",
     "queued": "Wartet, bis es an der Reihe ist",
     "remove": "Entfernen",
     "removeBody": "{{addon}} in {{app}} ausschalten? Beim Store wird nichts gekündigt, und es werden keine Daten gelöscht.",
     "removeAction": "Ausschalten",
     "installedFromApp": "Ein Add-on wird in seiner App installiert, von der Seite dieser App aus.",
-    "openApp": "Die App öffnen"
+    "openApp": "Die App öffnen",
+    "tickToAdd": "Die Add-ons ankreuzen, die dazukommen sollen, dann Installieren."
+  },
+  "scorecard": {
+    "title": "Steckbrief",
+    "edition": "Edition",
+    "maturity": "Reife",
+    "maturityOf": "{{score}} / 10",
+    "notScored": "Noch nicht bewertet",
+    "customization": "Anpassung",
+    "customizationGrade": "Stufe {{grade}}",
+    "customizationGradeRung": "Stufe {{grade}}, bis Sprosse {{rung}}",
+    "notCharacterised": "Noch nicht eingestuft",
+    "rating": "Bewertungen",
+    "notRated": "Noch keine Bewertungen",
+    "installations": "Installationen"
   }
 }
