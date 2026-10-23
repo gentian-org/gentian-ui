@@ -20,7 +20,7 @@ os.environ.setdefault("ENVIRONMENT", "local")
 import httpx
 import pytest
 from definition import Contract
-from fakecluster import CUSTODIAN, DIRECTOR, USHER, FakeCluster
+from fakecluster import CUSTODIAN, DIRECTOR, REGISTRAR, USHER, FakeCluster
 from fakestore import BASE, FakeStore
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -52,6 +52,7 @@ def make_settings(**over) -> Settings:
         "DIRECTOR_URL": DIRECTOR,
         "CUSTODIAN_URL": CUSTODIAN,
         "USHER_URL": USHER,
+        "REGISTRAR_URL": REGISTRAR,
         "GENTIAN_CLUSTER_ID": "cluster-under-test",
         "KERNEL_DOMAIN": "example",
     }

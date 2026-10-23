@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     cluster_id: str | None = Field(default=None, alias="GENTIAN_CLUSTER_ID")
     custodian_url: str | None = Field(default=None, alias="CUSTODIAN_URL")
     usher_url: str | None = Field(default=None, alias="USHER_URL")
+    # The registrar, asked with the person's own token for the tenant's
+    # people -- whom an app is installed for -- and to give each of them the
+    # app (its group). Unset: "Only selected users" lists nobody, and access
+    # is given in the Admin Console.
+    registrar_url: str | None = Field(default=None, alias="REGISTRAR_URL")
     # The tenant's desktop API, on the cluster network. Told the store's
     # picture of an app after it is installed or updated, so the app's tile
     # shows it. Unset leaves every tile with its profile's own picture.

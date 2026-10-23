@@ -218,7 +218,8 @@
     "rollout": "Roll out on the cluster",
     "metering": "Hand the app its usage key",
     "approvals": "Approvals",
-    "selectUsers": "Select users in Admin Console"
+    "selectUsers": "Select users in Admin Console",
+    "access": "Give the selected users the app"
   },
   "install": {
     "acquiring": "Asking {{store}} for this app…",
@@ -290,7 +291,12 @@
     "whoEverybody": "Everybody by default",
     "whoSelected": "Only selected users",
     "ok": "OK",
-    "configureInConsole": "Configure / Uninstall in Admin Console"
+    "configureInConsole": "Configure / Uninstall in Admin Console",
+    "whoReading": "Reading the tenant’s users…",
+    "whoSearch": "Search users",
+    "whoNobody": "The tenant has no users to choose from.",
+    "whoChosen_one": "{{count}} user selected",
+    "whoChosen_other": "{{count}} users selected"
   },
   "refused": {
     "addons-403": "The cluster refused: you may not install in this tenant. The app itself is installed.",

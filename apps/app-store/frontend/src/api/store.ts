@@ -304,6 +304,7 @@ export type Stage =
   | "metering-timeout"
   | "approvals"
   | "rollout"
+  | "access"
   | "failing"
   | "done"
   | "failed";
@@ -315,6 +316,8 @@ export type Operation = {
   /** For an add-on: the profile of the installed app it is pinned inside. Absent from an older backend. */
   addonOf?: string | null;
   forEveryone: boolean;
+  /** Installed for selected users: how many, and how many have the app so far. */
+  access?: { users: number; granted: number } | null;
   stage: Stage;
   failedStage: Stage | null;
   waitsForPerson: boolean;
@@ -492,7 +495,16 @@ export type StartRequest = {
   acquisitionId?: string;
   /** For an add-on: the coordinate of the installed app it goes in. */
   addonOf?: string;
+  /** Installed for selected users: their ids at the registrar; each is given the app once it is there. */
+  users?: string[];
+  /** How many people it is for: a priced app's checkout is for that many seats (store API 1.9). */
+  seats?: number;
 };
+
+/** One of the tenant's people, as the registrar names them. */
+export type Person = { id: string; name: string; username: string };
+
+export const fetchPeople = () => apiFetch<{ people: Person[] }>("/people");
 
 export const startOperation = (coordinate: string, body: StartRequest) =>
   apiFetch<Operation>(`/apps/${appPath(coordinate)}/operation`, { method: "POST", body: JSON.stringify(body) });

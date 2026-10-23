@@ -141,6 +141,11 @@ custodian:
 usher:
   url: ""
 
+# The registrar, asked with the person's own token for the tenant's people
+# when an app is installed for selected users, and to give each the app.
+registrar:
+  url: ""
+
 # Told the store's picture of an app after it is installed or updated, so the
 # app's tile on the tenant's desktop shows it: the desktop API's Service, e.g.
 # http://desktop-gentian-portal-api:8000. Empty leaves every tile with its

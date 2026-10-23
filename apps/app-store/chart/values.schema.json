@@ -142,6 +142,16 @@
         }
       }
     },
+    "registrar": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where the tenant's people are read, and given an app, for an install for selected users. Empty: nobody is listed, and access is given in the Admin Console.",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      }
+    },
     "desktop": {
       "type": "object",
       "additionalProperties": false,

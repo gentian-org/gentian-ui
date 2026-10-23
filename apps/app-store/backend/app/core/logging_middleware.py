@@ -33,10 +33,14 @@ class RedactingAccessLogMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         auth_header = request.headers.get("authorization", "")
         safe_auth = "[REDACTED]" if auth_header else "-"
+        response = await call_next(request)
+        # One line per request, the path without its query, so a failure
+        # is found in the log; nothing a person sent or was answered.
         logger.info(
-            "%s %s auth=%s",
+            "%s %s %s auth=%s",
             request.method,
             request.url.path,
+            response.status_code,
             safe_auth,
         )
-        return await call_next(request)
+        return response

@@ -222,6 +222,29 @@ async def ask_custodian(
         raise _unanswered("custodian", exc) from exc
 
 
+async def ask_registrar(
+    settings: Settings,
+    method: str,
+    path: str,
+    token: str,
+    *,
+    json_body: object | None = None,
+    params: dict[str, str] | None = None,
+) -> Answer:
+    """One request to the registrar, as the caller: the tenant's people, and
+    a person's membership of an app's group."""
+    if not settings.registrar_url:
+        raise Refusal(status=503, source="registrar", code="not-configured")
+    try:
+        base = settings.registrar_url.rstrip("/")
+        return _read(
+            "registrar",
+            await forward_to(base, method, path, token, params=params, json_body=json_body),
+        )
+    except HTTPException as exc:
+        raise _unanswered("registrar", exc) from exc
+
+
 async def ask_usher(settings: Settings, path: str, token: str) -> Answer:
     try:
         return _read("usher", await read(settings, path, token))

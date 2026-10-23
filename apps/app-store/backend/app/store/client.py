@@ -536,10 +536,15 @@ class Store:
         version: str | None,
         idempotency_key: str,
         language: str | None = None,
+        seats: int | None = None,
     ) -> tuple[models.Acquisition, int | None]:
-        body: dict[str, str] = {"coordinate": patterns.coordinate(coordinate)}
+        body: dict[str, Any] = {"coordinate": patterns.coordinate(coordinate)}
         if version is not None:
             body["version"] = patterns.version(version)
+        # 1.9: how many people the app is for; a priced app's checkout is for
+        # that many seats.
+        if seats is not None:
+            body["seats"] = seats
         _, answer, retry_after = await self.signed(
             "POST",
             "/v1/acquisitions",

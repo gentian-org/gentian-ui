@@ -218,7 +218,8 @@
     "rollout": "Auf dem Cluster ausrollen",
     "metering": "Der App ihren Nutzungsschlüssel geben",
     "approvals": "Genehmigungen",
-    "selectUsers": "Benutzer in der Admin Console auswählen"
+    "selectUsers": "Benutzer in der Admin Console auswählen",
+    "access": "Den ausgewählten Benutzern die App geben"
   },
   "install": {
     "acquiring": "{{store}} wird nach dieser App gefragt …",
@@ -290,7 +291,12 @@
     "whoEverybody": "Standardmäßig alle",
     "whoSelected": "Nur ausgewählte Benutzer",
     "ok": "OK",
-    "configureInConsole": "Konfigurieren / Deinstallieren in der Admin-Konsole"
+    "configureInConsole": "Konfigurieren / Deinstallieren in der Admin-Konsole",
+    "whoReading": "Benutzer des Mandanten werden gelesen…",
+    "whoSearch": "Benutzer suchen",
+    "whoNobody": "Der Mandant hat keine Benutzer zur Auswahl.",
+    "whoChosen_one": "{{count}} Benutzer ausgewählt",
+    "whoChosen_other": "{{count}} Benutzer ausgewählt"
   },
   "refused": {
     "addons-403": "Der Cluster hat abgelehnt: Sie dürfen in diesem Mandanten nicht installieren. Die App selbst ist installiert.",

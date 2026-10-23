@@ -12,10 +12,11 @@ the Admin Console's Apps tab; its add-ons are switched on and off here.
 
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import context
+from app.core import director
 from app.core.problems import Refusal
 from app.install import sequence, state
 from app.install.sequence import Context
@@ -57,6 +58,12 @@ class StartBody(BaseModel):
     # For an add-on: the coordinate of the installed app it goes in. The
     # add-on's build is then pinned inside that app, not installed apart.
     addonOf: str | None = None
+    # Installed for selected users: their ids at the registrar. They are
+    # given the app once it is there.
+    users: list[str] = Field(default_factory=list, max_length=1000)
+    # How many people the app is for: a priced app's checkout is for that
+    # many seats (store API 1.9).
+    seats: int | None = Field(default=None, ge=1, le=100_000)
 
 
 @router.post("/apps/{catalogue}/{app}/operation")
@@ -89,6 +96,8 @@ async def start(
         version=body.version,
         acquisition_id=body.acquisitionId,
         addon_of=patterns.app_of(body.addonOf) if body.addonOf is not None else None,
+        users=body.users,
+        seats=body.seats,
     )
     await sequence.advance(ctx, operation)
     return operation.view()
@@ -222,3 +231,36 @@ async def credential(
     return await sequence.set_credentials(
         ctx, patterns.acquisition_id(acquisition_id), rotate=body.rotate
     )
+
+
+@router.get("/people")
+async def people(
+    search: str | None = Query(default=None, max_length=100),
+    ctx: Context = Depends(context),
+) -> dict[str, Any]:
+    """The tenant's people, as the Admin Console's Users list reads them, to
+    choose whom an app is installed for: asked of the registrar with the
+    person's own token, and only id, name and login are passed on. A
+    registrar that refuses is said to refuse."""
+    params = {"limit": "200", **({"search": search} if search else {})}
+    answer = await director.ask_registrar(
+        ctx.settings,
+        "GET",
+        f"/v1/tenants/{patterns.name(ctx.tenant, 'tenant')}/people",
+        ctx.cluster_token,
+        params=params,
+    )
+    if answer.status != 200 or not isinstance(answer.body, dict):
+        raise answer.refusal()
+    out = []
+    for person in answer.body.get("people") or []:
+        if not isinstance(person, dict) or not isinstance(person.get("id"), str):
+            continue
+        out.append(
+            {
+                "id": person["id"][:64],
+                "name": str(person.get("name") or "")[:200],
+                "username": str(person.get("username") or "")[:200],
+            }
+        )
+    return {"people": out}
