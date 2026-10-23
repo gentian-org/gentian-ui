@@ -16,7 +16,10 @@ const rootRoute = createRootRoute({
 // The app itself: the gate, then the shell, then the catalogue. An app's
 // details open on top of the catalogue, which stays where it was beneath.
 const storeRoute = createRoute({ getParentRoute: () => rootRoute, id: "store", component: AppStore });
-const browseRoute = createRoute({ getParentRoute: () => storeRoute, path: "/", component: BrowsePage });
+// A layout without a path: a "/" route is an index route, which can have no
+// children, and the details would then match nothing.
+const browseRoute = createRoute({ getParentRoute: () => storeRoute, id: "browse", component: BrowsePage });
+const catalogueRoute = createRoute({ getParentRoute: () => browseRoute, path: "/" });
 const appRoute = createRoute({
   getParentRoute: () => browseRoute,
   path: "app/$catalogue/$app",
@@ -30,7 +33,7 @@ const appRoute = createRoute({
 // cluster and the store nothing.
 const signedInRoute = createRoute({ getParentRoute: () => rootRoute, path: "/signed-in", component: SignedInPage });
 
-const routeTree = rootRoute.addChildren([storeRoute.addChildren([browseRoute.addChildren([appRoute])]), signedInRoute]);
+const routeTree = rootRoute.addChildren([storeRoute.addChildren([browseRoute.addChildren([catalogueRoute, appRoute])]), signedInRoute]);
 
 export const router = createRouter({ routeTree });
 
