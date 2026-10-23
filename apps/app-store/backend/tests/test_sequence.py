@@ -739,8 +739,16 @@ WAITING = {
     "message": "waiting for approval of egress/smtp, podSecurity/run-as-root",
     "pendingPrivileges": ["egress/smtp", "podSecurity/run-as-root"],
     "pendingPrivilegeApprovals": [
-        {"privilege": "egress/smtp", "approvedBy": "perimeter-approver", "reason": "sends mail through the relay"},
-        {"privilege": "podSecurity/run-as-root", "approvedBy": "security-officer", "reason": "writes its cache as root"},
+        {
+            "privilege": "egress/smtp",
+            "approvedBy": "perimeter-approver",
+            "reason": "sends mail through the relay",
+        },
+        {
+            "privilege": "podSecurity/run-as-root",
+            "approvedBy": "security-officer",
+            "reason": "writes its cache as root",
+        },
     ],
 }
 
@@ -764,7 +772,10 @@ def test_an_app_that_waits_on_a_person_stands_at_approvals_until_none_is_pending
     assert view["stage"] == "approvals"
     assert view["waitsForPerson"] is False and view["waitSeconds"] == 5
     assert view["rollout"]["name"] == APP
-    assert [(p["privilege"], p["approvedBy"], p["reason"]) for p in view["rollout"]["pendingPrivilegeApprovals"]] == [
+    assert [
+        (p["privilege"], p["approvedBy"], p["reason"])
+        for p in view["rollout"]["pendingPrivilegeApprovals"]
+    ] == [
         ("egress/smtp", "perimeter-approver", "sends mail through the relay"),
         ("podSecurity/run-as-root", "security-officer", "writes its cache as root"),
     ]
@@ -778,7 +789,9 @@ def test_an_app_that_waits_on_a_person_stands_at_approvals_until_none_is_pending
     )
     assert answer.status_code == 200, answer.text
     assert answer.json() == {"status": "updated", "commit": "c0ffee5"}
-    assert cluster.approved == [(f"{APP}/egress/smtp", {"reason": "the relay is ours and rate-limited"})]
+    assert cluster.approved == [
+        (f"{APP}/egress/smtp", {"reason": "the relay is ours and rate-limited"})
+    ]
     assert cluster.of("director", "PUT")[-1].bearer == "Bearer alice.s1"
 
     # The security officer's: asked for, with a note.
@@ -790,7 +803,9 @@ def test_an_app_that_waits_on_a_person_stands_at_approvals_until_none_is_pending
     assert answer.status_code == 200, answer.text
     assert answer.json()["status"] == "requested"
     assert answer.json()["request"]["requestedBy"] == "alice@acme.example"
-    assert cluster.requested == [(APP, {"privilege": "podSecurity/run-as-root", "note": "needed for the pilot"})]
+    assert cluster.requested == [
+        (APP, {"privilege": "podSecurity/run-as-root", "note": "needed for the pilot"})
+    ]
 
     # The cluster takes the approval in and shows the request: still waiting,
     # on the security officer alone now.
@@ -813,7 +828,13 @@ def test_an_app_that_waits_on_a_person_stands_at_approvals_until_none_is_pending
     assert view["rollout"]["pendingPrivilegeApprovals"][0]["requestedBy"] == "alice@acme.example"
 
     # Approved at the platform console: nothing is pending, the rollout goes on.
-    cluster.states[APP] = {"profile": APP, "name": APP, "phase": "installing", "ready": False, "message": "deploying"}
+    cluster.states[APP] = {
+        "profile": APP,
+        "name": APP,
+        "phase": "installing",
+        "ready": False,
+        "message": "deploying",
+    }
     view = runner.step()
     assert view["stage"] == "rollout" and view["rollout"]["pendingPrivilegeApprovals"] == []
     cluster.states[APP] = {"profile": APP, "name": APP, "phase": "ready", "ready": True}
@@ -825,7 +846,11 @@ def test_a_grant_that_ran_out_and_an_approver_this_app_does_not_know(runner, sto
     cluster.states[APP] = {
         **WAITING,
         "pendingPrivilegeApprovals": [
-            {"privilege": "podSecurity/run-as-root", "approvedBy": "security-officer", "expiredAt": "2026-10-20T00:00:00Z"},
+            {
+                "privilege": "podSecurity/run-as-root",
+                "approvedBy": "security-officer",
+                "expiredAt": "2026-10-20T00:00:00Z",
+            },
             {"privilege": "egress/smtp", "approvedBy": "tenant"},
             {"approvedBy": "perimeter-approver"},
         ],
@@ -837,7 +862,9 @@ def test_a_grant_that_ran_out_and_an_approver_this_app_does_not_know(runner, sto
     assert approvals[0]["expiredAt"] == "2026-10-20T00:00:00Z"
 
 
-def test_a_declined_request_is_shown_as_such_and_can_be_asked_for_again(runner, store, cluster, clock):
+def test_a_declined_request_is_shown_as_such_and_can_be_asked_for_again(
+    runner, store, cluster, clock
+):
     to_rollout(runner, cluster, clock)
     cluster.states[APP] = {
         **WAITING,
@@ -873,7 +900,9 @@ def test_a_declined_request_is_shown_as_such_and_can_be_asked_for_again(runner, 
     )
     assert answer.status_code == 200, answer.text
     assert answer.json()["status"] == "requested"
-    assert cluster.requested == [(APP, {"privilege": "podSecurity/run-as-root", "note": "now with the rootless image"})]
+    assert cluster.requested == [
+        (APP, {"privilege": "podSecurity/run-as-root", "note": "now with the rootless image"})
+    ]
 
 
 def test_a_reload_shows_the_approvals_without_an_operation(runner, store, cluster, clock):
@@ -883,14 +912,20 @@ def test_a_reload_shows_the_approvals_without_an_operation(runner, store, cluste
     sequence.reset()
     state = runner.api.get(f"/api/v1/apps/{PAID}/state", headers=ALICE).json()
     assert state["operation"] is None and state["stage"] == "installing"
-    assert [p["approvedBy"] for p in state["state"]["pendingPrivilegeApprovals"]] == ["perimeter-approver", "security-officer"]
+    assert [p["approvedBy"] for p in state["state"]["pendingPrivilegeApprovals"]] == [
+        "perimeter-approver",
+        "security-officer",
+    ]
 
 
 def test_the_directors_refusal_of_an_approval_is_said_in_its_words(runner, store, cluster, clock):
     to_rollout(runner, cluster, clock)
     cluster.states[APP] = dict(WAITING)
     runner.step()
-    cluster.privilege_refusal = (403, "a podSecurity privilege weakens what protects the node; approving one is the security officer's")
+    cluster.privilege_refusal = (
+        403,
+        "a podSecurity privilege weakens what protects the node; approving one is the security officer's",
+    )
     answer = runner.api.post(
         f"/api/v1/apps/{PAID}/privileges/podSecurity/run-as-root/approve",
         json={"reason": "we would like it anyway"},
@@ -916,7 +951,9 @@ def test_the_directors_refusal_of_an_approval_is_said_in_its_words(runner, store
         ("privileges/egress/smtp/request", {"reason": "x"}),
     ],
 )
-def test_an_approval_that_is_not_well_formed_never_reaches_the_director(runner, cluster, path, body):
+def test_an_approval_that_is_not_well_formed_never_reaches_the_director(
+    runner, cluster, path, body
+):
     answer = runner.api.post(f"/api/v1/apps/{PAID}/{path}", json=body, headers=ALICE)
     assert answer.status_code in (400, 422), answer.text
     assert cluster.approved == [] and cluster.requested == []
@@ -1163,7 +1200,9 @@ def test_an_app_priced_by_use_is_handed_its_metering_after_the_install(runner, s
     }
     view = runner.install(forEveryone=True)
     assert view["stage"] == "done"
-    assert cluster.order()[-1] == "custodian PUT /v1/credentials/app-acme-nextcloud-base-ee-metering"
+    assert (
+        cluster.order()[-1] == "custodian PUT /v1/credentials/app-acme-nextcloud-base-ee-metering"
+    )
     assert cluster.supplied[("nextcloud-base-ee", "metering")] == store.metering
     # Never told to the browser, and not kept once the custodian has it.
     state = runner.api.get(f"/api/v1/apps/{PAID}/state", headers=ALICE)

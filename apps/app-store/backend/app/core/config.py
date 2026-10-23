@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     # the profile's valueMapping.platform.countryKey. Empty when the tenant
     # names none. A store is asked for the support offered there by default.
     tenant_country: str = Field(default="", alias="TENANT_COUNTRY")
+    # The tenant's unique id (its metadata.uid), from the profile's
+    # valueMapping.platform.tenantUIDKey. The store's identity provider for
+    # the tenant's realm is org-<it> (app/store/tenant_sign_in.py). Empty on
+    # a cluster that does not tell it.
+    tenant_uid: str = Field(default="", alias="TENANT_UID")
 
     # The store API's base address: what the Cluster claim names as
     # catalogue.storeUrl. https, no trailing slash, no path beyond a prefix.

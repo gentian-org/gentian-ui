@@ -365,3 +365,74 @@ def test_a_failed_sign_in_that_had_somewhere_to_return_ends_on_its_own_page(api,
     state = parse_qs(urlsplit(answer.json()["authorizationUrl"]).query)["state"][0]
     denied = api.get(f"/oauth/callback?error=access_denied&state={state}", headers=ALICE)
     assert denied.headers["location"] == "/signed-in?error=denied"
+
+
+# --- the sign-in through the tenant's own realm (store API 1.7) ---------------
+
+UID = "0f8e7d6c-5b4a-4321-9876-0123456789ab"
+
+
+def _through_the_realm(store):
+    from app.main import app
+    from app.store import tenant_sign_in
+
+    tenant_sign_in.reset()
+    store.meta["features"].append("tenant-sign-in")
+    settings = make_settings(TENANT_UID=UID)
+    app.dependency_overrides[get_settings] = lambda: settings
+
+
+def test_the_sign_in_names_the_tenant_s_provider_and_asks_silently_first(api, store):
+    _through_the_realm(store)
+    request = begin(api)
+    assert request["kc_idp_hint"] == f"org-{UID}"
+    assert request["prompt"] == "none"
+
+
+def test_without_the_tenant_s_uid_or_the_feature_nothing_is_hinted(api, store):
+    store.meta["features"].append("tenant-sign-in")
+    request = begin(api)
+    assert "kc_idp_hint" not in request and "prompt" not in request
+
+
+def test_a_silent_sign_in_the_issuer_cannot_answer_goes_on_to_the_visible_one(api, store):
+    _through_the_realm(store)
+    request = begin(api)
+    answer = api.get(
+        f"/oauth/callback?error=login_required&state={request['state']}", headers=ALICE
+    )
+    assert answer.status_code == 303
+    visible = {k: v[0] for k, v in parse_qs(urlsplit(answer.headers["location"]).query).items()}
+    assert answer.headers["location"].startswith(f"{ISSUER}/authorize?")
+    assert visible["kc_idp_hint"] == f"org-{UID}" and "prompt" not in visible
+    assert visible["state"] != request["state"]
+    # The visible one's error is shown as before: no second fallback.
+    denied = api.get(f"/oauth/callback?error=access_denied&state={visible['state']}", headers=ALICE)
+    assert denied.headers["location"] == "/signed-in?error=denied"
+
+
+def test_an_associated_tenant_s_side_is_turned_on_with_the_store_s_issuer(api, store, cluster):
+    _through_the_realm(store)
+    store.standing["signIn"] = {"tenantUid": UID}
+    sign_in(api, store)
+    assert cluster.store_sign_in == ISSUER.rstrip("/")
+    puts = [c for c in cluster.of("director", "PUT") if c.path.endswith("/store-sign-in")]
+    assert len(puts) == 1 and puts[0].bearer == ALICE["Authorization"]
+    # Asked once: a later sign-in finds it on.
+    sign_in(api, store)
+    assert len([c for c in cluster.of("director", "PUT") if c.path.endswith("/store-sign-in")]) == 1
+
+
+def test_a_person_who_may_not_turn_it_on_is_signed_in_all_the_same(api, store, cluster):
+    _through_the_realm(store)
+    store.standing["signIn"] = {"tenantUid": UID}
+    cluster.may_administer = False
+    sign_in(api, store)
+    assert cluster.store_sign_in is None
+
+
+def test_another_tenant_s_association_turns_nothing_on(api, store, cluster):
+    _through_the_realm(store)
+    store.standing["signIn"] = {"tenantUid": "1a2b3c4d-0000-4000-8000-000000000000"}
+    sign_in(api, store)
+    assert not [c for c in cluster.calls if c.path.endswith("/store-sign-in")]

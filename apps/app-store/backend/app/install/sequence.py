@@ -680,9 +680,7 @@ async def _metering(ctx: Context, op: Operation, _answer: dict[str, Any]) -> Non
         return
     if op.metering_deadline is None:
         op.metering_deadline = clock() + CREDENTIAL_WINDOW_SECONDS
-    name = supplied_credential_name(
-        patterns.name(ctx.tenant, "tenant"), op.profile, "metering"
-    )
+    name = supplied_credential_name(patterns.name(ctx.tenant, "tenant"), op.profile, "metering")
     answer = await director.ask_custodian(
         ctx.settings,
         "PUT",
@@ -835,10 +833,23 @@ def _approvals_view(entries: Any) -> list[dict[str, Any]]:
         if not isinstance(entry, dict):
             continue
         privilege, approved_by = entry.get("privilege"), entry.get("approvedBy")
-        if not isinstance(privilege, str) or "/" not in privilege or approved_by not in APPROVER_KINDS:
+        if (
+            not isinstance(privilege, str)
+            or "/" not in privilege
+            or approved_by not in APPROVER_KINDS
+        ):
             continue
         view: dict[str, Any] = {"privilege": privilege, "approvedBy": approved_by}
-        for key in ("reason", "requestedBy", "requestedAt", "note", "expiredAt", "declinedBy", "declinedAt", "declineReason"):
+        for key in (
+            "reason",
+            "requestedBy",
+            "requestedAt",
+            "note",
+            "expiredAt",
+            "declinedBy",
+            "declinedAt",
+            "declineReason",
+        ):
             value = entry.get(key)
             view[key] = value[:2000] if isinstance(value, str) and value else None
         out.append(view)
@@ -892,7 +903,9 @@ async def declared_apps(ctx: Context) -> dict[str, dict[str, Any]]:
             # The tenant's override of how the app moves to newer builds, when
             # the cluster's administrator wrote one; the effective mode is the
             # director's report's to say (updates), this is what git carries.
-            "updateMode": entry.get("updateMode") if isinstance(entry.get("updateMode"), str) else None,
+            "updateMode": entry.get("updateMode")
+            if isinstance(entry.get("updateMode"), str)
+            else None,
         }
     return out
 
@@ -913,7 +926,11 @@ async def update_modes(ctx: Context) -> dict[str, str]:
         return {}
     out: dict[str, str] = {}
     for entry in answer.body.get("entries") or []:
-        if isinstance(entry, dict) and isinstance(entry.get("profile"), str) and isinstance(entry.get("mode"), str):
+        if (
+            isinstance(entry, dict)
+            and isinstance(entry.get("profile"), str)
+            and isinstance(entry.get("mode"), str)
+        ):
             out[entry["profile"]] = entry["mode"]
     return out
 
@@ -972,7 +989,12 @@ async def set_credentials(ctx: Context, acquisition_id: str, *, rotate: bool) ->
 def _privilege_path(privilege: str) -> tuple[str, str]:
     kind, _, name = privilege.partition("/")
     if kind not in ("egress", "podSecurity", "clusterRoles"):
-        raise Refusal(status=400, source="app", code="invalid-request", detail="The privilege is <kind>/<name>.")
+        raise Refusal(
+            status=400,
+            source="app",
+            code="invalid-request",
+            detail="The privilege is <kind>/<name>.",
+        )
     return kind, patterns.name(name, "privilege")
 
 
@@ -1007,7 +1029,9 @@ async def approve_privilege(
     return {"status": answer.body.get("status"), "commit": answer.body.get("commit")}
 
 
-async def request_privilege(ctx: Context, profile: str, privilege: str, note: str | None) -> dict[str, Any]:
+async def request_privilege(
+    ctx: Context, profile: str, privilege: str, note: str | None
+) -> dict[str, Any]:
     """Ask the security officer for one request the tenant cannot approve
     itself. The director has the operator record who asked, when and the
     note on the app, where the security officer's admin console lists it.

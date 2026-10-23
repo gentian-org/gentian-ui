@@ -209,6 +209,10 @@ class TenantAccessRole(Model):
     role: Annotated[TenantRole, BeforeValidator(_role)] = "none"
 
 
+class TenantSignIn(Model):
+    tenantUid: Matching(r"^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$", 40)
+
+
 class TenantStanding(Model):
     tenantUrl: Text(300)
     known: bool
@@ -218,6 +222,9 @@ class TenantStanding(Model):
     notices: list[Notice]
     # 1.2. A 1.1 store says nothing of it: its one account manages the tenant.
     access: TenantAccessRole | None = None
+    # 1.7, with the feature tenant-sign-in: the tenant uid the store signs
+    # people in through the realm of.
+    signIn: TenantSignIn | None = None
 
 
 SUBJECT = re.compile(r"^[A-Za-z0-9._:@-]{1,256}$")
