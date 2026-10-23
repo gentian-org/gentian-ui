@@ -3,7 +3,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import "@/lib/i18n";
 import type { AdminContext, AppState } from "@/api/admin";
-import { PrivilegesPart } from "./AppsSection";
+import { linkedApp, PrivilegesPart } from "./AppsSection";
 
 // The operator's app state as it is served (gentian-os
 // internal/applifecycle/apps.go): each pending request with who answers it.
@@ -98,5 +98,13 @@ describe("PrivilegesPart", () => {
     expect(rowOf(html, "egress/smtp-relay")).toContain(notYours);
     expect(rowOf(html, "podSecurity/run-as-root")).not.toContain(approve);
     expect(rowOf(html, "podSecurity/run-as-root")).toContain(securityOfficersHint);
+  });
+});
+
+describe("linkedApp", () => {
+  it("opens the app a link names, and nothing that is not an app's name", () => {
+    expect(linkedApp("?tab=apps&app=nextcloud-base-ce")).toBe("nextcloud-base-ce");
+    expect(linkedApp("?tab=apps&app=../../x")).toBeNull();
+    expect(linkedApp("?tab=apps")).toBeNull();
   });
 });
