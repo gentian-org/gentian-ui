@@ -280,7 +280,6 @@
     "stopWaiting": "Stop waiting",
     "supportProject": "Support the project",
     "tryAgain": "Try again",
-    "twoWays": "You choose in the next step whether it is installed for everyone in this tenant.",
     "updateAction": "Update",
     "updateAvailable": "Update available: version {{version}}",
     "updateKeepsAccess": "Updating moves the installed app to this build. Who may open the app does not change.",

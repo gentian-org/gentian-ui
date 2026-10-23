@@ -230,8 +230,8 @@ function Details({ detail, storeName, autoInstall }: { detail: AppDetail; storeN
         </div>
 
         <div className="store-app__side">
-          <aside className={`store-install store-install--${detail.edition}`}>
-            <div className="admin-console__actions store-install__actions">
+          <div className={`store-get store-get--${detail.edition}`}>
+            <div className="store-get__actions">
               <InstallButton />
               {hasSupport(detail, supported) ? (
                 <button
@@ -244,7 +244,7 @@ function Details({ detail, storeName, autoInstall }: { detail: AppDetail; storeN
               ) : null}
             </div>
             <InstallStatus />
-          </aside>
+          </div>
           <Scorecard detail={detail} />
           <Resources links={detail.links} />
         </div>

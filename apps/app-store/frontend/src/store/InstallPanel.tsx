@@ -903,7 +903,7 @@ export function InstallButton() {
     return (
       <button
         type="button"
-        className={`admin-console__btn store-install__action${more ? " admin-console__btn--primary" : ""}`}
+        className={`admin-console__btn${more ? " admin-console__btn--primary" : ""}`}
         disabled={!more || sequence.busy || refused}
         onClick={installAddons}
       >
@@ -921,7 +921,7 @@ export function InstallButton() {
   return (
     <button
       type="button"
-      className="admin-console__btn admin-console__btn--primary store-install__action"
+      className="admin-console__btn admin-console__btn--primary"
       disabled={!state || Boolean(operation) || sequence.busy || refused}
       onClick={() => ask("install")}
     >
@@ -1053,7 +1053,6 @@ export function InstallStatus() {
           {state.stage === "acquired" ? <p className="admin-console__lead">{t("install.acquiredNotInstalled")}</p> : null}
           {state.stage === "checkout" ? <p className="admin-console__lead">{t("install.checkoutOpen", { store: storeName })}</p> : null}
           {refused ? <p className="admin-console__hint">{t("install.refusedByStore")}</p> : null}
-          {state.stage === "not-installed" ? <p className="admin-console__meta">{t("install.twoWays")}</p> : null}
         </>
       )}
 

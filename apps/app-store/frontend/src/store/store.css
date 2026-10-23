@@ -407,9 +407,28 @@ a.admin-console__btn {
   padding: 0 1.25rem 1.25rem;
 }
 
-.store-install__actions {
-  margin-top: 0;
-  margin-bottom: 0.75rem;
+/* Getting the app: two buttons with room around them, and beneath them how
+   the installation stands. No frame. */
+.store-get {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+}
+
+.store-get__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.store-get--ee .admin-console__btn--primary {
+  background: var(--store-ee-action);
+}
+
+.store-get--ee .admin-console__btn--primary:hover:not(:disabled) {
+  background: var(--store-ee-action-hover);
 }
 
 .store-scorecard__list {

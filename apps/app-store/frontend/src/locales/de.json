@@ -280,7 +280,6 @@
     "stopWaiting": "Nicht länger warten",
     "supportProject": "Das Projekt unterstützen",
     "tryAgain": "Erneut versuchen",
-    "twoWays": "Im nächsten Schritt wählen Sie, ob sie für alle in diesem Mandanten installiert wird.",
     "updateAction": "Aktualisieren",
     "updateAvailable": "Aktualisierung verfügbar: Version {{version}}",
     "updateKeepsAccess": "Die Aktualisierung stellt die installierte App auf diesen Build um. Wer die App öffnen darf, ändert sich nicht.",
