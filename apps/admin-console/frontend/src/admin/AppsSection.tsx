@@ -49,7 +49,29 @@ const messageOf = (err: unknown) => (err instanceof Error ? err.message : String
  * reports, or both. Either half can be missing, and which one is missing is
  * the thing worth showing.
  */
-type AppRow = { profile: string; declared?: DeclaredApp; state?: AppState };
+export type AppRow = { profile: string; declared?: DeclaredApp; state?: AppState };
+
+/**
+ * The list's rows: git's apps and the cluster's components, joined by profile.
+ *
+ * A component runs or does not whatever put it there, so one the platform
+ * placed as a default (origin `default`) gives a declared app its standing
+ * like any other. A default component git does not declare is the
+ * platform's own -- the desktop, the consoles -- and is not a row: it is not
+ * the tenant's app, and it is not being removed.
+ */
+export function joinApps(declaredApps: DeclaredApp[], states: AppState[]): AppRow[] {
+  const byProfile = new Map<string, AppRow>();
+  for (const declared of declaredApps) {
+    byProfile.set(declared.profile, { profile: declared.profile, declared });
+  }
+  for (const state of states) {
+    const row = byProfile.get(state.profile);
+    if (!row && state.origin === "default") continue;
+    byProfile.set(state.profile, { ...(row ?? { profile: state.profile }), state });
+  }
+  return [...byProfile.values()].sort((a, b) => a.profile.localeCompare(b.profile));
+}
 
 /** What the director answered to the last write on this screen. */
 type Outcome = { kind: "access" | "uninstall"; app: string; everyone?: boolean; result: AppWriteResult };
@@ -109,17 +131,10 @@ export function AppsSection({
     queryFn: () => fetchAppStates(),
   });
 
-  const rows = useMemo(() => {
-    const byProfile = new Map<string, AppRow>();
-    for (const declared of declaredQuery.data?.apps ?? []) {
-      byProfile.set(declared.profile, { profile: declared.profile, declared });
-    }
-    for (const state of statesQuery.data?.apps ?? []) {
-      const row = byProfile.get(state.profile) ?? { profile: state.profile };
-      byProfile.set(state.profile, { ...row, state });
-    }
-    return [...byProfile.values()].sort((a, b) => a.profile.localeCompare(b.profile));
-  }, [declaredQuery.data, statesQuery.data]);
+  const rows = useMemo(
+    () => joinApps(declaredQuery.data?.apps ?? [], statesQuery.data?.apps ?? []),
+    [declaredQuery.data, statesQuery.data],
+  );
 
   if (declaredQuery.isLoading || statesQuery.isLoading) {
     return <p className="admin-console__loading">{t("apps.loading")}</p>;
@@ -508,7 +523,7 @@ function StatePart({
  * Who has access now is who is in the app's group, and that is the registrar's
  * list, changed a person at a time.
  */
-function AccessPart({
+export function AccessPart({
   row,
   tenant,
   onOutcome,
@@ -550,6 +565,17 @@ function AccessPart({
       ? t("apps.everyoneOffConfirm", { app: profile, tenant })
       : t("apps.everyoneOnConfirm", { app: profile, tenant });
     if (window.confirm(question)) access.mutate(!everyone);
+  }
+
+  // A default component is the platform's: who may open it is decided for
+  // the cluster, not by the tenant, so nothing here is offered for it.
+  if (row.state?.origin === "default") {
+    return (
+      <div className="admin-console__subsection">
+        <h3 className="admin-console__subsection-title">{t("apps.accessTitle")}</h3>
+        <p className="admin-console__hint">{t("apps.accessPlatformManaged")}</p>
+      </div>
+    );
   }
 
   return (
