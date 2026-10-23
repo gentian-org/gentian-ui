@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { fetchApp, fetchMeta, fetchReports, type AppDetail, type Link as StoreLink, type Version } from "@/api/store";
 import i18n from "@/lib/i18n";
@@ -164,37 +164,83 @@ function Resources({ links }: { links: StoreLink[] }) {
 }
 
 /**
- * Where to get help: the partners the store lists, and for an app that is
- * not sold, where to give back to the people who build it.
+ * Support Project: where to give back to the people who build an app that
+ * is not sold, and the partners the store lists that offer support for it.
+ * With no partner listed it is the project's own page; otherwise a dialog
+ * with both.
  */
-function SupportSection({ detail, storeName }: { detail: AppDetail; storeName: string }) {
+function SupportProject({ detail, storeName }: { detail: AppDetail; storeName: string }) {
   const { t } = useTranslation();
   const metaQuery = useQuery({ queryKey: ["store", "meta"], queryFn: fetchMeta, retry: false });
+  const [open, setOpen] = useState(false);
   const giveBack = giveBackLink(detail.edition, detail.links);
+  const partners = metaQuery.data?.features.includes("support") === true && (detail.support ?? []).length > 0;
+  if (!partners && !giveBack) return null;
+  if (!partners && giveBack) {
+    return (
+      <a className="admin-console__btn" href={giveBack.url} target="_blank" rel="noopener noreferrer" title={giveBack.label ?? undefined}>
+        {t("install.supportAction")}
+      </a>
+    );
+  }
   return (
-    <div id="store-support">
-      <Support detail={detail} meta={metaQuery.data} storeName={storeName} />
-      {giveBack ? (
-        <section className="admin-console__subsection store-giveback">
-          <a className="admin-console__btn store-giveback__btn" href={giveBack.url} target="_blank" rel="noopener noreferrer" title={giveBack.label ?? undefined}>
-            {giveBack.rel === "donate" ? t("install.donate") : t("install.supportProject")}
-          </a>
-          {giveBack.label ? <p className="admin-console__meta store-giveback__label">{giveBack.label}</p> : null}
-        </section>
+    <>
+      <button type="button" className="admin-console__btn" onClick={() => setOpen(true)}>
+        {t("install.supportAction")}
+      </button>
+      {open ? (
+        <SupportDialog title={t("install.supportAction")} onClose={() => setOpen(false)}>
+          {giveBack ? (
+            <div className="admin-console__actions">
+              <a className="admin-console__btn admin-console__btn--primary" href={giveBack.url} target="_blank" rel="noopener noreferrer">
+                {giveBack.rel === "donate" ? t("install.donate") : t("install.supportProject")}
+              </a>
+              {giveBack.label ? <span className="admin-console__meta">{giveBack.label}</span> : null}
+            </div>
+          ) : null}
+          <Support detail={detail} meta={metaQuery.data} storeName={storeName} />
+        </SupportDialog>
       ) : null}
-    </div>
+    </>
   );
 }
 
-/** Whether the app has a Support section to go to. */
-function hasSupport(detail: AppDetail, supported: boolean): boolean {
-  return (supported && (detail.support ?? []).length > 0) || giveBackLink(detail.edition, detail.links) !== null;
+function SupportDialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => dialog?.close();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className="admin-console__dialog"
+      aria-labelledby="support-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <div className="admin-console__dialog-body">
+        <h3 id="support-title" className="admin-console__dialog-title">
+          {title}
+        </h3>
+        {children}
+        <div className="admin-console__dialog-footer">
+          <button type="button" className="admin-console__btn admin-console__btn--quiet" onClick={onClose}>
+            {t("app.close")}
+          </button>
+        </div>
+      </div>
+    </dialog>
+  );
 }
 
 function Details({ detail, storeName, autoInstall }: { detail: AppDetail; storeName: string; autoInstall: boolean }) {
   const { t } = useTranslation();
   const metaQuery = useQuery({ queryKey: ["store", "meta"], queryFn: fetchMeta, retry: false });
-  const supported = metaQuery.data?.features.includes("support") === true;
   const otherEditions = detail.editions.filter((entry) => entry.coordinate !== detail.coordinate);
 
   return (
@@ -262,7 +308,6 @@ function Details({ detail, storeName, autoInstall }: { detail: AppDetail; storeN
           ) : null}
 
           <AddonSection />
-          <SupportSection detail={detail} storeName={storeName} />
           <Reviews detail={detail} meta={metaQuery.data} storeName={storeName} />
           <Reports coordinate={detail.coordinate} />
         </div>
@@ -271,15 +316,7 @@ function Details({ detail, storeName, autoInstall }: { detail: AppDetail; storeN
           <div className={`store-get store-get--${detail.edition}`}>
             <div className="store-get__actions">
               <InstallButton />
-              {hasSupport(detail, supported) ? (
-                <button
-                  type="button"
-                  className="admin-console__btn"
-                  onClick={() => document.getElementById("store-support")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                >
-                  {t("install.supportAction")}
-                </button>
-              ) : null}
+              <SupportProject detail={detail} storeName={storeName} />
             </div>
             <InstallStatus />
           </div>

@@ -294,7 +294,7 @@
     "updateByCluster": "The cluster's administrator moves this app to newer builds.",
     "installed": "Installed",
     "buyAction": "Buy",
-    "supportAction": "Support",
+    "supportAction": "Support Project",
     "acquisition": "At the store:"
   },
   "refused": {
@@ -386,7 +386,6 @@
     "role_none": "signed in"
   },
   "support": {
-    "title": "Support",
     "lead": "Partners that offer support for this app, as {{store}} lists them. What they offer and on which terms is theirs to say.",
     "verified": "Verified",
     "worldwide": "Worldwide",

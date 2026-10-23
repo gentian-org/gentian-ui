@@ -135,42 +135,41 @@ function RequestForm({ offer, coordinate, storeName }: { offer: SupportOffer; co
   );
 }
 
+/**
+ * One partner's offer, on a few lines: who, where and in which languages,
+ * the tiers by name and the price hint, and one button -- the request where
+ * the store takes one, the partner's contact page otherwise.
+ */
 function OfferCard({ offer, coordinate, storeName }: { offer: SupportOffer; coordinate: string; storeName: string }) {
   const { t } = useTranslation();
   const { partner } = offer;
   const countries = offer.countries.map((code) => displayName("region", code)).join(", ");
   const languages = offer.languages.map((code) => displayName("language", code)).join(", ");
+  const facts = [
+    countries ? t("support.countries", { countries }) : t("support.worldwide"),
+    languages ? t("support.languages", { languages }) : null,
+    offer.tiers.length > 0 ? offer.tiers.map((tier) => tier.name).join(", ") : null,
+    offer.priceHint,
+  ].filter(Boolean);
+  const contact = offer.contactUrl && offer.contactUrl.startsWith("https://") ? offer.contactUrl : null;
   return (
-    <li className="admin-console__card store-support__offer">
+    <li className="store-support__offer">
       <Picture src={partner.logoUrl} alt="" className="store-support__logo" initialOf={partner.name} />
-      <div className="admin-console__card-main">
-        <p className="admin-console__card-title">
+      <div className="store-support__main">
+        <p className="store-support__name">
           <ExternalLink href={partner.url}>{partner.name}</ExternalLink>
           {partner.verified ? <span className="admin-console__badge admin-console__badge--ok">{t("support.verified")}</span> : null}
         </p>
-        <p className="admin-console__card-meta">
-          {countries ? t("support.countries", { countries }) : t("support.worldwide")}
-          {languages ? ` · ${t("support.languages", { languages })}` : ""}
-        </p>
-        {offer.tiers.length > 0 ? (
-          <ul className="store-support__tiers">
-            {offer.tiers.map((tier, index) => (
-              <li key={index}>
-                <span className="store-support__tier-name">{tier.name}</span>
-                {tier.description ? <span className="admin-console__card-desc"> {tier.description}</span> : null}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {offer.priceHint ? <p className="admin-console__card-desc">{offer.priceHint}</p> : null}
-        {offer.contactUrl && offer.contactUrl.startsWith("https://") ? (
+        <p className="admin-console__meta">{facts.join(" · ")}</p>
+        {offer.requestable ? (
+          <RequestForm offer={offer} coordinate={coordinate} storeName={storeName} />
+        ) : contact ? (
           <div className="admin-console__actions">
-            <a className="admin-console__btn" href={offer.contactUrl} target="_blank" rel="noopener noreferrer">
+            <a className="admin-console__btn" href={contact} target="_blank" rel="noopener noreferrer">
               {t("support.contact")}
             </a>
           </div>
         ) : null}
-        {offer.requestable ? <RequestForm offer={offer} coordinate={coordinate} storeName={storeName} /> : null}
       </div>
     </li>
   );
@@ -215,9 +214,8 @@ export function Support({ detail, meta, storeName }: { detail: AppDetail; meta: 
   // A store with no offer for the app anywhere: nothing to show, nor to switch.
   if (offers.length === 0 && country === "" && !switched.isLoading) return null;
   return (
-    <section className="admin-console__subsection store-support">
-      <h2 className="admin-console__subsection-title">{t("support.title")}</h2>
-      <p className="admin-console__lead">{t("support.lead", { store: storeName })}</p>
+    <section className="store-support">
+      <p className="admin-console__meta">{t("support.lead", { store: storeName })}</p>
       <CountrySwitch
         value={country}
         onChange={(next) => {
@@ -227,7 +225,7 @@ export function Support({ detail, meta, storeName }: { detail: AppDetail; meta: 
       />
       {switched.error ? <ProblemNote error={switched.error} /> : null}
       {offers.length > 0 ? (
-        <ul className="admin-console__cards">
+        <ul className="store-support__offers">
           {offers.map((offer) => (
             <OfferCard key={offer.id} offer={offer} coordinate={detail.coordinate} storeName={storeName} />
           ))}

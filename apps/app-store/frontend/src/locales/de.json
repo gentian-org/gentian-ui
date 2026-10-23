@@ -294,7 +294,7 @@
     "updateByCluster": "Die Cluster-Administration bringt diese App auf neuere Builds.",
     "installed": "Installiert",
     "buyAction": "Kaufen",
-    "supportAction": "Support",
+    "supportAction": "Projekt unterstützen",
     "acquisition": "Beim Store:"
   },
   "refused": {
@@ -386,7 +386,6 @@
     "role_none": "angemeldet"
   },
   "support": {
-    "title": "Support",
     "lead": "Partnerunternehmen, die Support für diese App anbieten, wie {{store}} sie aufführt. Was sie anbieten und zu welchen Bedingungen, sagen sie selbst.",
     "verified": "Verifiziert",
     "worldwide": "Weltweit",
