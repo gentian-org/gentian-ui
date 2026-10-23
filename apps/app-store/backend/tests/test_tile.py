@@ -1,7 +1,7 @@
 """The store's picture of an app, put on the app's tile on the desktop.
 
-After an install or an update has rolled out, the store's picture of the app
-is fetched the way every store picture is and handed to the tenant's desktop
+Once the director has an install or an update, the store's picture of the
+app is fetched the way every store picture is and handed to the tenant's desktop
 with the person's own token. What is checked: what the desktop was sent, that
 only a PNG from the store's media origin is sent, and that nothing that goes
 wrong with it fails the install.
@@ -29,11 +29,11 @@ def runner(api, store, cluster, clock) -> Runner:
     return Runner(api, clock)
 
 
-def test_the_stores_picture_is_put_on_the_apps_tile_once_it_is_ready(runner, store, cluster):
+def test_the_stores_picture_is_put_on_the_apps_tile_after_the_install(runner, store, cluster):
     view = runner.install(forEveryone=True)
     assert view["stage"] == "done"
     assert view["tile"] == {"outcome": "copied", "problem": None}
-    # After the install, as the last thing done.
+    # Right after the install, as the last thing sent to the cluster.
     assert cluster.order()[-2:] == ["director POST /v1/tenants/acme/apps/nextcloud-base-ee", TILE]
     put = cluster.of("desktop", "PUT")[0]
     assert put.content == PNG
@@ -44,6 +44,19 @@ def test_the_stores_picture_is_put_on_the_apps_tile_once_it_is_ready(runner, sto
     fetched = [c for c in store.calls if c.path == "/icons/nextcloud.png"]
     assert len(fetched) == 1
     assert "authorization" not in fetched[0].headers
+
+
+def test_the_picture_is_on_the_tile_before_the_app_is_ready(runner, store, cluster, clock):
+    # The rollout is watched only while the page is open. Whoever leaves
+    # before the app runs must find the store's picture on its tile all the
+    # same.
+    cluster.ready_on_install = False
+    view = runner.start(forEveryone=True)
+    while view["stage"] != "rollout":
+        clock.advance(view["waitSeconds"])
+        view = runner.step()
+    assert view["tile"] == {"outcome": "copied", "problem": None}
+    assert cluster.of("desktop", "PUT")[0].content == PNG
 
 
 def test_an_update_puts_the_picture_on_the_tile_again(runner, store, cluster):

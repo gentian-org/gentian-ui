@@ -1,7 +1,7 @@
 """The store's picture of an app, put on the app's tile on the tenant's desktop.
 
-After an install or an update has rolled out, the picture the store shows for
-the app is fetched here -- the way every store picture is (app/store/media.py):
+Once the director has an install or an update, the picture the store shows
+for the app is fetched here -- the way every store picture is (app/store/media.py):
 only from a media origin the store's meta lists, only as the image its bytes
 say it is -- and handed to the desktop as the tenant's tile for the app
 (`PUT /api/v1/tenant-tiles/{app}`), with the person's own token. The desktop

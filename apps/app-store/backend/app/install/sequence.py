@@ -13,7 +13,7 @@ person's own token:
     metering     custodian  PUT  /v1/credentials/app-{t}-{app}-metering   (an app priced by use)
     approvals    usher      GET  /v1/tenants/{t}/apps/status  (while the app waits on a person)
     rollout      usher      GET  /v1/tenants/{t}/apps/status
-    tile         desktop    PUT  /api/v1/tenant-tiles/{app}   (once ready; never fails the install)
+    tile         desktop    PUT  /api/v1/tenant-tiles/{app}   (after the install; never fails it)
 
 An add-on is an entry of its own, acquired as an app is, and installed inside
 the app it extends: its sequence is the same up to the install, which it
@@ -597,6 +597,12 @@ async def _install(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None
     if answer.status not in (200, 202) or not isinstance(answer.body, dict):
         raise answer.refusal()
     op.install = {"status": answer.body.get("status"), "commit": answer.body.get("commit")}
+    # The app's tile is given the store's picture as soon as the director has
+    # the app, not once it is ready: the rollout is only watched while the
+    # person keeps this page open, and a picture that waited for it was never
+    # copied for anyone who did not. Whatever comes of it, the install goes on.
+    if op.tile is None:
+        op.tile = await tile.copy_to_desktop(ctx, op.coordinate, op.profile)
     op.stage = "addons" if confirmation.addons else _after_install(op)
 
 
@@ -733,11 +739,6 @@ async def _rollout(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None
     op.rollout = state
     phase = state["phase"] if state else None
     if phase == "ready" and not (state and state["pendingPrivilegeApprovals"]):
-        # The app is there. Its tile is given the store's picture once, and
-        # whatever comes of that, the install is done. An add-on's tile is
-        # its base's.
-        if op.tile is None and not op.addon_of:
-            op.tile = await tile.copy_to_desktop(ctx, op.coordinate, op.profile)
         op.stage = "done"
     elif phase == "failing":
         op.stage = "failing"
