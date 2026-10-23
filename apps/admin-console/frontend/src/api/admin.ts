@@ -1113,6 +1113,14 @@ export type AppState = {
   pendingPrivilegeApprovals?: PendingPrivilegeApproval[];
   /** The component's own conditions, as the operator reports them. */
   conditions?: { type: string; status: string; reason?: string; message?: string }[];
+  /**
+   * Who put the component in the tenant, from the operator's
+   * `gentianos.io/component-origin` label: `default` for one the platform
+   * places in every tenant and manages itself, `install` for one the tenant
+   * installed. Absent from an operator older than this field, and then the
+   * component counts as installed.
+   */
+  origin?: "default" | "install";
 };
 
 export function fetchAppStates() {
