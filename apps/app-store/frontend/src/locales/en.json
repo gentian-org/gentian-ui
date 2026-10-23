@@ -27,27 +27,25 @@
   "session": {
     "endedSignInAgain": "Your sign-in to {{store}} has ended. Sign in again to carry on; nothing that was done is lost.",
     "neededToAcquire": "Acquiring an app is done at {{store}}, with your account there. It is a different account from the one you are signed in to this cluster with.",
-    "openSignIn": "Open the sign-in at {{store}}",
-    "opensAt": "The sign-in opens in a separate window, at",
     "signIn": "Sign in to {{store}}",
     "signOut": "Sign out of the store",
     "signedIn": "Signed in to {{store}}",
-    "waitingForSignIn": "Waiting for the sign-in in the other window. This page carries on by itself."
+    "signingIn": "Signing you in to {{store}}…"
   },
   "signedIn": {
     "close": "Close this window",
-    "continueHere": "Continue in this window",
+    "continueHere": "Back to the App Store",
     "doneBody": "You can close this window. The App Store carries on in the window you came from.",
     "doneTitle": "You are signed in to the store",
     "failedTitle": "The sign-in to the store did not complete"
   },
   "signInReason": {
-    "code": "The store sent no sign-in code. Close this window and start the sign-in again.",
-    "denied": "The sign-in was cancelled or refused at the store. Close this window and start again if you want to sign in.",
-    "exchange": "The store did not accept the sign-in. Close this window and start again; if it keeps happening, the store’s support can say why.",
-    "other": "Close this window and start the sign-in again.",
-    "other-session": "This sign-in was started in another session on this cluster, so it was not completed here. Close this window and start the sign-in again from the App Store.",
-    "state": "This sign-in has expired or was already used. Close this window and start the sign-in again from the App Store."
+    "code": "The store sent no sign-in code. Start again from the App Store.",
+    "denied": "The sign-in was cancelled or refused at the store. Start again from the App Store if you want to sign in.",
+    "exchange": "The store did not accept the sign-in. Start again from the App Store; if it keeps happening, the store’s support can say why.",
+    "other": "Start the sign-in again from the App Store.",
+    "other-session": "This sign-in was started in another session on this cluster, so it was not completed here. Start it again from the App Store.",
+    "state": "This sign-in has expired or was already used. Start it again from the App Store."
   },
   "standing": {
     "browsingStays": "Browsing is not affected. Acquiring is not available until the store serves this tenant. Apps that are installed keep running.",
@@ -219,10 +217,10 @@
     "install": "Install",
     "rollout": "Roll out on the cluster",
     "metering": "Hand the app its usage key",
-    "approvals": "Approvals"
+    "approvals": "Approvals",
+    "selectUsers": "Select users in Admin Console"
   },
   "install": {
-    "acquiredNotInstalled": "This tenant has acquired this app. It is not installed.",
     "acquiring": "Asking {{store}} for this app…",
     "administeredInConsole": "Administration — access, uninstall, purge — is in the Admin Console, under Apps.",
     "alreadyInstalled": "Nothing to commit — this tenant already has that build.",
@@ -251,16 +249,10 @@
     "forEveryone": "for everyone",
     "installAction": "Install",
     "installBody": "Build <mono>{{digest}}</mono> of <mono>{{coordinate}}</mono>. Installing is a commit to the deployments repository with you as its author; the cluster has the app once that is synced.",
-    "installEveryone": "Install for everyone",
-    "installEveryoneBody": "Every member of this tenant has access by default; people invited later get it pre-selected.",
-    "installPlain": "Install",
-    "installPlainBody": "Access is given per person, under Members.",
     "installThisBuild": "Install this build",
-    "installTitle": "Install <mono>{{app}}</mono>?",
     "installing": "Installing: asking the cluster to commit the app at this build…",
     "loadingState": "Asking the cluster…",
     "lookAgain": "Look again",
-    "mayNeedCheckout": "This app has a price. The store may ask for a checkout, which opens in a separate window at the store.",
     "notPinned": "Installed with no stated build.",
     "nothingLost": "Nothing is lost: each step is safe to repeat, and the app is not acquired twice.",
     "openAdminConsole": "Open the Admin Console",
@@ -280,7 +272,6 @@
     "stopWaiting": "Stop waiting",
     "supportProject": "Support the project",
     "tryAgain": "Try again",
-    "twoWays": "You choose in the next step whether it is installed for everyone in this tenant.",
     "updateAction": "Update",
     "updateAvailable": "Update available: version {{version}}",
     "updateKeepsAccess": "Updating moves the installed app to this build. Who may open the app does not change.",
@@ -295,8 +286,12 @@
     "updateByCluster": "The cluster's administrator moves this app to newer builds.",
     "installed": "Installed",
     "buyAction": "Buy",
-    "supportAction": "Support",
-    "acquisition": "At the store:"
+    "supportAction": "Support Project",
+    "acquisition": "At the store:",
+    "whoTitle": "Who should get the app?",
+    "whoEverybody": "Everybody by default",
+    "whoSelected": "Only selected users",
+    "ok": "OK"
   },
   "refused": {
     "addons-403": "The cluster refused: you may not install in this tenant. The app itself is installed.",
@@ -387,7 +382,6 @@
     "role_none": "signed in"
   },
   "support": {
-    "title": "Support",
     "lead": "Partners that offer support for this app, as {{store}} lists them. What they offer and on which terms is theirs to say.",
     "verified": "Verified",
     "worldwide": "Worldwide",
@@ -434,7 +428,6 @@
   },
   "addons": {
     "chooseTitle": "Add-ons to install with it",
-    "withTheApp": "With the add-ons: {{addons}}. Each is acquired at the store and switched on in the app after it, one at a time.",
     "pinning": "Switching the add-on on in {{app}}…",
     "doneTitle": "{{addon}} is on in {{app}}",
     "doneBody": "Committed to the deployments repository. It takes effect once {{app}} has picked the change up, which can take a few minutes.",
@@ -460,5 +453,13 @@
     "rating": "Reviews",
     "notRated": "Not rated yet",
     "installations": "Installations"
+  },
+  "requirements": {
+    "title": "What it needs",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "storage": "Storage",
+    "platform": "Gentian OS",
+    "notStated": "The store does not say."
   }
 }

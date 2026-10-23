@@ -55,31 +55,30 @@ const STEP_OF: Record<Stage, Stage> = {
 };
 
 /**
- * The dialog an install is confirmed in.
+ * The dialog an install is confirmed in: the one thing that is the person's
+ * to decide, who gets the app. Everybody by default: every member of the
+ * tenant has it. Only selected users: nobody has it until they are given it
+ * in the Admin Console, which the install's last step leads to.
  *
- * It shows what is about to be sent to the cluster -- the coordinate and the
- * digest of the build -- before anything is sent, and asks the one thing
- * that is the person's to decide: whether the app is for everyone.
+ * An update asks nothing of the kind; its dialog shows the build it moves
+ * to and what changed.
  */
 function InstallDialog({
   detail,
   version,
   update,
-  addons,
   onConfirm,
   onClose,
 }: {
   detail: AppDetail;
   version: Version;
   update: boolean;
-  /** The names of the add-ons ticked to be installed with it. */
-  addons: string[];
   onConfirm: (everyone: boolean) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
-  const [everyone, setEveryone] = useState(false);
+  const [everyone, setEveryone] = useState(true);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -104,24 +103,19 @@ function InstallDialog({
           onConfirm(everyone);
         }}
       >
-        <h3 id="install-title" className="admin-console__dialog-title">
-          <Trans
-            i18nKey={update ? "install.updateTitle" : "install.installTitle"}
-            values={{ app: detail.name, version: version.version }}
-            components={mono}
-          />
-        </h3>
-        <p className="admin-console__lead">
-          <Trans
-            i18nKey="install.installBody"
-            values={{ coordinate: detail.coordinate, digest: shortDigest(version.digest) }}
-            components={mono}
-          />
-        </p>
-        <p className="admin-console__meta admin-console__mono admin-console__wrap">{version.digest}</p>
-
         {update ? (
           <>
+            <h3 id="install-title" className="admin-console__dialog-title">
+              <Trans i18nKey="install.updateTitle" values={{ app: detail.name, version: version.version }} components={mono} />
+            </h3>
+            <p className="admin-console__lead">
+              <Trans
+                i18nKey="install.installBody"
+                values={{ coordinate: detail.coordinate, digest: shortDigest(version.digest) }}
+                components={mono}
+              />
+            </p>
+            <p className="admin-console__meta admin-console__mono admin-console__wrap">{version.digest}</p>
             <p className="admin-console__lead">{t("install.updateKeepsAccess")}</p>
             {version.releaseNotes ? (
               <div className="store-dialog__notes">
@@ -131,36 +125,29 @@ function InstallDialog({
             ) : null}
           </>
         ) : (
-          <div className="admin-console__choices" role="radiogroup" aria-labelledby="install-title">
-            <label className={`admin-console__choice${everyone ? "" : " admin-console__choice--selected"}`}>
-              <input type="radio" name="install-access" checked={!everyone} onChange={() => setEveryone(false)} />
-              <span>
-                <span className="admin-console__choice-title">{t("install.installPlain")}</span>
-                <span className="admin-console__choice-desc">{t("install.installPlainBody")}</span>
-              </span>
-            </label>
-            <label className={`admin-console__choice${everyone ? " admin-console__choice--selected" : ""}`}>
-              <input type="radio" name="install-access" checked={everyone} onChange={() => setEveryone(true)} />
-              <span>
-                <span className="admin-console__choice-title">{t("install.installEveryone")}</span>
-                <span className="admin-console__choice-desc">{t("install.installEveryoneBody")}</span>
-              </span>
-            </label>
-          </div>
+          <>
+            <h3 id="install-title" className="admin-console__dialog-title">
+              {t("install.whoTitle")}
+            </h3>
+            <div className="admin-console__choices" role="radiogroup" aria-labelledby="install-title">
+              <label className={`admin-console__choice${everyone ? " admin-console__choice--selected" : ""}`}>
+                <input type="radio" name="install-access" checked={everyone} onChange={() => setEveryone(true)} />
+                <span className="admin-console__choice-title">{t("install.whoEverybody")}</span>
+              </label>
+              <label className={`admin-console__choice${everyone ? "" : " admin-console__choice--selected"}`}>
+                <input type="radio" name="install-access" checked={!everyone} onChange={() => setEveryone(false)} />
+                <span className="admin-console__choice-title">{t("install.whoSelected")}</span>
+              </label>
+            </div>
+          </>
         )}
-
-        {!update && addons.length > 0 ? (
-          <p className="admin-console__lead">{t("addons.withTheApp", { addons: addons.join(", ") })}</p>
-        ) : null}
-
-        {!update && detail.price.model !== "free" ? <p className="admin-console__hint">{t("install.mayNeedCheckout")}</p> : null}
 
         <div className="admin-console__dialog-footer">
           <button type="button" className="admin-console__btn admin-console__btn--quiet" onClick={onClose}>
             {t("install.cancel")}
           </button>
           <button type="submit" className="admin-console__btn admin-console__btn--primary">
-            {update ? t("install.updateAction") : everyone ? t("install.installEveryone") : t("install.installAction")}
+            {update ? t("install.updateAction") : t("install.ok")}
           </button>
         </div>
       </form>
@@ -191,6 +178,22 @@ function stepWords(operation: Operation, problem: Problem): string | null {
   if (problem.source !== "director" && problem.source !== "custodian") return null;
   const key = `refused.${operation.failedStage ?? ""}-${problem.status ?? ""}`;
   return i18n.exists(key) ? i18n.t(key) : null;
+}
+
+/** Installed for selected users only: who they are is given in the Admin Console, the install's last step. */
+const selectsUsers = (operation: Operation) => operation.mode === "install" && !operation.forEveryone && !operation.addonOf;
+
+/** The Admin Console's Apps tab, opened at one app, where who has it is given. */
+export function accessUrl(adminConsoleUrl: string | null | undefined, coordinate: string): string | null {
+  if (!adminConsoleUrl || !adminConsoleUrl.startsWith("https://")) return null;
+  try {
+    const url = new URL(adminConsoleUrl);
+    url.searchParams.set("tab", "apps");
+    url.searchParams.set("app", coordinate.split("/", 2)[1] ?? coordinate);
+    return url.toString();
+  } catch {
+    return null;
+  }
 }
 
 function StepList({ operation }: { operation: Operation }) {
@@ -225,6 +228,14 @@ function StepList({ operation }: { operation: Operation }) {
           </li>
         );
       })}
+      {selectsUsers(operation) ? (
+        <li
+          className={`store-steps__step${operation.stage === "done" ? " store-steps__step--current" : ""}`}
+          aria-current={operation.stage === "done" ? "step" : undefined}
+        >
+          {t("steps.selectUsers")}
+        </li>
+      ) : null}
     </ol>
   );
 }
@@ -260,6 +271,7 @@ function Progress({
 }) {
   const { t } = useTranslation();
   const { session } = useStoreSession();
+  const contextQuery = useQuery({ queryKey: ["context"], queryFn: fetchContext, retry: false });
   const [typed, setTyped] = useState("");
   const stage = operation.stage;
   const waitingRepository = operation.repositories.find((r) => r.credential === "waiting");
@@ -494,6 +506,16 @@ function Progress({
             <p className="store-notice__text">{t("install.alreadyInstalled")}</p>
           ) : null}
           <div className="admin-console__actions">
+            {selectsUsers(operation) && accessUrl(contextQuery.data?.adminConsoleUrl, operation.coordinate) ? (
+              <a
+                className="admin-console__btn admin-console__btn--primary"
+                href={accessUrl(contextQuery.data?.adminConsoleUrl, operation.coordinate) ?? undefined}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t("steps.selectUsers")}
+              </a>
+            ) : null}
             <button type="button" className="admin-console__btn admin-console__btn--quiet" onClick={onStop}>
               {t("install.close")}
             </button>
@@ -762,23 +784,45 @@ function useInstall(): InstallModel {
 }
 
 /**
+ * What a page of this app carries to go on where it was: the install asked
+ * for from a tile (`install`), and once the person chose who gets the app,
+ * that choice (`everyone`) and the add-ons ticked with it -- so a sign-in to
+ * the store, which takes the window away and back, does not make anybody
+ * press Install again.
+ */
+export type Resume = { install?: boolean; everyone?: boolean; addons?: string };
+
+/** The page to come back to after a sign-in, carrying what to go on with. */
+function resumePath(coordinate: string, resume: Resume): string {
+  const query = new URLSearchParams();
+  if (resume.install) query.set("install", "true");
+  if (resume.everyone !== undefined) query.set("everyone", String(resume.everyone));
+  if (resume.addons) query.set("addons", resume.addons);
+  const tail = query.toString();
+  return `/app/${coordinate}${tail ? `?${tail}` : ""}`;
+}
+
+/**
  * What the tenant has of one app, and getting it: asked of the cluster and
  * the store once, and shown by the parts of the details placed inside.
- * `autoInstall` asks for the install as soon as it is known the app is not
- * installed: the details were opened by a tile's Install or Buy.
+ * `resume` is what the page was opened with: a tile's Install or Buy, or
+ * the way back from a sign-in to the store. `onResumed` is told once it has
+ * been acted on, so a reload does not do it again.
  */
 export function InstallScope({
   detail,
   storeName,
-  autoInstall,
+  resume,
+  onResumed,
   children,
 }: {
   detail: AppDetail;
   storeName: string;
-  autoInstall?: boolean;
+  resume?: Resume;
+  onResumed?: () => void;
   children: ReactNode;
 }) {
-  const { session } = useStoreSession();
+  const { session, begin: signIn } = useStoreSession();
   const coordinate = detail.coordinate;
   const latest = detail.versions[0];
 
@@ -792,7 +836,7 @@ export function InstallScope({
   const [chosen, setChosen] = useState<string[]>([]);
   const [queued, setQueued] = useState<string[]>([]);
   const sequence = useSequence(coordinate, coordinate, stateQuery.data?.operation ?? null);
-  const { operation, start, setStepError, setWantsSignIn } = sequence;
+  const { operation, start, setStepError } = sequence;
 
   const state = stateQuery.data;
   const standing = session?.signedIn ? session.standing : null;
@@ -802,11 +846,24 @@ export function InstallScope({
   const appPinned = (installed !== null || Boolean(operation?.install)) && (!operation || PINNED.includes(operation.stage));
   const activeAddons = installed?.addons ?? [];
 
-  const begin = (mode: "install" | "update", everyone: boolean) => {
+  /**
+   * Install or update, as chosen in the dialog. Without a sign-in to the
+   * store the window goes to the store first and comes back here with the
+   * choice, and this is done then.
+   */
+  const begin = (mode: "install" | "update", everyone: boolean, addons: string[] = chosen) => {
     setDialog(null);
     setStepError(null);
+    if (!signedIn) {
+      signIn(
+        mode === "install"
+          ? resumePath(coordinate, { install: true, everyone, addons: addons.join(",") || undefined })
+          : resumePath(coordinate, {}),
+      );
+      return;
+    }
     if (mode === "install") {
-      setQueued(chosen);
+      setQueued(addons);
       setChosen([]);
     }
     start.mutate({
@@ -818,36 +875,43 @@ export function InstallScope({
     });
   };
 
-  const ask = (mode: "install" | "update") => {
-    if (!signedIn) {
-      setWantsSignIn(true);
-      return;
-    }
-    setDialog(mode);
-  };
+  const ask = (mode: "install" | "update") => setDialog(mode);
 
   // The add-ons ticked beside an installed app go in one at a time, as the
   // director replaces the list whole.
+  const queue = (addons: string[]) =>
+    setQueued((now) => [...now, ...addons.filter((c) => !now.includes(c) && !activeAddons.includes(nameOf(c)))]);
   const installAddons = () => {
     if (!signedIn) {
-      setWantsSignIn(true);
+      signIn(resumePath(coordinate, { addons: chosen.join(",") }));
       return;
     }
-    setQueued((now) => [...now, ...chosen.filter((c) => !now.includes(c) && !activeAddons.includes(nameOf(c)))]);
+    queue(chosen);
     setChosen([]);
   };
 
   const settled = useCallback((addon: string) => setQueued((now) => now.filter((c) => c !== addon)), []);
 
-  // Opened by a tile's Install or Buy: asked once, when it is known that the
-  // app is not installed and nothing is under way. Not before the store
-  // session is known, so a person signed in is not asked to sign in.
-  const asked = useRef(false);
+  // What the page was opened with, acted on once: when the app's state and
+  // the store session are known, and nothing is under way.
+  const resumed = useRef(false);
   const sessionKnown = session !== undefined;
   useEffect(() => {
-    if (!autoInstall || asked.current || !state || !sessionKnown || operation || state.installed || detail.addonOf) return;
-    asked.current = true;
-    ask("install");
+    if (resumed.current || !resume || !state || !sessionKnown || operation || detail.addonOf) return;
+    if (!resume.install && !resume.addons) return;
+    resumed.current = true;
+    const addons = (resume.addons ?? "").split(",").filter((c) => detail.addons.some((a) => a.coordinate === c));
+    if (!state.installed && resume.install) {
+      if (signedIn && resume.everyone !== undefined) begin("install", resume.everyone, addons);
+      else {
+        setChosen(addons);
+        ask("install");
+      }
+    } else if (state.installed && addons.length > 0) {
+      if (signedIn) queue(addons);
+      else setChosen(addons);
+    }
+    onResumed?.();
   });
 
   const model: InstallModel = {
@@ -876,7 +940,6 @@ export function InstallScope({
           detail={detail}
           version={latest}
           update={dialog === "update"}
-          addons={dialog === "install" ? detail.addons.filter((a) => chosen.includes(a.coordinate)).map((a) => a.name) : []}
           onClose={() => setDialog(null)}
           onConfirm={(everyone) => begin(dialog, everyone)}
         />
@@ -903,7 +966,7 @@ export function InstallButton() {
     return (
       <button
         type="button"
-        className={`admin-console__btn store-install__action${more ? " admin-console__btn--primary" : ""}`}
+        className={`admin-console__btn${more ? " admin-console__btn--primary" : ""}`}
         disabled={!more || sequence.busy || refused}
         onClick={installAddons}
       >
@@ -921,7 +984,7 @@ export function InstallButton() {
   return (
     <button
       type="button"
-      className="admin-console__btn admin-console__btn--primary store-install__action"
+      className="admin-console__btn admin-console__btn--primary"
       disabled={!state || Boolean(operation) || sequence.busy || refused}
       onClick={() => ask("install")}
     >
@@ -1050,10 +1113,8 @@ export function InstallStatus() {
         </>
       ) : (
         <>
-          {state.stage === "acquired" ? <p className="admin-console__lead">{t("install.acquiredNotInstalled")}</p> : null}
           {state.stage === "checkout" ? <p className="admin-console__lead">{t("install.checkoutOpen", { store: storeName })}</p> : null}
           {refused ? <p className="admin-console__hint">{t("install.refusedByStore")}</p> : null}
-          {state.stage === "not-installed" ? <p className="admin-console__meta">{t("install.twoWays")}</p> : null}
         </>
       )}
 
@@ -1169,21 +1230,12 @@ function AddonRow({ addon }: { addon: AppDetail["addons"][number] }) {
               setChosen(event.target.checked ? [...chosen, coordinate] : chosen.filter((c) => c !== coordinate))
             }
           />
-          <span>
-            <span className="admin-console__card-title">{addon.name}</span>
-            {detail ? (
-              <span className="admin-console__meta">
-                {" — "}
-                <PriceText price={detail.price} />
-              </span>
-            ) : null}
-            {addon.summary ? <span className="admin-console__meta store-addon__summary">{addon.summary}</span> : null}
-          </span>
+          <span className="store-addon__name">{addon.name}</span>
         </label>
         <div className="store-addon__act">
           {on && !operation ? <span className="admin-console__badge admin-console__badge--ok">{t("addons.on")}</span> : null}
           {isQueued && !operation ? <span className="admin-console__chip">{t("addons.queued")}</span> : null}
-          <button type="button" className="admin-console__btn admin-console__btn--quiet" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <button type="button" className="admin-console__btn-link store-addon__toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
             {t("app.details")}
           </button>
         </div>
@@ -1191,6 +1243,11 @@ function AddonRow({ addon }: { addon: AppDetail["addons"][number] }) {
 
       {open ? (
         <div className="store-addon__details">
+          {detail && detail.price.model !== "free" ? (
+            <p className="admin-console__meta">
+              <PriceText price={detail.price} />
+            </p>
+          ) : null}
           {description ? <StoreMarkdown source={description} /> : null}
           {on && !operation ? (
             <div className="admin-console__actions">

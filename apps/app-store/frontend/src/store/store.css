@@ -313,20 +313,9 @@ a.admin-console__btn {
   }
 }
 
-/* Where an enterprise edition's panel has its price, a community or
-   maintained one says where to give back: a second button, never the first. */
-.store-giveback {
-  margin-top: 1rem;
-  padding-top: 0.875rem;
-  border-top: 1px solid var(--gtn-border-faint);
-}
-
-.store-giveback__label {
-  margin-top: 0.35rem;
-}
-
 .store-card__main {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.2rem;
   min-width: 0;
 }
@@ -366,11 +355,14 @@ a.admin-console__btn {
   color: var(--gtn-ink-4);
 }
 
+/* At the foot of the card, each button its own height. */
 .store-card__actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.4rem;
-  margin-top: 0.6rem;
+  margin-top: auto;
+  padding-top: 0.6rem;
 }
 
 .store-card__actions [aria-disabled="true"] {
@@ -403,9 +395,28 @@ a.admin-console__btn {
   padding: 0 1.25rem 1.25rem;
 }
 
-.store-install__actions {
-  margin-top: 0;
-  margin-bottom: 0.75rem;
+/* Getting the app: two buttons with room around them, and beneath them how
+   the installation stands. No frame. */
+.store-get {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+}
+
+.store-get__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.store-get--ee .admin-console__btn--primary {
+  background: var(--store-ee-action);
+}
+
+.store-get--ee .admin-console__btn--primary:hover:not(:disabled) {
+  background: var(--store-ee-action-hover);
 }
 
 .store-scorecard__list {
@@ -984,33 +995,55 @@ a.admin-console__btn {
 
 /* ── Support offers ──────────────────────────────────────────────────────── */
 
+.store-support {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.store-support__offers {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .store-support__offer {
-  align-items: flex-start;
-  gap: 1rem;
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--gtn-border-faint);
+}
+
+.store-support__main {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.store-support__main .admin-console__meta,
+.store-support__main .admin-console__actions {
+  margin: 0;
+}
+
+.store-support__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-weight: 600;
 }
 
 .store-support__logo {
-  flex: none;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: var(--gtn-r2);
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--gtn-r1);
   object-fit: contain;
   background: var(--gtn-paper-1);
   font-weight: 600;
   line-height: 1;
-}
-
-.store-support__offer .admin-console__card-title .admin-console__badge {
-  margin-left: 0.5rem;
-}
-
-.store-support__tiers {
-  margin: 0.5rem 0;
-  padding-left: 1.125rem;
-}
-
-.store-support__tier-name {
-  font-weight: 600;
 }
 
 .store-support__received {
@@ -1057,7 +1090,7 @@ a.admin-console__btn {
 
 .store-addons__list {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.3rem;
   margin: 0.5rem 0 0;
   padding: 0;
   list-style: none;
@@ -1065,8 +1098,8 @@ a.admin-console__btn {
 
 .store-addon {
   display: grid;
-  gap: 0.5rem;
-  padding: 0.6rem 0.75rem;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
   border: 1px solid var(--gtn-border);
   border-radius: var(--gtn-r1);
 }
@@ -1094,8 +1127,17 @@ a.admin-console__btn {
   gap: 0.4rem;
 }
 
-.store-addon__summary {
-  display: block;
+.store-addon__name {
+  font-weight: 600;
+  color: var(--gtn-ink-1);
+}
+
+.store-addon__toggle {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 0.8125rem;
+  cursor: pointer;
 }
 
 .store-addon__details {

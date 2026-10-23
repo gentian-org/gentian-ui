@@ -99,6 +99,12 @@ type Outcome = { kind: "access" | "uninstall"; app: string; everyone?: boolean; 
  * and what that service answers is shown as it said it, a refusal included.
  * This screen decides nothing about who may do what.
  */
+/** The app a link names (?app=<profile>), when it names one. */
+export function linkedApp(search: string = typeof window === "undefined" ? "" : window.location.search): string | null {
+  const wanted = new URLSearchParams(search).get("app");
+  return wanted && /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(wanted) ? wanted : null;
+}
+
 export function AppsSection({
   tenant,
   onOpenIntegrations,
@@ -111,7 +117,9 @@ export function AppsSection({
   // The app whose Details are open, by name: the row is looked up again on
   // every render, so the panel shows the app as it is now and closes by
   // itself when the app is gone from both answers.
-  const [open, setOpen] = useState<string | null>(null);
+  // A link may name one (?app=<profile>): the App Store's last step of an
+  // install for selected users opens its Details here, where access is given.
+  const [open, setOpen] = useState<string | null>(() => linkedApp());
   const [outcome, setOutcome] = useState<Outcome | null>(null);
 
   const declaredQuery = useQuery({

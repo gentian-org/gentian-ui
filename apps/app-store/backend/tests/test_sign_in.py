@@ -12,6 +12,7 @@ import hashlib
 import logging
 from urllib.parse import parse_qs, urlsplit
 
+import pytest
 from conftest import ALICE, ALICE_ELSEWHERE, BOB, HOST, make_settings
 from fakestore import ISSUER, REFRESH_TOKEN, STORE_TOKEN
 
@@ -330,3 +331,37 @@ def test_starting_a_sign_in_is_refused_from_another_origin(api, store):
     assert answer.status_code == 403
     assert answer.json()["reason"] == "origin_mismatch"
     assert oauth._pending == {}
+
+
+def test_a_sign_in_returns_to_the_page_it_left(api, store):
+    """A sign-in made in the same window comes back to the page that needed
+    it, where what the person was doing carries on."""
+    page = "/app/gentian/nextcloud-base-ee?install=true&everyone=true"
+    answer = api.post("/api/v1/store/sign-in", json={"returnTo": page}, headers=ALICE)
+    state = parse_qs(urlsplit(answer.json()["authorizationUrl"]).query)["state"][0]
+    back = api.get(f"/oauth/callback?code=the-code&state={state}", headers=ALICE)
+    assert back.status_code == 303 and back.headers["location"] == page
+    assert api.get("/api/v1/store/session", headers=ALICE).json()["signedIn"] is True
+
+
+@pytest.mark.parametrize(
+    "elsewhere",
+    [
+        "https://evil.example/",
+        "//evil.example/x",
+        "/\\evil.example",
+        "javascript:alert(1)",
+        "app/x",
+        "/a b",
+    ],
+)
+def test_a_sign_in_returns_to_no_other_origin(api, store, elsewhere):
+    answer = api.post("/api/v1/store/sign-in", json={"returnTo": elsewhere}, headers=ALICE)
+    assert answer.status_code == 400
+
+
+def test_a_failed_sign_in_that_had_somewhere_to_return_ends_on_its_own_page(api, store):
+    answer = api.post("/api/v1/store/sign-in", json={"returnTo": "/app/gentian/x"}, headers=ALICE)
+    state = parse_qs(urlsplit(answer.json()["authorizationUrl"]).query)["state"][0]
+    denied = api.get(f"/oauth/callback?error=access_denied&state={state}", headers=ALICE)
+    assert denied.headers["location"] == "/signed-in?error=denied"

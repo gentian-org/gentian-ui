@@ -465,8 +465,12 @@ export const fetchReports = (coordinate: string) =>
   apiFetch<{ items: Report[] }>(`/store/apps/${appPath(coordinate)}/reports`);
 
 export const fetchStoreSession = () => apiFetch<StoreSession>("/store/session");
-export const beginStoreSignIn = () =>
-  apiFetch<{ authorizationUrl: string }>("/store/sign-in", { method: "POST" });
+/** Start a sign-in to the store; `returnTo` is the page of this app the browser comes back to. */
+export const beginStoreSignIn = (returnTo?: string) =>
+  apiFetch<{ authorizationUrl: string }>("/store/sign-in", {
+    method: "POST",
+    ...(returnTo ? { body: JSON.stringify({ returnTo }) } : {}),
+  });
 export const signOutOfStore = () => apiFetch<StoreSession>("/store/session", { method: "DELETE" });
 
 export const fetchAppState = (coordinate: string) =>

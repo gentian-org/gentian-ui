@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { fetchApp, fetchMeta, fetchReports, type AppDetail, type Link as StoreLink } from "@/api/store";
+import { fetchApp, fetchMeta, fetchReports, type AppDetail, type Link as StoreLink, type Version } from "@/api/store";
 import i18n from "@/lib/i18n";
 import { coordinateParams } from "@/store/BrowsePage";
-import { AddonSection, InstallButton, InstallScope, InstallStatus } from "@/store/InstallPanel";
+import { AddonSection, InstallButton, InstallScope, InstallStatus, type Resume } from "@/store/InstallPanel";
 import { DateText, EditionBadge, ExternalLink, giveBackLink, Picture, PriceText, ProblemNote, StoreLinkItem, useStoreName } from "@/store/parts";
 import { Reviews } from "@/store/Reviews";
 import { StoreMarkdown } from "@/store/StoreMarkdown";
@@ -99,6 +99,44 @@ function Scorecard({ detail }: { detail: AppDetail }) {
   );
 }
 
+/**
+ * What the app needs of the cluster, as the store states it for the latest
+ * version: the least it reserves, the platform versions it runs on, and
+ * anything else in a sentence. A description; the cluster reads the profile.
+ */
+function Requirements({ version }: { version: Version | undefined }) {
+  const { t } = useTranslation();
+  const needs = version?.requirements;
+  const rows = [
+    ["requirements.cpu", needs?.resources?.cpu],
+    ["requirements.memory", needs?.resources?.memory],
+    ["requirements.storage", needs?.resources?.storage],
+    ["requirements.platform", needs?.platform],
+  ].filter((row): row is [string, string] => Boolean(row[1]));
+  const notes = needs?.notes ?? [];
+  return (
+    <aside className="store-install store-scorecard">
+      <h2 className="admin-console__subsection-title">{t("requirements.title")}</h2>
+      {rows.length > 0 ? (
+        <dl className="store-scorecard__list">
+          {rows.map(([key, value]) => (
+            <Fragment key={key}>
+              <dt>{t(key)}</dt>
+              <dd className="admin-console__mono">{value}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      ) : null}
+      {notes.map((note, index) => (
+        <p key={index} className="admin-console__meta">
+          {note}
+        </p>
+      ))}
+      {rows.length === 0 && notes.length === 0 ? <p className="admin-console__meta">{t("requirements.notStated")}</p> : null}
+    </aside>
+  );
+}
+
 /** Where to read more of the app: its homepage, its source, its videos. Support and donations are in Support. */
 const NOT_RESOURCES = new Set(["donate", "support", "license", "privacy", "terms", "subscription"]);
 
@@ -126,41 +164,87 @@ function Resources({ links }: { links: StoreLink[] }) {
 }
 
 /**
- * Where to get help: the partners the store lists, and for an app that is
- * not sold, where to give back to the people who build it.
+ * Support Project: where to give back to the people who build an app that
+ * is not sold, and the partners the store lists that offer support for it.
+ * With no partner listed it is the project's own page; otherwise a dialog
+ * with both.
  */
-function SupportSection({ detail, storeName }: { detail: AppDetail; storeName: string }) {
+function SupportProject({ detail, storeName }: { detail: AppDetail; storeName: string }) {
   const { t } = useTranslation();
   const metaQuery = useQuery({ queryKey: ["store", "meta"], queryFn: fetchMeta, retry: false });
+  const [open, setOpen] = useState(false);
   const giveBack = giveBackLink(detail.edition, detail.links);
+  const partners = metaQuery.data?.features.includes("support") === true && (detail.support ?? []).length > 0;
+  if (!partners && !giveBack) return null;
+  if (!partners && giveBack) {
+    return (
+      <a className="admin-console__btn" href={giveBack.url} target="_blank" rel="noopener noreferrer" title={giveBack.label ?? undefined}>
+        {t("install.supportAction")}
+      </a>
+    );
+  }
   return (
-    <div id="store-support">
-      <Support detail={detail} meta={metaQuery.data} storeName={storeName} />
-      {giveBack ? (
-        <section className="admin-console__subsection store-giveback">
-          <a className="admin-console__btn store-giveback__btn" href={giveBack.url} target="_blank" rel="noopener noreferrer" title={giveBack.label ?? undefined}>
-            {giveBack.rel === "donate" ? t("install.donate") : t("install.supportProject")}
-          </a>
-          {giveBack.label ? <p className="admin-console__meta store-giveback__label">{giveBack.label}</p> : null}
-        </section>
+    <>
+      <button type="button" className="admin-console__btn" onClick={() => setOpen(true)}>
+        {t("install.supportAction")}
+      </button>
+      {open ? (
+        <SupportDialog title={t("install.supportAction")} onClose={() => setOpen(false)}>
+          {giveBack ? (
+            <div className="admin-console__actions">
+              <a className="admin-console__btn admin-console__btn--primary" href={giveBack.url} target="_blank" rel="noopener noreferrer">
+                {giveBack.rel === "donate" ? t("install.donate") : t("install.supportProject")}
+              </a>
+              {giveBack.label ? <span className="admin-console__meta">{giveBack.label}</span> : null}
+            </div>
+          ) : null}
+          <Support detail={detail} meta={metaQuery.data} storeName={storeName} />
+        </SupportDialog>
       ) : null}
-    </div>
+    </>
   );
 }
 
-/** Whether the app has a Support section to go to. */
-function hasSupport(detail: AppDetail, supported: boolean): boolean {
-  return (supported && (detail.support ?? []).length > 0) || giveBackLink(detail.edition, detail.links) !== null;
+function SupportDialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => dialog?.close();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className="admin-console__dialog"
+      aria-labelledby="support-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <div className="admin-console__dialog-body">
+        <h3 id="support-title" className="admin-console__dialog-title">
+          {title}
+        </h3>
+        {children}
+        <div className="admin-console__dialog-footer">
+          <button type="button" className="admin-console__btn admin-console__btn--quiet" onClick={onClose}>
+            {t("app.close")}
+          </button>
+        </div>
+      </div>
+    </dialog>
+  );
 }
 
-function Details({ detail, storeName, autoInstall }: { detail: AppDetail; storeName: string; autoInstall: boolean }) {
+function Details({ detail, storeName, resume, onResumed }: { detail: AppDetail; storeName: string; resume: Resume; onResumed: () => void }) {
   const { t } = useTranslation();
   const metaQuery = useQuery({ queryKey: ["store", "meta"], queryFn: fetchMeta, retry: false });
-  const supported = metaQuery.data?.features.includes("support") === true;
   const otherEditions = detail.editions.filter((entry) => entry.coordinate !== detail.coordinate);
 
   return (
-    <InstallScope key={detail.coordinate} detail={detail} storeName={storeName} autoInstall={autoInstall}>
+    <InstallScope key={detail.coordinate} detail={detail} storeName={storeName} resume={resume} onResumed={onResumed}>
       <div className="store-app__columns">
         <div className="store-app__main">
           <header className={`store-app__head store-app__head--${detail.edition}`}>
@@ -224,28 +308,20 @@ function Details({ detail, storeName, autoInstall }: { detail: AppDetail; storeN
           ) : null}
 
           <AddonSection />
-          <SupportSection detail={detail} storeName={storeName} />
           <Reviews detail={detail} meta={metaQuery.data} storeName={storeName} />
           <Reports coordinate={detail.coordinate} />
         </div>
 
         <div className="store-app__side">
-          <aside className={`store-install store-install--${detail.edition}`}>
-            <div className="admin-console__actions store-install__actions">
+          <div className={`store-get store-get--${detail.edition}`}>
+            <div className="store-get__actions">
               <InstallButton />
-              {hasSupport(detail, supported) ? (
-                <button
-                  type="button"
-                  className="admin-console__btn"
-                  onClick={() => document.getElementById("store-support")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                >
-                  {t("install.supportAction")}
-                </button>
-              ) : null}
+              <SupportProject detail={detail} storeName={storeName} />
             </div>
             <InstallStatus />
-          </aside>
+          </div>
           <Scorecard detail={detail} />
+          <Requirements version={detail.versions[0]} />
           <Resources links={detail.links} />
         </div>
       </div>
@@ -266,7 +342,7 @@ export function AppDetails() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { catalogue, app } = useParams({ strict: false }) as { catalogue: string; app: string };
-  const search = useSearch({ strict: false }) as { install?: boolean };
+  const search = useSearch({ strict: false }) as Resume;
   const coordinate = `${catalogue}/${app}`;
   const detailQuery = useQuery({ queryKey: ["store", "app", coordinate], queryFn: () => fetchApp(coordinate), retry: false });
   const metaQuery = useQuery({ queryKey: ["store", "meta"], queryFn: fetchMeta, retry: false });
@@ -287,7 +363,16 @@ export function AppDetails() {
   let body: React.ReactNode;
   if (detailQuery.isLoading) body = <p className="admin-console__loading">{t("app.loading")}</p>;
   else if (detailQuery.isError || !detailQuery.data) body = <ProblemNote error={detailQuery.error} />;
-  else body = <Details detail={detailQuery.data} storeName={storeName} autoInstall={search.install === true} />;
+  else
+    body = (
+      <Details
+        detail={detailQuery.data}
+        storeName={storeName}
+        resume={search}
+        // Acted on: the address no longer says it, so a reload does not do it again.
+        onResumed={() => void navigate({ to: "/app/$catalogue/$app", params: { catalogue, app }, search: {}, replace: true })}
+      />
+    );
 
   return (
     <dialog

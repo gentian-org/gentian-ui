@@ -10,12 +10,13 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import language_of, session_of
 from app.core.config import Settings, get_settings
 from app.core.problems import Refusal
 from app.install import sequence
-from app.store import oauth
+from app.store import oauth, patterns
 from app.store.client import get_store
 
 router = APIRouter(prefix="/store", tags=["store session"])
@@ -56,14 +57,27 @@ async def session(
     return _view(session)
 
 
+class SignInBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # The page of this app the browser comes back to once signed in; a path
+    # of this app, or the sign-in ends on its own page as before.
+    returnTo: str | None = Field(default=None, max_length=620)
+
+
 @router.post("/sign-in")
 async def sign_in(
-    session: str = Depends(session_of), settings: Settings = Depends(get_settings)
+    body: SignInBody | None = None,
+    session: str = Depends(session_of),
+    settings: Settings = Depends(get_settings),
 ) -> dict[str, str]:
-    """Start a sign-in: the address at the store's issuer to open in a
-    separate window. `state` and the PKCE verifier stay here."""
+    """Start a sign-in: the address at the store's issuer to send the
+    browser to. `state` and the PKCE verifier stay here."""
     store = get_store(settings)
-    return {"authorizationUrl": await oauth.begin(settings, store, session)}
+    back_to = body.returnTo if body else None
+    if back_to is not None and oauth.return_path(back_to) is None:
+        raise patterns.invalid("That is not a page of this app.")
+    return {"authorizationUrl": await oauth.begin(settings, store, session, back_to)}
 
 
 @router.delete("/session")
@@ -88,6 +102,7 @@ async def callback(
     and the browser is sent on to a page that says how it went -- with a
     reason from a fixed set, never with anything the query said."""
     reason: str | None = None
+    back_to = oauth.return_to(state)
     try:
         if error is not None:
             # The issuer refused, or the person did. The state is used up
@@ -104,5 +119,6 @@ async def callback(
             # Signed in all the same; the standing is asked again before the
             # first call that needs it.
             pass
-    target = _DONE if reason is None else f"{_DONE}?error={reason}"
+    # Signed in: back to the page the person left, where it carries on.
+    target = (back_to or _DONE) if reason is None else f"{_DONE}?error={reason}"
     return RedirectResponse(target, status_code=303)
