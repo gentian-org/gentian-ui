@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { type Problem, problemOf } from "@/api/client";
 import type { Edition, Link as StoreLink, Price } from "@/api/store";
 import i18n from "@/lib/i18n";
-import { useStoreSession } from "@/store/session";
+import { inFrame, useStoreSession } from "@/store/session";
 
 /**
  * A link to somewhere outside this app: a store's page, a publisher's, a
@@ -151,47 +151,80 @@ export function ProblemNote({ problem, error }: { problem?: Problem | null; erro
   );
 }
 
+/** When this browser last left for a store sign-in, so a sign-in that does not hold is not tried over and over. */
+const SIGN_IN_AT = "gentian-app-store.signInAt";
+const SIGN_IN_AGAIN_AFTER_MS = 60_000;
+
+function recentlyLeft(): boolean {
+  try {
+    const at = Number(window.sessionStorage.getItem(SIGN_IN_AT) ?? "0");
+    return Date.now() - at < SIGN_IN_AGAIN_AFTER_MS;
+  } catch {
+    return false;
+  }
+}
+
+function leaving(): void {
+  try {
+    window.sessionStorage.setItem(SIGN_IN_AT, String(Date.now()));
+  } catch {
+    // Without storage the guard is off; the sign-in still works.
+  }
+}
+
 /**
- * Asks for the sign-in to the store, when something needs it.
+ * The sign-in to the store, when something needs it: started at once, with
+ * nothing to press. The window goes to the store's issuer and comes back to
+ * `returnTo` (by default this page), where what was asked for carries on.
  *
- * Two steps on purpose. The first asks the API to prepare the sign-in; the
- * second is a plain link the person follows, which a browser opens in a new
- * window without asking -- a window opened by script after a request has
- * come back is what pop-up blockers stop.
+ * One button only where going on by itself is not possible: in a frame,
+ * where the sign-in opens in a separate window, or when a sign-in a moment
+ * ago did not hold and trying again at once would go round in a circle.
  */
-export function StoreSignIn({ reason, storeName }: { reason: string; storeName: string }) {
+export function StoreSignIn({ reason, storeName, returnTo }: { reason: string; storeName: string; returnTo?: string }) {
   const { t } = useTranslation();
   const { session, signInUrl, starting, startError, begin } = useStoreSession();
-  if (session?.signedIn) return null;
-  let host = "";
-  if (signInUrl) {
-    try {
-      host = new URL(signInUrl).host;
-    } catch {
-      host = "";
-    }
-  }
+  const [held] = useState(() => recentlyLeft());
+  const framed = inFrame();
+  const signedIn = session?.signedIn === true;
+  const known = session !== undefined;
+
+  useEffect(() => {
+    if (!known || signedIn || held || framed) return;
+    leaving();
+    begin(returnTo);
+    // Once, when it is known that the person is not signed in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [known, signedIn]);
+
+  if (signedIn) return null;
   return (
     <div className="store-signin">
-      <p className="admin-console__lead">{reason}</p>
-      {signInUrl ? (
+      {framed && signInUrl ? (
+        <div className="admin-console__actions">
+          <a className="admin-console__btn admin-console__btn--primary" href={signInUrl} target="_blank" rel="noopener noreferrer">
+            {t("session.signIn", { store: storeName })}
+          </a>
+        </div>
+      ) : framed || held || startError ? (
         <>
-          <p className="admin-console__hint">
-            {t("session.opensAt")} <span className="admin-console__mono">{host}</span>
-          </p>
+          <p className="admin-console__meta">{reason}</p>
           <div className="admin-console__actions">
-            <a className="admin-console__btn admin-console__btn--primary" href={signInUrl} target="_blank" rel="noopener noreferrer">
-              {t("session.openSignIn", { store: storeName })}
-            </a>
+            <button
+              type="button"
+              className="admin-console__btn admin-console__btn--primary"
+              disabled={starting}
+              onClick={() => {
+                leaving();
+                begin(returnTo);
+              }}
+            >
+              {t("session.signIn", { store: storeName })}
+            </button>
           </div>
-          <p className="admin-console__meta">{t("session.waitingForSignIn")}</p>
         </>
       ) : (
-        <div className="admin-console__actions">
-          <button type="button" className="admin-console__btn admin-console__btn--primary" disabled={starting} onClick={begin}>
-            {t("session.signIn", { store: storeName })}
-          </button>
-        </div>
+        <p className="admin-console__meta">{t("session.signingIn", { store: storeName })}</p>
       )}
       {startError ? <ProblemNote error={startError} /> : null}
     </div>

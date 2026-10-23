@@ -1,6 +1,7 @@
 import { createRootRoute, createRoute, createRouter, Outlet } from "@tanstack/react-router";
 import { RequireAuth } from "@/auth/RequireAuth";
 import { AppDetails } from "@/store/AppPage";
+import type { Resume } from "@/store/InstallPanel";
 import { AppStore } from "@/store/AppStore";
 import { BrowsePage } from "@/store/BrowsePage";
 import { SignedInPage } from "@/store/SignedInPage";
@@ -23,9 +24,17 @@ const catalogueRoute = createRoute({ getParentRoute: () => browseRoute, path: "/
 const appRoute = createRoute({
   getParentRoute: () => browseRoute,
   path: "app/$catalogue/$app",
-  // `install`: opened by a tile's Install or Buy, which asks for the install at once.
-  validateSearch: (search: Record<string, unknown>): { install?: boolean } =>
-    search.install === true || search.install === "true" || search.install === 1 ? { install: true } : {},
+  // What the details go on with (InstallPanel's Resume): `install` from a
+  // tile's Install or Buy, and the way back from a store sign-in.
+  validateSearch: (search: Record<string, unknown>): Resume => {
+    const flag = (value: unknown) => (value === true || value === "true" ? true : value === false || value === "false" ? false : undefined);
+    const out: Resume = {};
+    if (flag(search.install)) out.install = true;
+    const everyone = flag(search.everyone);
+    if (everyone !== undefined) out.everyone = everyone;
+    if (typeof search.addons === "string" && /^[a-z0-9/,-]{1,600}$/.test(search.addons)) out.addons = search.addons;
+    return out;
+  },
   component: AppDetails,
 });
 

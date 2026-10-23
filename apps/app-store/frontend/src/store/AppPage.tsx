@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { fetchApp, fetchMeta, fetchReports, type AppDetail, type Link as StoreLink, type Version } from "@/api/store";
 import i18n from "@/lib/i18n";
 import { coordinateParams } from "@/store/BrowsePage";
-import { AddonSection, InstallButton, InstallScope, InstallStatus } from "@/store/InstallPanel";
+import { AddonSection, InstallButton, InstallScope, InstallStatus, type Resume } from "@/store/InstallPanel";
 import { DateText, EditionBadge, ExternalLink, giveBackLink, Picture, PriceText, ProblemNote, StoreLinkItem, useStoreName } from "@/store/parts";
 import { Reviews } from "@/store/Reviews";
 import { StoreMarkdown } from "@/store/StoreMarkdown";
@@ -238,13 +238,13 @@ function SupportDialog({ title, onClose, children }: { title: string; onClose: (
   );
 }
 
-function Details({ detail, storeName, autoInstall }: { detail: AppDetail; storeName: string; autoInstall: boolean }) {
+function Details({ detail, storeName, resume, onResumed }: { detail: AppDetail; storeName: string; resume: Resume; onResumed: () => void }) {
   const { t } = useTranslation();
   const metaQuery = useQuery({ queryKey: ["store", "meta"], queryFn: fetchMeta, retry: false });
   const otherEditions = detail.editions.filter((entry) => entry.coordinate !== detail.coordinate);
 
   return (
-    <InstallScope key={detail.coordinate} detail={detail} storeName={storeName} autoInstall={autoInstall}>
+    <InstallScope key={detail.coordinate} detail={detail} storeName={storeName} resume={resume} onResumed={onResumed}>
       <div className="store-app__columns">
         <div className="store-app__main">
           <header className={`store-app__head store-app__head--${detail.edition}`}>
@@ -342,7 +342,7 @@ export function AppDetails() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { catalogue, app } = useParams({ strict: false }) as { catalogue: string; app: string };
-  const search = useSearch({ strict: false }) as { install?: boolean };
+  const search = useSearch({ strict: false }) as Resume;
   const coordinate = `${catalogue}/${app}`;
   const detailQuery = useQuery({ queryKey: ["store", "app", coordinate], queryFn: () => fetchApp(coordinate), retry: false });
   const metaQuery = useQuery({ queryKey: ["store", "meta"], queryFn: fetchMeta, retry: false });
@@ -363,7 +363,16 @@ export function AppDetails() {
   let body: React.ReactNode;
   if (detailQuery.isLoading) body = <p className="admin-console__loading">{t("app.loading")}</p>;
   else if (detailQuery.isError || !detailQuery.data) body = <ProblemNote error={detailQuery.error} />;
-  else body = <Details detail={detailQuery.data} storeName={storeName} autoInstall={search.install === true} />;
+  else
+    body = (
+      <Details
+        detail={detailQuery.data}
+        storeName={storeName}
+        resume={search}
+        // Acted on: the address no longer says it, so a reload does not do it again.
+        onResumed={() => void navigate({ to: "/app/$catalogue/$app", params: { catalogue, app }, search: {}, replace: true })}
+      />
+    );
 
   return (
     <dialog
