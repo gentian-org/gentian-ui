@@ -30,8 +30,8 @@ def _coordinate(catalogue: str, app: str) -> str:
 
 @router.get("/overview")
 async def overview(ctx: Context = Depends(context)) -> dict[str, Any]:
-    """Installed and acquired: the cluster's side always, the store's side
-    when the person is signed in to it."""
+    """What the tenant has, for the catalogue's tiles: the cluster's side
+    always, the store's side when the person is signed in to it."""
     return await state.overview(ctx)
 
 

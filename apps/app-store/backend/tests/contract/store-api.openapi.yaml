@@ -9,7 +9,7 @@
 openapi: 3.1.0
 info:
   title: Gentian OS store API
-  version: "1.3"
+  version: "1.6"
   summary: What a cluster's App Store app asks of a store outside the cluster.
   license:
     name: Mozilla Public License 2.0
@@ -612,6 +612,9 @@ paths:
                           count: 2
                           average: 4.5
                           distribution: {"1": 0, "2": 0, "3": 0, "4": 1, "5": 1}
+                        addonCount: 1
+                        maturityScore: 7
+                        installations: 120
                       - coordinate: gentian/xwiki-ce
                         family: xwiki
                         name: XWiki
@@ -658,7 +661,11 @@ paths:
       summary: One app in full
       description: |
         `country` narrows `support` to the offers that cover that country,
-        worldwide offers among them. Without it every offer is listed.
+        worldwide offers among them. Without it, the store lists every
+        offer to an anonymous caller, and may narrow them for a signed-in
+        caller to a country it knows of the account (its company's); such
+        an answer is personalised and carries `Cache-Control: private,
+        no-store`. A `country` asked always wins.
       parameters:
         - $ref: "#/components/parameters/AcceptLanguage"
         - $ref: "#/components/parameters/IfNoneMatch"
@@ -2002,6 +2009,22 @@ components:
             (`POST /v1/apps/{catalogue}/{app}/support-requests`).
           items:
             type: string
+        catalogues:
+          type: array
+          description: |
+            The catalogue sources the store's entries come from: the first
+            half of every coordinate it serves is the `name` of one of them.
+            A cluster's installer that names this store may add each to the
+            cluster's own catalogue sources under that name, when the
+            cluster has none of the name, so an entry acquired here can be
+            installed without the administrator adding its catalogue by
+            hand. The bytes are still held to the digest of the install. A
+            catalogue whose entries are private still says where its
+            profiles are read from here; the charts and images they name are
+            pulled with the credential an acquisition confirms. Optional;
+            added in 1.5.
+          items:
+            $ref: "#/components/schemas/StoreCatalogue"
         links:
           type: object
           description: Pages of the store's a client may link to. Each is opened in a separate window.
@@ -2015,6 +2038,22 @@ components:
             account:
               $ref: "#/components/schemas/Url"
               description: Where a person manages their store account.
+    StoreCatalogue:
+      type: object
+      required: [name, url]
+      description: One catalogue source a store's entries come from. Added in 1.5.
+      properties:
+        name:
+          type: string
+          description: The catalogue's name, the first half of a coordinate.
+          pattern: "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
+        url:
+          $ref: "#/components/schemas/Url"
+          description: The https address the catalogue is served from, holding `index.yaml` and `profiles/<name>.yaml`.
+        displayName:
+          type: string
+          maxLength: 80
+          description: What the catalogue is called, in plain text.
     TenantStanding:
       type: object
       required: [tenantUrl, known, served, refusal, notices]
@@ -2179,7 +2218,8 @@ components:
             address, for a value it does not know. Values: `homepage`,
             `documentation`, `source`, `support`, `license`, `privacy`,
             `terms`, `subscription`, `donate` -- where to give money to
-            the people who build the app, on an entry that is not sold.
+            the people who build the app, on an entry that is not sold --
+            and `video` (1.6), a tutorial or demonstration video.
         label:
           type: [string, "null"]
           description: What to call it. Plain text.
@@ -2325,6 +2365,28 @@ components:
             - $ref: "#/components/schemas/ReviewSummary"
             - type: "null"
           description: The summary of the entry's reviews; `null` when the store carries none.
+        addonCount:
+          type: integer
+          minimum: 0
+          description: How many add-ons the entry's detail names in `addons`. Optional; a client that needs them reads the detail. Added in 1.4.
+        maturityScore:
+          type: [integer, "null"]
+          minimum: 0
+          maximum: 10
+          description: |
+            How mature the store judges the entry, 0 (least) to 10 (most).
+            What each point means is the store's to define and to publish
+            beside its listings; a client shows the number and does not
+            interpret it. `null` or absent: the store has not scored the
+            entry. Optional; added in 1.6.
+        installations:
+          type: integer
+          minimum: 0
+          description: |
+            How many tenants the store counts as having the entry. What it
+            counts -- confirmed acquisitions, installs it is told of -- is
+            the store's to say. Absent when the store does not say. Optional;
+            added in 1.6.
     AppDetail:
       allOf:
         - $ref: "#/components/schemas/AppSummary"
@@ -2374,10 +2436,33 @@ components:
               description: |
                 The partners that offer support for the entry, in the order
                 to show them, in the language of the request; narrowed by
-                `country` when it was asked. Absent or empty when there are
+                `country` when it was asked, or for a signed-in caller as the
+                operation says. Absent or empty when there are
                 none. Added in 1.3, with the feature `support`.
               items:
                 $ref: "#/components/schemas/SupportOffer"
+            customization:
+              $ref: "#/components/schemas/CustomizationSummary"
+    CustomizationSummary:
+      type: object
+      description: |
+        How far the entry can be customized, as its profile declares it
+        (`spec.customization` of the ComponentProfile): the grade and the
+        rungs of the customization ladder it supports. A description, read
+        from the profile as published; the cluster reads the profile
+        itself. Optional; added in 1.6.
+      required: [grade, rungs]
+      properties:
+        grade:
+          type: string
+          enum: [A, B, C, D, unknown]
+          description: The profile's customization grade; `unknown` when the profile states none.
+        rungs:
+          type: array
+          description: The rungs the profile lists as supported, lowest first. Empty when it lists none.
+          items:
+            type: string
+            enum: [L0, L1, L2, L3, L4, L5, L6]
     Screenshot:
       type: object
       required: [url, contentType]
@@ -2459,6 +2544,17 @@ components:
         summary:
           type: string
           maxLength: 300
+        iconUrl:
+          oneOf:
+            - $ref: "#/components/schemas/Url"
+            - type: "null"
+          description: The add-on's icon, as `iconUrl` of a summary. Optional; added in 1.4.
+        edition:
+          $ref: "#/components/schemas/Edition"
+          description: The add-on's edition. Optional; added in 1.4.
+        price:
+          $ref: "#/components/schemas/Price"
+          description: The add-on's list price. Optional; added in 1.4.
     License:
       type: object
       required: [name]
@@ -3160,6 +3256,13 @@ components:
         mediaOrigins: ["https://media.store.example"]
         checkoutOrigins: ["https://store.example"]
         features: [reviews, reports, checkout, support]
+        catalogues:
+          - name: gentian
+            url: https://catalogue.example/gentian
+            displayName: Gentian OS
+          - name: publisher
+            url: https://catalogue.publisher.example
+            displayName: Example Publisher
         links:
           terms: https://store.example/terms
           privacy: https://store.example/privacy
@@ -3237,6 +3340,9 @@ components:
           count: 2
           average: 4.5
           distribution: {"1": 0, "2": 0, "3": 0, "4": 1, "5": 1}
+        addonCount: 1
+        maturityScore: 7
+        installations: 120
         description: |
           Nextcloud keeps a team's files, calendars and contacts in one place.
 
@@ -3274,10 +3380,21 @@ components:
           - coordinate: gentian/nextcloud-office-ee
             name: Office
             summary: Edit documents in the browser.
+            iconUrl: https://media.store.example/icons/nextcloud-office.png
+            edition: ee
+            price:
+              model: subscription
+              amount: "2.00"
+              currency: CHF
+              per: user
+              period: month
+              note: null
         addonOf: null
         links:
           - {rel: homepage, label: null, url: "https://publisher.example"}
           - {rel: documentation, label: Administration manual, url: "https://publisher.example/docs"}
+          - {rel: source, label: null, url: "https://git.publisher.example/nextcloud"}
+          - {rel: video, label: Getting started, url: "https://www.youtube.com/watch?v=example"}
         license:
           spdx: null
           name: Example Publisher Enterprise License
@@ -3300,6 +3417,9 @@ components:
             priceHint: On request
             contactUrl: https://integrations.example/contact
             requestable: true
+        customization:
+          grade: A
+          rungs: [L0, L1, L3, L4]
     Confirmation:
       value:
         coordinate: gentian/nextcloud-base-ee

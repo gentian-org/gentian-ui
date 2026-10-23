@@ -309,6 +309,18 @@ class AppSummary(Model):
     latestVersion: Text(64)
     price: Price
     rating: ReviewSummary | None = None
+    # 1.6. The store's own score, 0 to 10, which it defines; null or absent
+    # when it has not scored the entry.
+    maturityScore: int | None = Field(default=None, ge=0, le=10)
+    # 1.6. How many tenants the store counts as having the entry.
+    installations: int | None = Field(default=None, ge=0)
+
+
+class CustomizationSummary(Model):
+    """How far the entry can be customized, as its profile declares it (1.6)."""
+
+    grade: Literal["A", "B", "C", "D", "unknown"]
+    rungs: list[Literal["L0", "L1", "L2", "L3", "L4", "L5", "L6"]] = []
 
 
 class Screenshot(Model):
@@ -401,6 +413,8 @@ class AppDetail(AppSummary):
     # 1.3. A store before it, or one without `support`, lists none; an offer
     # that does not fit is left out rather than taking the entry with it.
     support: Annotated[list[SupportOffer], BeforeValidator(_each_that_fits(SupportOffer))] = []
+    # 1.6. Absent from a store before it.
+    customization: CustomizationSummary | None = None
 
 
 Stars = Annotated[int, Field(ge=1, le=5)]

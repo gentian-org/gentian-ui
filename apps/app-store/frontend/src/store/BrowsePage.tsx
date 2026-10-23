@@ -1,9 +1,10 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, Outlet } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { fetchApps, fetchCategories, type AppSummary, type Edition } from "@/api/store";
+import { fetchApps, fetchCategories, fetchOverview, type AppSummary, type Edition } from "@/api/store";
 import { EditionBadge, Picture, PriceText, ProblemNote } from "@/store/parts";
+import { useStoreSession } from "@/store/session";
 
 const EDITIONS: Edition[] = ["ce", "me", "ee", "pe"];
 
@@ -12,12 +13,29 @@ export function coordinateParams(coordinate: string) {
   return { catalogue, app };
 }
 
-/** One entry of the catalogue. An enterprise edition's card stands out (store.css). */
-function AppCard({ entry }: { entry: AppSummary }) {
+/** What the tenant has of an entry, for its tile's button: from the cluster, and the store when signed in. */
+type Having = "installed" | "acquired" | "checkout" | null;
+
+/**
+ * One entry of the catalogue: Install, or Buy for one that is sold, and its
+ * Details. Both open the details on top of the catalogue; Install and Buy
+ * ask for the install there at once. An enterprise edition's card stands
+ * out (store.css).
+ */
+function AppCard({ entry, having }: { entry: AppSummary; having: Having }) {
   const { t } = useTranslation();
+  const params = coordinateParams(entry.coordinate);
+  const action =
+    having === "installed"
+      ? t("install.installed")
+      : having === "checkout"
+        ? t("install.continue")
+        : having === "acquired" || entry.price.model === "free"
+          ? t("install.installAction")
+          : t("install.buyAction");
   return (
     <li className={`store-card store-card--${entry.edition}`}>
-      <Link to="/app/$catalogue/$app" params={coordinateParams(entry.coordinate)} className="store-card__link">
+      <div className="store-card__link">
         <Picture src={entry.iconUrl} alt="" className="store-card__icon" initialOf={entry.name} />
         <span className="store-card__main">
           <span className="store-card__name">{entry.name}</span>
@@ -25,7 +43,6 @@ function AppCard({ entry }: { entry: AppSummary }) {
           <span className="store-card__summary">{entry.summary}</span>
           <span className="store-card__meta">
             <EditionBadge edition={entry.edition} />
-            <span className="admin-console__chip">{t(`trustTier.${entry.trustTier}`)}</span>
             <span className="store-card__price">
               <PriceText price={entry.price} />
             </span>
@@ -35,10 +52,40 @@ function AppCard({ entry }: { entry: AppSummary }) {
               </span>
             ) : null}
           </span>
+          <span className="store-card__actions">
+            {having === "installed" ? (
+              <Link to="/app/$catalogue/$app" params={params} className="admin-console__btn" aria-disabled="true">
+                {action}
+              </Link>
+            ) : (
+              <Link to="/app/$catalogue/$app" params={params} search={{ install: true }} className="admin-console__btn admin-console__btn--primary">
+                {action}
+              </Link>
+            )}
+            <Link to="/app/$catalogue/$app" params={params} className="admin-console__btn admin-console__btn--quiet">
+              {t("app.details")}
+            </Link>
+          </span>
         </span>
-      </Link>
+      </div>
     </li>
   );
+}
+
+/** What the tenant has, by app name: what the overview says, or nothing when it cannot be asked. */
+function useHaving(): (coordinate: string) => Having {
+  const { session } = useStoreSession();
+  const signedIn = session?.signedIn === true;
+  const overviewQuery = useQuery({ queryKey: ["overview", signedIn], queryFn: fetchOverview, retry: false });
+  const byProfile = new Map((overviewQuery.data?.rows ?? []).map((row) => [row.profile, row]));
+  return (coordinate) => {
+    const row = byProfile.get(coordinate.split("/", 2)[1] ?? "");
+    if (!row) return null;
+    // An installed app is matched by its name; one acquired, by its coordinate.
+    if (row.installed) return row.coordinate === null || row.coordinate === coordinate ? "installed" : null;
+    if (row.coordinate !== coordinate || !row.acquisition) return null;
+    return row.acquisition.status === "pending" ? "checkout" : row.acquisition.status === "confirmed" ? "acquired" : null;
+  };
 }
 
 /**
@@ -62,6 +109,7 @@ export function BrowsePage() {
     retry: false,
   });
   const entries = appsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const having = useHaving();
   const omitted = appsQuery.data?.pages.reduce((sum, page) => sum + page.omitted, 0) ?? 0;
 
   return (
@@ -117,7 +165,7 @@ export function BrowsePage() {
 
       <ul className="store-cards">
         {entries.map((entry) => (
-          <AppCard key={entry.coordinate} entry={entry} />
+          <AppCard key={entry.coordinate} entry={entry} having={having(entry.coordinate)} />
         ))}
       </ul>
 
@@ -134,6 +182,7 @@ export function BrowsePage() {
           </button>
         </div>
       ) : null}
+      <Outlet />
     </section>
   );
 }

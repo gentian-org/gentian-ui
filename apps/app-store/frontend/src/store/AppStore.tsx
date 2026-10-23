@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { useQuery } from "@tanstack/react-query";
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { Outlet } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { fetchContext, fetchMeta, type Notice } from "@/api/store";
 import { AccessButton } from "@/store/Access";
@@ -148,9 +148,7 @@ function Shell({ tenant }: { tenant: string }) {
   const { t } = useTranslation();
   const metaQuery = useQuery({ queryKey: ["store", "meta"], queryFn: fetchMeta, retry: false });
   const { session, signOut } = useStoreSession();
-  const path = useRouterState({ select: (state) => state.location.pathname });
   const storeName = useStoreName(metaQuery.data?.name);
-  const onInstalled = path.startsWith("/installed");
   const links = metaQuery.data?.links;
 
   return (
@@ -176,15 +174,6 @@ function Shell({ tenant }: { tenant: string }) {
           ) : null}
         </div>
       </header>
-
-      <nav className="admin-console__tabs" aria-label={t("shell.sections")}>
-        <Link to="/" className={`admin-console__tab${onInstalled ? "" : " admin-console__tab--active"}`}>
-          {t("shell.tabBrowse")}
-        </Link>
-        <Link to="/installed" className={`admin-console__tab${onInstalled ? " admin-console__tab--active" : ""}`}>
-          {t("shell.tabInstalled")}
-        </Link>
-      </nav>
 
       <div className="admin-console__body">
         {metaQuery.isError ? (

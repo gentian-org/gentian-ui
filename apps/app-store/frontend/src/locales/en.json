@@ -7,10 +7,7 @@
   },
   "shell": {
     "loading": "Loading the App Store…",
-    "sections": "App Store sections",
     "storeAwayClusterStays": "What is installed on this cluster is not affected, and is still shown.",
-    "tabBrowse": "Browse",
-    "tabInstalled": "Installed and acquired",
     "tenant": "Tenant: {{tenant}}",
     "theStore": "the store",
     "title": "App Store"
@@ -29,7 +26,6 @@
   },
   "session": {
     "endedSignInAgain": "Your sign-in to {{store}} has ended. Sign in again to carry on; nothing that was done is lost.",
-    "neededForAcquisitions": "What this tenant has acquired is kept at {{store}}. Sign in there with your account at the store to see it. It is a different account from the one you are signed in to this cluster with.",
     "neededToAcquire": "Acquiring an app is done at {{store}}, with your account there. It is a different account from the one you are signed in to this cluster with.",
     "openSignIn": "Open the sign-in at {{store}}",
     "opensAt": "The sign-in opens in a separate window, at",
@@ -82,11 +78,6 @@
     "me": "Maintained",
     "pe": "Private"
   },
-  "trustTier": {
-    "certified": "certified",
-    "experimental": "experimental",
-    "platform": "platform"
-  },
   "price": {
     "free": "Free",
     "oneTime": "{{amount}}, once",
@@ -103,10 +94,8 @@
   "app": {
     "addonOf": "An add-on of",
     "addons": "Add-ons",
-    "backToCatalogue": "Back to the catalogue",
     "latestVersion": "Version {{version}}",
     "license": "License:",
-    "links": "Links",
     "listPrice": "This is the list price. What this tenant is charged is what the checkout at the store says.",
     "loading": "Loading the app…",
     "moreReviews": "More reviews",
@@ -115,18 +104,15 @@
     "releaseNotes": "Release notes",
     "reports": "Evaluations and reports",
     "reportsLead": "Documents somebody wrote about this app. The store says who issued each one; it does not vouch for them, and nothing on the cluster reads them.",
-    "requiresCpu": "CPU {{quantity}}",
-    "requiresMemory": "memory {{quantity}}",
-    "requiresPlatform": "Gentian OS {{range}}",
-    "requiresStorage": "storage {{quantity}}",
     "reviewCount_one": "{{count}} review",
     "reviewCount_other": "{{count}} reviews",
     "reviewRating": "{{rating}} of 5",
     "reviewSummary_one": "{{average}} of 5, from {{count}} review",
     "reviewSummary_other": "{{average}} of 5, from {{count}} reviews",
     "reviews": "Reviews",
-    "screenshots": "Screenshots",
-    "versions": "Versions"
+    "details": "Details",
+    "close": "Close",
+    "resources": "Resources"
   },
   "score": {
     "easeOfSetup": "Ease of setup",
@@ -206,7 +192,8 @@
     "source": "Source code",
     "subscription": "Subscription",
     "support": "Support",
-    "terms": "Terms"
+    "terms": "Terms",
+    "video": "Video tutorial"
   },
   "stage": {
     "acquired": "Acquired, not installed",
@@ -262,7 +249,6 @@
     "doneTitle": "{{app}} is running",
     "failingLead": "The cluster reports that the app cannot start. In its own words:",
     "forEveryone": "for everyone",
-    "heading": "On this cluster",
     "installAction": "Install",
     "installBody": "Build <mono>{{digest}}</mono> of <mono>{{coordinate}}</mono>. Installing is a commit to the deployments repository with you as its author; the cluster has the app once that is synced.",
     "installEveryone": "Install for everyone",
@@ -306,7 +292,11 @@
     "meteringNotArrivedTitle": "The cluster has not made the app’s usage credential yet",
     "meteringNotArrivedBody": "The app is installed and billed by use, but the cluster has not yet asked for the key it reports its use with. Continue to try again; nothing is billed for use that is not reported.",
     "updateByPlatform": "The platform moves this app to the newest build inside the cluster's update window.",
-    "updateByCluster": "The cluster's administrator moves this app to newer builds."
+    "updateByCluster": "The cluster's administrator moves this app to newer builds.",
+    "installed": "Installed",
+    "buyAction": "Buy",
+    "supportAction": "Support",
+    "acquisition": "At the store:"
   },
   "refused": {
     "addons-403": "The cluster refused: you may not install in this tenant. The app itself is installed.",
@@ -325,18 +315,6 @@
     "install-502": "The cluster could not verify the build: its catalogue could not be read, or serves another build than the one the store named. Nothing was installed.",
     "install-503": "The cluster cannot write to its deployments repository right now. Nothing was installed.",
     "metering-403": "The cluster refused: you may not set this app’s credentials."
-  },
-  "installed": {
-    "colAcquisition": "At the store",
-    "colApp": "App",
-    "colBuild": "Installed build",
-    "colState": "On the cluster",
-    "lead": "What this tenant has acquired at the store, beside what is installed on this cluster and how it is doing.",
-    "loading": "Asking the cluster and the store…",
-    "notPinned": "no stated build",
-    "nothing": "Nothing is installed and nothing has been acquired.",
-    "nothingInstalled": "Nothing is installed.",
-    "title": "Installed and acquired"
   },
   "credential": {
     "noRepository": "This acquisition names no repository, so there is no credential to set.",
@@ -461,12 +439,26 @@
     "doneTitle": "{{addon}} is on in {{app}}",
     "doneBody": "Committed to the deployments repository. It takes effect once {{app}} has picked the change up, which can take a few minutes.",
     "on": "On",
-    "install": "Install",
     "queued": "Waiting its turn",
     "remove": "Remove",
     "removeBody": "Switch {{addon}} off in {{app}}? Nothing is cancelled at the store, and no data is deleted.",
     "removeAction": "Switch it off",
     "installedFromApp": "An add-on is installed inside its app, from that app’s page.",
-    "openApp": "Open the app"
+    "openApp": "Open the app",
+    "tickToAdd": "Tick the add-ons to add, then Install."
+  },
+  "scorecard": {
+    "title": "Scorecard",
+    "edition": "Edition",
+    "maturity": "Maturity",
+    "maturityOf": "{{score}} / 10",
+    "notScored": "Not scored yet",
+    "customization": "Customization",
+    "customizationGrade": "Grade {{grade}}",
+    "customizationGradeRung": "Grade {{grade}}, up to rung {{rung}}",
+    "notCharacterised": "Not characterised yet",
+    "rating": "Reviews",
+    "notRated": "Not rated yet",
+    "installations": "Installations"
   }
 }

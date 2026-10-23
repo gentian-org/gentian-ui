@@ -103,6 +103,16 @@ export type AppSummary = {
   latestVersion: string;
   price: Price;
   rating?: ReviewSummary | null;
+  /** The store's own score, 0 to 10, as it defines it (store API 1.6); null or absent when not scored. */
+  maturityScore?: number | null;
+  /** How many tenants the store counts as having the entry (1.6); null or absent when it does not say. */
+  installations?: number | null;
+};
+
+/** How far an entry can be customized, as its profile declares it (store API 1.6). */
+export type Customization = {
+  grade: "A" | "B" | "C" | "D" | "unknown";
+  rungs: string[];
 };
 
 export type Version = {
@@ -129,6 +139,8 @@ export type AppDetail = AppSummary & {
   license: { spdx?: string | null; name: string; url?: string | null } | null;
   /** The partners that offer support (store API 1.3); empty from a store without them. */
   support: SupportOffer[];
+  /** Absent or null from a store before 1.6. */
+  customization?: Customization | null;
 };
 
 /** A partner's offer of support for an app, in the store's words. */
