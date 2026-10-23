@@ -811,6 +811,7 @@
     "conditionReason": "Grund",
     "conditionMessage": "Meldung",
     "accessTitle": "Zugriff",
+    "accessPlatformManaged": "Die Plattform stellt diese App in jeden Mandanten und verwaltet sie selbst. Wer sie öffnen darf, wird für den Cluster entschieden, nicht hier.",
     "everyoneIsOn": "Diese App ist für alle: alle Mitglieder dieses Mandanten haben standardmäßig Zugriff, und bei später eingeladenen Personen ist er vorausgewählt.",
     "everyoneIsOff": "Diese App ist nicht für alle: Zugriff wird pro Person vergeben, unten.",
     "everyoneSwitchOn": "Für alle freigeben",

@@ -3,7 +3,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import "@/lib/i18n";
 import type { AdminContext, AppState } from "@/api/admin";
-import { PrivilegesPart } from "./AppsSection";
+import { AccessPart, joinApps, linkedApp, PrivilegesPart } from "./AppsSection";
 
 // The operator's app state as it is served (gentian-os
 // internal/applifecycle/apps.go): each pending request with who answers it.
@@ -98,5 +98,63 @@ describe("PrivilegesPart", () => {
     expect(rowOf(html, "egress/smtp-relay")).toContain(notYours);
     expect(rowOf(html, "podSecurity/run-as-root")).not.toContain(approve);
     expect(rowOf(html, "podSecurity/run-as-root")).toContain(securityOfficersHint);
+  });
+});
+
+describe("linkedApp", () => {
+  it("opens the app a link names, and nothing that is not an app's name", () => {
+    expect(linkedApp("?tab=apps&app=nextcloud-base-ce")).toBe("nextcloud-base-ce");
+    expect(linkedApp("?tab=apps&app=../../x")).toBeNull();
+    expect(linkedApp("?tab=apps")).toBeNull();
+  });
+});
+
+describe("joinApps", () => {
+  const running: AppState = { profile: "operations-console", name: "operations-console", ready: true, phase: "ready" };
+
+  it("gives a declared app the standing of a default component that runs it", () => {
+    const rows = joinApps([{ profile: "operations-console" }], [{ ...running, origin: "default" }]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].declared).toBeDefined();
+    expect(rows[0].state?.ready).toBe(true);
+  });
+
+  it("lists no row for a default component git does not declare", () => {
+    expect(joinApps([], [{ ...running, profile: "desktop", name: "desktop", origin: "default" }])).toEqual([]);
+  });
+
+  it("still lists an installed component git no longer declares", () => {
+    const rows = joinApps([], [{ ...state, origin: "install" }, state]);
+    expect(rows.map((row) => row.profile)).toEqual(["crm"]);
+    expect(rows[0].declared).toBeUndefined();
+  });
+});
+
+describe("AccessPart", () => {
+  function renderAccess(appState: AppState) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(["admin", "people", "groups"], { groups: [] });
+    return renderToString(
+      <QueryClientProvider client={client}>
+        <AccessPart
+          row={{ profile: appState.profile, declared: { profile: appState.profile }, state: appState }}
+          tenant="acme"
+          onOutcome={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("offers no access management for a default component", () => {
+    const html = renderAccess({ ...state, origin: "default" });
+    expect(html).toContain("The platform places and manages this app");
+    expect(html).not.toContain("Make it for everyone");
+    expect(html).not.toContain("People with access");
+  });
+
+  it("offers it for an installed app", () => {
+    const html = renderAccess({ ...state, origin: "install" });
+    expect(html).toContain("Make it for everyone");
+    expect(html).toContain("People with access");
   });
 });

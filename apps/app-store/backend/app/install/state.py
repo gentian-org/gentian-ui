@@ -65,7 +65,9 @@ async def _cluster(ctx: Context) -> tuple[dict | None, dict | None, dict[str, An
             return None
 
     declared, states, modes = await asyncio.gather(
-        ask("director", sequence.declared_apps), ask("usher", sequence.app_states), sequence.update_modes(ctx)
+        ask("director", sequence.declared_apps),
+        ask("usher", sequence.app_states),
+        sequence.update_modes(ctx),
     )
     # How each installed app moves to newer builds, beside what git says of
     # it: "tenant" is the one mode under which this store may move it.
@@ -194,7 +196,9 @@ async def overview(ctx: Context) -> dict[str, Any]:
         row["updateAvailable"] = bool(
             row["latest"] and pinned and row["latest"]["digest"] != pinned
         )
-        row["mayUpdate"] = bool(row["updateAvailable"] and (row["installed"] or {}).get("updateMode") == "tenant")
+        row["mayUpdate"] = bool(
+            row["updateAvailable"] and (row["installed"] or {}).get("updateMode") == "tenant"
+        )
         operation = sequence.find(ctx.session, row["coordinate"]) if row["coordinate"] else None
         row["operation"] = operation.view() if operation else None
     return {

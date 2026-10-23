@@ -15,6 +15,7 @@ DIRECTOR = "http://director.test:8080"
 CUSTODIAN = "http://custodian.test:9444"
 USHER = "http://usher.test:8081"
 DESKTOP = "http://desktop.test:8000"
+REGISTRAR = "http://registrar.test:9445"
 
 
 @dataclass
@@ -50,6 +51,18 @@ class FakeCluster:
         self.down: set[str] = set()  # services that cannot be reached
         self.tiles: dict[str, bytes] = {}  # app -> the tenant's tile the desktop keeps
         self.tile_refusal: tuple[int, str] | None = None
+        # The tenant's spec.store.signIn issuer, and whether the person may
+        # change it (can_administer).
+        self.store_sign_in: str | None = None
+        # The registrar: the tenant's people, the groups that exist (an app's
+        # once the cluster made it) and who is in each.
+        self.people = [
+            {"id": "u-ada", "name": "Ada", "username": "ada@acme.example", "email": "x"},
+            {"id": "u-bob", "name": "Bob", "username": "bob@acme.example"},
+        ]
+        self.groups: set[str] = set()
+        self.members: dict[str, set[str]] = {}
+        self.may_administer = True
 
     def of(self, service: str, method: str | None = None) -> list[Call]:
         return [
@@ -75,6 +88,7 @@ class FakeCluster:
             ("custodian", CUSTODIAN),
             ("usher", USHER),
             ("desktop", DESKTOP),
+            ("registrar", REGISTRAR),
         )
         for service, base in services:
             if url.startswith(base):
@@ -91,10 +105,31 @@ class FakeCluster:
                 return httpx.Response(status, json=body, request=httpx.Request(method, url))
         raise AssertionError(f"a request to somewhere that is not the cluster: {url}")
 
+    # ── registrar ───────────────────────────────────────────────────────────
+
+    def _registrar(self, method: str, path: str, body: Any) -> tuple[int, Any]:
+        prefix = f"/v1/tenants/{self.tenant}"
+        if (method, path) == ("GET", f"{prefix}/people"):
+            return 200, {"people": self.people}
+        if (method, path) == ("POST", f"{prefix}/actions/set-membership"):
+            if body["group"] not in self.groups:
+                return 404, {"error": "no such group"}
+            self.members.setdefault(body["group"], set()).add(body["person"])
+            return 200, {"status": "updated"}
+        return 404, {"error": "not found"}
+
     # ── director ────────────────────────────────────────────────────────────
 
     def _director(self, method: str, path: str, body: Any) -> tuple[int, Any]:
         prefix = f"/v1/tenants/{self.tenant}"
+        if path == f"{prefix}/store-sign-in":
+            if method == "GET":
+                issuer = self.store_sign_in
+                return 200, {"tenant": self.tenant, "enabled": bool(issuer), "issuer": issuer}
+            if not self.may_administer:
+                return 403, {"error": "forbidden", "request_id": "r-1"}
+            self.store_sign_in = body["issuer"] if method == "PUT" else None
+            return 202, {"status": "updated", "commit": "c0ffee2"}
         if (method, path) == ("GET", f"{prefix}/me"):
             return 200, {"tenant": self.tenant, "subject": "person", "relations": self.relations}
         if (method, path) == ("GET", f"{prefix}/apps"):
@@ -145,7 +180,11 @@ class FakeCluster:
                 return status, {"error": text, "request_id": "r-5"}
             self.approved.append((path.removeprefix(f"{prefix}/privileges/"), body))
             return 202, {"status": "updated", "commit": "c0ffee5"}
-        if method == "POST" and path.startswith(f"{prefix}/apps/") and path.endswith("/actions/request-privilege"):
+        if (
+            method == "POST"
+            and path.startswith(f"{prefix}/apps/")
+            and path.endswith("/actions/request-privilege")
+        ):
             profile = path.split("/")[-3]
             if self.privilege_refusal is not None:
                 status, text = self.privilege_refusal
@@ -157,7 +196,11 @@ class FakeCluster:
                 "profile": profile,
                 "install": profile,
                 "privilege": body["privilege"],
-                "request": {"requestedBy": "alice@acme.example", "requestedAt": "2026-10-21T09:12:00Z", "note": body.get("note", "")},
+                "request": {
+                    "requestedBy": "alice@acme.example",
+                    "requestedAt": "2026-10-21T09:12:00Z",
+                    "note": body.get("note", ""),
+                },
             }
         if method == "POST" and path.startswith(f"{prefix}/apps/"):
             profile = path.rsplit("/", 1)[1]
@@ -211,7 +254,11 @@ class FakeCluster:
             if app not in self.apps:
                 return 404, {"error": f'credential "app-{self.tenant}-{app}-{name}" is not known'}
             self.supplied[(app, name)] = body["fields"]
-            return 200, {"name": f"app-{self.tenant}-{app}-{name}", "stored": True, "setBy": "person"}
+            return 200, {
+                "name": f"app-{self.tenant}-{app}-{name}",
+                "stored": True,
+                "setBy": "person",
+            }
         return 404, {"error": "not found"}
 
     # ── usher ───────────────────────────────────────────────────────────────

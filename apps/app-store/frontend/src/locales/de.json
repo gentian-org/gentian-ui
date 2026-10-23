@@ -27,27 +27,25 @@
   "session": {
     "endedSignInAgain": "Ihre Anmeldung bei {{store}} ist beendet. Melden Sie sich erneut an, um fortzufahren; nichts von dem, was getan wurde, geht verloren.",
     "neededToAcquire": "Eine App wird bei {{store}} erworben, mit Ihrem Konto dort. Es ist ein anderes Konto als das, mit dem Sie an diesem Cluster angemeldet sind.",
-    "openSignIn": "Anmeldung bei {{store}} öffnen",
-    "opensAt": "Die Anmeldung öffnet sich in einem eigenen Fenster, bei",
     "signIn": "Bei {{store}} anmelden",
     "signOut": "Vom Store abmelden",
     "signedIn": "Angemeldet bei {{store}}",
-    "waitingForSignIn": "Es wird auf die Anmeldung im anderen Fenster gewartet. Diese Seite fährt von selbst fort."
+    "signingIn": "Sie werden bei {{store}} angemeldet …"
   },
   "signedIn": {
     "close": "Dieses Fenster schließen",
-    "continueHere": "In diesem Fenster fortfahren",
+    "continueHere": "Zurück zum App Store",
     "doneBody": "Sie können dieses Fenster schließen. Der App Store fährt in dem Fenster fort, aus dem Sie gekommen sind.",
     "doneTitle": "Sie sind beim Store angemeldet",
     "failedTitle": "Die Anmeldung beim Store wurde nicht abgeschlossen"
   },
   "signInReason": {
-    "code": "Der Store hat keinen Anmeldecode geschickt. Schließen Sie dieses Fenster und beginnen Sie die Anmeldung erneut.",
-    "denied": "Die Anmeldung wurde beim Store abgebrochen oder abgelehnt. Schließen Sie dieses Fenster und beginnen Sie erneut, wenn Sie sich anmelden möchten.",
-    "exchange": "Der Store hat die Anmeldung nicht angenommen. Schließen Sie dieses Fenster und beginnen Sie erneut; wenn es wieder geschieht, kann der Support des Stores sagen, warum.",
-    "other": "Schließen Sie dieses Fenster und beginnen Sie die Anmeldung erneut.",
-    "other-session": "Diese Anmeldung wurde in einer anderen Sitzung auf diesem Cluster begonnen und deshalb hier nicht abgeschlossen. Schließen Sie dieses Fenster und beginnen Sie die Anmeldung erneut im App Store.",
-    "state": "Diese Anmeldung ist abgelaufen oder wurde bereits verwendet. Schließen Sie dieses Fenster und beginnen Sie die Anmeldung erneut im App Store."
+    "code": "Der Store hat keinen Anmeldecode geschickt. Beginnen Sie erneut im App Store.",
+    "denied": "Die Anmeldung wurde beim Store abgebrochen oder abgelehnt. Beginnen Sie erneut im App Store, wenn Sie sich anmelden möchten.",
+    "exchange": "Der Store hat die Anmeldung nicht angenommen. Beginnen Sie erneut im App Store; wenn es wieder geschieht, kann der Support des Stores sagen, warum.",
+    "other": "Beginnen Sie die Anmeldung erneut im App Store.",
+    "other-session": "Diese Anmeldung wurde in einer anderen Sitzung auf diesem Cluster begonnen und deshalb hier nicht abgeschlossen. Beginnen Sie sie erneut im App Store.",
+    "state": "Diese Anmeldung ist abgelaufen oder wurde bereits verwendet. Beginnen Sie sie erneut im App Store."
   },
   "standing": {
     "browsingStays": "Das Stöbern ist davon nicht betroffen. Erwerben ist nicht möglich, bis der Store diesen Mandanten bedient. Installierte Apps laufen weiter.",
@@ -219,12 +217,12 @@
     "install": "Installieren",
     "rollout": "Auf dem Cluster ausrollen",
     "metering": "Der App ihren Nutzungsschlüssel geben",
-    "approvals": "Genehmigungen"
+    "approvals": "Genehmigungen",
+    "selectUsers": "Benutzer in der Admin Console auswählen",
+    "access": "Den ausgewählten Benutzern die App geben"
   },
   "install": {
-    "acquiredNotInstalled": "Dieser Mandant hat diese App erworben. Sie ist nicht installiert.",
     "acquiring": "{{store}} wird nach dieser App gefragt …",
-    "administeredInConsole": "Die Verwaltung — Zugriff, Deinstallation, endgültiges Löschen — befindet sich in der Admin-Konsole, unter Apps.",
     "alreadyInstalled": "Nichts zu committen — dieser Mandant hat diesen Build bereits.",
     "approvalLead": "Ein anderes Konto verwaltet diesen Mandanten bei {{store}}. Es wurde gebeten, auch Ihr Konto verwalten zu lassen; die App wird erworben, sobald es zugestimmt hat. Diese Seite fährt von selbst fort.",
     "buildConfirmed": "Vom Store bestätigt (Version {{version}}):",
@@ -251,19 +249,12 @@
     "forEveryone": "für alle",
     "installAction": "Installieren",
     "installBody": "Build <mono>{{digest}}</mono> von <mono>{{coordinate}}</mono>. Die Installation ist ein Commit im Deployments-Repository mit Ihnen als Autor; der Cluster hat die App, sobald dieser synchronisiert ist.",
-    "installEveryone": "Für alle installieren",
-    "installEveryoneBody": "Alle Mitglieder dieses Mandanten haben standardmäßig Zugriff; bei später eingeladenen Personen ist er vorausgewählt.",
-    "installPlain": "Installieren",
-    "installPlainBody": "Zugriff wird pro Person vergeben, unter Mitglieder.",
     "installThisBuild": "Diesen Build installieren",
-    "installTitle": "<mono>{{app}}</mono> installieren?",
     "installing": "Installation: Der Cluster wird gebeten, die App mit diesem Build zu committen …",
     "loadingState": "Der Cluster wird gefragt …",
     "lookAgain": "Erneut nachsehen",
-    "mayNeedCheckout": "Diese App hat einen Preis. Der Store kann einen Checkout verlangen, der sich in einem eigenen Fenster beim Store öffnet.",
     "notPinned": "Ohne festgelegten Build installiert.",
     "nothingLost": "Nichts geht verloren: Jeder Schritt kann gefahrlos wiederholt werden, und die App wird nicht zweimal erworben.",
-    "openAdminConsole": "Admin-Konsole öffnen",
     "openCheckout": "Checkout öffnen",
     "otherBuildBody": "{{store}} hat einen anderen Build bestätigt als den, den diese Seite Ihnen angezeigt hat. Es wurde nichts an den Cluster gesendet. Prüfen Sie beide, bevor Sie fortfahren.",
     "otherBuildTitle": "Der Store hat einen anderen Build bestätigt",
@@ -280,7 +271,6 @@
     "stopWaiting": "Nicht länger warten",
     "supportProject": "Das Projekt unterstützen",
     "tryAgain": "Erneut versuchen",
-    "twoWays": "Im nächsten Schritt wählen Sie, ob sie für alle in diesem Mandanten installiert wird.",
     "updateAction": "Aktualisieren",
     "updateAvailable": "Aktualisierung verfügbar: Version {{version}}",
     "updateKeepsAccess": "Die Aktualisierung stellt die installierte App auf diesen Build um. Wer die App öffnen darf, ändert sich nicht.",
@@ -295,8 +285,18 @@
     "updateByCluster": "Die Cluster-Administration bringt diese App auf neuere Builds.",
     "installed": "Installiert",
     "buyAction": "Kaufen",
-    "supportAction": "Support",
-    "acquisition": "Beim Store:"
+    "supportAction": "Projekt unterstützen",
+    "acquisition": "Beim Store:",
+    "whoTitle": "Wer soll die App erhalten?",
+    "whoEverybody": "Standardmäßig alle",
+    "whoSelected": "Nur ausgewählte Benutzer",
+    "ok": "OK",
+    "configureInConsole": "Konfigurieren / Deinstallieren in der Admin-Konsole",
+    "whoReading": "Benutzer des Mandanten werden gelesen…",
+    "whoSearch": "Benutzer suchen",
+    "whoNobody": "Der Mandant hat keine Benutzer zur Auswahl.",
+    "whoChosen_one": "{{count}} Benutzer ausgewählt",
+    "whoChosen_other": "{{count}} Benutzer ausgewählt"
   },
   "refused": {
     "addons-403": "Der Cluster hat abgelehnt: Sie dürfen in diesem Mandanten nicht installieren. Die App selbst ist installiert.",
@@ -387,7 +387,6 @@
     "role_none": "angemeldet"
   },
   "support": {
-    "title": "Support",
     "lead": "Partnerunternehmen, die Support für diese App anbieten, wie {{store}} sie aufführt. Was sie anbieten und zu welchen Bedingungen, sagen sie selbst.",
     "verified": "Verifiziert",
     "worldwide": "Weltweit",
@@ -434,7 +433,6 @@
   },
   "addons": {
     "chooseTitle": "Add-ons, die mit installiert werden",
-    "withTheApp": "Mit den Add-ons: {{addons}}. Jedes wird beim Store erworben und danach in der App eingeschaltet, eines nach dem anderen.",
     "pinning": "Das Add-on wird in {{app}} eingeschaltet …",
     "doneTitle": "{{addon}} ist in {{app}} eingeschaltet",
     "doneBody": "Im Deployment-Repository festgeschrieben. Es wirkt, sobald {{app}} die Änderung übernommen hat; das kann einige Minuten dauern.",
@@ -460,5 +458,15 @@
     "rating": "Bewertungen",
     "notRated": "Noch keine Bewertungen",
     "installations": "Installationen"
+  },
+  "requirements": {
+    "title": "Was es braucht",
+    "cpu": "CPU",
+    "memory": "Arbeitsspeicher",
+    "storage": "Speicherplatz",
+    "platform": "Gentian OS",
+    "notStated": "Der Store gibt nichts an.",
+    "offers": "Bietet",
+    "canUse": "Kann nutzen"
   }
 }

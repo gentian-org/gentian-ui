@@ -44,7 +44,15 @@ chart/      Helm. Two Deployments and two Services, named from fullnameOverride 
   client. The backend builds the request, receives the redirect on
   `/oauth/callback`, exchanges the code and keeps the token in memory, bound
   to the person's cluster session (`backend/app/store/oauth.py`). The browser
-  learns that the person is signed in, and nothing else.
+  learns that the person is signed in, and nothing else. Nothing is pressed
+  for it: the whole window goes to the store's issuer and comes back to the
+  page it left (`returnTo`, a path of this app), which goes on with what was
+  asked -- an install with the choice already made. Shown in a frame, the
+  sign-in opens in a window of its own instead.
+* **Who gets an app** is the one question before an install: everybody by
+  default (every member of the tenant), or only selected users, who are then
+  given it in the Admin Console -- the install's last step links to the
+  app's Access there (`?tab=apps&app=<app>`).
 * **Acquire and install** (`backend/app/install/sequence.py`): acquire at the
   store, wait for a checkout where one is needed, declare the repository at
   the director under the name computed from the tenant and the address

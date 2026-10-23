@@ -6,7 +6,8 @@ import "./store.css";
 const REASONS = new Set(["state", "other-session", "code", "exchange", "denied"]);
 
 /**
- * Where the window that held the store's sign-in ends up.
+ * Where a store sign-in ends when it did not come back to the page it left:
+ * one that failed, or one made in a separate window from a page in a frame.
  *
  * The API has exchanged the code by the time this is shown, and kept the
  * token. This page has nothing to do but say how it went: the page the
@@ -27,9 +28,12 @@ export function SignedInPage() {
           </h1>
           <p className="admin-console__lead">{reason === null ? t("signedIn.doneBody") : t(`signInReason.${reason}`)}</p>
           <div className="admin-console__actions">
-            <button type="button" className="admin-console__btn admin-console__btn--primary" onClick={() => window.close()}>
-              {t("signedIn.close")}
-            </button>
+            {/* Opened as a window of its own, from a page shown in a frame. */}
+            {window.opener ? (
+              <button type="button" className="admin-console__btn admin-console__btn--primary" onClick={() => window.close()}>
+                {t("signedIn.close")}
+              </button>
+            ) : null}
             <a className="admin-console__btn" href="/">
               {t("signedIn.continueHere")}
             </a>

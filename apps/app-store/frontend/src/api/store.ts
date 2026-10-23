@@ -125,8 +125,15 @@ export type Version = {
     platform?: string | null;
     resources?: { cpu?: string | null; memory?: string | null; storage?: string | null } | null;
     notes?: string[] | null;
+    /** 1.8: the integration contracts it provides. */
+    offers?: ContractMention[] | null;
+    /** 1.8: the integration contracts it can consume, all optional. */
+    canUse?: ContractMention[] | null;
   };
 };
+
+/** An integration contract, by its name and, where the store has one, what people call it. */
+export type ContractMention = { contract: string; name?: string | null };
 
 export type AppDetail = AppSummary & {
   /** store-markdown-1. */
@@ -297,6 +304,7 @@ export type Stage =
   | "metering-timeout"
   | "approvals"
   | "rollout"
+  | "access"
   | "failing"
   | "done"
   | "failed";
@@ -308,6 +316,8 @@ export type Operation = {
   /** For an add-on: the profile of the installed app it is pinned inside. Absent from an older backend. */
   addonOf?: string | null;
   forEveryone: boolean;
+  /** Installed for selected users: how many, and how many have the app so far. */
+  access?: { users: number; granted: number } | null;
   stage: Stage;
   failedStage: Stage | null;
   waitsForPerson: boolean;
@@ -465,8 +475,12 @@ export const fetchReports = (coordinate: string) =>
   apiFetch<{ items: Report[] }>(`/store/apps/${appPath(coordinate)}/reports`);
 
 export const fetchStoreSession = () => apiFetch<StoreSession>("/store/session");
-export const beginStoreSignIn = () =>
-  apiFetch<{ authorizationUrl: string }>("/store/sign-in", { method: "POST" });
+/** Start a sign-in to the store; `returnTo` is the page of this app the browser comes back to. */
+export const beginStoreSignIn = (returnTo?: string) =>
+  apiFetch<{ authorizationUrl: string }>("/store/sign-in", {
+    method: "POST",
+    ...(returnTo ? { body: JSON.stringify({ returnTo }) } : {}),
+  });
 export const signOutOfStore = () => apiFetch<StoreSession>("/store/session", { method: "DELETE" });
 
 export const fetchAppState = (coordinate: string) =>
@@ -481,7 +495,16 @@ export type StartRequest = {
   acquisitionId?: string;
   /** For an add-on: the coordinate of the installed app it goes in. */
   addonOf?: string;
+  /** Installed for selected users: their ids at the registrar; each is given the app once it is there. */
+  users?: string[];
+  /** How many people it is for: a priced app's checkout is for that many seats (store API 1.9). */
+  seats?: number;
 };
+
+/** One of the tenant's people, as the registrar names them. */
+export type Person = { id: string; name: string; username: string };
+
+export const fetchPeople = () => apiFetch<{ people: Person[] }>("/people");
 
 export const startOperation = (coordinate: string, body: StartRequest) =>
   apiFetch<Operation>(`/apps/${appPath(coordinate)}/operation`, { method: "POST", body: JSON.stringify(body) });

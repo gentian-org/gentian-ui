@@ -64,6 +64,8 @@ usher say (`app.install.state`), and continuing reads the acquisition again
 rather than acquiring again.
 """
 
+import logging
+import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -81,6 +83,12 @@ from app.store.naming import credential_name, repository_name, supplied_credenti
 
 # How long the custodian is asked for before the sequence stops and says so.
 CREDENTIAL_WINDOW_SECONDS = 300
+# The most people an install for selected users names at once.
+MAX_USERS = 1000
+# A person's id at the registrar.
+_PERSON = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+
+_log = logging.getLogger("gentian.sequence")
 OPERATION_TTL_SECONDS = 1800
 MAX_OPERATIONS = 500
 # The definition: never more often than every two seconds.
@@ -174,6 +182,14 @@ class Operation:
     metering_deadline: float | None = None
     metering_attempts: int = 0
     rollout: dict[str, Any] | None = None
+    # Installed for selected users: who they are (registrar person ids), and
+    # those given the app's group so far. A priced app's checkout is for
+    # `seats` people.
+    users: list[str] = field(default_factory=list)
+    granted: list[str] = field(default_factory=list)
+    access_deadline: float | None = None
+    access_attempts: int = 0
+    seats: int | None = None
     # What came of putting the store's picture on the app's desktop tile.
     tile: dict[str, Any] | None = None
     error: dict[str, Any] | None = None
@@ -230,6 +246,10 @@ class Operation:
             "install": self.install,
             "addons": self.addons,
             "rollout": self.rollout,
+            "access": (
+                {"users": len(self.users), "granted": len(self.granted)} if self.users else None
+            ),
+            "seats": self.seats,
             "tile": self.tile,
             "error": self.error,
         }
@@ -282,6 +302,8 @@ def start(
     version: str | None,
     acquisition_id: str | None,
     addon_of: str | None = None,
+    users: list[str] | None = None,
+    seats: int | None = None,
 ) -> Operation:
     """A new place in the sequence for this session and coordinate, replacing
     any there was. With `acquisition_id` the acquisition is read, never made
@@ -300,12 +322,29 @@ def start(
             patterns.acquisition_id(acquisition_id) if acquisition_id is not None else None
         ),
         addon_of=patterns.name(addon_of, "app") if addon_of is not None else None,
+        users=_people(users or []) if not for_everyone and addon_of is None else [],
+        seats=seats if isinstance(seats, int) and 1 <= seats <= 100_000 else None,
     )
     _operations[(session, coordinate)] = operation
     return operation
 
 
+def _people(users: list[str]) -> list[str]:
+    if len(users) > MAX_USERS or not all(isinstance(u, str) and _PERSON.match(u) for u in users):
+        raise patterns.invalid("A person is named by their id at the registrar.")
+    return list(dict.fromkeys(users))
+
+
 def _fail(ctx: Context, op: Operation, refusal: Refusal) -> None:
+    _log.warning(
+        "%s %s: %s refused at %s: %s %s",
+        op.mode,
+        op.coordinate,
+        refusal.source,
+        op.stage,
+        refusal.status,
+        refusal.code,
+    )
     oauth.forget_if_unauthenticated(ctx.session, refusal)
     if op.stage != "failed":
         op.failed_stage = op.stage
@@ -356,8 +395,21 @@ async def _acquire(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None
             raise Refusal(status=502, source="store", code="store-format")
     else:
         acquisition, retry_after = await ctx.store.acquire(
-            token, ctx.session, op.coordinate, op.version, op.idempotency_key, ctx.language
+            token,
+            ctx.session,
+            op.coordinate,
+            op.version,
+            op.idempotency_key,
+            ctx.language,
+            seats=op.seats,
         )
+    _log.info(
+        "acquire %s (seats %s): %s %s",
+        op.coordinate,
+        op.seats,
+        acquisition.status,
+        acquisition.waitingFor or "",
+    )
     await _take(ctx, op, acquisition, retry_after)
 
 
@@ -366,6 +418,7 @@ async def _checkout(ctx: Context, op: Operation, _answer: dict[str, Any]) -> Non
     acquisition, retry_after = await ctx.store.acquisition(
         token, ctx.session, op.acquisition_id or "", op.version, ctx.language
     )
+    _log.info("checkout %s: %s", op.coordinate, acquisition.status)
     await _take(ctx, op, acquisition, retry_after)
 
 
@@ -686,9 +739,7 @@ async def _metering(ctx: Context, op: Operation, _answer: dict[str, Any]) -> Non
         return
     if op.metering_deadline is None:
         op.metering_deadline = clock() + CREDENTIAL_WINDOW_SECONDS
-    name = supplied_credential_name(
-        patterns.name(ctx.tenant, "tenant"), op.profile, "metering"
-    )
+    name = supplied_credential_name(patterns.name(ctx.tenant, "tenant"), op.profile, "metering")
     answer = await director.ask_custodian(
         ctx.settings,
         "PUT",
@@ -738,7 +789,15 @@ async def _rollout(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None
             }
     op.rollout = state
     phase = state["phase"] if state else None
-    if phase == "ready" and not (state and state["pendingPrivilegeApprovals"]):
+    if (
+        phase == "ready"
+        and not (state and state["pendingPrivilegeApprovals"])
+        and len(op.granted) < len(op.users)
+    ):
+        # Installed for selected users: each is given the app's group now
+        # that the cluster has made it.
+        op.stage = "access"
+    elif phase == "ready" and not (state and state["pendingPrivilegeApprovals"]):
         op.stage = "done"
     elif phase == "failing":
         op.stage = "failing"
@@ -751,6 +810,35 @@ async def _rollout(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None
     else:
         op.stage = "rollout"
         op.wait = ROLLOUT_POLL_SECONDS
+
+
+async def _access(ctx: Context, op: Operation, _answer: dict[str, Any]) -> None:
+    """Give each selected person the app: membership of its group,
+    gentian:tenant:<t>:app:<profile>, asked of the registrar with the
+    person's own token. The group is the cluster's to make once the app is
+    there; a group not there yet is asked again for a bounded time."""
+    tenant = patterns.name(ctx.tenant, "tenant")
+    group = f"gentian:tenant:{tenant}:app:{op.profile}"
+    if op.access_deadline is None:
+        op.access_deadline = clock() + CREDENTIAL_WINDOW_SECONDS
+    for person in [u for u in op.users if u not in op.granted]:
+        answer = await director.ask_registrar(
+            ctx.settings,
+            "POST",
+            f"/v1/tenants/{tenant}/actions/set-membership",
+            ctx.cluster_token,
+            json_body={"person": person, "group": group, "member": True},
+        )
+        if 200 <= answer.status < 300:
+            op.granted.append(person)
+            continue
+        if answer.status == 404 and clock() < op.access_deadline:
+            op.access_attempts += 1
+            op.wait = min(2**op.access_attempts, 10)
+            return
+        raise answer.refusal()
+    _log.info("access %s: %d people given the app", op.coordinate, len(op.granted))
+    op.stage = "rollout"
 
 
 async def _done(_ctx: Context, _op: Operation, _answer: dict[str, Any]) -> None:
@@ -770,6 +858,7 @@ _STEPS = {
     "metering": _metering,
     "metering-timeout": _metering_timeout,
     "rollout": _rollout,
+    "access": _access,
     # Each approval given or asked for shows in the app's state; the step
     # looks again until none is pending.
     "approvals": _rollout,
@@ -836,10 +925,23 @@ def _approvals_view(entries: Any) -> list[dict[str, Any]]:
         if not isinstance(entry, dict):
             continue
         privilege, approved_by = entry.get("privilege"), entry.get("approvedBy")
-        if not isinstance(privilege, str) or "/" not in privilege or approved_by not in APPROVER_KINDS:
+        if (
+            not isinstance(privilege, str)
+            or "/" not in privilege
+            or approved_by not in APPROVER_KINDS
+        ):
             continue
         view: dict[str, Any] = {"privilege": privilege, "approvedBy": approved_by}
-        for key in ("reason", "requestedBy", "requestedAt", "note", "expiredAt", "declinedBy", "declinedAt", "declineReason"):
+        for key in (
+            "reason",
+            "requestedBy",
+            "requestedAt",
+            "note",
+            "expiredAt",
+            "declinedBy",
+            "declinedAt",
+            "declineReason",
+        ):
             value = entry.get(key)
             view[key] = value[:2000] if isinstance(value, str) and value else None
         out.append(view)
@@ -893,7 +995,9 @@ async def declared_apps(ctx: Context) -> dict[str, dict[str, Any]]:
             # The tenant's override of how the app moves to newer builds, when
             # the cluster's administrator wrote one; the effective mode is the
             # director's report's to say (updates), this is what git carries.
-            "updateMode": entry.get("updateMode") if isinstance(entry.get("updateMode"), str) else None,
+            "updateMode": entry.get("updateMode")
+            if isinstance(entry.get("updateMode"), str)
+            else None,
         }
     return out
 
@@ -914,7 +1018,11 @@ async def update_modes(ctx: Context) -> dict[str, str]:
         return {}
     out: dict[str, str] = {}
     for entry in answer.body.get("entries") or []:
-        if isinstance(entry, dict) and isinstance(entry.get("profile"), str) and isinstance(entry.get("mode"), str):
+        if (
+            isinstance(entry, dict)
+            and isinstance(entry.get("profile"), str)
+            and isinstance(entry.get("mode"), str)
+        ):
             out[entry["profile"]] = entry["mode"]
     return out
 
@@ -973,7 +1081,12 @@ async def set_credentials(ctx: Context, acquisition_id: str, *, rotate: bool) ->
 def _privilege_path(privilege: str) -> tuple[str, str]:
     kind, _, name = privilege.partition("/")
     if kind not in ("egress", "podSecurity", "clusterRoles"):
-        raise Refusal(status=400, source="app", code="invalid-request", detail="The privilege is <kind>/<name>.")
+        raise Refusal(
+            status=400,
+            source="app",
+            code="invalid-request",
+            detail="The privilege is <kind>/<name>.",
+        )
     return kind, patterns.name(name, "privilege")
 
 
@@ -1008,7 +1121,9 @@ async def approve_privilege(
     return {"status": answer.body.get("status"), "commit": answer.body.get("commit")}
 
 
-async def request_privilege(ctx: Context, profile: str, privilege: str, note: str | None) -> dict[str, Any]:
+async def request_privilege(
+    ctx: Context, profile: str, privilege: str, note: str | None
+) -> dict[str, Any]:
     """Ask the security officer for one request the tenant cannot approve
     itself. The director has the operator record who asked, when and the
     note on the app, where the security officer's admin console lists it.

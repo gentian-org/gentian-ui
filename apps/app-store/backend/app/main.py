@@ -34,6 +34,9 @@ settings = get_settings()
 # this process asks a store -- what was searched for, which acquisition --
 # is nobody's to read in a log.
 logging.getLogger("httpx").setLevel(logging.WARNING)
+# This app's own lines (gentian.*): the access log and the install sequence's
+# steps. Uvicorn configures only its own loggers, which left these unwritten.
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
 
 app = FastAPI(title=settings.project_name, openapi_url=f"{settings.api_v1_str}/openapi.json")
 app.add_exception_handler(Refusal, refusal_handler)

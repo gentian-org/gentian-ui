@@ -62,7 +62,7 @@ for (const language of LANGUAGES) {
       edition: ["ce", "pe", "me", "ee"],
       stage: ["not-installed", "checkout", "acquired", "installing", "ready", "failing", "installed"],
       acquisition: ["pending", "confirmed", "cancelled", "failed"],
-      steps: ["acquire", "checkout", "declare", "credential", "install", "addons", "rollout"],
+      steps: ["acquire", "checkout", "declare", "credential", "install", "addons", "rollout", "selectUsers"],
       signInReason: ["state", "other-session", "code", "exchange", "denied", "other"],
       credentialOutcome: ["set", "not-declared", "refused", "no-credential"],
       // The definition's open enumerations: the values it names. One it does

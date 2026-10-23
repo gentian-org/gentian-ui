@@ -9,6 +9,7 @@ import { usePrefsStore, type DesktopTile } from "@/stores/prefs";
 import { buildAppLaunchUrl } from "@/lib/appLaunchUrl";
 import { WindowManager } from "@/windows/WindowManager";
 import { DesktopShortcuts } from "@/shell/DesktopShortcuts";
+import { OPENED, openAppRequest } from "@/lib/openApp";
 
 const GRID_X = 100;
 const GRID_Y = 110;
@@ -76,6 +77,21 @@ export function DesktopPage() {
       });
     }
   }, [apps, windows, openWindow]);
+
+  // A page in one of the windows asks for another of the person's apps in a
+  // window of its own (src/lib/openApp.js says which messages are taken).
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      const request = openAppRequest(event, apps);
+      if (!request) return;
+      setActiveAppId(request.app.id);
+      openWindow({ id: crypto.randomUUID(), appId: request.app.id, title: request.app.title, url: request.url });
+      // Told, so the page does not open a browser tab as well.
+      (event.source as WindowProxy | null)?.postMessage({ type: OPENED }, event.origin);
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [apps, openWindow, setActiveAppId]);
 
   function openBuiltinPanel(
     id: "account" | "settings",
