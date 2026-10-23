@@ -459,5 +459,13 @@
     "rating": "Bewertungen",
     "notRated": "Noch keine Bewertungen",
     "installations": "Installationen"
+  },
+  "requirements": {
+    "title": "Was es braucht",
+    "cpu": "CPU",
+    "memory": "Arbeitsspeicher",
+    "storage": "Speicherplatz",
+    "platform": "Gentian OS",
+    "notStated": "Der Store gibt nichts an."
   }
 }

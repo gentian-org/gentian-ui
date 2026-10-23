@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { fetchApp, fetchMeta, fetchReports, type AppDetail, type Link as StoreLink } from "@/api/store";
+import { fetchApp, fetchMeta, fetchReports, type AppDetail, type Link as StoreLink, type Version } from "@/api/store";
 import i18n from "@/lib/i18n";
 import { coordinateParams } from "@/store/BrowsePage";
 import { AddonSection, InstallButton, InstallScope, InstallStatus } from "@/store/InstallPanel";
@@ -95,6 +95,44 @@ function Scorecard({ detail }: { detail: AppDetail }) {
           </>
         ) : null}
       </dl>
+    </aside>
+  );
+}
+
+/**
+ * What the app needs of the cluster, as the store states it for the latest
+ * version: the least it reserves, the platform versions it runs on, and
+ * anything else in a sentence. A description; the cluster reads the profile.
+ */
+function Requirements({ version }: { version: Version | undefined }) {
+  const { t } = useTranslation();
+  const needs = version?.requirements;
+  const rows = [
+    ["requirements.cpu", needs?.resources?.cpu],
+    ["requirements.memory", needs?.resources?.memory],
+    ["requirements.storage", needs?.resources?.storage],
+    ["requirements.platform", needs?.platform],
+  ].filter((row): row is [string, string] => Boolean(row[1]));
+  const notes = needs?.notes ?? [];
+  return (
+    <aside className="store-install store-scorecard">
+      <h2 className="admin-console__subsection-title">{t("requirements.title")}</h2>
+      {rows.length > 0 ? (
+        <dl className="store-scorecard__list">
+          {rows.map(([key, value]) => (
+            <Fragment key={key}>
+              <dt>{t(key)}</dt>
+              <dd className="admin-console__mono">{value}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      ) : null}
+      {notes.map((note, index) => (
+        <p key={index} className="admin-console__meta">
+          {note}
+        </p>
+      ))}
+      {rows.length === 0 && notes.length === 0 ? <p className="admin-console__meta">{t("requirements.notStated")}</p> : null}
     </aside>
   );
 }
@@ -246,6 +284,7 @@ function Details({ detail, storeName, autoInstall }: { detail: AppDetail; storeN
             <InstallStatus />
           </div>
           <Scorecard detail={detail} />
+          <Requirements version={detail.versions[0]} />
           <Resources links={detail.links} />
         </div>
       </div>
