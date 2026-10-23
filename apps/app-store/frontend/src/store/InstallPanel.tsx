@@ -1168,21 +1168,12 @@ function AddonRow({ addon }: { addon: AppDetail["addons"][number] }) {
               setChosen(event.target.checked ? [...chosen, coordinate] : chosen.filter((c) => c !== coordinate))
             }
           />
-          <span>
-            <span className="admin-console__card-title">{addon.name}</span>
-            {detail ? (
-              <span className="admin-console__meta">
-                {" — "}
-                <PriceText price={detail.price} />
-              </span>
-            ) : null}
-            {addon.summary ? <span className="admin-console__meta store-addon__summary">{addon.summary}</span> : null}
-          </span>
+          <span className="store-addon__name">{addon.name}</span>
         </label>
         <div className="store-addon__act">
           {on && !operation ? <span className="admin-console__badge admin-console__badge--ok">{t("addons.on")}</span> : null}
           {isQueued && !operation ? <span className="admin-console__chip">{t("addons.queued")}</span> : null}
-          <button type="button" className="admin-console__btn admin-console__btn--quiet" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <button type="button" className="admin-console__btn-link store-addon__toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
             {t("app.details")}
           </button>
         </div>
@@ -1190,6 +1181,11 @@ function AddonRow({ addon }: { addon: AppDetail["addons"][number] }) {
 
       {open ? (
         <div className="store-addon__details">
+          {detail && detail.price.model !== "free" ? (
+            <p className="admin-console__meta">
+              <PriceText price={detail.price} />
+            </p>
+          ) : null}
           {description ? <StoreMarkdown source={description} /> : null}
           {on && !operation ? (
             <div className="admin-console__actions">
