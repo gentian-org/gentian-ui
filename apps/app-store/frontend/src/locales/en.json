@@ -222,7 +222,6 @@
   },
   "install": {
     "acquiring": "Asking {{store}} for this app…",
-    "administeredInConsole": "Administration — access, uninstall, purge — is in the Admin Console, under Apps.",
     "alreadyInstalled": "Nothing to commit — this tenant already has that build.",
     "approvalLead": "Another account manages this tenant at {{store}}. It has been asked to let yours manage it too; the app is acquired as soon as it has. This page carries on by itself.",
     "buildConfirmed": "Confirmed by the store (version {{version}}):",
@@ -255,7 +254,6 @@
     "lookAgain": "Look again",
     "notPinned": "Installed with no stated build.",
     "nothingLost": "Nothing is lost: each step is safe to repeat, and the app is not acquired twice.",
-    "openAdminConsole": "Open the Admin Console",
     "openCheckout": "Open the checkout",
     "otherBuildBody": "{{store}} confirmed another build than the one this page showed you. Nothing has been sent to the cluster. Check the two before you go on.",
     "otherBuildTitle": "The store confirmed a different build",
@@ -291,7 +289,8 @@
     "whoTitle": "Who should get the app?",
     "whoEverybody": "Everybody by default",
     "whoSelected": "Only selected users",
-    "ok": "OK"
+    "ok": "OK",
+    "configureInConsole": "Configure / Uninstall in Admin Console"
   },
   "refused": {
     "addons-403": "The cluster refused: you may not install in this tenant. The app itself is installed.",
@@ -460,6 +459,8 @@
     "memory": "Memory",
     "storage": "Storage",
     "platform": "Gentian OS",
-    "notStated": "The store does not say."
+    "notStated": "The store does not say.",
+    "offers": "Offers",
+    "canUse": "Can use"
   }
 }

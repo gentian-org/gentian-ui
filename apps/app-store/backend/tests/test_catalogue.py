@@ -432,3 +432,19 @@ def test_a_score_outside_zero_to_ten_is_not_the_format(api, store, monkeypatch):
     assert answer.status_code >= 500
     # Answered outside the definition on purpose.
     store.violations.clear()
+
+
+def test_the_contracts_an_app_offers_and_can_use_reach_the_screen():
+    """Store API 1.8; an entry that is not a contract is left out, alone."""
+    from app.store.models import Requirements
+
+    needs = Requirements.model_validate(
+        {
+            "notes": [],
+            "offers": [{"contract": "file-store", "name": None}, {"contract": "Bad Name"}],
+            "canUse": [{"contract": "project-management", "name": "Project management"}],
+        }
+    )
+    assert [c.contract for c in needs.offers] == ["file-store"]
+    assert needs.canUse[0].name == "Project management"
+    assert Requirements.model_validate({}).offers == []

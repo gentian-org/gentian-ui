@@ -132,6 +132,18 @@ function Requirements({ version }: { version: Version | undefined }) {
           {note}
         </p>
       ))}
+      {(
+        [
+          ["requirements.offers", needs?.offers],
+          ["requirements.canUse", needs?.canUse],
+        ] as const
+      ).map(([key, contracts]) =>
+        contracts && contracts.length > 0 ? (
+          <p key={key} className="admin-console__meta">
+            {t(key)}: {contracts.map((c) => c.name || c.contract).join(", ")}
+          </p>
+        ) : null,
+      )}
       {rows.length === 0 && notes.length === 0 ? <p className="admin-console__meta">{t("requirements.notStated")}</p> : null}
     </aside>
   );

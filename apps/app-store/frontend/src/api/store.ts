@@ -125,8 +125,15 @@ export type Version = {
     platform?: string | null;
     resources?: { cpu?: string | null; memory?: string | null; storage?: string | null } | null;
     notes?: string[] | null;
+    /** 1.8: the integration contracts it provides. */
+    offers?: ContractMention[] | null;
+    /** 1.8: the integration contracts it can consume, all optional. */
+    canUse?: ContractMention[] | null;
   };
 };
+
+/** An integration contract, by its name and, where the store has one, what people call it. */
+export type ContractMention = { contract: string; name?: string | null };
 
 export type AppDetail = AppSummary & {
   /** store-markdown-1. */
