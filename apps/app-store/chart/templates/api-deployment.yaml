@@ -83,6 +83,10 @@ spec:
             - name: USHER_URL
               value: {{ .Values.usher.url | quote }}
             {{- end }}
+            {{- if and .Values.registrar .Values.registrar.url (not (hasKey (default dict .Values.api.env) "REGISTRAR_URL")) }}
+            - name: REGISTRAR_URL
+              value: {{ .Values.registrar.url | quote }}
+            {{- end }}
             {{- if and .Values.desktop .Values.desktop.url (not (hasKey (default dict .Values.api.env) "DESKTOP_API_URL")) }}
             - name: DESKTOP_API_URL
               value: {{ .Values.desktop.url | quote }}

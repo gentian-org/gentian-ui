@@ -15,6 +15,7 @@ DIRECTOR = "http://director.test:8080"
 CUSTODIAN = "http://custodian.test:9444"
 USHER = "http://usher.test:8081"
 DESKTOP = "http://desktop.test:8000"
+REGISTRAR = "http://registrar.test:9445"
 
 
 @dataclass
@@ -53,6 +54,14 @@ class FakeCluster:
         # The tenant's spec.store.signIn issuer, and whether the person may
         # change it (can_administer).
         self.store_sign_in: str | None = None
+        # The registrar: the tenant's people, the groups that exist (an app's
+        # once the cluster made it) and who is in each.
+        self.people = [
+            {"id": "u-ada", "name": "Ada", "username": "ada@acme.example", "email": "x"},
+            {"id": "u-bob", "name": "Bob", "username": "bob@acme.example"},
+        ]
+        self.groups: set[str] = set()
+        self.members: dict[str, set[str]] = {}
         self.may_administer = True
 
     def of(self, service: str, method: str | None = None) -> list[Call]:
@@ -79,6 +88,7 @@ class FakeCluster:
             ("custodian", CUSTODIAN),
             ("usher", USHER),
             ("desktop", DESKTOP),
+            ("registrar", REGISTRAR),
         )
         for service, base in services:
             if url.startswith(base):
@@ -94,6 +104,19 @@ class FakeCluster:
                     return httpx.Response(status, request=httpx.Request(method, url))
                 return httpx.Response(status, json=body, request=httpx.Request(method, url))
         raise AssertionError(f"a request to somewhere that is not the cluster: {url}")
+
+    # ── registrar ───────────────────────────────────────────────────────────
+
+    def _registrar(self, method: str, path: str, body: Any) -> tuple[int, Any]:
+        prefix = f"/v1/tenants/{self.tenant}"
+        if (method, path) == ("GET", f"{prefix}/people"):
+            return 200, {"people": self.people}
+        if (method, path) == ("POST", f"{prefix}/actions/set-membership"):
+            if body["group"] not in self.groups:
+                return 404, {"error": "no such group"}
+            self.members.setdefault(body["group"], set()).add(body["person"])
+            return 200, {"status": "updated"}
+        return 404, {"error": "not found"}
 
     # ── director ────────────────────────────────────────────────────────────
 

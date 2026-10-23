@@ -33,6 +33,8 @@ const appRoute = createRoute({
     const everyone = flag(search.everyone);
     if (everyone !== undefined) out.everyone = everyone;
     if (typeof search.addons === "string" && /^[a-z0-9/,-]{1,600}$/.test(search.addons)) out.addons = search.addons;
+    // The people chosen for an install for selected users, by registrar id.
+    if (typeof search.users === "string" && /^[A-Za-z0-9,-]{1,4000}$/.test(search.users)) out.users = search.users;
     return out;
   },
   component: AppDetails,

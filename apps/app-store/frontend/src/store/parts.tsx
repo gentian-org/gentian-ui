@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { openPending } from "@/lib/pendingWindow";
 import { useTranslation } from "react-i18next";
 import { type Problem, problemOf } from "@/api/client";
 import type { Edition, Link as StoreLink, Price } from "@/api/store";
@@ -216,7 +217,8 @@ export function StoreSignIn({ reason, storeName, returnTo }: { reason: string; s
               disabled={starting}
               onClick={() => {
                 leaving();
-                begin(returnTo);
+                // In a frame the sign-in has a window of its own, opened in this click.
+                begin(returnTo, framed ? openPending() : null);
               }}
             >
               {t("session.signIn", { store: storeName })}

@@ -1214,3 +1214,44 @@ def test_an_app_priced_by_use_is_handed_its_metering_after_the_install(runner, s
 def test_an_app_without_metering_sets_none(runner, store, cluster):
     runner.install(forEveryone=True)
     assert not cluster.supplied
+
+
+# --- installed for selected users, and the seats a checkout is for ------------
+
+
+def test_selected_users_are_given_the_app_once_it_is_there(runner, store, cluster):
+    group = "gentian:tenant:acme:app:nextcloud-base-ee"
+    view = runner.start(forEveryone=False, users=["u-ada", "u-bob"], seats=2)
+    acquire = store.calls_to("POST", "/v1/acquisitions")
+    assert acquire[0].json == {"coordinate": PAID, "seats": 2}
+    # The group is not made yet: asked again until it is.
+    for _ in range(3):
+        runner.clock.advance(view["waitSeconds"])
+        view = runner.step()
+    cluster.groups.add(group)
+    view = runner.run(view)
+    assert view["stage"] == "done"
+    assert cluster.members[group] == {"u-ada", "u-bob"}
+    assert view["access"] == {"users": 2, "granted": 2}
+    calls = [c for c in cluster.of("registrar", "POST")]
+    assert {c.bearer for c in calls} == {"Bearer alice.s1"}
+
+
+def test_a_person_who_is_not_one_is_refused(runner):
+    answer = runner.api.post(
+        f"/api/v1/apps/{PAID}/operation",
+        json={"expectedDigest": DIGEST, "users": ["../admin"]},
+        headers=runner.who,
+    )
+    assert answer.status_code == 400
+
+
+def test_the_tenant_s_people_are_listed_with_id_name_and_login_only(runner, cluster):
+    answer = runner.api.get("/api/v1/people", headers=runner.who)
+    assert answer.status_code == 200
+    assert answer.json() == {
+        "people": [
+            {"id": "u-ada", "name": "Ada", "username": "ada@acme.example"},
+            {"id": "u-bob", "name": "Bob", "username": "bob@acme.example"},
+        ]
+    }

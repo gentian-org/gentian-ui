@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { beginStoreSignIn, fetchStoreSession, signOutOfStore, type StoreSession } from "@/api/store";
+import { closePending, sendPending } from "@/lib/pendingWindow";
 
 /**
  * The person's sign-in to the store, as far as the browser knows of it.
@@ -22,8 +23,13 @@ type StoreSessionValue = {
   signInUrl: string | null;
   starting: boolean;
   startError: unknown;
-  /** Start a sign-in that comes back to `returnTo`, a page of this app (by default this one). */
-  begin: (returnTo?: string) => void;
+  /**
+   * Start a sign-in that comes back to `returnTo`, a page of this app (by
+   * default this one). In a frame, `pending` is a window the caller opened
+   * in the person's click (lib/pendingWindow.js), sent to the issuer once
+   * its address is known; without one, the page offers a link.
+   */
+  begin: (returnTo?: string, pending?: Window | null) => void;
   signOut: () => void;
 };
 
@@ -67,11 +73,17 @@ export function StoreSessionProvider({ children }: { children: ReactNode }) {
   }, [signedIn, signInUrl, queryClient]);
 
   const start = useMutation({
-    mutationFn: (returnTo: string) => beginStoreSignIn(inFrame() ? undefined : returnTo),
-    onSuccess: (answer) => {
-      if (inFrame()) setSignInUrl(answer.authorizationUrl);
-      else window.location.assign(answer.authorizationUrl);
+    mutationFn: (v: { returnTo: string; pending?: Window | null }) =>
+      beginStoreSignIn(inFrame() ? undefined : v.returnTo),
+    onSuccess: (answer, v) => {
+      if (inFrame()) {
+        // The window opened in the click goes to the issuer; the link stays
+        // offered all the same, and this page asks until the sign-in arrived.
+        sendPending(v.pending ?? null, answer.authorizationUrl);
+        setSignInUrl(answer.authorizationUrl);
+      } else window.location.assign(answer.authorizationUrl);
     },
+    onError: (_error, v) => closePending(v.pending ?? null),
   });
 
   const end = useMutation({
@@ -85,7 +97,10 @@ export function StoreSessionProvider({ children }: { children: ReactNode }) {
   });
 
   const { mutate: startSignIn } = start;
-  const begin = useCallback((returnTo?: string) => startSignIn(returnTo ?? herePath()), [startSignIn]);
+  const begin = useCallback(
+    (returnTo?: string, pending?: Window | null) => startSignIn({ returnTo: returnTo ?? herePath(), pending }),
+    [startSignIn],
+  );
   const signOut = useCallback(() => end.mutate(), [end]);
 
   const value = useMemo(
