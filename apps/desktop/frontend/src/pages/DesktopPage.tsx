@@ -73,6 +73,7 @@ export function DesktopPage() {
         title: app.title,
         url: app.launchUrl,
         isHidden: true,
+        keepAlive: true,
         state: "minimized",
       });
     }

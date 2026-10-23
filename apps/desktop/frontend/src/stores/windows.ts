@@ -25,6 +25,8 @@ export type ShellWindow = {
   zIndex: number;
   focused: boolean;
   isHidden?: boolean;
+  /** Closing hides the window instead: an app opened at mount (gentianos.io/portal-preopen). */
+  keepAlive?: boolean;
 };
 
 type OpenWindowInput = {
@@ -36,6 +38,7 @@ type OpenWindowInput = {
   pendingUrl?: string;
   geometry?: WindowGeometry;
   isHidden?: boolean;
+  keepAlive?: boolean;
   state?: WindowVisualState;
 };
 
@@ -84,6 +87,7 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
             focused: winState !== "minimized",
             state: winState,
             isHidden,
+            keepAlive: win.keepAlive,
           },
         ],
       };
@@ -91,7 +95,7 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
   closeWindow: (id) =>
     set((state) => {
       const win = state.windows.find((w) => w.id === id);
-      if (win && win.appId === "open-webui-open-webui") {
+      if (win?.keepAlive) {
         // Instead of removing, we hide it!
         return {
           windows: state.windows.map((w) =>

@@ -211,7 +211,10 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
       {tiles.map((tile) => {
         let displayTitle = tile.title;
         let displayIcon = tile.icon;
-        const isAiWidget = tile.type === "app" && tile.appId === "open-webui-open-webui";
+        // The AI widget stands for the app opened at mount for it
+        // (gentianos.io/portal-preopen); the shell does not know which app it is.
+        const isAiWidget =
+          tile.type === "app" && Boolean(apps.find((a) => a.id === tile.appId)?.preopen);
 
         if (tile.type === "app" && tile.appId) {
           const app = apps.find((a) => a.id === tile.appId);
@@ -239,7 +242,7 @@ export function DesktopShortcuts({ apps, onSelectApp, onOpenLinkWindow }: Deskto
                 <AiWidget
                   isDesktop={true}
                   onExpand={(prompt) => {
-                    const app = apps.find((a) => a.id === "open-webui-open-webui");
+                    const app = apps.find((a) => a.id === tile.appId);
                     if (app) {
                       const dynamicApp = { ...app };
                       if (prompt && dynamicApp.launchUrl) {
