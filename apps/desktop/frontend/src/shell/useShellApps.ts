@@ -100,14 +100,18 @@ export function useShellApps() {
     ];
     const getSortIndex = (id: string) => {
       // A tenant's own consoles carry its name in place of "platform".
-      const generic = id.replace(/^kernel-[^/]+\/(admin-console|operations-console)\//, "kernel-platform/$1/");
+      // An edition suffix (operations-console-ee) is not part of the console's name.
+      const generic = id.replace(
+        /^kernel-[^/]+\/(admin-console|operations-console)(?:-(?:ce|me|ie|pe|ee))?\//,
+        "kernel-platform/$1/",
+      );
       const pinned = ADMIN_ORDER.indexOf(generic);
       if (pinned !== -1) return pinned;
       if (
         id === "subscriptions" ||
         id.startsWith("subscriptions-") ||
-        id === "gentian-subscriptions" ||
-        id.startsWith("gentian-subscriptions-")
+        id === "aluvian-center" ||
+        id.startsWith("aluvian-center-")
       ) {
         return ADMIN_ORDER.length;
       }
