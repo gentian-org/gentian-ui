@@ -88,6 +88,9 @@ class Pending:
     client_id: str
     redirect_uri: str
     created: float
+    # Where in this app the browser goes once the sign-in is done: the page
+    # it left, so what the person was doing carries on. A path of this app.
+    return_to: str | None = None
 
 
 @dataclass
@@ -149,7 +152,26 @@ def scopes_for(meta: models.Meta) -> str:
     return " ".join(meta.scopes)
 
 
-async def begin(settings: Settings, store: Store, session: str) -> str:
+# A path of this app and nothing else: no scheme, no host, no "//", nothing
+# a browser would read as another origin.
+_RETURN_TO = re.compile(r"/(?!/)[A-Za-z0-9/_.,=&%-]{0,300}(\?[A-Za-z0-9/_.,=&%-]{0,300})?")
+
+
+def return_path(value: str | None) -> str | None:
+    """`value` when it is a path of this app, otherwise None."""
+    if value is None or not _RETURN_TO.fullmatch(value) or "\\" in value:
+        return None
+    return value
+
+
+def return_to(state: str | None) -> str | None:
+    """Where a pending sign-in returns the browser to, looked at before it
+    is completed."""
+    pending = _pending.get(state or "")
+    return pending.return_to if pending else None
+
+
+async def begin(settings: Settings, store: Store, session: str, back_to: str | None = None) -> str:
     """Start a sign-in for one cluster session: the address to send the
     person's browser to. `state` and the verifier stay here."""
     redirect_uri, tenant_url = settings.redirect_uri, settings.tenant_url
@@ -205,6 +227,7 @@ async def begin(settings: Settings, store: Store, session: str) -> str:
         client_id=meta.clientId,
         redirect_uri=redirect_uri,
         created=clock(),
+        return_to=return_path(back_to),
     )
     query = urlencode(
         {
