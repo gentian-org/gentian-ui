@@ -222,7 +222,6 @@
   },
   "install": {
     "acquiring": "{{store}} wird nach dieser App gefragt …",
-    "administeredInConsole": "Die Verwaltung — Zugriff, Deinstallation, endgültiges Löschen — befindet sich in der Admin-Konsole, unter Apps.",
     "alreadyInstalled": "Nichts zu committen — dieser Mandant hat diesen Build bereits.",
     "approvalLead": "Ein anderes Konto verwaltet diesen Mandanten bei {{store}}. Es wurde gebeten, auch Ihr Konto verwalten zu lassen; die App wird erworben, sobald es zugestimmt hat. Diese Seite fährt von selbst fort.",
     "buildConfirmed": "Vom Store bestätigt (Version {{version}}):",
@@ -255,7 +254,6 @@
     "lookAgain": "Erneut nachsehen",
     "notPinned": "Ohne festgelegten Build installiert.",
     "nothingLost": "Nichts geht verloren: Jeder Schritt kann gefahrlos wiederholt werden, und die App wird nicht zweimal erworben.",
-    "openAdminConsole": "Admin-Konsole öffnen",
     "openCheckout": "Checkout öffnen",
     "otherBuildBody": "{{store}} hat einen anderen Build bestätigt als den, den diese Seite Ihnen angezeigt hat. Es wurde nichts an den Cluster gesendet. Prüfen Sie beide, bevor Sie fortfahren.",
     "otherBuildTitle": "Der Store hat einen anderen Build bestätigt",
@@ -291,7 +289,8 @@
     "whoTitle": "Wer soll die App erhalten?",
     "whoEverybody": "Standardmäßig alle",
     "whoSelected": "Nur ausgewählte Benutzer",
-    "ok": "OK"
+    "ok": "OK",
+    "configureInConsole": "Konfigurieren / Deinstallieren in der Admin-Konsole"
   },
   "refused": {
     "addons-403": "Der Cluster hat abgelehnt: Sie dürfen in diesem Mandanten nicht installieren. Die App selbst ist installiert.",
@@ -460,6 +459,8 @@
     "memory": "Arbeitsspeicher",
     "storage": "Speicherplatz",
     "platform": "Gentian OS",
-    "notStated": "Der Store gibt nichts an."
+    "notStated": "Der Store gibt nichts an.",
+    "offers": "Bietet",
+    "canUse": "Kann nutzen"
   }
 }

@@ -23,9 +23,10 @@ import {
   type Version,
 } from "@/api/store";
 import i18n from "@/lib/i18n";
+import { openInDesktop } from "@/lib/openInDesktop";
 import { Approvals } from "@/store/Approvals";
 import { coordinateParams } from "@/store/BrowsePage";
-import { ExternalLink, PriceText, ProblemNote, shortDigest, StoreSignIn } from "@/store/parts";
+import { PriceText, ProblemNote, shortDigest, StoreSignIn } from "@/store/parts";
 import { useStoreSession } from "@/store/session";
 import { StoreMarkdown } from "@/store/StoreMarkdown";
 
@@ -194,6 +195,28 @@ export function accessUrl(adminConsoleUrl: string | null | undefined, coordinate
   } catch {
     return null;
   }
+}
+
+/**
+ * A link to the Admin Console at one app: a window of the desktop when this
+ * app runs in one, a browser tab otherwise (src/lib/openInDesktop.js).
+ */
+function ConsoleLink({ href, className, children }: { href: string; className: string; children: ReactNode }) {
+  return (
+    <a
+      className={className}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(event) => {
+        if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
+        event.preventDefault();
+        openInDesktop("admin-console", href);
+      }}
+    >
+      {children}
+    </a>
+  );
 }
 
 function StepList({ operation }: { operation: Operation }) {
@@ -507,14 +530,12 @@ function Progress({
           ) : null}
           <div className="admin-console__actions">
             {selectsUsers(operation) && accessUrl(contextQuery.data?.adminConsoleUrl, operation.coordinate) ? (
-              <a
+              <ConsoleLink
                 className="admin-console__btn admin-console__btn--primary"
-                href={accessUrl(contextQuery.data?.adminConsoleUrl, operation.coordinate) ?? undefined}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={accessUrl(contextQuery.data?.adminConsoleUrl, operation.coordinate) ?? ""}
               >
                 {t("steps.selectUsers")}
-              </a>
+              </ConsoleLink>
             ) : null}
             <button type="button" className="admin-console__btn admin-console__btn--quiet" onClick={onStop}>
               {t("install.close")}
@@ -1147,10 +1168,11 @@ export function InstallStatus() {
         />
       ) : null}
 
-      {installed ? (
+      {installed && accessUrl(contextQuery.data?.adminConsoleUrl, coordinate) ? (
         <p className="admin-console__meta">
-          {t("install.administeredInConsole")}{" "}
-          <ExternalLink href={contextQuery.data?.adminConsoleUrl}>{t("install.openAdminConsole")}</ExternalLink>
+          <ConsoleLink className="admin-console__btn-link" href={accessUrl(contextQuery.data?.adminConsoleUrl, coordinate) ?? ""}>
+            {t("install.configureInConsole")}
+          </ConsoleLink>
         </p>
       ) : null}
 

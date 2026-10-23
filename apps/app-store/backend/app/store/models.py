@@ -344,10 +344,18 @@ class Resources(Model):
     storage: Text(40) | None = None
 
 
+class ContractMention(Model):
+    contract: Matching(r"^[a-z0-9-]{1,63}$", 63)
+    name: Text(80) | None = None
+
+
 class Requirements(Model):
     platform: Text(80) | None = None
     resources: Resources | None = None
     notes: list[Text(300)] | None = None
+    # 1.8: the integration contracts it offers and can use.
+    offers: Annotated[list[ContractMention], BeforeValidator(_known_only(ContractMention))] = []
+    canUse: Annotated[list[ContractMention], BeforeValidator(_known_only(ContractMention))] = []
 
 
 class Version(Model):
