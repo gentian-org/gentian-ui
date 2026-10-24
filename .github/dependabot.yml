@@ -15,7 +15,6 @@ updates:
   - package-ecosystem: uv
     directories:
       - /apps/admin-console/backend
-      - /apps/app-store/backend
       - /apps/desktop/backend
     schedule:
       interval: weekly
@@ -27,7 +26,6 @@ updates:
   - package-ecosystem: npm
     directories:
       - /apps/admin-console/frontend
-      - /apps/app-store/frontend
       - /apps/desktop/frontend
     schedule:
       interval: weekly
@@ -40,8 +38,6 @@ updates:
     directories:
       - /apps/admin-console/backend
       - /apps/admin-console/frontend
-      - /apps/app-store/backend
-      - /apps/app-store/frontend
       - /apps/concierge
       - /apps/desktop/backend
       - /apps/desktop/frontend
