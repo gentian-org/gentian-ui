@@ -1042,13 +1042,33 @@ function OutcomeNotice({ outcome }: { outcome: Outcome }) {
 /** The kinds of data an uninstalled app can still hold, in the order shown. */
 const RETAINED_KINDS = ["files", "database", "objectStorage", "credentials", "accessGroup", "cache"] as const;
 
-/** How a purge ended, for the one notice that says so. */
+/** How a purge ended, for the notice that says so. */
 type PurgeOutcome =
   | { app: string; result: AppPurgeResult }
   | { app: string; refused: boolean; message: string };
 
+/** Whether a purge ended with an answer that says it is complete. */
+const purgeComplete = (outcome: PurgeOutcome) => "result" in outcome && outcome.result.complete === true;
+
+/** Purging one app, its answer or failure turned into how it ended. */
+async function purgeOne(app: string): Promise<PurgeOutcome> {
+  try {
+    return { app, result: await purgeAppData(app) };
+  } catch (err) {
+    const status = err instanceof ApiError ? err.status : undefined;
+    return {
+      app,
+      // A 4xx is the cluster declining to start. Anything else -- a purge
+      // that stopped half-way, a relay that stopped waiting, no answer at
+      // all -- may have destroyed something, and asking again is safe.
+      refused: status !== undefined && status >= 400 && status < 500,
+      message: (err instanceof ApiError && err.detail) || messageOf(err),
+    };
+  }
+}
+
 /**
- * Uninstalled apps with retained data, and purging one.
+ * Uninstalled apps with retained data, and purging them.
  *
  * Uninstalling keeps what an app stored, and this list is the only place that
  * says so afterwards: the apps the tenant no longer has that still hold data,
@@ -1056,10 +1076,15 @@ type PurgeOutcome =
  * on the matching a purge uses, so what a row shows is what purging that app
  * destroys.
  *
+ * Rows can be selected, and the selected apps purged behind one confirmation
+ * that lists them all -- an app with many add-ons leaves many rows. The purges
+ * run one after the other, each the same request a single purge makes.
+ *
  * A purge is one request that is answered when it is over, which can take
- * minutes. Nothing here gives up before the answer; while it runs the dialog
- * stays open and nothing else can be started. What comes back is shown as the
- * cluster said it, and only an answer that says it is complete is called done.
+ * minutes. Nothing here gives up before the answer; while purges run the
+ * dialog stays open, says how far it got and how each one ended, and nothing
+ * else can be started. What comes back is shown as the cluster said it, and
+ * only an answer that says it is complete is called done.
  *
  * The answer also names the kinds of data the cluster could not check, and
  * why. Whenever it names any, the list may be missing apps, and that is said
@@ -1068,55 +1093,69 @@ type PurgeOutcome =
  * Naming an app by hand is offered when the list could not be read, and when
  * it came back empty without everything having been checked.
  */
-function RetainedSection({ tenant, declared }: { tenant: string; declared?: DeclaredApp[] }) {
+export function RetainedSection({ tenant, declared }: { tenant: string; declared?: DeclaredApp[] }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  // The app the dialog is about, and whether its purge has been confirmed:
-  // from then on the dialog only says that it is running.
-  const [asking, setAsking] = useState<{ app: string; confirmed: boolean } | null>(null);
-  const [outcome, setOutcome] = useState<PurgeOutcome | null>(null);
+  // The apps the dialog asks about, before the purge is confirmed.
+  const [asking, setAsking] = useState<string[] | null>(null);
+  // The confirmed purges and how each finished one ended, while they run.
+  const [running, setRunning] = useState<{ apps: string[]; done: PurgeOutcome[] } | null>(null);
+  const [outcomes, setOutcomes] = useState<PurgeOutcome[]>([]);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const runningRef = useRef(false);
+  const busy = running !== null;
 
   const retainedQuery = useQuery({
     queryKey: ["admin", "apps", "retained"],
     queryFn: () => fetchRetainedApps(),
   });
 
-  const purge = useMutation({
-    mutationFn: (app: string) => purgeAppData(app),
-    onSuccess: (result, app) => setOutcome({ app, result }),
-    onError: (err, app) => {
-      const status = err instanceof ApiError ? err.status : undefined;
-      setOutcome({
-        app,
-        // A 4xx is the cluster declining to start. Anything else -- a purge
-        // that stopped half-way, a relay that stopped waiting, no answer at
-        // all -- may have destroyed something, and asking again is safe.
-        refused: status !== undefined && status >= 400 && status < 500,
-        message: (err instanceof ApiError && err.detail) || messageOf(err),
-      });
-    },
-    onSettled: () => {
-      setAsking(null);
-      // Whatever the answer, what is held may have changed.
-      void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "retained"] });
-    },
-  });
-
-  function run(app: string) {
-    if (purge.isPending) return;
-    setOutcome(null);
-    setAsking({ app, confirmed: true });
-    purge.mutate(app);
+  async function run(apps: string[]) {
+    if (runningRef.current || apps.length === 0) return;
+    runningRef.current = true;
+    setOutcomes([]);
+    setAsking(null);
+    const done: PurgeOutcome[] = [];
+    setRunning({ apps, done });
+    for (const app of apps) {
+      done.push(await purgeOne(app));
+      setRunning({ apps, done: [...done] });
+    }
+    runningRef.current = false;
+    setRunning(null);
+    setOutcomes(done);
+    // What is purged is gone from the list; what did not finish stays selected.
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const outcome of done) if (purgeComplete(outcome)) next.delete(outcome.app);
+      return next;
+    });
+    // Whatever the answers, what is held may have changed.
+    void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "retained"] });
   }
 
-  function ask(app: string) {
-    if (purge.isPending) return;
-    setOutcome(null);
-    setAsking({ app, confirmed: false });
+  function ask(apps: string[]) {
+    if (busy || apps.length === 0) return;
+    setOutcomes([]);
+    setAsking(apps);
   }
 
   const apps = retainedQuery.data?.apps ?? [];
   const reasons = retainedQuery.data?.unknown ?? {};
+  // Only an app whose profile is available can be purged, so only it can be selected.
+  const selectable = apps.filter((app) => app.profileAvailable).map((app) => app.profile);
+  const chosen = selectable.filter((app) => selected.has(app));
+  const allChosen = selectable.length > 0 && chosen.length === selectable.length;
+
+  function toggle(app: string, on: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(app);
+      else next.delete(app);
+      return next;
+    });
+  }
+
   // Every kind the cluster could not check, the known ones first in the order
   // the table shows them: an app that holds only such data is not listed.
   const known: readonly string[] = RETAINED_KINDS;
@@ -1128,18 +1167,27 @@ function RetainedSection({ tenant, declared }: { tenant: string; declared?: Decl
   const byName = (
     <details>
       <summary className="admin-console__hint">{t("apps.purgeByName")}</summary>
-      <PurgeByName declared={declared} busy={purge.isPending} onAsk={ask} />
+      <PurgeByName declared={declared} busy={busy} onAsk={(app) => ask([app])} />
     </details>
   );
+  const dialogApps = running?.apps ?? asking;
 
   return (
     <div className="admin-console__subsection">
       <h3 className="admin-console__subsection-title">{t("apps.retainedTitle")}</h3>
       <p className="admin-console__lead">{t("apps.retainedLead")}</p>
 
-      {outcome ? (
-        <PurgeOutcomeNotice outcome={outcome} busy={purge.isPending} onRetry={() => run(outcome.app)} />
+      {outcomes.length > 1 ? (
+        <p className="admin-console__lead" role="status">
+          {t("apps.purgeBatchSummary", {
+            complete: outcomes.filter(purgeComplete).length,
+            count: outcomes.length,
+          })}
+        </p>
       ) : null}
+      {outcomes.map((outcome) => (
+        <PurgeOutcomeNotice key={outcome.app} outcome={outcome} busy={busy} onRetry={() => void run([outcome.app])} />
+      ))}
 
       {retainedQuery.isLoading ? (
         <p className="admin-console__hint">{t("apps.retainedReading")}</p>
@@ -1172,38 +1220,94 @@ function RetainedSection({ tenant, declared }: { tenant: string; declared?: Decl
               <p className="admin-console__empty">{t("apps.retainedNone")}</p>
             )
           ) : (
-            <div className="admin-console__table-wrap">
-              <table className="admin-console__table">
-                <thead>
-                  <tr>
-                    <th>{t("apps.app")}</th>
-                    {RETAINED_KINDS.map((kind) => (
-                      <th key={kind}>{kindWord(t, kind)}</th>
+            <>
+              <div className="admin-console__actions">
+                <button
+                  type="button"
+                  className="admin-console__btn admin-console__btn--danger"
+                  disabled={busy || chosen.length === 0}
+                  onClick={() => ask(chosen)}
+                >
+                  {t("apps.purgeSelected", { count: chosen.length })}
+                </button>
+              </div>
+              <div className="admin-console__table-wrap">
+                <table className="admin-console__table">
+                  <thead>
+                    <tr>
+                      <th>
+                        <SelectAll
+                          checked={allChosen}
+                          partial={chosen.length > 0 && !allChosen}
+                          disabled={busy || selectable.length === 0}
+                          onChange={(on) => setSelected(new Set(on ? selectable : []))}
+                        />
+                      </th>
+                      <th>{t("apps.app")}</th>
+                      {RETAINED_KINDS.map((kind) => (
+                        <th key={kind}>{kindWord(t, kind)}</th>
+                      ))}
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {apps.map((app) => (
+                      <RetainedRow
+                        key={app.profile}
+                        app={app}
+                        busy={busy}
+                        selected={selected.has(app.profile)}
+                        onSelect={(on) => toggle(app.profile, on)}
+                        onAsk={(name) => ask([name])}
+                      />
                     ))}
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {apps.map((app) => (
-                    <RetainedRow key={app.profile} app={app} busy={purge.isPending} onAsk={ask} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </>
       )}
 
-      {asking ? (
+      {dialogApps ? (
         <PurgeDialog
-          app={asking.app}
+          apps={dialogApps}
           tenant={tenant}
-          pending={asking.confirmed}
-          onConfirm={() => run(asking.app)}
+          done={running?.done ?? null}
+          onConfirm={() => void run(dialogApps)}
           onClose={() => setAsking(null)}
         />
       ) : null}
     </div>
+  );
+}
+
+/** The header checkbox: on when every selectable row is, mixed when some are. */
+function SelectAll({
+  checked,
+  partial,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  partial: boolean;
+  disabled: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = partial;
+  }, [partial]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      aria-label={t("apps.retainedSelectAll")}
+      checked={checked}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.checked)}
+    />
   );
 }
 
@@ -1255,16 +1359,29 @@ function KindState({ state }: { state?: string }) {
 function RetainedRow({
   app,
   busy,
+  selected,
+  onSelect,
   onAsk,
 }: {
   app: RetainedApp;
   busy: boolean;
+  selected: boolean;
+  onSelect: (on: boolean) => void;
   onAsk: (app: string) => void;
 }) {
   const { t } = useTranslation();
   const volumes = app.volumes ?? [];
   return (
     <tr>
+      <td>
+        <input
+          type="checkbox"
+          aria-label={t("apps.retainedSelect", { app: app.profile })}
+          checked={selected && app.profileAvailable}
+          disabled={busy || !app.profileAvailable}
+          onChange={(e) => onSelect(e.target.checked)}
+        />
+      </td>
       <td className="admin-console__mono">{app.profile}</td>
       {RETAINED_KINDS.map((kind) => (
         <td key={kind}>
@@ -1437,27 +1554,52 @@ function PurgeByName({
   );
 }
 
+/** How one purge in a run stands, as a word for the progress list. */
+function purgeStateWord(t: TFunction, outcome: PurgeOutcome | undefined, current: boolean): ReactNode {
+  if (!outcome) {
+    return current ? (
+      <span className="admin-console__badge admin-console__badge--info">{t("apps.purgeStateRunning")}</span>
+    ) : (
+      <span className="admin-console__badge">{t("apps.purgeStateWaiting")}</span>
+    );
+  }
+  if (purgeComplete(outcome)) {
+    return <span className="admin-console__badge admin-console__badge--info">{t("apps.purgeStateComplete")}</span>;
+  }
+  if ("result" in outcome) {
+    return <span className="admin-console__badge admin-console__badge--warn">{t("apps.purgeStateIncomplete")}</span>;
+  }
+  return (
+    <span className="admin-console__badge admin-console__badge--warn">
+      {outcome.refused ? t("apps.purgeStateRefused") : t("apps.purgeStateFailed")}
+    </span>
+  );
+}
+
 /**
- * Purging one app's data, behind its name typed out.
+ * Purging the data of one app or several, behind a typed confirmation.
  *
- * Typing the name is the confirmation because this is the one act on this
- * screen nothing brings back, and a click is too easy to make.
+ * Typing is the confirmation because this is the one act on this screen
+ * nothing brings back, and a click is too easy to make: one app's name, or,
+ * for several, how many apps are listed.
  *
- * Once confirmed the dialog stays, saying the purge is running, until the
+ * Once confirmed the dialog stays, saying the purges are running, until every
  * answer is there: it cannot be dismissed and offers nothing to press, so a
- * purge is not asked for twice and the answer is not walked away from. It
- * sets no time limit of its own.
+ * purge is not asked for twice and the answers are not walked away from. For
+ * several apps it shows how far the run is and how each finished purge ended.
+ * It sets no time limit of its own.
  */
-function PurgeDialog({
-  app,
+export function PurgeDialog({
+  apps,
   tenant,
-  pending,
+  done,
   onConfirm,
   onClose,
 }: {
-  app: string;
+  apps: string[];
   tenant: string;
-  pending: boolean;
+  /** How each finished purge ended, once the purges are confirmed; null before. */
+  done: PurgeOutcome[] | null;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -1471,7 +1613,12 @@ function PurgeDialog({
     return () => dialog?.close();
   }, []);
 
-  const confirmed = typed.trim() === app;
+  const single = apps.length === 1;
+  const app = apps[0];
+  const count = apps.length;
+  const expected = single ? app : String(count);
+  const confirmed = typed.trim() === expected;
+  const pending = done !== null;
 
   return (
     <dialog
@@ -1486,9 +1633,26 @@ function PurgeDialog({
       {pending ? (
         <div className="admin-console__dialog-body" role="status" aria-live="polite">
           <h3 id="purge-app-title" className="admin-console__dialog-title">
-            <Trans i18nKey="apps.purgeRunningTitle" values={{ app }} components={mono} />
+            {single ? (
+              <Trans i18nKey="apps.purgeRunningTitle" values={{ app }} components={mono} />
+            ) : (
+              t("apps.purgeBatchRunningTitle", { count })
+            )}
           </h3>
           <p className="admin-console__lead">{t("apps.purgeRunningBody")}</p>
+          {single ? null : (
+            <>
+              <p className="admin-console__lead">{t("apps.purgeBatchProgress", { done: done.length, count })}</p>
+              <ul>
+                {apps.map((name, i) => (
+                  <li key={name}>
+                    <span className="admin-console__mono">{name}</span>{" "}
+                    {purgeStateWord(t, done[i], i === done.length)}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <div className="admin-console__dialog-footer">
             <button type="button" className="admin-console__btn admin-console__btn--danger-solid" disabled>
               {t("apps.purging")}
@@ -1504,17 +1668,38 @@ function PurgeDialog({
           }}
         >
           <h3 id="purge-app-title" className="admin-console__dialog-title">
-            <Trans i18nKey="apps.purgeDialogTitle" values={{ app }} components={mono} />
+            {single ? (
+              <Trans i18nKey="apps.purgeDialogTitle" values={{ app }} components={mono} />
+            ) : (
+              t("apps.purgeBatchDialogTitle", { count })
+            )}
           </h3>
           <p className="admin-console__lead">
-            <Trans i18nKey="apps.purgeDialogBody" values={{ app, tenant }} components={mono} />
+            {single ? (
+              <Trans i18nKey="apps.purgeDialogBody" values={{ app, tenant }} components={mono} />
+            ) : (
+              <Trans i18nKey="apps.purgeBatchDialogBody" values={{ tenant }} components={mono} />
+            )}
           </p>
+          {single ? null : (
+            <ul>
+              {apps.map((name) => (
+                <li key={name} className="admin-console__mono">
+                  {name}
+                </li>
+              ))}
+            </ul>
+          )}
           <p className="admin-console__lead">{t("apps.purgeDialogKept")}</p>
           <p className="admin-console__lead">{t("apps.purgeDialogFinal")}</p>
 
           <label className="admin-console__label" htmlFor="purge-app-confirm">
             <span className="admin-console__label-text">
-              <Trans i18nKey="apps.purgeTypeToConfirm" values={{ app }} components={mono} />
+              {single ? (
+                <Trans i18nKey="apps.purgeTypeToConfirm" values={{ app }} components={mono} />
+              ) : (
+                <Trans i18nKey="apps.purgeBatchTypeToConfirm" values={{ count }} components={mono} />
+              )}
             </span>
             <input
               id="purge-app-confirm"
