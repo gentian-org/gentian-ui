@@ -3,7 +3,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import "@/lib/i18n";
 import type { AdminContext, AppState } from "@/api/admin";
-import { AccessPart, joinApps, linkedApp, PrivilegesPart } from "./AppsSection";
+import { AccessPart, joinApps, linkedApp, PrivilegesPart, PurgeDialog, RetainedSection } from "./AppsSection";
 
 // The operator's app state as it is served (gentian-os
 // internal/applifecycle/apps.go): each pending request with who answers it.
@@ -156,5 +156,72 @@ describe("AccessPart", () => {
     const html = renderAccess({ ...state, origin: "install" });
     expect(html).toContain("Make it for everyone");
     expect(html).toContain("People with access");
+  });
+});
+
+describe("RetainedSection", () => {
+  function renderRetained() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(["admin", "apps", "retained"], {
+      apps: [
+        { profile: "crm", profileAvailable: true, kinds: { files: "present" } },
+        { profile: "crm-mail", profileAvailable: true, kinds: { database: "present" } },
+        { profile: "orphan", profileAvailable: false, kinds: { files: "present" } },
+      ],
+    });
+    return renderToString(
+      <QueryClientProvider client={client}>
+        <RetainedSection tenant="acme" />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("offers a checkbox per row, one for all, and purging the selection", () => {
+    const html = renderRetained();
+    expect(html).toContain('aria-label="Select all"');
+    expect(html).toContain('aria-label="Select crm"');
+    expect(html).toContain('aria-label="Select crm-mail"');
+    // Nothing selected yet: the batch purge waits for a selection.
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Purge selected \(0\)…<\/button>/);
+  });
+
+  it("does not let an app without its profile be selected", () => {
+    const html = renderRetained();
+    expect(html).toMatch(/<input type="checkbox" aria-label="Select orphan"[^>]*disabled=""/);
+  });
+});
+
+describe("PurgeDialog", () => {
+  const noop = () => {};
+
+  it("lists every selected app and asks for their number", () => {
+    const html = renderToString(
+      <PurgeDialog apps={["crm", "crm-mail"]} tenant="acme" done={null} onConfirm={noop} onClose={noop} />,
+    );
+    expect(html).toContain("Permanently destroy the data of 2 apps?");
+    expect(html).toContain(">crm</li>");
+    expect(html).toContain(">crm-mail</li>");
+    expect(html).toContain("the number of apps, to confirm");
+  });
+
+  it("shows how far a run is and how each finished purge ended", () => {
+    const html = renderToString(
+      <PurgeDialog
+        apps={["crm", "crm-mail", "crm-chat"]}
+        tenant="acme"
+        done={[{ app: "crm", result: { status: "Purged", complete: true } }]}
+        onConfirm={noop}
+        onClose={noop}
+      />,
+    );
+    expect(html).toContain("1 of 3 finished.");
+    expect(html).toMatch(/crm<\/span> <span[^>]*>complete</);
+    expect(html).toMatch(/crm-mail<\/span> <span[^>]*>purging</);
+    expect(html).toMatch(/crm-chat<\/span> <span[^>]*>waiting</);
+  });
+
+  it("keeps the single-app confirmation by name", () => {
+    const html = renderToString(<PurgeDialog apps={["crm"]} tenant="acme" done={null} onConfirm={noop} onClose={noop} />);
+    expect(html).toContain("Type <span class=\"admin-console__mono\">crm</span> to confirm");
   });
 });
