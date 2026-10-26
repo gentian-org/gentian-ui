@@ -212,6 +212,7 @@
     "noCredentialsAreDeclaredFor": "No credentials are declared for your scope.",
     "noRepositoriesAreConfiguredFor": "No repositories are configured for your scope.",
     "notSet": "not set",
+    "pending": "Saved, being checked",
     "oci": "oci",
     "present": "present",
     "refresh": "Refresh",

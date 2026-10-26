@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError } from "@/api/client";
 import {
   deleteRepository,
@@ -47,14 +47,48 @@ export function groupByProvider(credentials: CredentialStatus[]): [string, Crede
     .map(([k, list]) => [k, [...list].sort((x, y) => x.displayName.localeCompare(y.displayName))]);
 }
 
+/** How often the list is re-read while a stored value waits to be confirmed. */
+export const PENDING_POLL_FAST_MS = 3_000;
+export const PENDING_POLL_SLOW_MS = 30_000;
+/** How long the fast polling lasts after a save, before it slows down. */
+export const PENDING_FAST_WINDOW_MS = 60_000;
+
+/**
+ * The list's refetch interval. A value just stored is confirmed by the
+ * secret store within seconds, so the list is re-read every few seconds for a
+ * minute after a save and then every half minute, for as long as anything is
+ * still pending. Nothing pending, no polling: the custodian stops reporting a
+ * value as pending once its window has passed, so this always comes to rest.
+ */
+export function credentialsRefetchInterval(
+  credentials: CredentialStatus[] | undefined,
+  pollingSince: number | null,
+  now: number,
+): number | false {
+  if (!credentials?.some((c) => c.pending)) return false;
+  if (pollingSince !== null && now - pollingSince < PENDING_FAST_WINDOW_MS) {
+    return PENDING_POLL_FAST_MS;
+  }
+  return PENDING_POLL_SLOW_MS;
+}
+
 export function CredentialsSection() {
   const { t } = useTranslation();
 
   const queryClient = useQueryClient();
+  // When the last save happened, or when a pending value was first seen on a
+  // freshly opened page (stored by someone else a moment ago).
+  const [pollingSince, setPollingSince] = useState<number | null>(null);
   const credentialsQuery = useQuery({
     queryKey: ["admin", "credentials"],
     queryFn: fetchCredentials,
+    refetchInterval: (query) =>
+      credentialsRefetchInterval(query.state.data, pollingSince, Date.now()),
   });
+  const anyPending = credentialsQuery.data?.some((c) => c.pending) ?? false;
+  useEffect(() => {
+    if (anyPending && pollingSince === null) setPollingSince(Date.now());
+  }, [anyPending, pollingSince]);
   const repositoriesQuery = useQuery({
     queryKey: ["admin", "repositories"],
     queryFn: fetchRepositories,
@@ -87,7 +121,7 @@ export function CredentialsSection() {
   }
 
   const credentials = credentialsQuery.data ?? [];
-  const unsatisfied = credentials.filter((c) => !c.satisfied && !c.optional);
+  const unsatisfied = credentials.filter((c) => !c.satisfied && !c.pending && !c.optional);
 
   return (
     <section>
@@ -126,9 +160,10 @@ export function CredentialsSection() {
                 <CredentialCard
                   key={credential.name}
                   credential={credential}
-                  onSaved={() =>
-                    void queryClient.invalidateQueries({ queryKey: ["admin", "credentials"] })
-                  }
+                  onSaved={() => {
+                    setPollingSince(Date.now());
+                    void queryClient.invalidateQueries({ queryKey: ["admin", "credentials"] });
+                  }}
                 />
               ))}
             </ul>
@@ -178,7 +213,7 @@ function CredentialCard({
       ? Object.fromEntries(mutation.error.fields.map((fe) => [fe.field, fe.message]))
       : {};
 
-  const needsAttention = !credential.satisfied && !credential.optional;
+  const needsAttention = !credential.satisfied && !credential.pending && !credential.optional;
 
   return (
     <li
@@ -191,7 +226,9 @@ function CredentialCard({
             className={`admin-console__badge ${
               credential.satisfied
                 ? "admin-console__badge--ok"
-                : credential.optional
+                : credential.pending
+                  ? "admin-console__badge--info"
+                  : credential.optional
                   ? "admin-console__badge--warn"
                   : "admin-console__badge--danger"
             }`}
@@ -199,7 +236,9 @@ function CredentialCard({
             {t(
               credential.satisfied
                 ? "credentials.present"
-                : credential.optional
+                : credential.pending
+                  ? "credentials.pending"
+                  : credential.optional
                   ? "credentials.notSet"
                   : "credentials.missing",
             )}
@@ -216,7 +255,7 @@ function CredentialCard({
         {/* ESO's verdict, not a guess — a "missing" here means the value is
             genuinely absent from OpenBao rather than that something failed to
             start. */}
-        {!credential.satisfied && credential.reason ? (
+        {!credential.satisfied && !credential.pending && credential.reason ? (
           <p className="admin-console__card-meta">{credential.reason}</p>
         ) : null}
 
