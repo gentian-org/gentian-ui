@@ -212,6 +212,7 @@
     "noCredentialsAreDeclaredFor": "Für Ihren Bereich sind keine Zugangsdaten deklariert.",
     "noRepositoriesAreConfiguredFor": "Für Ihren Bereich sind keine Repositories konfiguriert.",
     "notSet": "nicht gesetzt",
+    "pending": "Gespeichert, wird geprüft",
     "oci": "oci",
     "present": "vorhanden",
     "refresh": "Aktualisieren",

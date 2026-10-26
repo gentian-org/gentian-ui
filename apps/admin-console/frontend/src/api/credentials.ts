@@ -14,6 +14,12 @@ export type CredentialStatus = {
   fields: CredentialField[];
   validator?: string;
   satisfied: boolean;
+  /**
+   * Stored moments ago and not yet confirmed by the secret store's sync: the
+   * custodian asked for it to be read again and is waiting for the answer.
+   * Never true together with `satisfied`.
+   */
+  pending?: boolean;
   reason?: string;
   setBy?: string;
   updatedAt?: string;
