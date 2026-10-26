@@ -15,7 +15,9 @@ and a tile is drawn on the desktop every member has open.
 Which one a tile shows
 ----------------------
 The most specific: the person's own, else the tenant's for the app the tile
-is the main entry of, else the profile's own picture from the catalogue.
+belongs to, else the profile's own picture from the catalogue. The tenant's
+picture goes on an app's main entry; an app with none, an add-on that lives
+inside another app's host, shows it on each of its tiles.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from __future__ import annotations
 import re
 import struct
 import time
+from collections.abc import Collection
 from dataclasses import dataclass
 
 from sqlalchemy import delete, select
@@ -106,17 +109,32 @@ def check_person_tile(data: bytes, declared: str) -> str:
     return found
 
 
-def main_app_of(tile_id: str, tenant: str) -> str | None:
-    """The app a tile is the main entry of, or None.
-
-    A tenant's tile replaces the picture of one tile per app: its main entry.
-    An app's other tiles (an add-on's, a second host's) keep their own.
-    """
-    name = tile_id.removeprefix("kernel-")
-    parts = name.split("/")
-    if len(parts) != 3 or parts[0] != tenant or parts[2] not in MAIN_ENTRIES:
+def app_of(tile_id: str, tenant: str) -> str | None:
+    """The app a tile of this tenant's belongs to, or None."""
+    parts = tile_id.removeprefix("kernel-").split("/")
+    if len(parts) != 3 or parts[0] != tenant or not _APP_NAME.match(parts[1]):
         return None
-    return parts[1] if _APP_NAME.match(parts[1]) else None
+    return parts[1]
+
+
+def is_main_entry(tile_id: str) -> bool:
+    return tile_id.rsplit("/", 1)[-1] in MAIN_ENTRIES
+
+
+def pictured_app_of(tile_id: str, tenant: str, names: Collection[str]) -> str | None:
+    """The app whose tenant's picture tile `tile_id` shows, or None.
+
+    A tenant's picture is of one app. It replaces the picture of that app's
+    main entry, and a second host's tile keeps its own. An app without a main
+    entry -- an add-on, whose tiles open inside another app's host -- shows it
+    on each of its tiles. `names` are the catalogue's tile names, which say
+    whether the app has a main entry.
+    """
+    app = app_of(tile_id, tenant)
+    if app is None or is_main_entry(tile_id):
+        return app
+    mains = {f"{tenant}/{app}/{entry}" for entry in MAIN_ENTRIES}
+    return None if mains & set(names) else app
 
 
 @dataclass

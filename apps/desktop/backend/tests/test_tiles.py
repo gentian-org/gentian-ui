@@ -80,6 +80,12 @@ def usher(monkeypatch):
              "description": "", "icon": "data:image/png;base64," + base64.b64encode(OTHER_PNG).decode()},
             {"name": f"{TENANT}/nextcloud/collabora", "displayName": "Office", "url": "https://c",
              "description": "", "icon": "data:image/png;base64," + base64.b64encode(OTHER_PNG).decode()},
+            # An add-on: its tiles open inside Nextcloud's host, and it has no
+            # main entry of its own.
+            {"name": f"{TENANT}/nextcloud-office/document", "displayName": "Document",
+             "url": "https://n/d", "description": "", "icon": "document"},
+            {"name": f"{TENANT}/nextcloud-office/spreadsheet", "displayName": "Spreadsheet",
+             "url": "https://n/s", "description": "", "icon": "spreadsheet"},
             {"name": f"{TENANT}/legacy/web", "displayName": "Legacy", "url": "https://l",
              "description": "", "icon": "data:image/svg+xml;base64," + base64.b64encode(SVG).decode()},
             {"name": "headlamp", "displayName": "Headlamp", "url": "https://h",
@@ -306,6 +312,30 @@ def test_the_tenants_tile_replaces_only_the_apps_main_tile(client):
     put_tenant(client, body=PNG)
     other = client.get("/api/v1/tiles/kernel-acme/nextcloud/collabora", headers=BEARER)
     assert other.content == OTHER_PNG
+
+
+def test_an_addons_tiles_show_the_tenants_picture_of_the_addon(client):
+    # Before the App Store has given the add-on its picture, its glyphs.
+    tile = "/api/v1/tiles/kernel-acme/nextcloud-office/document"
+    assert client.get(tile, headers=BEARER).headers["location"] == "/tiles/document.png"
+
+    put_tenant(client, app="nextcloud-office", body=PNG)
+    assert client.get(tile, headers=BEARER).content == PNG
+    sheet = "/api/v1/tiles/kernel-acme/nextcloud-office/spreadsheet"
+    assert client.get(sheet, headers=BEARER).content == PNG
+    # Its base keeps its own.
+    assert client.get("/api/v1/tiles/kernel-acme/nextcloud/web", headers=BEARER).content == OTHER_PNG
+
+
+def test_the_tile_list_names_this_apis_address_for_an_addons_picture(client):
+    put_tenant(client, app="nextcloud-office", body=PNG)
+    listed = client.get("/api/v1/cluster/tiles", headers=BEARER).json()["tiles"]
+    icons = {t["name"]: t["icon"] for t in listed}
+    for entry in ("document", "spreadsheet"):
+        assert icons[f"{TENANT}/nextcloud-office/{entry}"].startswith(
+            f"/api/v1/tiles/kernel-acme/nextcloud-office/{entry}?v=t"
+        )
+    assert icons[f"{TENANT}/nextcloud/web"].startswith("data:image/png;base64,")
 
 
 def test_a_profile_picture_that_is_an_svg_is_never_served(client):
