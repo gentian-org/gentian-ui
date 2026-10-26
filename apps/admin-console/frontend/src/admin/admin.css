@@ -654,6 +654,17 @@
   filter: brightness(0.9);
 }
 
+/* A write committed and waiting for the cluster: grey whatever its kind,
+   until the change it asked for has been applied. */
+.admin-console__btn--waiting,
+.admin-console__btn--waiting:disabled {
+  background: var(--gtn-paper-1);
+  border-color: var(--gtn-border-strong);
+  color: var(--gtn-ink-3);
+  opacity: 1;
+  cursor: progress;
+}
+
 .admin-console__btn--quiet {
   border-color: var(--gtn-border-strong);
   background: transparent;

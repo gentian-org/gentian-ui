@@ -256,6 +256,7 @@
     "upstreamFirstObligationUnmetOr": "Upstream-First-Pflicht nicht erfüllt oder überholt"
   },
   "integrations": {
+    "applying": "Wird angewendet …",
     "activeIntegrationbindingsAreOperatorWired": "Aktive IntegrationBindings werden vom Operator verdrahtet. AppGrants sind vom Mandanten genehmigte Teilmengen von Fähigkeiten, die nach OpenFGA synchronisiert werden. Contract-NetworkPolicies erlauben ausgehenden Verkehr nur für genehmigte Fähigkeiten.",
     "app": "App",
     "appGrants": "App-Freigaben",

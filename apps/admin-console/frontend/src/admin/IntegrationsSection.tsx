@@ -56,7 +56,9 @@ function IntegrationApprovals({
   // What a person unticked of what a binding asks for, by row. Everything
   // asked for is offered ticked: the request is what the profile declares.
   const [withheld, setWithheld] = useState<Record<string, string[]>>({});
-  const [done, setDone] = useState<string | null>(null);
+  // The row last written, and the list it stood in: until the cluster has
+  // applied the commit it stays there, and its button waits.
+  const [done, setDone] = useState<{ key: string; from: "pending" | "granted" } | null>(null);
   const [failed, setFailed] = useState<{ key: string; message: string } | null>(null);
   const [written, setWritten] = useState<Written>({});
 
@@ -76,9 +78,9 @@ function IntegrationApprovals({
       setDone(null);
       setFailed(null);
     },
-    onSuccess: (body, { row }) => {
+    onSuccess: (body, { row, granted }) => {
       setWritten((before) => ({ ...before, [row.consumer]: body }));
-      setDone(rowKey(row));
+      setDone({ key: rowKey(row), from: granted ? "pending" : "granted" });
       void queryClient.invalidateQueries({ queryKey: ["admin", "integrations", tenant] });
     },
     onError: (err, { row }) => setFailed({ key: rowKey(row), message: refusalOf(err) }),
@@ -86,6 +88,18 @@ function IntegrationApprovals({
 
   const pending = rows.filter((row) => row.grantedCapabilities.length === 0);
   const granted = rows.filter((row) => row.grantedCapabilities.length > 0);
+
+  const applying = (row: EffectiveAccessRow, list: "pending" | "granted") =>
+    done?.key === rowKey(row) && done.from === list;
+  const waiting = pending.some((row) => applying(row, "pending")) || granted.some((row) => applying(row, "granted"));
+  // While a commit waits for the cluster, the overview is asked again until
+  // the row has moved.
+  useQuery({
+    queryKey: ["admin", "integrations", tenant],
+    queryFn: () => fetchIntegrationsOverview(tenant),
+    enabled: waiting,
+    refetchInterval: waiting ? 3000 : false,
+  });
 
   const chosen = (row: EffectiveAccessRow) =>
     row.bindingCapabilities.filter((cap) => !(withheld[rowKey(row)] ?? []).includes(cap));
@@ -96,12 +110,12 @@ function IntegrationApprovals({
     setWithheld({ ...withheld, [key]: now.includes(cap) ? now.filter((c) => c !== cap) : [...now, cap] });
   };
 
-  const outcome = (row: EffectiveAccessRow) => {
+  const outcome = (row: EffectiveAccessRow, list: "pending" | "granted") => {
     const key = rowKey(row);
     if (failed?.key === key) {
       return <div className="admin-console__error">{t("integrations.writeRefused", { reason: failed.message })}</div>;
     }
-    if (done === key) {
+    if (applying(row, list)) {
       return <div className="admin-console__hint">{t("integrations.writeCommitted")}</div>;
     }
     return null;
@@ -148,17 +162,18 @@ function IntegrationApprovals({
                       </label>
                     ))
                   )}
-                  {outcome(row)}
+                  {outcome(row, "pending")}
                 </td>
                 <td style={{ textAlign: "right" }}>
                   {canGrant ? (
                     <button
                       type="button"
-                      className="admin-console__btn admin-console__btn--primary"
-                      disabled={write.isPending || chosen(row).length === 0}
+                      className={`admin-console__btn admin-console__btn--primary${
+                        applying(row, "pending") ? " admin-console__btn--waiting" : ""}`}
+                      disabled={write.isPending || applying(row, "pending") || chosen(row).length === 0}
                       onClick={() => write.mutate({ row, granted: chosen(row) })}
                     >
-                      {t("integrations.approve")}</button>
+                      {applying(row, "pending") ? t("integrations.applying") : t("integrations.approve")}</button>
                   ) : null}
                 </td>
               </tr>
@@ -194,17 +209,17 @@ function IntegrationApprovals({
                     <div className="admin-console__hint">
                       {t("integrations.notGranted", { capabilities: row.ungranted.join(", ") })}</div>
                   ) : null}
-                  {outcome(row)}
+                  {outcome(row, "granted")}
                 </td>
                 <td style={{ textAlign: "right" }}>
                   {canGrant ? (
                     <button
                       type="button"
-                      className="admin-console__btn"
-                      disabled={write.isPending}
+                      className={`admin-console__btn${applying(row, "granted") ? " admin-console__btn--waiting" : ""}`}
+                      disabled={write.isPending || applying(row, "granted")}
                       onClick={() => write.mutate({ row, granted: null })}
                     >
-                      {t("integrations.withdraw")}</button>
+                      {applying(row, "granted") ? t("integrations.applying") : t("integrations.withdraw")}</button>
                   ) : null}
                 </td>
               </tr>
