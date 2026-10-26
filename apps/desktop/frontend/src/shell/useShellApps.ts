@@ -26,7 +26,7 @@ function kernelConsoleApps(data: ClusterTilesResponse | undefined): ShellApp[] {
     // realm, and the session the person already holds is what carries them
     // through it.
     authMode: null,
-    preopen: false,
+    preopen: tile.preopen ?? false,
     builtin: false,
   }));
 }

@@ -98,6 +98,8 @@ export type ClusterTile = {
   description: string;
   url: string;
   icon: string;
+  /** The app's profile asks to be opened hidden at desktop mount (gentianos.io/portal-preopen). */
+  preopen?: boolean;
 };
 
 export type ClusterTilesResponse = {
