@@ -20,6 +20,7 @@ import {
   type Person,
   type RemovedMailbox,
 } from "@/api/admin";
+import { toggleDraft, withDraft, withoutKey, type MembershipDraft } from "./membershipDraft";
 import { Checklist, type ChecklistItem } from "./Checklist";
 import { describeGroups, type DescribedGroup } from "./groupLabels";
 import "./admin.css";
@@ -455,8 +456,16 @@ function MemberEditor({
   const [draft, setDraft] = useState<{ firstName?: string; lastName?: string; email?: string; enabled?: boolean }>(
     {},
   );
+  // The groups ticked or unticked and not saved yet, by path: what the
+  // person is to be (true) or not to be (false) a member of. Applied with the
+  // other fields when Save is pressed, never as each box is ticked.
+  const [groupDraft, setGroupDraft] = useState<MembershipDraft>({});
   const [notice, setNotice] = useState<string | null>(null);
-  const changed = Object.keys(draft).length > 0;
+  const current = new Set(p.groups ?? []);
+  const changed = Object.keys(draft).length > 0 || Object.keys(groupDraft).length > 0;
+  const selectedGroups = withDraft(current, groupDraft);
+  const toggleGroup = (group: string, member: boolean) =>
+    setGroupDraft((now) => toggleDraft(now, current, group, member));
 
   const after = (message?: string) => {
     setNotice(message ?? null);
@@ -464,16 +473,38 @@ function MemberEditor({
     onChanged();
   };
 
+  // Everything changed, in one go: the fields, then each group. A change
+  // that goes through is taken off the draft; what failed stays on it, and
+  // is named, so Save asks again for that alone.
   const save = useMutation({
-    mutationFn: () => updatePerson({ person: person.id, ...draft }),
-    onSuccess: () => {
-      setDraft({});
-      after(t("members.saved"));
+    mutationFn: async () => {
+      const failed: string[] = [];
+      if (Object.keys(draft).length > 0) {
+        try {
+          await updatePerson({ person: person.id, ...draft });
+          setDraft({});
+        } catch (error) {
+          failed.push(t("members.saveFailedDetails", { error: String(error) }));
+        }
+      }
+      const labels = new Map(groups.map((g) => [g.path, g.label]));
+      for (const [group, member] of Object.entries(groupDraft)) {
+        try {
+          await setMembership({ person: person.id, group, member });
+          setGroupDraft((now) => withoutKey(now, group));
+        } catch (error) {
+          failed.push(
+            t(member ? "members.saveFailedJoin" : "members.saveFailedLeave", {
+              group: labels.get(group) ?? group,
+              error: String(error),
+            }),
+          );
+        }
+      }
+      if (failed.length > 0) throw new Error(failed.join(" "));
     },
-  });
-  const membership = useMutation({
-    mutationFn: (v: { group: string; member: boolean }) => setMembership({ person: person.id, ...v }),
-    onSuccess: () => after(),
+    onSuccess: () => after(t("members.saved")),
+    onError: () => after(),
   });
   const reset = useMutation({
     mutationFn: () => sendPasswordReset(person.id),
@@ -496,7 +527,7 @@ function MemberEditor({
       onChanged();
     },
   });
-  const failure = [save, membership, reset, totpOn, totpOff, remove].find((m) => m.isError)?.error;
+  const failure = [save, reset, totpOn, totpOff, remove].find((m) => m.isError)?.error;
 
   if (detail.isLoading) {
     return <p className="admin-console__hint">{t("members.reading")}</p>;
@@ -548,10 +579,10 @@ function MemberEditor({
           <Checklist
             id={`m-groups-${person.id}`}
             items={groupItems(groups)}
-            selected={new Set(p.groups ?? [])}
-            disabled={membership.isPending}
+            selected={selectedGroups}
+            disabled={save.isPending}
             sectionLabel={(kind) => t(`groupPicker.kind_${kind}`)}
-            onToggle={(group, member) => membership.mutate({ group, member })}
+            onToggle={toggleGroup}
           />
         </div>
 
@@ -599,7 +630,7 @@ function MemberEditor({
         </div>
 
         {notice && <p className="admin-console__success">{notice}</p>}
-        {failure && <p className="admin-console__error">{String(failure)}</p>}
+        {failure && <p className="admin-console__error">{failure instanceof Error ? failure.message : String(failure)}</p>}
 
         <div className="admin-console__editor-footer">
           <button

@@ -676,7 +676,10 @@
     "mailboxMessages_one": "{{count}} E-Mail",
     "mailboxMessages_other": "{{count}} E-Mails",
     "deleteArchived": "Archiviertes Postfach löschen",
-    "deleteArchivedConfirm": "Das archivierte Postfach von {{address}} mit allen E-Mails darin löschen? Das lässt sich nicht rückgängig machen."
+    "deleteArchivedConfirm": "Das archivierte Postfach von {{address}} mit allen E-Mails darin löschen? Das lässt sich nicht rückgängig machen.",
+    "saveFailedDetails": "Name, E-Mail oder Anmeldung wurden nicht gespeichert: {{error}}",
+    "saveFailedJoin": "Nicht zu {{group}} hinzugefügt: {{error}}",
+    "saveFailedLeave": "Nicht aus {{group}} entfernt: {{error}}"
   },
   "groups": {
     "title": "Gruppen",
@@ -696,7 +699,10 @@
     "edit": "Bearbeiten",
     "close": "Schliessen",
     "rename": "Umbenennen",
-    "whoIsIn": "Mitglieder dieser Gruppe"
+    "whoIsIn": "Mitglieder dieser Gruppe",
+    "membersSaved": "Mitglieder gespeichert.",
+    "saveFailedAdd": "{{person}} wurde nicht hinzugefügt: {{error}}",
+    "saveFailedRemove": "{{person}} wurde nicht entfernt: {{error}}"
   },
   "groupPicker": {
     "kind_app": "Apps",
@@ -821,7 +827,7 @@
     "everyoneOffConfirm": "{{app}} in {{tenant}} nicht mehr allen geben? Personen, die bereits Zugriff haben, behalten ihn. Später eingeladene Personen erhalten ihn nicht mehr automatisch.",
     "everyoneNotDeclared": "Git deklariert diese App nicht; es gibt nichts umzuschalten.",
     "peopleTitle": "Personen mit Zugriff",
-    "peopleLead": "Wer in der Gruppe der App <mono>{{group}}</mono> ist, hat Zugriff. Ein Häkchen gibt ihn einer Person; ohne Häkchen wird er entzogen.",
+    "peopleLead": "Wer in der Gruppe der App <mono>{{group}}</mono> ist, hat Zugriff. Personen an- oder abwählen, dann Speichern drücken.",
     "readingGroup": "Wird gelesen…",
     "noGroupYet": "Diese App hat noch keine Gruppe. Der Cluster legt sie an, sobald die App bereit ist; bis dahin kann niemandem Zugriff gegeben werden.",
     "integrationsTitle": "Integrationen",
@@ -1062,7 +1068,12 @@
     "privilegeApproveCancel": "Abbrechen",
     "privilegeApproveFailed": "Nicht genehmigt:",
     "privilegeApproveNotYours": "Ein Perimeter-Freigeber genehmigt dies.",
-    "privilegeApproveSecurityOfficer": "Genehmigen ist Sache der Sicherheitsverantwortlichen des Clusters: es schwächt, was den Knoten schützt, und damit jeden Mandanten darauf."
+    "privilegeApproveSecurityOfficer": "Genehmigen ist Sache der Sicherheitsverantwortlichen des Clusters: es schwächt, was den Knoten schützt, und damit jeden Mandanten darauf.",
+    "addonAccessTitle": "Add-ons",
+    "addonAccessLead": "Jedes Add-on hat seinen eigenen Zugriff: Wer in seiner Gruppe ist, hat es, unabhängig vom Zugriff auf die App.",
+    "addonEveryoneIsOn": "Dieses Add-on ist für alle: Alle Mitglieder dieses Mandanten haben es standardmäßig.",
+    "addonEveryoneIsOff": "Dieses Add-on ist nicht für alle: Es wird pro Person vergeben.",
+    "addonNoGroupYet": "Dieses Add-on hat noch keine Gruppe. Der Cluster legt sie an, sobald das Add-on bereit ist."
   },
   "perimeter": {
     "title": "Perimeter",

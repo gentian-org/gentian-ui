@@ -917,3 +917,63 @@ def test_a_removal_from_another_origin_is_refused_before_anything_is_asked(monke
         assert seen["url"] == f"{_base}/apps/timesheets/actions/remove-residue"
     finally:
         app.dependency_overrides.pop(get_settings, None)
+
+
+# -- an add-on's own access -------------------------------------------------
+
+
+def _fake_director(monkeypatch, answers: list[tuple[int, dict]], calls: list):
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def request(self, method, url, params=None, json=None, headers=None):
+            calls.append((method, url, json))
+            status, body = answers.pop(0)
+            return httpx.Response(status, json=body, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(director.httpx, "AsyncClient", FakeClient)
+
+
+@pytest.mark.parametrize("everyone", [True, False])
+def test_an_addons_access_restates_the_list_with_that_one_addons_grant(monkeypatch, everyone):
+    calls: list = []
+    _fake_director(
+        monkeypatch,
+        [
+            (200, {"profile": "cloud", "addons": ["cloud-calendar", "cloud-deck"]}),
+            (202, {"status": "updated", "commit": "a1b2c3d4"}),
+        ],
+        calls,
+    )
+    answer = _client().put(
+        "/api/v1/admin/apps/cloud/addons/cloud-deck/access",
+        json={"everyone": everyone},
+        headers=_person,
+    )
+    assert answer.status_code == 202
+    assert calls[0][:2] == ("GET", f"{_base}/apps/cloud/addons")
+    # Every add-on stays by name, so its pin and grant stay; only this one says.
+    assert calls[1] == (
+        "PUT",
+        f"{_base}/apps/cloud/addons",
+        {"addons": ["cloud-calendar", {"name": "cloud-deck", "defaultGrant": everyone}]},
+    )
+
+
+def test_an_addon_the_app_does_not_activate_is_not_switched_on(monkeypatch):
+    calls: list = []
+    _fake_director(monkeypatch, [(200, {"profile": "cloud", "addons": ["cloud-calendar"]})], calls)
+    answer = _client().put(
+        "/api/v1/admin/apps/cloud/addons/cloud-deck/access",
+        json={"everyone": True},
+        headers=_person,
+    )
+    assert answer.status_code == 404
+    assert [c[0] for c in calls] == ["GET"]

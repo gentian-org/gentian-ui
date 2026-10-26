@@ -676,7 +676,10 @@
     "mailboxMessages_one": "{{count}} message",
     "mailboxMessages_other": "{{count}} messages",
     "deleteArchived": "Delete archived mailbox",
-    "deleteArchivedConfirm": "Delete the archived mailbox of {{address}} with all the mail in it? This cannot be undone."
+    "deleteArchivedConfirm": "Delete the archived mailbox of {{address}} with all the mail in it? This cannot be undone.",
+    "saveFailedDetails": "Name, e-mail or sign-in were not saved: {{error}}",
+    "saveFailedJoin": "Not added to {{group}}: {{error}}",
+    "saveFailedLeave": "Not removed from {{group}}: {{error}}"
   },
   "groups": {
     "title": "Groups",
@@ -696,7 +699,10 @@
     "edit": "Edit",
     "close": "Close",
     "rename": "Rename",
-    "whoIsIn": "Members of this group"
+    "whoIsIn": "Members of this group",
+    "membersSaved": "Members saved.",
+    "saveFailedAdd": "{{person}} was not added: {{error}}",
+    "saveFailedRemove": "{{person}} was not removed: {{error}}"
   },
   "groupPicker": {
     "kind_app": "Apps",
@@ -821,7 +827,7 @@
     "everyoneOffConfirm": "Stop giving {{app}} to everyone in {{tenant}}? People who already have access keep it. People invited later no longer get it automatically.",
     "everyoneNotDeclared": "Git does not declare this app, so there is nothing to switch.",
     "peopleTitle": "People with access",
-    "peopleLead": "Whoever is in the app’s group <mono>{{group}}</mono> has access. Ticking a person gives it to them; unticking takes it away.",
+    "peopleLead": "Whoever is in the app’s group <mono>{{group}}</mono> has access. Tick or untick people, then press Save.",
     "readingGroup": "Reading…",
     "noGroupYet": "This app has no group yet. The cluster makes it when the app is ready; until then nobody can be given access.",
     "integrationsTitle": "Integrations",
@@ -1062,7 +1068,12 @@
     "privilegeApproveCancel": "Cancel",
     "privilegeApproveFailed": "Not approved:",
     "privilegeApproveNotYours": "A perimeter approver approves this.",
-    "privilegeApproveSecurityOfficer": "Approving it is the cluster's security officer's: it weakens what protects the node, and every tenant on it."
+    "privilegeApproveSecurityOfficer": "Approving it is the cluster's security officer's: it weakens what protects the node, and every tenant on it.",
+    "addonAccessTitle": "Add-ons",
+    "addonAccessLead": "Each add-on has its own access: whoever is in its group has it, whatever the app’s access is.",
+    "addonEveryoneIsOn": "This add-on is for everyone: every member of this tenant has it by default.",
+    "addonEveryoneIsOff": "This add-on is not for everyone: it is given per person.",
+    "addonNoGroupYet": "This add-on has no group yet. The cluster makes it when the add-on is ready."
   },
   "perimeter": {
     "title": "Perimeter",

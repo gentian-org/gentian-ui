@@ -157,6 +157,41 @@ describe("AccessPart", () => {
     expect(html).toContain("Make it for everyone");
     expect(html).toContain("People with access");
   });
+
+  it("lists each add-on with its own access", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(["admin", "people", "groups"], {
+      groups: [
+        { id: "g1", path: "gentian:tenant:acme:app:cloud", name: "app:cloud" },
+        { id: "g2", path: "gentian:tenant:acme:app:cloud-calendar", name: "app:cloud-calendar" },
+      ],
+    });
+    const html = renderToString(
+      <QueryClientProvider client={client}>
+        <AccessPart
+          row={{
+            profile: "cloud",
+            declared: {
+              profile: "cloud",
+              defaultGrant: true,
+              addons: ["cloud-calendar", "cloud-deck"],
+              addonGrants: [{ name: "cloud-calendar", defaultGrant: true }],
+            },
+            state: { ...state, profile: "cloud", origin: "install" },
+          }}
+          tenant="acme"
+          onOutcome={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+    expect(html).toContain("Each add-on has its own access");
+    const calendar = html.slice(html.indexOf('data-addon="cloud-calendar"'), html.indexOf('data-addon="cloud-deck"'));
+    const deck = html.slice(html.indexOf('data-addon="cloud-deck"'));
+    expect(calendar).toContain("This add-on is for everyone");
+    expect(calendar).not.toContain("has no group yet");
+    expect(deck).toContain("This add-on is not for everyone");
+    expect(deck).toContain("This add-on has no group yet");
+  });
 });
 
 describe("RetainedSection", () => {

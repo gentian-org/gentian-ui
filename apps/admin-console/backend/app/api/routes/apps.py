@@ -15,6 +15,7 @@ usher's to answer and is read beside this (`/admin/apps/status`, in admin.py).
 The two are joined on the screen, and where they disagree the screen says so.
 """
 
+import json
 import re
 from typing import Literal
 
@@ -322,6 +323,48 @@ async def set_access(
         bearer_of(credentials),
         json_body={"defaultGrant": body.everyone},
     )
+
+
+# An add-on's name, as the director accepts it in an app's add-on list.
+_ADDON = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$")
+
+
+@router.put("/{profile}/addons/{addon}/access")
+async def set_addon_access(
+    profile: str,
+    addon: str,
+    body: AccessBody,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """State whether one add-on of an installed app is for everyone.
+
+    An add-on is entitled on its own, by its own group. The director's add-on
+    route replaces the list whole, so the list git has now is read first and
+    sent back by name -- which keeps every add-on, its pin and its grant as
+    they are -- with this one add-on as {"name", "defaultGrant"}. An add-on
+    the app does not activate is refused here (404): adding it to the list
+    would switch it on. Whether the person may is the director's
+    (can_install_app, and can_grant to make it for everyone).
+    """
+    if not _ADDON.match(addon):
+        raise HTTPException(status_code=400, detail="That is not a valid add-on name.")
+    path = f"/v1/tenants/{settings.tenant_id}/apps/{_name(profile)}/addons"
+    token = bearer_of(credentials)
+    current = await director.forward(settings, "GET", path, token)
+    if current.status_code != 200:
+        return current
+    try:
+        names = [n for n in json.loads(current.body).get("addons") or [] if isinstance(n, str)]
+    except (ValueError, AttributeError) as exc:
+        raise HTTPException(status_code=502, detail="The director's answer did not parse.") from exc
+    if addon not in names:
+        raise HTTPException(status_code=404, detail="The app does not activate that add-on.")
+    entries: list[object] = [
+        {"name": n, "defaultGrant": body.everyone} if n == addon else n for n in names
+    ]
+    return await director.forward(settings, "PUT", path, token, json_body={"addons": entries})
 
 
 @router.delete("/{profile}")
