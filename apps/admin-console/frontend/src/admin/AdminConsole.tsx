@@ -283,7 +283,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
           ) : current === "export" ? (
             <>
               <ExportSection tenant={tenant} />
-              <OperationsPromo />
+              {isPlatformAdmin && <OperationsPromo />}
             </>
           ) : (
             <AuditSection tenant={tenant} />

@@ -3,6 +3,10 @@ import { useTranslation } from "react-i18next";
 import { fetchAppStates } from "@/api/admin";
 import "./admin.css";
 
+// The published profile, and the name it had before the edition suffix, which
+// clusters on an older build still carry.
+const OPERATIONS_PROFILES = ["operations-console-ee", "operations-console"];
+
 /**
  * The Operations Console, promoted or linked.
  *
@@ -11,11 +15,14 @@ import "./admin.css";
  * installed from the store. When it is installed this card is the way there;
  * when it is not, it says what it would give this tenant. The free path above
  * it always works on its own.
+ *
+ * The console runs once per cluster, in the platform tenant, for the
+ * cluster's administrators, so only they are shown this card.
  */
 export function OperationsPromo() {
   const { t } = useTranslation();
   const states = useQuery({ queryKey: ["admin", "apps", "status"], queryFn: () => fetchAppStates() });
-  const operations = states.data?.apps.find((a) => a.profile === "operations-console");
+  const operations = states.data?.apps.find((a) => OPERATIONS_PROFILES.includes(a.profile));
   // Both consoles are tiles of the same tenant on the same domain: swap the
   // first label of this host for the Operations Console's.
   const host = window.location.hostname.replace(/^[^.]+\./, "operations.");
