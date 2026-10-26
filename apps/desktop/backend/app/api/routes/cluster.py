@@ -106,8 +106,8 @@ async def cluster_tiles(
 
 
 def _with_tenant_pictures(content: bytes, tenant: str, settings: Settings) -> bytes:
-    """The usher's answer, with each main tile the tenant has a picture for
-    pointing at it. A picture that cannot be looked up leaves the answer as
+    """The usher's answer, with each tile that shows a picture the tenant
+    has pointing at it. A picture that cannot be looked up leaves the answer as
     it came: the profile's own picture is a tile, a missing tile list is not."""
     try:
         versions = tile_store.tenant_tile_versions(tenant)
@@ -123,11 +123,12 @@ def _with_tenant_pictures(content: bytes, tenant: str, settings: Settings) -> by
     tiles = body.get("tiles") if isinstance(body, dict) else None
     if not isinstance(tiles, list):
         return content
+    names = [t["name"] for t in tiles if isinstance(t, dict) and isinstance(t.get("name"), str)]
     for tile in tiles:
         if not isinstance(tile, dict) or not isinstance(tile.get("name"), str):
             continue
         tile_id = f"kernel-{tile['name']}"
-        app = tile_store.main_app_of(tile_id, tenant)
+        app = tile_store.pictured_app_of(tile_id, tenant, names)
         if app is not None and app in versions:
             tile["icon"] = f"{settings.api_v1_str}/tiles/{tile_id}?v=t{versions[app]}"
     return json.dumps(body).encode()

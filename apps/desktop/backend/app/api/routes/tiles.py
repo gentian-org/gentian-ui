@@ -161,12 +161,9 @@ async def delete_person_tile(
 # ── which one a tile shows ──────────────────────────────────────────────────
 
 
-async def _profile_picture(
-    tile_id: str, token: str | None, settings: Settings
-) -> Picture | str | None:
-    """The profile's own picture for a tile, from the catalogue the usher
-    answers for this person: PNG bytes, the name of one of the desktop's own
-    glyphs, or None. A picture in any other form is not drawn."""
+async def _catalogue(token: str | None, settings: Settings) -> list[dict] | None:
+    """The tiles the usher answers this person for this desktop's tenant, or
+    None when it cannot be asked or does not answer."""
     if not settings.usher_url or not settings.gentian_tenant or not token:
         return None
     url = f"{settings.usher_url.rstrip('/')}/v1/tenants/{settings.gentian_tenant}/tiles"
@@ -181,12 +178,19 @@ async def _profile_picture(
         tiles = answer.json().get("tiles") or []
     except (ValueError, AttributeError):
         return None
+    return [t for t in tiles if isinstance(t, dict)] if isinstance(tiles, list) else None
+
+
+def _names(tiles: list[dict]) -> list[str]:
+    return [t["name"] for t in tiles if isinstance(t.get("name"), str)]
+
+
+def _profile_picture(tile_id: str, tiles: list[dict] | None) -> Picture | str | None:
+    """The profile's own picture for a tile, from the catalogue: PNG bytes,
+    the name of one of the desktop's own glyphs, or None. A picture in any
+    other form is not drawn."""
     icon = next(
-        (
-            t.get("icon")
-            for t in tiles
-            if isinstance(t, dict) and f"kernel-{t.get('name')}" == tile_id
-        ),
+        (t.get("icon") for t in tiles or [] if f"kernel-{t.get('name')}" == tile_id),
         None,
     )
     if not isinstance(icon, str):
@@ -210,14 +214,22 @@ async def get_tile(
     """The picture tile `tile_id` shows this person: theirs, else the
     tenant's for the app it is the main entry of, else the profile's."""
     tenant = resolve_user_context(user, settings)
+    token = credentials.credentials if credentials else None
+    tiles: list[dict] | None = None
     picture = tile_store.person_tile(tenant, _sub(user), tile_id)
-    if picture is None and (app := tile_store.main_app_of(tile_id, tenant)) is not None:
+    if picture is None and (app := tile_store.app_of(tile_id, tenant)) is not None:
         picture = tile_store.tenant_tile(tenant, app)
+        # Off an app's main entry the tenant's picture is shown only where
+        # the app has none, which the catalogue says.
+        if picture is not None and not tile_store.is_main_entry(tile_id):
+            tiles = await _catalogue(token, settings)
+            if tiles is None or tile_store.pictured_app_of(tile_id, tenant, _names(tiles)) != app:
+                picture = None
     if picture is not None:
         return _picture(picture)
-    default = await _profile_picture(
-        tile_id, credentials.credentials if credentials else None, settings
-    )
+    if tiles is None:
+        tiles = await _catalogue(token, settings)
+    default = _profile_picture(tile_id, tiles)
     if isinstance(default, Picture):
         return _picture(default)
     if isinstance(default, str):
