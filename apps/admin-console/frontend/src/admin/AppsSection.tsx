@@ -17,6 +17,7 @@ import {
   fetchRetainedApps,
   fetchTenantPrivileges,
   purgeAppData,
+  setAddonForEveryone,
   setAppForEveryone,
   uninstallApp,
   type AppPurgeResult,
@@ -617,6 +618,81 @@ export function AccessPart({
       ) : (
         <p className="admin-console__hint">{t("apps.noGroupYet")}</p>
       )}
+
+      {(declared?.addons ?? []).length > 0 ? (
+        <>
+          <h4 className="admin-console__group-title">{t("apps.addonAccessTitle")}</h4>
+          <p className="admin-console__hint">{t("apps.addonAccessLead")}</p>
+          {(declared?.addons ?? []).map((addon) => (
+            <AddonAccess
+              key={addon}
+              profile={profile}
+              addon={addon}
+              tenant={tenant}
+              everyone={(declared?.addonGrants ?? []).some((g) => g.name === addon && g.defaultGrant)}
+              groups={groupsQuery.data?.groups ?? []}
+              onOutcome={onOutcome}
+            />
+          ))}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * One add-on's own access. An add-on is entitled by its own group, as an app
+ * is: whether it is for everyone, and who is in its group, are the add-on's,
+ * not the app's.
+ */
+function AddonAccess({
+  profile,
+  addon,
+  tenant,
+  everyone,
+  groups,
+  onOutcome,
+}: {
+  profile: string;
+  addon: string;
+  tenant: string;
+  everyone: boolean;
+  groups: Parameters<typeof describeGroups>[0];
+  onOutcome: (outcome: Outcome) => void;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const group = useMemo(
+    () => describeGroups(groups, tenant).find((g) => g.kind === "app" && g.label === addon),
+    [groups, tenant, addon],
+  );
+  const access = useMutation({
+    mutationFn: (next: boolean) => setAddonForEveryone(profile, addon, next),
+    onSuccess: (result, next) => {
+      onOutcome({ kind: "access", app: addon, everyone: next, result });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "declared"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "people"] });
+    },
+  });
+  function switchAccess() {
+    const question = everyone
+      ? t("apps.everyoneOffConfirm", { app: addon, tenant })
+      : t("apps.everyoneOnConfirm", { app: addon, tenant });
+    if (window.confirm(question)) access.mutate(!everyone);
+  }
+  return (
+    <div className="admin-console__subsection" data-addon={addon}>
+      <h5 className="admin-console__group-title">
+        <span className="admin-console__chip">{addon}</span>
+      </h5>
+      <p className="admin-console__lead">{everyone ? t("apps.addonEveryoneIsOn") : t("apps.addonEveryoneIsOff")}</p>
+      <div className="admin-console__actions">
+        <button type="button" className="admin-console__btn" disabled={access.isPending} onClick={switchAccess}>
+          {everyone ? t("apps.everyoneSwitchOff") : t("apps.everyoneSwitchOn")}
+        </button>
+      </div>
+      {access.isError ? <p className="admin-console__error">{messageOf(access.error)}</p> : null}
+      {group ? <GroupMembers group={group} /> : <p className="admin-console__hint">{t("apps.addonNoGroupYet")}</p>}
     </div>
   );
 }

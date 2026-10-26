@@ -19,6 +19,8 @@ export type DeclaredApp = {
   addonPins?: { name: string; digest: string; catalogue?: string }[];
   /** Installed for everyone: every member has access by default. */
   defaultGrant?: boolean;
+  /** The add-ons for everyone; each add-on has its own access, and one with no entry is given per person. */
+  addonGrants?: { name: string; defaultGrant?: boolean }[];
   /**
    * The catalogue the build was fetched from. Git records it; the director
    * does not serve it yet, so this is absent today and shown as such.
@@ -49,6 +51,17 @@ export function setAppForEveryone(profile: string, everyone: boolean) {
     method: "PUT",
     body: JSON.stringify({ everyone }),
   });
+}
+
+/**
+ * State whether one add-on of an installed app is for everyone. An add-on is
+ * entitled on its own; the rest of the app's add-ons stay as they are.
+ */
+export function setAddonForEveryone(profile: string, addon: string, everyone: boolean) {
+  return apiFetch<AppWriteResult>(
+    `/admin/apps/${encodeURIComponent(profile)}/addons/${encodeURIComponent(addon)}/access`,
+    { method: "PUT", body: JSON.stringify({ everyone }) },
+  );
 }
 
 /**
