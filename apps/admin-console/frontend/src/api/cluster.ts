@@ -334,9 +334,10 @@ export function providerKeyProperty(name: string): string {
 /**
  * One model under the name the gateway gives it, with what the claim alone
  * says about it. The director reads git and asks neither the gateway nor the
- * vault: `not-served` is a model of the cluster's own that nothing starts a
- * server for, `not-offered` one the gateway does not list, and `declared` a
- * provider's model, whose token is the credential named here.
+ * vault: `not-offered` is a model the gateway does not list, and `declared`
+ * one it lists -- served by the cluster's own instance, or by a provider whose
+ * token is the credential named here. `not-served` is what a director answered
+ * before the platform ran instances.
  */
 export type GatewayModel = {
   name: string;

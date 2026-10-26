@@ -29,8 +29,8 @@ import { Trans, useTranslation } from "react-i18next";
  * Two things it is careful to be honest about.
  *
  * Whether a model works. Nothing here asks the gateway. A model the cluster
- * would serve itself is flagged as not served because the director says the
- * platform starts no server for it. A provider's model is checked against the
+ * serves itself is reported as served by the instance the platform runs for
+ * it, not as working -- nobody probes it. A provider's model is checked against the
  * credentials list this console already reads: the token missing, or no
  * credential to enter it under, is flagged. A token that is there is reported
  * as supplied, not as working -- nobody probes it.
@@ -52,6 +52,13 @@ function verdictOf(model: GatewayModel, credentials: CredentialStatus[] | undefi
   }
   if (model.state === "not-offered") {
     return { tone: "warn", label: t("models.notOffered"), note: model.reason };
+  }
+  if (model.kind === "instance") {
+    return {
+      tone: "info",
+      label: t("models.served"),
+      note: t("models.servedNote", { instance: `vllm-${model.source}-inference` }),
+    };
   }
   if (!credentials) {
     return { tone: "info", label: t("models.declared"), note: t("models.credentialsUnreadable") };
