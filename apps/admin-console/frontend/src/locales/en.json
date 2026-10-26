@@ -256,6 +256,7 @@
     "upstreamFirstObligationUnmetOr": "Upstream-first obligation unmet or superseded"
   },
   "integrations": {
+    "applying": "Applying…",
     "activeIntegrationbindingsAreOperatorWired": "Active IntegrationBindings are operator-wired. AppGrants are tenant-approved capability subsets synced to OpenFGA. Contract NetworkPolicies allow egress only for granted capabilities.",
     "app": "App",
     "appGrants": "App grants",
