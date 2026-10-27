@@ -100,6 +100,9 @@ type Outcome = { kind: "access" | "uninstall"; app: string; everyone?: boolean; 
  * and what that service answers is shown as it said it, a refusal included.
  * This screen decides nothing about who may do what.
  */
+/** How often the tab asks again, so an install or removal shows without a reload. */
+const APPS_REFRESH_MS = 5000;
+
 /** The app a link names (?app=<profile>), when it names one. */
 export function linkedApp(search: string = typeof window === "undefined" ? "" : window.location.search): string | null {
   const wanted = new URLSearchParams(search).get("app");
@@ -126,10 +129,12 @@ export function AppsSection({
   const declaredQuery = useQuery({
     queryKey: ["admin", "apps", "declared"],
     queryFn: () => fetchDeclaredApps(),
+    refetchInterval: APPS_REFRESH_MS,
   });
   const statesQuery = useQuery({
     queryKey: ["admin", "apps", "status"],
     queryFn: () => fetchAppStates(),
+    refetchInterval: APPS_REFRESH_MS,
   });
 
   const rows = useMemo(
@@ -1184,6 +1189,7 @@ export function RetainedSection({ tenant, declared }: { tenant: string; declared
   const retainedQuery = useQuery({
     queryKey: ["admin", "apps", "retained"],
     queryFn: () => fetchRetainedApps(),
+    refetchInterval: APPS_REFRESH_MS,
   });
 
   async function run(apps: string[]) {
