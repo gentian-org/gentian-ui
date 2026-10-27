@@ -1,26 +1,22 @@
 # AI Widget
 
-The AI widget is the assistant on the desktop: a one-line prompt that unfolds
-into a short conversation, answered by the platform's model gateway. It sits
-where the Open WebUI tile is -- in the quick bar and on the desktop grid -- and
-its expand button opens Open WebUI with the prompt, for a conversation that
-should be kept.
+The AI widget is the assistant on the desktop: a one-line prompt that opens
+Open WebUI with the question. It sits where the Open WebUI tile is -- in the
+quick bar and on the desktop grid.
 
 ## What it looks like
 
 The widget is as wide as six tiles (284px).
 
 - **Idle.** A single-line prompt, "Ask anything…".
-- **Asked.** `Enter` sends the conversation. The thread unfolds -- above the
-  quick bar, below the prompt on the desktop -- and the answer is written as it
-  arrives. The thread scrolls and can be closed; the conversation stays until
-  the page is left. It is kept in the browser's memory only, and is short: the
-  last twenty messages are sent.
-- **Expand.** The button at the right of the prompt opens Open WebUI with the
-  prompt (or the conversation's first question).
-- **Not available.** Where this desktop has no assistant the prompt is disabled
-  and says so in one line. The expand button still opens the app. Nothing else
-  on the desktop changes.
+- **Asked.** `Enter` opens Open WebUI in its window with the question
+  (`?q=…`), and Open WebUI answers it. The window was opened hidden when the
+  desktop loaded (`gentianos.io/portal-preopen`), so it shows at once.
+- **Expand.** The button at the right of the prompt does the same; with an
+  empty prompt it opens Open WebUI as it is.
+
+The widget answers nothing itself. The desktop's API below has a route to the
+model gateway of its own, which the widget does not call.
 
 ## How it reaches a model
 
