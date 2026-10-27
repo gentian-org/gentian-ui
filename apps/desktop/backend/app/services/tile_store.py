@@ -127,14 +127,19 @@ def pictured_app_of(tile_id: str, tenant: str, names: Collection[str]) -> str | 
     A tenant's picture is of one app. It replaces the picture of that app's
     main entry, and a second host's tile keeps its own. An app without a main
     entry -- an add-on, whose tiles open inside another app's host -- shows it
-    on each of its tiles. `names` are the catalogue's tile names, which say
-    whether the app has a main entry.
+    only when it has a single tile: one picture on several tiles (Office's
+    Document, Spreadsheet and Presentation) makes them indistinguishable, so
+    each keeps its own. `names` are the catalogue's tile names, which say
+    whether the app has a main entry and how many tiles it has.
     """
     app = app_of(tile_id, tenant)
     if app is None or is_main_entry(tile_id):
         return app
     mains = {f"{tenant}/{app}/{entry}" for entry in MAIN_ENTRIES}
-    return None if mains & set(names) else app
+    if mains & set(names):
+        return None
+    tiles = {name for name in names if name.startswith(f"{tenant}/{app}/")}
+    return app if len(tiles) == 1 else None
 
 
 @dataclass
