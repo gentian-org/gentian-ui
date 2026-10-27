@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { useTranslation } from "react-i18next";
 
@@ -36,6 +37,8 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
+  const inputAreaRef = useRef<HTMLDivElement>(null);
+  const [anchor, setAnchor] = useState<{ left: number; bottom: number } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -54,6 +57,20 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
       threadRef.current.scrollTop = threadRef.current.scrollHeight;
     }
   }, [messages, open]);
+
+  // In the quick bar the thread floats above the bar. The bar clips what
+  // overflows its track and positions fixed children itself (it blurs its
+  // backdrop), so the thread is drawn on the page, at the prompt's place.
+  useLayoutEffect(() => {
+    if (isDesktop || !open) return;
+    function place() {
+      const rect = inputAreaRef.current?.getBoundingClientRect();
+      if (rect) setAnchor({ left: rect.left, bottom: window.innerHeight - rect.top + 8 });
+    }
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [isDesktop, open]);
 
   const unavailable = available === false;
 
@@ -116,6 +133,8 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
   const width = "284px";
   const note = unavailable ? t("ai.unavailable") : failed ? t("ai.failed") : "";
 
+  const portal = (node: React.ReactNode) => (isDesktop ? node : createPortal(node, document.body));
+
   return (
     <div
       className="ai-widget-container"
@@ -127,6 +146,7 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
       }}
     >
       <div
+        ref={inputAreaRef}
         className="ai-widget-input-area"
         title={unavailable ? t("ai.unavailable") : undefined}
         style={{
@@ -195,11 +215,11 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
         </form>
       </div>
 
-      {open && (messages.length > 0 || note) && (
+      {open && (messages.length > 0 || note) && (isDesktop || anchor) && portal(
         <div
           className="ai-widget-thread-area"
           style={{
-            width: "100%",
+            width,
             maxHeight: "300px",
             background: "var(--gtn-bg-primary, rgba(30,30,30,0.95))",
             borderRadius: "var(--gtn-r1, 8px)",
@@ -210,11 +230,10 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
             flexDirection: "column",
             overflow: "hidden",
             boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
-            // In the quick bar the thread floats above the bar; on the
-            // desktop it unfolds below the prompt.
-            position: isDesktop ? "relative" : "absolute",
-            bottom: isDesktop ? "auto" : "48px",
-            zIndex: 20,
+            // On the desktop it unfolds below the prompt.
+            ...(isDesktop
+              ? { position: "relative" as const, zIndex: 20 }
+              : { position: "fixed" as const, left: anchor?.left, bottom: anchor?.bottom, zIndex: 210 }),
           }}
         >
           <div
@@ -281,7 +300,7 @@ export function AiWidget({ isDesktop = false, onExpand }: AiWidgetProps) {
               </div>
             )}
           </div>
-        </div>
+        </div>,
       )}
     </div>
   );
