@@ -129,7 +129,10 @@ export function UpdatesSection() {
                 ) : null}
               </td>
               <td>{e.tenant}</td>
-              <td>{e.profile}</td>
+              <td>
+                {e.profile}
+                {e.addonOf ? <div className="admin-console__meta">{t("updates.addonOf", { app: e.addonOf })}</div> : null}
+              </td>
               <td><span className="admin-console__mono" title={e.pinned}>{shortDigest(e.pinned)}</span></td>
               <td><span className="admin-console__mono" title={e.running}>{shortDigest(e.running)}</span></td>
               <td>
@@ -137,20 +140,25 @@ export function UpdatesSection() {
                 {e.newestVersion ? <div className="admin-console__meta">{e.newestVersion}</div> : null}
               </td>
               <td>
-                <select
-                  aria-label={t("updates.modeFor", { app: e.profile, tenant: e.tenant })}
-                  value={e.modeFrom === "tenant" ? e.mode : ""}
-                  disabled={setMode.isPending}
-                  onChange={(ev) => setMode.mutate({ entry: e, mode: ev.target.value })}
-                >
-                  {MODES.map((m) => (
-                    <option key={m} value={m}>
-                      {m === ""
-                        ? t("updates.modeDefault", { mode: e.modeFrom === "tenant" ? data.policy.apps?.[e.profile] ?? data.policy.mode : e.mode })
-                        : t(`updates.mode${m.charAt(0).toUpperCase()}${m.slice(1)}`)}
-                    </option>
-                  ))}
-                </select>
+                {e.addonOf ? (
+                  // An add-on moves with its app: its mode is the app's.
+                  <span className="admin-console__meta">{t("updates.modeOfApp", { mode: e.mode, app: e.addonOf })}</span>
+                ) : (
+                  <select
+                    aria-label={t("updates.modeFor", { app: e.profile, tenant: e.tenant })}
+                    value={e.modeFrom === "tenant" ? e.mode : ""}
+                    disabled={setMode.isPending}
+                    onChange={(ev) => setMode.mutate({ entry: e, mode: ev.target.value })}
+                  >
+                    {MODES.map((m) => (
+                      <option key={m} value={m}>
+                        {m === ""
+                          ? t("updates.modeDefault", { mode: e.modeFrom === "tenant" ? data.policy.apps?.[e.profile] ?? data.policy.mode : e.mode })
+                          : t(`updates.mode${m.charAt(0).toUpperCase()}${m.slice(1)}`)}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </td>
               <td>
                 {state(e)}
