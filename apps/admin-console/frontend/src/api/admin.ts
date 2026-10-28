@@ -1141,3 +1141,50 @@ export function updatePlatformAccess(adminsEnter: boolean, tenant?: string) {
     body: JSON.stringify({ adminsEnter }),
   });
 }
+
+/** Where the organisation is; its country is the tenant's. */
+export type TenantAddress = {
+  street?: string;
+  postalCode?: string;
+  city?: string;
+  region?: string;
+};
+
+/** Who the tenant is, as the tenant's manifest declares it (spec.organization). */
+export type TenantOrganization = {
+  legalName?: string;
+  currency?: string;
+  timeZone?: string;
+  fiscalYearStartMonth?: number;
+  address?: TenantAddress;
+  website?: string;
+  email?: string;
+  phone?: string;
+  taxId?: string;
+  registrationNumber?: string;
+};
+
+/**
+ * Tenant Settings: who the tenant is, and which of the facts an app needs to
+ * set itself up are still missing (legal name, country, currency, time zone,
+ * languages), by their place in the manifest.
+ */
+export type TenantSettings = {
+  displayName: string;
+  country: string;
+  /** The first is the tenant's own language. */
+  locales: string[];
+  organization: TenantOrganization;
+  missing: string[];
+};
+
+export function fetchTenantSettings(tenant?: string) {
+  return apiFetch<TenantSettings>(`/admin/tenant-settings${tenantQuery(tenant)}`);
+}
+
+export function updateTenantSettings(body: Omit<TenantSettings, "missing">, tenant?: string) {
+  return apiFetch<{ status: string }>(`/admin/tenant-settings${tenantQuery(tenant)}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}

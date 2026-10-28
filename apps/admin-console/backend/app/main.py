@@ -26,6 +26,7 @@ from app.api.routes import (
     resources,
     security,
     session,
+    tenant_settings,
 )
 from app.core.config import get_settings
 from app.core.logging_middleware import RedactingAccessLogMiddleware
@@ -56,6 +57,7 @@ app.include_router(resources.router, prefix=settings.api_v1_str)
 app.include_router(audit.router, prefix=settings.api_v1_str)
 app.include_router(backups.router, prefix=settings.api_v1_str)
 app.include_router(security.router, prefix=settings.api_v1_str)
+app.include_router(tenant_settings.router, prefix=settings.api_v1_str)
 app.include_router(platform.router, prefix=settings.api_v1_str)
 app.include_router(catalogue.router, prefix=settings.api_v1_str)
 app.include_router(apps.router, prefix=settings.api_v1_str)
