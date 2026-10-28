@@ -377,6 +377,8 @@ export async function updateClusterModels(settings: ModelSettings): Promise<Clus
 export type UpdateEntry = {
   tenant: string;
   profile: string;
+  /** The app an add-on's pin sits in: the entry is that add-on, moved under the app's mode. */
+  addonOf?: string;
   pinned?: string;
   running?: string;
   catalogue?: string;
