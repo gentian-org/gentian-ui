@@ -31,6 +31,7 @@ import { AppPublicAddresses } from "./AppPublicAddresses";
 import { GroupMembers } from "./GroupMembers";
 import { describeGroups } from "./groupLabels";
 import "./admin.css";
+import { formatDateTime } from "@/lib/format";
 
 const mono = { mono: <span className="admin-console__mono" /> };
 const code = { code: <code /> };
@@ -860,7 +861,7 @@ export function PrivilegesPart({ row }: { row: AppRow }) {
                             values={{
                               who: declined.get(privilege)?.declinedBy ?? "",
                               when: declined.get(privilege)?.declinedAt
-                                ? new Date(declined.get(privilege)?.declinedAt as string).toLocaleString()
+                                ? formatDateTime(declined.get(privilege)?.declinedAt as string)
                                 : "",
                             }}
                             components={mono}
@@ -896,7 +897,7 @@ export function PrivilegesPart({ row }: { row: AppRow }) {
                         i18nKey="apps.privilegeApprovedBy"
                         values={{
                           approver: grant.approver,
-                          when: new Date(grant.approvedAt).toLocaleString(),
+                          when: formatDateTime(grant.approvedAt),
                         }}
                         components={mono}
                       />
@@ -904,7 +905,7 @@ export function PrivilegesPart({ row }: { row: AppRow }) {
                     <div>{grant.reason}</div>
                     {grant.expiresAt ? (
                       <div>
-                        {t("apps.privilegeExpires", { when: new Date(grant.expiresAt).toLocaleString() })}
+                        {t("apps.privilegeExpires", { when: formatDateTime(grant.expiresAt) })}
                       </div>
                     ) : null}
                   </td>

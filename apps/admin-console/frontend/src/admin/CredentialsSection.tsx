@@ -15,6 +15,7 @@ import {
 } from "@/api/credentials";
 import "./admin.css";
 import { Trans, useTranslation } from "react-i18next";
+import { formatDateTime } from "@/lib/format";
 
 /**
  * Credentials and repositories.
@@ -264,7 +265,7 @@ function CredentialCard({
             {credential.updatedAt
               ? t("credentials.setByOn", {
                   who: credential.setBy,
-                  when: new Date(credential.updatedAt).toLocaleString(),
+                  when: formatDateTime(credential.updatedAt),
                 })
               : t("credentials.setBy", { who: credential.setBy })}
           </p>

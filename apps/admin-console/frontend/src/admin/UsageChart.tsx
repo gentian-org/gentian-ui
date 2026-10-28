@@ -7,6 +7,7 @@ import {
   resourceLabel,
 } from "@/admin/resourceQuantity";
 import { useTranslation } from "react-i18next";
+import { formatDateTime } from "@/lib/format";
 
 /**
  * One resource's history: what was committed under the ceiling, and — where a
@@ -224,7 +225,7 @@ export function UsageChart({ resource, samples }: UsageChartProps) {
             style={{ left: `${(hovered.x / WIDTH) * 100}%` }}
           >
             <div className="usage-chart__tooltip-time">
-              {new Date(hovered.sample.observedAt).toLocaleString()}
+              {formatDateTime(hovered.sample.observedAt)}
             </div>
             <div className="usage-chart__tooltip-row">
               <span className="usage-chart__key" style={{ background: COMMITTED }} />

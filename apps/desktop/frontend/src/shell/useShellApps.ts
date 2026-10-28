@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   apiFetch,
   type ClusterTilesResponse,
@@ -11,10 +12,10 @@ import { localisedLabel } from "@/lib/locale";
 import { getAccessToken, isEdgeSession } from "@/auth/oidc";
 
 /** The usher's tiles, in the shape the desktop renders. */
-function kernelConsoleApps(data: ClusterTilesResponse | undefined): ShellApp[] {
+function kernelConsoleApps(data: ClusterTilesResponse | undefined, language: string): ShellApp[] {
   return (data?.tiles ?? []).map((tile) => ({
     id: `kernel-${tile.name}`,
-    title: localisedLabel(tile.displayName, tile.displayNames),
+    title: localisedLabel(tile.displayName, tile.displayNames, language),
     icon: tile.icon,
     launchUrl: tile.url,
     // In a window on the desktop, like every other tile. These are separate
@@ -47,6 +48,9 @@ export function useShellApps() {
   const { isAuthenticated, isLoading: authLoading, authDisabled } = useAuth();
   const sessionReady = authDisabled || (!authLoading && isAuthenticated);
   const hasToken = authDisabled || isEdgeSession() || Boolean(getAccessToken());
+  // The labels follow the language chosen in the settings, and change with it.
+  const { i18n } = useTranslation();
+  const language = i18n.resolvedLanguage || i18n.language;
 
   const {
     data: me,
@@ -84,7 +88,7 @@ export function useShellApps() {
   });
 
   const apps = useMemo(() => {
-    const list = [...shellAppsFromMe(me), ...kernelConsoleApps(clusterTiles)];
+    const list = [...shellAppsFromMe(me), ...kernelConsoleApps(clusterTiles, language)];
 
     // The administration tiles first, in the order a platform administrator
     // works through them: the console that configures, the one that looks
@@ -124,7 +128,7 @@ export function useShellApps() {
     adminApps.sort((a, b) => getSortIndex(a.id) - getSortIndex(b.id));
 
     return [...adminApps, ...userApps];
-  }, [me, clusterTiles]);
+  }, [me, clusterTiles, language]);
 
   const isAdminUser = Boolean(me?.isPlatformAdmin || me?.isTenantAdmin);
   // An administrator whose only tile is the administration console. Named by

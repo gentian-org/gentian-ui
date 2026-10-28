@@ -15,6 +15,7 @@ import {
   type RoleHolder,
 } from "@/api/cluster";
 import "./admin.css";
+import { formatDateTime } from "@/lib/format";
 
 const ROLES: ClusterRole[] = ["securityOfficer", "auditor", "perimeterApprover", "serviceAdmin", "sharedAppsAdmin"];
 /** The roles a non-platform tenant's administrator may hold; the rest are the platform tenant's people's. */
@@ -173,7 +174,7 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
                         <td className="admin-console__mono">{holder.scope || "cluster"}</td>
                         <td>{holder.reason || "—"}</td>
                         <td>
-                          {holder.expiresAt ? new Date(holder.expiresAt).toLocaleString() : "—"}
+                          {holder.expiresAt ? formatDateTime(holder.expiresAt) : "—"}
                           {holder.expiresAt && new Date(holder.expiresAt).getTime() < Date.now() ? (
                             <>
                               {" "}
@@ -249,8 +250,8 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
                   <td className="admin-console__mono">{g.privilege}</td>
                   <td>{g.reason}</td>
                   <td className="admin-console__mono">{g.approver}</td>
-                  <td>{g.approvedAt ? new Date(g.approvedAt).toLocaleString() : "—"}</td>
-                  <td>{g.expiresAt ? new Date(g.expiresAt).toLocaleString() : "—"}</td>
+                  <td>{g.approvedAt ? formatDateTime(g.approvedAt) : "—"}</td>
+                  <td>{g.expiresAt ? formatDateTime(g.expiresAt) : "—"}</td>
                 </tr>
               ))}
             </tbody>

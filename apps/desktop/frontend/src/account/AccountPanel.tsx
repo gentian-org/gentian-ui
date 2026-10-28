@@ -12,6 +12,7 @@ import { accountConsoleUrl } from "@/auth/oidc";
 import "@/styles/shell-panel.css";
 
 import { useTranslation } from "react-i18next";
+import { formatDateTime } from "@/lib/locale";
 type AccountTab = "profile" | "password" | "security" | "sessions";
 
 type AccountPanelProps = {
@@ -22,7 +23,7 @@ function formatTime(epochMs: number | null | undefined) {
   if (!epochMs) {
     return "—";
   }
-  return new Date(epochMs).toLocaleString();
+  return formatDateTime(epochMs);
 }
 
 export function AccountPanel({ embedded = false }: AccountPanelProps) {

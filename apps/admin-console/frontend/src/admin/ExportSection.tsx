@@ -19,6 +19,7 @@ import { BackupKeyChoice, type KeyChoice, type KeyDecision } from "@/admin/Backu
 import "./admin.css";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
+import { formatDateTime } from "@/lib/format";
 
 type BackupSectionProps = {
   tenant: string;
@@ -51,7 +52,7 @@ function formatTime(value: string | null): string {
   if (!value) {
     return "—";
   }
-  return new Date(value).toLocaleString();
+  return formatDateTime(value);
 }
 
 /** The phase colour: an export is fine, working, or broken — nothing in between. */

@@ -4,6 +4,7 @@ import { dismissInboxNotification, fetchNotificationInbox, type InboxNotificatio
 import { BellIcon, TrayButton } from "@/shell/TrayButton";
 
 import { useTranslation } from "react-i18next";
+import { formatDateTime } from "@/lib/locale";
 function severityClass(severity: InboxNotification["severity"]) {
   if (severity === "critical") {
     return "notification-inbox__item--critical";
@@ -15,7 +16,7 @@ function severityClass(severity: InboxNotification["severity"]) {
 }
 
 function formatTime(epochMs: number) {
-  return new Date(epochMs).toLocaleString();
+  return formatDateTime(epochMs);
 }
 
 export function NotificationInbox() {

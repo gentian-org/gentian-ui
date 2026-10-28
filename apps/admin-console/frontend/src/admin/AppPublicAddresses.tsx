@@ -15,6 +15,7 @@ import {
 } from "@/api/apps";
 import { ApiError } from "@/api/client";
 import "./admin.css";
+import { formatDate } from "@/lib/format";
 
 const mono = { mono: <span className="admin-console__mono" /> };
 
@@ -23,7 +24,7 @@ const messageOf = (err: unknown) => (err instanceof Error ? err.message : String
 /** What the director said, as it said it, when the answer carried a reason. */
 const refusalOf = (err: unknown) => (err instanceof ApiError && err.detail ? err.detail : messageOf(err));
 
-const day = (value?: string) => (value ? new Date(value).toLocaleDateString() : "");
+const day = (value?: string) => (value ? formatDate(value) : "");
 
 /**
  * Whether approving the entry publishes something. An entry behind sign-in

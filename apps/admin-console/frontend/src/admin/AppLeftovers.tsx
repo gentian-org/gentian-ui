@@ -10,6 +10,7 @@ import {
 } from "@/api/apps";
 import { ApiError } from "@/api/client";
 import "./admin.css";
+import { formatDate } from "@/lib/format";
 
 const mono = { mono: <span className="admin-console__mono" /> };
 
@@ -148,7 +149,7 @@ export function AppLeftovers({ app }: { app: string }) {
                           <div>{classWord(t, item.class)}</div>
                           <div className="admin-console__hint">{item.reason}</div>
                         </td>
-                        <td>{item.created ? new Date(item.created).toLocaleDateString() : "—"}</td>
+                        <td>{item.created ? formatDate(item.created) : "—"}</td>
                         <td>
                           <InEffect item={item} />
                         </td>

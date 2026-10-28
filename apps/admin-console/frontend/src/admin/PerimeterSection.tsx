@@ -5,6 +5,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { fetchPerimeterHistory, fetchPerimeterTraffic, type ExposureEntry } from "@/api/apps";
 import { PublicAddressList } from "./AppPublicAddresses";
 import "./admin.css";
+import { formatDateTime, formatNumber } from "@/lib/format";
 
 const mono = { mono: <span className="admin-console__mono" /> };
 
@@ -90,7 +91,7 @@ function PerimeterHistory() {
             <tbody>
               {query.data.changes.map((change) => (
                 <tr key={change.commit}>
-                  <td>{change.at ? new Date(change.at).toLocaleString() : "—"}</td>
+                  <td>{change.at ? formatDateTime(change.at) : "—"}</td>
                   <td>
                     {change.summary}
                     <div className="admin-console__mono">{change.commit.slice(0, 7)}</div>
@@ -173,7 +174,7 @@ function PerimeterTraffic() {
           {series.map((p) => (
             <div
               key={p.at}
-              title={`${new Date(p.at).toLocaleString()}: ${p.requests}`}
+              title={`${formatDateTime(p.at)}: ${p.requests}`}
               className={`admin-console__traffic-bar${p["5xx"] > 0 ? " admin-console__traffic-bar--failed" : ""}`}
               style={{ height: `${Math.max(2, (p.requests / peak) * 100)}%` }}
             />
@@ -205,7 +206,7 @@ function PerimeterTraffic() {
                   <td>
                     <span className="admin-console__mono">{row.path}</span>
                   </td>
-                  <td>{row.requests.toLocaleString()}</td>
+                  <td>{formatNumber(row.requests)}</td>
                   <td>{share(row["2xx"], row.requests)}</td>
                   <td>{share(row["3xx"], row.requests)}</td>
                   <td>{share(row["4xx"], row.requests)}</td>

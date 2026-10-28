@@ -5,6 +5,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { fetchAdminContext } from "@/api/admin";
 import { approveNodePrivilege, declineNodePrivilege, fetchApprovals, type Approval } from "@/api/approvals";
 import "./admin.css";
+import { formatDateTime } from "@/lib/format";
 
 const mono = { mono: <span className="admin-console__mono" /> };
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
@@ -74,7 +75,7 @@ export function ApprovalsSection() {
                         <div>
                           <Trans
                             i18nKey="approvals.requestedBy"
-                            values={{ who: approval.requestedBy, when: approval.requestedAt ? new Date(approval.requestedAt).toLocaleString() : "" }}
+                            values={{ who: approval.requestedBy, when: approval.requestedAt ? formatDateTime(approval.requestedAt) : "" }}
                             components={mono}
                           />
                         </div>
@@ -85,7 +86,7 @@ export function ApprovalsSection() {
                     )}
                     {approval.expiredAt ? (
                       <div className="admin-console__hint">
-                        {t("approvals.expired", { when: new Date(approval.expiredAt).toLocaleString() })}
+                        {t("approvals.expired", { when: formatDateTime(approval.expiredAt) })}
                       </div>
                     ) : null}
                     {approval.declinedBy ? (
@@ -94,7 +95,7 @@ export function ApprovalsSection() {
                           i18nKey="approvals.declinedBy"
                           values={{
                             who: approval.declinedBy,
-                            when: approval.declinedAt ? new Date(approval.declinedAt).toLocaleString() : "",
+                            when: approval.declinedAt ? formatDateTime(approval.declinedAt) : "",
                             reason: approval.declineReason ?? "",
                           }}
                           components={mono}

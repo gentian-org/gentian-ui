@@ -24,6 +24,7 @@ import { toggleDraft, withDraft, withoutKey, type MembershipDraft } from "./memb
 import { Checklist, type ChecklistItem } from "./Checklist";
 import { describeGroups, type DescribedGroup } from "./groupLabels";
 import "./admin.css";
+import { formatDate } from "@/lib/format";
 
 /**
  * The tenant's members, managed through the director.
@@ -850,7 +851,7 @@ function RemovedMailboxesCard() {
             {mailboxes.map((m) => (
               <tr key={m.id}>
                 <td className="admin-console__mono">{m.address}</td>
-                <td>{new Date(m.removedAt).toLocaleDateString()}</td>
+                <td>{formatDate(m.removedAt)}</td>
                 <td>{m.by || "—"}</td>
                 <td>
                   {state(m)}
