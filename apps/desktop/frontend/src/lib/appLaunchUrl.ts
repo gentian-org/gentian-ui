@@ -11,6 +11,15 @@ export type AppLaunchUrlOptions = {
    * inference turned an ordinary click on most tiles into a forced login prompt.
    */
   forceLogin?: boolean;
+  /**
+   * The desktop's language, handed to the app as `lang`.
+   *
+   * An app on another host cannot read the desktop's settings, and taking
+   * its language from the browser shows it in a language other than the one
+   * chosen here. The platform's own apps read `lang` first; an app that does
+   * not know the parameter ignores it.
+   */
+  language?: string;
 };
 
 /**
@@ -28,16 +37,21 @@ export function buildAppLaunchUrl(
     return rawLink;
   }
 
-  const { username, linkTarget, authMode, forceLogin } = options;
-  if (!username || authMode !== "oidc") {
-    return rawLink;
-  }
-  if (linkTarget !== "newwindow" && linkTarget !== "embedded") {
+  const { username, linkTarget, authMode, forceLogin, language } = options;
+  const hinted = Boolean(username) && authMode === "oidc"
+    && (linkTarget === "newwindow" || linkTarget === "embedded");
+  if (!hinted && !language) {
     return rawLink;
   }
 
   try {
     const url = new URL(rawLink);
+    if (language) {
+      url.searchParams.set("lang", language);
+    }
+    if (!hinted) {
+      return url.toString();
+    }
     if (username) {
       url.searchParams.set("login_hint", username);
     }
