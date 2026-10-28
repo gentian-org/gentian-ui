@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { fetchAdminContext } from "@/api/admin";
+import { fetchAdminContext, fetchTenantSettings } from "@/api/admin";
 import { AppsSection } from "@/admin/AppsSection";
 import { ApprovalsSection } from "@/admin/ApprovalsSection";
 import { AuditSection } from "@/admin/AuditSection";
@@ -23,12 +23,14 @@ import { PerimeterSection } from "@/admin/PerimeterSection";
 import { PlatformSecuritySection } from "@/admin/PlatformSecuritySection";
 import { RoleHoldersSection } from "@/admin/RoleHoldersSection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
+import { TenantSettingsSection } from "@/admin/TenantSettingsSection";
 import { TenantsSection } from "@/admin/TenantsSection";
 import "./admin.css";
 import { useTranslation } from "react-i18next";
 
 type AdminTab =
   | "approvals"
+  | "tenantSettings"
   | "updates"
   | "tenants"
   | "members"
@@ -102,6 +104,9 @@ const TABS: {
   // and the perimeter approver who answer it, in the console of their own tenant; the usher decides who
   // reads the list and the director decides each approval.
   { id: "approvals", labelKey: "tabApprovals", officerOnly: true },
+  // Who the tenant is, which its apps set themselves up from. Before the
+  // people because the console opens here while a required fact is missing.
+  { id: "tenantSettings", labelKey: "tabTenantSettings" },
   { id: "members", labelKey: "tabMembers" },
   { id: "groups", labelKey: "tabGroups" },
   // What the tenant has installed, and everything done to an app after it is
@@ -169,8 +174,16 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
   // to read `?? "demo"`, which would have queried a real, unrelated tenant the
   // moment someone reordered any of that.
   const tenant = contextQuery.data?.tenant ?? "";
+  // Whether the tenant still lacks a fact its apps set themselves up from:
+  // while it does, the console opens on Tenant Settings rather than Members.
+  const settingsQuery = useQuery({
+    queryKey: ["admin", "tenant-settings", tenant],
+    queryFn: () => fetchTenantSettings(tenant),
+    enabled: !!contextQuery.data && contextQuery.data.isTenantAdmin !== false,
+  });
+  const settingsIncomplete = (settingsQuery.data?.missing.length ?? 0) > 0;
 
-  if (contextQuery.isLoading) {
+  if (contextQuery.isLoading || settingsQuery.isLoading) {
     return (
       <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
         <div className="admin-console__frame">
@@ -207,10 +220,13 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
       (!entry.officerOnly || canApproveNodePrivilege === true || canApprovePerimeter === true || isPlatformAdmin) &&
       (!entry.auditorOnly || canAuditCluster === true),
   );
-  // Members first, as it always was, for whoever has it; the officer let in
-  // for one screen lands on it.
+  // Tenant Settings while the tenant is incomplete, otherwise Members, as it
+  // always was, for whoever has it; the officer let in for one screen lands
+  // on it.
   const isShown = (id: AdminTab) => shown.some((entry) => entry.id === id);
-  const current: AdminTab = tab && isShown(tab) ? tab : isShown("members") ? "members" : (shown[0]?.id ?? "members");
+  const landing: AdminTab = settingsIncomplete && isShown("tenantSettings") ? "tenantSettings" : "members";
+  const current: AdminTab =
+    tab && isShown(tab) ? tab : isShown(landing) ? landing : (shown[0]?.id ?? "members");
 
   return (
     <div className={`admin-console${embedded ? " admin-console--embedded" : ""}`}>
@@ -246,6 +262,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <ApprovalsSection />
           ) : current === "tenants" ? (
             <TenantsSection />
+          ) : current === "tenantSettings" ? (
+            <TenantSettingsSection tenant={tenant} />
           ) : current === "members" ? (
             <MembersSection tenant={tenant} />
           ) : current === "groups" ? (

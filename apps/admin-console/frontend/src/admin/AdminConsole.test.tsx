@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import "@/lib/i18n";
-import type { AdminContext } from "@/api/admin";
+import type { AdminContext, TenantSettings } from "@/api/admin";
 import { AdminConsole } from "./AdminConsole";
 
 const base: AdminContext = {
@@ -15,19 +15,40 @@ const base: AdminContext = {
   kernelDomain: "example",
 };
 
-function tabs(context: AdminContext): string[] {
+const complete: TenantSettings = {
+  displayName: "Platform",
+  country: "CH",
+  locales: ["de"],
+  organization: { legalName: "Platform AG", currency: "CHF", timeZone: "Europe/Zurich" },
+  missing: [],
+};
+
+function render(context: AdminContext, settings: TenantSettings = complete): string {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(["admin", "context"], context);
   client.setQueryData(["admin", "approvals"], { approvals: [] });
-  const html = renderToString(
+  client.setQueryData(["admin", "tenant-settings", context.tenant], settings);
+  return renderToString(
     <QueryClientProvider client={client}>
       <AdminConsole embedded />
     </QueryClientProvider>,
   );
-  return [...html.matchAll(/class="admin-console__tab[^"]*"[^>]*>([^<]+)</g)].map((m) => m[1]);
+}
+
+function tabs(context: AdminContext): string[] {
+  return [...render(context).matchAll(/class="admin-console__tab[^"]*"[^>]*>([^<]+)</g)].map((m) => m[1]);
+}
+
+function activeTab(context: AdminContext, settings?: TenantSettings): string | undefined {
+  return render(context, settings).match(/class="admin-console__tab admin-console__tab--active"[^>]*>([^<]+)</)?.[1];
 }
 
 describe("AdminConsole", () => {
+  it("opens on Tenant Settings while a required fact is missing, and on Members once none is", () => {
+    expect(activeTab(base, { ...complete, missing: ["organization.legalName"] })).toBe("Tenant Settings");
+    expect(activeTab(base)).toBe("Members");
+  });
+
   it("shows the Approvals tab to the security officer, the perimeter approver and the cluster's administrator", () => {
     expect(tabs({ ...base, canApproveNodePrivilege: true })).toContain("Approvals");
     expect(tabs({ ...base, canApprovePerimeter: true })).toContain("Approvals");
