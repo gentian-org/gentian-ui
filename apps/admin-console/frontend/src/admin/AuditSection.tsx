@@ -9,6 +9,7 @@ import {
 import "./admin.css";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { formatDateTime } from "@/lib/format";
 
 type AuditSectionProps = {
   tenant: string;
@@ -25,7 +26,7 @@ function formatAuditTime(epochMs: number) {
   if (!epochMs) {
     return "—";
   }
-  return new Date(epochMs).toLocaleString();
+  return formatDateTime(epochMs);
 }
 
 // Takes t rather than holding a hook: a helper is not a component, and a
@@ -82,7 +83,7 @@ function ChangeHistory({ tenant }: { tenant: string }) {
           <tbody>
             {changes.map((change) => (
               <tr key={change.commit}>
-                <td>{change.at ? new Date(change.at).toLocaleString() : "—"}</td>
+                <td>{change.at ? formatDateTime(change.at) : "—"}</td>
                 <td>
                   {change.summary}
                   <div className="admin-console__mono" style={{ fontSize: "0.75rem" }}>

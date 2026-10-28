@@ -14,6 +14,7 @@ import { UsageChart } from "@/admin/UsageChart";
 import { formatQuantity, parseQuantity, quantityKind, resourceLabel } from "@/admin/resourceQuantity";
 import "./admin.css";
 import { useTranslation } from "react-i18next";
+import { formatDate } from "@/lib/format";
 
 type ResourcesSectionProps = {
   tenant: string;
@@ -471,8 +472,8 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                     <tr key={`${interval.plan}-${interval.from}`}>
                       <td>{interval.plan}</td>
                       <td className="admin-console__mono">{interval.productSku || "—"}</td>
-                      <td>{new Date(interval.from).toLocaleDateString()}</td>
-                      <td>{new Date(interval.to).toLocaleDateString()}</td>
+                      <td>{formatDate(interval.from)}</td>
+                      <td>{formatDate(interval.to)}</td>
                       <td className="admin-console__mono">
                         {(interval.seconds / 86400).toFixed(2)}
                       </td>

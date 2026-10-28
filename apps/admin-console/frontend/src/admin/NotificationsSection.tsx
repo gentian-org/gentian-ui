@@ -10,6 +10,7 @@ import {
 import "./admin.css";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
+import { formatDateTime } from "@/lib/format";
 
 type NotificationsSectionProps = {
   tenant: string;
@@ -26,7 +27,7 @@ function formatPublishedAt(epochMs: number) {
   if (!epochMs) {
     return "—";
   }
-  return new Date(epochMs).toLocaleString();
+  return formatDateTime(epochMs);
 }
 
 function audienceLabel(

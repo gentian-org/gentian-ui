@@ -9,6 +9,7 @@ import {
   type AdminInvitation,
 } from "@/api/cluster";
 import "./admin.css";
+import { formatDateTime } from "@/lib/format";
 
 /** How long a tenant the cluster does not have yet is waited for. */
 const WAIT_LIMIT_MS = 15 * 60 * 1000;
@@ -169,7 +170,7 @@ export function AdminActivationPanel({
   // nothing to ask for here. Afterwards the activation by hand is offered.
   const held = invitation?.state === "pending" || invitation?.state === "sent";
   const reason = invitation?.reason ?? "";
-  const expires = activation?.expiresAt ? new Date(activation.expiresAt * 1000).toLocaleString() : "";
+  const expires = activation?.expiresAt ? formatDateTime(activation.expiresAt * 1000) : "";
 
   return (
     <div className="admin-console__editor">

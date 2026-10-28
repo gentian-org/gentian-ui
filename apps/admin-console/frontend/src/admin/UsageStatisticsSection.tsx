@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchUsageStatistics } from "@/api/admin";
 import "./admin.css";
 import { useTranslation } from "react-i18next";
+import { formatDateTime } from "@/lib/format";
 
 /** The usher's words for an attempt, and the catalogue key that says each. */
 const OUTCOME_KEYS: Record<string, string> = {
@@ -22,7 +23,7 @@ const REASON_KEYS: Record<string, string> = {
 function when(value: string | undefined) {
   if (!value) return "—";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : formatDateTime(date);
 }
 
 /**
