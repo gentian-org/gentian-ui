@@ -7,6 +7,7 @@ import { useAppsStore } from "@/stores/apps";
 import { useWindowsStore } from "@/stores/windows";
 import { usePrefsStore, type DesktopTile } from "@/stores/prefs";
 import { buildAppLaunchUrl } from "@/lib/appLaunchUrl";
+import { activeLanguage } from "@/lib/locale";
 import { WindowManager } from "@/windows/WindowManager";
 import { DesktopShortcuts } from "@/shell/DesktopShortcuts";
 import { OPENED, openAppRequest } from "@/lib/openApp";
@@ -71,7 +72,7 @@ export function DesktopPage() {
         id: app.id,
         appId: app.id,
         title: app.title,
-        url: app.launchUrl,
+        url: buildAppLaunchUrl(app.launchUrl, { language: activeLanguage() }),
         isHidden: true,
         keepAlive: true,
         state: "minimized",
@@ -151,6 +152,7 @@ export function DesktopPage() {
         linkTarget,
         authMode: app.authMode,
         forceLogin: options?.forceLogin,
+        language: activeLanguage(),
       });
 
       const openInNewTab = options?.forceNewWindow || linkTarget === "newwindow";

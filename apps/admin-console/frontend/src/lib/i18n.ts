@@ -47,14 +47,14 @@ export const languages: readonly string[] = Object.keys(resources).sort();
 export const fallbackLanguage = "en";
 
 /**
- * The key the desktop stores an explicit choice under.
+ * Where this app keeps the language it was last opened in.
  *
- * The same key as gentian-ui, on purpose. The console and the desktop are
- * served from different hosts in the same zone, so this is not one shared
- * value — it is the same NAME in each origin's storage, which is what makes
- * the console honour a language chosen in the desktop's settings the first
- * time it is opened on that machine. The account remains the source of truth;
- * this is the first-paint cache, and the desktop is where the choice is made.
+ * The desktop is where the choice is made, and this app is on another host:
+ * it cannot read the desktop's settings, and the same key in its own storage
+ * is a different value. The desktop hands the language in as `lang` on the
+ * address it opens; it is read first and kept here, so the app stays in it
+ * as the person moves around, and a later open without it (a bookmark, a
+ * reload) keeps the last one. The browser's language is the last resort.
  */
 export const languageStorageKey = "gentian.language";
 
@@ -71,7 +71,8 @@ void i18n
     nonExplicitSupportedLngs: true,
     load: "languageOnly",
     detection: {
-      order: ["localStorage", "navigator"],
+      order: ["querystring", "localStorage", "navigator"],
+      lookupQuerystring: "lang",
       lookupLocalStorage: languageStorageKey,
       caches: ["localStorage"],
     },
