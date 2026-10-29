@@ -49,12 +49,9 @@ export const fallbackLanguage = "en";
 /**
  * Where this app keeps the language it was last opened in.
  *
- * The desktop is where the choice is made, and this app is on another host:
- * it cannot read the desktop's settings, and the same key in its own storage
- * is a different value. The desktop hands the language in as `lang` on the
- * address it opens; it is read first and kept here, so the app stays in it
- * as the person moves around, and a later open without it (a bookmark, a
- * reload) keeps the last one. The browser's language is the last resort.
+ * This app is on another host than the desktop and cannot read its
+ * settings: it keeps the one it last used, and the browser's language is
+ * the last resort.
  */
 export const languageStorageKey = "gentian.language";
 
@@ -71,8 +68,7 @@ void i18n
     nonExplicitSupportedLngs: true,
     load: "languageOnly",
     detection: {
-      order: ["querystring", "localStorage", "navigator"],
-      lookupQuerystring: "lang",
+      order: ["localStorage", "navigator"],
       lookupLocalStorage: languageStorageKey,
       caches: ["localStorage"],
     },
