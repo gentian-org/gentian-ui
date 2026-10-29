@@ -8,7 +8,6 @@ import { useShellBackgroundUrl } from "@/shell/useShellBackground";
 import { SettingsPanel } from "@/settings/SettingsPanel";
 import { useAppsStore } from "@/stores/apps";
 import { buildAppLaunchUrl } from "@/lib/appLaunchUrl";
-import { activeLanguage } from "@/lib/locale";
 
 import { useTranslation } from "react-i18next";
 type MobileOverlay = "account" | "settings" | null;
@@ -57,7 +56,6 @@ export function MobilePage() {
           username: me?.username,
           linkTarget: activeApp.linkTarget,
           authMode: activeApp.authMode,
-          language: activeLanguage(),
         }),
       );
     })();
