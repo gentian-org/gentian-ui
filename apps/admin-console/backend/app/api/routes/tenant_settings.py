@@ -50,7 +50,7 @@ async def set_tenant_settings(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Commits the form: country, languages, then the organisation. The first
+    """Commits the form: country, languages, then the organization. The first
     refusal is the answer; a part that did not change commits nothing."""
     base = f"/v1/tenants/{_tenant(settings, tenant)}"
     token = bearer_of(credentials)

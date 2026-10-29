@@ -30,7 +30,7 @@ async def get_me(
     cluster through the Kubernetes API, which needed a ServiceAccount that could
     read cluster-scoped custom resources -- so the desktop held a cluster
     identity in order to draw a list of icons. The tiles come from the
-    director's projected catalogue now, which the shell reads separately, and
+    director's projected catalog now, which the shell reads separately, and
     this process holds no Kubernetes credential at all (gentian-os S7A.6).
 
     No groups either: the director answers what the caller holds on this

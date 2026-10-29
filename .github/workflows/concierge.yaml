@@ -215,7 +215,7 @@ jobs:
 
   # The one status the branch rules require. It passes when every job above
   # succeeded or was skipped because this pull request gave it nothing to do,
-  # and fails when any of them failed or was cancelled. `changes` itself must
+  # and fails when any of them failed or was canceled. `changes` itself must
   # have run: a decision that was skipped is not a decision.
   gate:
     name: concierge gate

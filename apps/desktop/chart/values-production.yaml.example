@@ -41,4 +41,4 @@ web:
 openfga:
   apiUrl: ""
   storeId: ""
-  authzenEnabled: true  # requires OpenFGA experimentals: [authzen] in Suze values
+  authzenEnabled: true  # requires OPENFGA_EXPERIMENTALS=authzen on the kernel OpenFGA (gentian-os kernel/services/openfga)

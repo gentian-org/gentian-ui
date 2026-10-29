@@ -69,9 +69,9 @@ type AdminTab =
  */
 
 /**
- * Whether the Catalogues tab is shown. It is not, for now.
+ * Whether the Catalogs tab is shown. It is not, for now.
  *
- * The cluster renders no catalogue of its own: apps are installed from the
+ * The cluster renders no catalog of its own: apps are installed from the
  * App Store, and where no store is available by command
  * (`kubectl gentian apps install`). The screen, its routes and its tests are
  * kept as they are, and with them the Install action that lives in it; this

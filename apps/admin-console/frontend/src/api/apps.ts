@@ -22,7 +22,7 @@ export type DeclaredApp = {
   /** The add-ons for everyone; each add-on has its own access, and one with no entry is given per person. */
   addonGrants?: { name: string; defaultGrant?: boolean }[];
   /**
-   * The catalogue the build was fetched from. Git records it; the director
+   * The catalog the build was fetched from. Git records it; the director
    * does not serve it yet, so this is absent today and shown as such.
    */
   catalogue?: string;
@@ -313,20 +313,20 @@ export function withdrawExposure(install: string, name: string) {
 
 /**
  * Whether a leftover sign-in configuration is still read. An app's sign-in
- * clients are configured from the one piece labelled with the app's name (an
+ * clients are configured from the one piece labeled with the app's name (an
  * extension's, from its parent app's) and from no other piece.
  */
 export type ResidueOIDC = {
   /**
-   * `yes`: the only piece labelled for an installed app. `contested`: another
-   * piece is labelled for the same app, and the app's sign-in clients are
+   * `yes`: the only piece labeled for an installed app. `contested`: another
+   * piece is labeled for the same app, and the app's sign-in clients are
    * refused until one of the two is removed.
    * `no`: no installed app's label.
    */
   effective: string;
   /** The client ids this piece configures, when it is in effect. */
   clients?: string[];
-  /** The client ids this piece holds, refused while another piece is labelled for the same app. */
+  /** The client ids this piece holds, refused while another piece is labeled for the same app. */
   contested?: string[];
   /** The installed app whose label this piece carries, and whose sign-in reads it. */
   composition?: string;

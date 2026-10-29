@@ -14,9 +14,9 @@ import LanguageDetector from "i18next-browser-languagedetector";
  *
  * **Adding a language is one file.** Drop `src/locales/<code>.json` in, copy
  * the keys from `en.json`, translate them. Nothing here is edited: the
- * catalogues are discovered at build time by the glob below, and the language
+ * catalogs are discovered at build time by the glob below, and the language
  * list and the detector derive from what was found. That is the whole reason
- * the catalogues are JSON rather than TypeScript — a translator needs no
+ * the catalogs are JSON rather than TypeScript — a translator needs no
  * toolchain, and the files go to a translation service and come back without
  * anybody touching code.
  *
@@ -26,7 +26,7 @@ import LanguageDetector from "i18next-browser-languagedetector";
  * shippable while it is still half translated.
  */
 
-// Every catalogue in src/locales. eager so they are in the bundle: this is an
+// Every catalog in src/locales. eager so they are in the bundle: this is an
 // administrative console behind a sign-in, the strings are a few kilobytes,
 // and a language that arrives one network round trip after the page does is a
 // flash of English on every load.
@@ -65,7 +65,7 @@ void i18n
     resources,
     supportedLngs: languages as string[],
     fallbackLng: fallbackLanguage,
-    // de-CH and de-AT are served the German catalogue. Falling back ACROSS
+    // de-CH and de-AT are served the German catalog. Falling back ACROSS
     // languages is what never happens: an unmatched language gets English,
     // which is the author's own words rather than a guess.
     nonExplicitSupportedLngs: true,

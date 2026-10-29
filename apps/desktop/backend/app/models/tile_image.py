@@ -9,7 +9,7 @@ shows decides nothing about who may open it.
   tenant  the App Store's picture for an app, copied here when the App Store
           app installs or updates it. Keyed by the app's profile name.
 
-The third level, the profile's own picture, is in the tile catalogue the
+The third level, the profile's own picture, is in the tile catalog the
 cluster projects and is not copied.
 """
 

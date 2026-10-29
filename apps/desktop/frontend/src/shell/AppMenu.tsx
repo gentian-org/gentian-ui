@@ -61,7 +61,7 @@ export function AppMenu({
   // fixed list written the first time someone reorders or pins anything; without
   // this, every app provisioned afterwards is silently absent from the bar, because
   // it simply is not in the list. Appending keeps their ordering and adds the new
-  // ones at the end — the same place they would have been had they never customised.
+  // ones at the end — the same place they would have been had they never customized.
   const pinned = new Set(menuAppIds || []);
   const removed = new Set(menuRemovedAppIds || []);
   const effectiveMenuAppIds = menuAppIds

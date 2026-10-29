@@ -16,7 +16,7 @@ export function activeLanguage(): string {
 /**
  * Which of a tile's labels this viewer should see.
  *
- * The platform's catalogue carries a label and, for some tiles, translations
+ * The platform's catalog carries a label and, for some tiles, translations
  * keyed by locale — "de_DE", "en_US". Thirty tiles are genuinely translated
  * ("Dateien", "Automatisierung", every Odoo module), so picking the right one
  * is not decoration.
@@ -34,13 +34,13 @@ export function localisedLabel(
 ): string {
   if (!translations) return fallback;
 
-  const normalise = (s: string) => s.replace("-", "_").toLowerCase();
+  const normalize = (s: string) => s.replace("-", "_").toLowerCase();
   const byKey = new Map<string, string>();
   for (const [key, value] of Object.entries(translations)) {
-    if (value) byKey.set(normalise(key), value);
+    if (value) byKey.set(normalize(key), value);
   }
 
-  const want = normalise(language);
+  const want = normalize(language);
   const exact = byKey.get(want);
   if (exact) return exact;
 

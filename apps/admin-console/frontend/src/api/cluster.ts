@@ -3,7 +3,7 @@ import { ApiError, apiFetch } from "@/api/client";
 /**
  * One setting of the cluster, as the director describes it.
  *
- * The catalogue arrives with the values, so the console renders the screen
+ * The catalog arrives with the values, so the console renders the screen
  * from one answer and holds no list of its own. A setting with no `value` is
  * unset in the claim, which is a different thing from set to nothing: the
  * schema's default applies, and the screen says so rather than showing a blank
@@ -371,7 +371,7 @@ export async function updateClusterModels(settings: ModelSettings): Promise<Clus
 /**
  * One installed app in the cluster's update report (gentian-os
  * docs/plans/versioning.md §4.2): the build git pins, the build the cluster
- * runs, the newest build its catalogue offers, the mode it moves under and
+ * runs, the newest build its catalog offers, the mode it moves under and
  * what keeps it where it is.
  */
 export type UpdateEntry = {
@@ -408,7 +408,7 @@ export function fetchClusterUpdates() {
 
 export type MoveOutcome = { tenant: string; profile: string; to?: string; status: string; detail?: string };
 
-/** Move every outdated app, or those named, to the newest build its catalogue offers. */
+/** Move every outdated app, or those named, to the newest build its catalog offers. */
 export function moveOutdated(selection: { tenants?: string[]; apps?: string[] }) {
   return apiFetch<{ moved: MoveOutcome[]; skipped: MoveOutcome[] }>("/cluster/updates/move", {
     method: "POST",

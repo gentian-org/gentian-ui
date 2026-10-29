@@ -1,7 +1,7 @@
 # Gentian UI
 
 The platform's own user interfaces: the components every tenant gets from the
-platform itself rather than from a catalogue. Each is an app in the gentian-apps
+platform itself rather than from a catalog. Each is an app in the gentian-apps
 layout (`apps/<name>/` with `backend/`, `frontend/`, `chart/`, `docs/`), built
 and published by its own workflow, and installed by the gentian-os operator from
 a ComponentProfile the gentian-os chart ships.
@@ -17,7 +17,7 @@ Charts go to `oci://ghcr.io/gentian-org/charts` from `develop`, as
 
 No `profile/` in any app: the profiles live in gentian-os, with the platform
 that installs them. A store's interface on the cluster (an App Store app) is
-not one of these: it is installed from a catalogue like any other app, as
+not one of these: it is installed from a catalog like any other app, as
 Aluvian's is from catalogue.aluvian.io, against the store contract gentian-os
 defines (`docs/design/store-contract.md`). See [AGENTS.md](AGENTS.md) for conventions.
 
@@ -30,7 +30,7 @@ given here for every file in the repository instead of in each one:
 > v. 2.0. If a copy of the MPL was not distributed with this file, You can
 > obtain one at https://mozilla.org/MPL/2.0/.
 
-An organisation may change the desktop and the consoles for itself. Whoever
+An organization may change the desktop and the consoles for itself. Whoever
 distributes a changed version — and serving its browser code to users is
 distributing it — publishes the files they changed; files they add are theirs.
 A brand and extensions are configuration and new files, not changes.

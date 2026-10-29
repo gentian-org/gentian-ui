@@ -711,7 +711,7 @@ export type ResourceState = {
   annotatedPlan: string;
   /** The enforced ceiling is not the one the recorded plan describes. */
   drifted: boolean;
-  /** The ceiling matches no plan in the catalogue — set by hand. */
+  /** The ceiling matches no plan in the catalog — set by hand. */
   custom: boolean;
   quota: ResourceHeadroom[];
   hasQuota: boolean;
@@ -824,10 +824,10 @@ export function fetchTenantResourceStates() {
  * One change to declared state, from git.
  *
  * Every change the platform makes is a commit the director authored as the
- * person whose token authorised it, trailered with the relation and object
+ * person whose token authorized it, trailered with the relation and object
  * that permitted it. A commit with `throughPlatform: false` was pushed by
  * hand — with whatever credential the pusher held and no record of what
- * allowed it — and is shown as such rather than dressed up as authorised.
+ * allowed it — and is shown as such rather than dressed up as authorized.
  */
 export type Change = {
   commit: string;
@@ -874,7 +874,7 @@ export type Person = {
   enabled: boolean;
   /** An authenticator is enrolled. Filled only by the single read. */
   totpConfigured?: boolean;
-  /** They must enrol one at their next sign-in. */
+  /** They must enroll one at their next sign-in. */
   totpRequired?: boolean;
   /**
    * Invited and not finished: the address is unverified or a required action
@@ -1142,7 +1142,7 @@ export function updatePlatformAccess(adminsEnter: boolean, tenant?: string) {
   });
 }
 
-/** Where the organisation is; its country is the tenant's. */
+/** Where the organization is; its country is the tenant's. */
 export type TenantAddress = {
   street?: string;
   postalCode?: string;

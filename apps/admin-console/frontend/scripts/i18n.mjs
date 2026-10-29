@@ -1,5 +1,5 @@
 /**
- * The console's user-visible strings, lifted into a catalogue (AD-15).
+ * The console's user-visible strings, lifted into a catalog (AD-15).
  *
  *   node scripts/i18n.mjs --check    fail if a component has an inline string
  *   node scripts/i18n.mjs --apply    rewrite the components and write en.json
@@ -55,7 +55,7 @@ function keyOf(text, used) {
 const hasWords = (s) => /[A-Za-z]{2}/.test(s);
 
 /**
- * JSX decodes `&rsquo;` when it parses the file; a catalogue string does not.
+ * JSX decodes `&rsquo;` when it parses the file; a catalog string does not.
  * A value carried across as written would render the six characters
  * `&apos;` on the screen, so the entity is resolved here, once, where the
  * text leaves the syntax tree.
@@ -77,7 +77,7 @@ const isBlank = (node) => node.kind === ts.SyntaxKind.JsxText && node.text.trim(
  * Elements whose text is not language.
  *
  * `<code>spec.catalogue.sources</code>` is a field path: the same nine
- * characters in every language, and a catalogue entry for it would invite a
+ * characters in every language, and a catalog entry for it would invite a
  * translator to change one. Same for a shell command, a key name or a sample
  * of output.
  */
@@ -94,7 +94,7 @@ const isVerbatim = (node) => {
   return false;
 };
 
-const catalogue = {};
+const catalog = {};
 const mixed = [];
 let inlineCount = 0;
 
@@ -150,7 +150,7 @@ for (const file of walkFiles(SRC)) {
   visit(sf);
 
   if (Object.keys(entries).length) {
-    catalogue[ns] = Object.fromEntries(Object.entries(entries).sort(([a], [b]) => a.localeCompare(b)));
+    catalog[ns] = Object.fromEntries(Object.entries(entries).sort(([a], [b]) => a.localeCompare(b)));
   }
   if (APPLY && edits.length) {
     let out = source;
@@ -161,12 +161,12 @@ for (const file of walkFiles(SRC)) {
   }
 }
 
-const keys = Object.values(catalogue).reduce((n, v) => n + Object.keys(v).length, 0);
+const keys = Object.values(catalog).reduce((n, v) => n + Object.keys(v).length, 0);
 
 if (APPLY) {
   mkdirSync(join(SRC, "locales"), { recursive: true });
-  writeFileSync(join(SRC, "locales", "en.json"), JSON.stringify(catalogue, null, 2) + "\n");
-  console.log(`wrote src/locales/en.json — ${Object.keys(catalogue).length} namespaces, ${keys} keys`);
+  writeFileSync(join(SRC, "locales", "en.json"), JSON.stringify(catalog, null, 2) + "\n");
+  console.log(`wrote src/locales/en.json — ${Object.keys(catalog).length} namespaces, ${keys} keys`);
   console.log(`${mixed.length} element(s) mix text with an expression and need <Trans> by hand:`);
   for (const m of mixed) console.log("  " + m);
   process.exit(0);
@@ -181,7 +181,7 @@ if (APPLY) {
  * only looked there, which is how a screen ends up half translated.
  *
  * A string thrown to a developer is not in scope: nobody using the console
- * ever sees it, and a catalogue entry for it would invite somebody to
+ * ever sees it, and a catalog entry for it would invite somebody to
  * translate a bug report.
  */
 const CSSISH = /^\s*[a-z0-9-]+(__|--)[a-z0-9-]+/;
@@ -225,13 +225,13 @@ function proseLiterals(file) {
   return out;
 }
 
-// --check: the catalogue is the only place a user-visible string may live.
-const catalogueFile = join(SRC, "locales", "en.json");
+// --check: the catalog is the only place a user-visible string may live.
+const catalogFile = join(SRC, "locales", "en.json");
 let known = {};
 try {
-  known = JSON.parse(readFileSync(catalogueFile, "utf8"));
+  known = JSON.parse(readFileSync(catalogFile, "utf8"));
 } catch {
-  console.error(`${catalogueFile} is missing — run: node scripts/i18n.mjs --apply`);
+  console.error(`${catalogFile} is missing — run: node scripts/i18n.mjs --apply`);
   process.exit(1);
 }
 const literals = walkFiles(SRC).flatMap(proseLiterals);
@@ -244,7 +244,7 @@ if (inlineCount > 0 || literals.length > 0) {
   process.exit(1);
 }
 const missing = [];
-for (const [ns, v] of Object.entries(catalogue)) {
+for (const [ns, v] of Object.entries(catalog)) {
   for (const k of Object.keys(v)) if (!known[ns]?.[k]) missing.push(`${ns}.${k}`);
 }
 if (missing.length) {
@@ -279,4 +279,4 @@ if (gaps.length) {
   process.exit(1);
 }
 const total = Object.values(known).reduce((n, v) => n + Object.keys(v).length, 0);
-console.log(`i18n: no inline strings; ${total} key(s) in the catalogue.`);
+console.log(`i18n: no inline strings; ${total} key(s) in the catalog.`);

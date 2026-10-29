@@ -36,7 +36,7 @@ What this leaves open:
   browser and the edge that strips both, is not protected by rule 3.
 * A page on this same origin -- script injected into the bundle, or anything
   else served under this host -- is same-origin and passes. This is not a
-  defence against cross-site scripting.
+  defense against cross-site scripting.
 * A GET that changes state is not checked. Routes must not change state on
   GET.
 * Outside edge mode an http ``Origin`` on the same host passes when this
@@ -63,7 +63,7 @@ def _authority(netloc: str, scheme: str) -> str:
 
 
 def _parse_origin(value: str) -> tuple[str, str] | None:
-    """(scheme, authority) of a serialised origin, or None when it is not one."""
+    """(scheme, authority) of a serialized origin, or None when it is not one."""
     try:
         parts = urlsplit(value.strip())
     except ValueError:

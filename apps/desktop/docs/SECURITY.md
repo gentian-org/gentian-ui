@@ -1,7 +1,7 @@
 # Security conventions — gentian-ui (kernel shell)
 
 Implements the same mandatory controls as
-[gentian-app-template/docs/SECURITY.md](https://github.com/gentian-org/gentian-app-template/blob/main/docs/SECURITY.md).
+[gentian-apps/apps/_template/docs/SECURITY.md](https://github.com/gentian-org/gentian-apps/blob/develop/apps/_template/docs/SECURITY.md).
 Read that document for the full M1–M27 checklist; this file maps template modules
 to this repo and notes kernel-specific deployment differences.
 
@@ -26,14 +26,14 @@ to this repo and notes kernel-specific deployment differences.
 
 ## Kernel-specific differences
 
-| Topic | Catalogue app (template) | Kernel shell (this repo) |
+| Topic | Catalog app (template) | Kernel shell (this repo) |
 |-------|--------------------------|---------------------------|
 | Deploy | AppProfile + tenant install | `gentian-os` ApplicationSet |
 | Gateway | Tenant Gateway | `kernel-public-gateway` in `gentian-kernel` |
 | Host | `{subDomain}.{tenantDomain}` | `portal.{kernelDomain}` |
 | Identity env | `TENANT_ID`, `TENANT_NAMESPACE` | `KERNEL_DOMAIN` |
-| RBAC | Optional namespace Role | ClusterRole for catalogue APIs (`rbac.create: true`) |
-| No `profile/` | — | Correct — not a catalogue app |
+| RBAC | Optional namespace Role | ClusterRole for catalog APIs (`rbac.create: true`) |
+| No `profile/` | — | Correct — not a catalog app |
 
 ## The assistant and the model gateway
 

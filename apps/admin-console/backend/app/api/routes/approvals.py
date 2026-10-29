@@ -13,7 +13,7 @@ privilege, decided by the kind. An egress request is the perimeter
 approver's (approvedBy perimeter-approver), on the same list.
 
 A decline is the officer's no: the director's action on the app, which it
-authorises exactly as the approval of that kind, and which the operator
+authorizes exactly as the approval of that kind, and which the operator
 records on the app -- who, when, why -- without committing anything. The
 privilege stays pending and the install keeps waiting; the tenant is told.
 

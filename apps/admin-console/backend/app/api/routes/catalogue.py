@@ -1,4 +1,4 @@
-"""The cluster's own catalogues — the plain fallback, not a shop.
+"""The cluster's own catalogs — the plain fallback, not a shop.
 
 The App Store is where somebody should be looking. It knows what an app is
 for, what it costs, who maintains it, and it is kept current by people whose
@@ -20,7 +20,7 @@ everyone), and its status and body come back as they are. Taking an app out
 again is the Apps screen's (routes/apps.py).
 
 The screen is not shown at present (SHOW_CATALOGUES in the console's tab
-registry): the cluster renders no catalogue of its own. The routes stay.
+registry): the cluster renders no catalog of its own. The routes stay.
 """
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -42,7 +42,7 @@ async def sources(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Which catalogues this cluster may fetch from.
+    """Which catalogs this cluster may fetch from.
 
     `storeUrl` comes back with them, because the honest answer to most of this
     screen is "go to the App Store" and the screen needs somewhere to point.
@@ -63,7 +63,7 @@ async def entries(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """What is in one catalogue.
+    """What is in one catalog.
 
     An entry is `installable` when its source states a digest for it.
     `storeOnly` says how many further entries are the App Store's and not
@@ -99,7 +99,7 @@ async def install(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Install one catalogue entry into this console's tenant.
+    """Install one catalog entry into this console's tenant.
 
     A commit, not a rollout: 202 with a commit means git has it and the
     cluster does not yet, 200 means the tenant already had that build. The

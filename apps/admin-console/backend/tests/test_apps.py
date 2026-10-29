@@ -212,7 +212,7 @@ def test_an_approval_is_the_directors_for_this_tenant_as_the_person(monkeypatch)
 
 def test_an_approval_with_nothing_said_sends_nothing_said(monkeypatch):
     """No expiry, no reason, not the main address: an empty body, and no key
-    this relay made up -- an absent acknowledgement stays absent."""
+    this relay made up -- an absent acknowledgment stays absent."""
     seen: dict = {}
     _fake_client(monkeypatch, {"status": "updated", "commit": "a1b2c3d4"}, seen, status=202)
     assert _client().put(_entry, json={}, headers=_person).status_code == 202
@@ -225,7 +225,7 @@ def test_the_main_address_travels_only_as_the_person_sent_it(monkeypatch):
     client = _client()
     client.put(_entry, json={"apex": True, "acknowledgeMainAddressRule": True}, headers=_person)
     assert seen["json"] == {"apex": True, "acknowledgeMainAddressRule": True}
-    # Asked for without the acknowledgement: it goes as it is, and the
+    # Asked for without the acknowledgment: it goes as it is, and the
     # director is the one that refuses it.
     client.put(_entry, json={"apex": True}, headers=_person)
     assert seen["json"] == {"apex": True}
@@ -644,7 +644,7 @@ def test_a_name_that_cannot_be_an_app_is_not_put_in_a_path(monkeypatch, name):
     assert put.status_code == 400
     purge = client.post("/api/v1/admin/apps/purge", json={"profile": name}, headers=_person)
     assert purge.status_code == 400
-    # In a body nothing normalises a dot-dot away before it gets here.
+    # In a body nothing normalizes a dot-dot away before it gets here.
     dots = client.post("/api/v1/admin/apps/purge", json={"profile": ".."}, headers=_person)
     assert dots.status_code == 400
     assert seen == {}

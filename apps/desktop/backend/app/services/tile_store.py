@@ -15,7 +15,7 @@ and a tile is drawn on the desktop every member has open.
 Which one a tile shows
 ----------------------
 The most specific: the person's own, else the tenant's for the app the tile
-belongs to, else the profile's own picture from the catalogue. The tenant's
+belongs to, else the profile's own picture from the catalog. The tenant's
 picture goes on an app's main entry; an app with none, an add-on that lives
 inside another app's host, shows it on each of its tiles.
 """
@@ -45,7 +45,7 @@ _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 APP_NAME = r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
 _APP_NAME = re.compile(APP_NAME)
 
-# The desktop's id of a tile: an app tile's is "kernel-" and the catalogue's
+# The desktop's id of a tile: an app tile's is "kernel-" and the catalog's
 # name (<tenant>/<component>/<entry>), a link shortcut's is a UUID.
 TILE_ID = r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,511}$"
 
@@ -129,7 +129,7 @@ def pictured_app_of(tile_id: str, tenant: str, names: Collection[str]) -> str | 
     entry -- an add-on, whose tiles open inside another app's host -- shows it
     only when it has a single tile: one picture on several tiles (Office's
     Document, Spreadsheet and Presentation) makes them indistinguishable, so
-    each keeps its own. `names` are the catalogue's tile names, which say
+    each keeps its own. `names` are the catalog's tile names, which say
     whether the app has a main entry and how many tiles it has.
     """
     app = app_of(tile_id, tenant)

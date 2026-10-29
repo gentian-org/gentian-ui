@@ -454,7 +454,7 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
   // window.top is same-origin when the shell frames its own pages, and cross-
   // origin framing still permits top navigation for a non-sandboxed frame. The
   // fallback covers the case where the assignment is refused; it is no worse
-  // than the previous behaviour.
+  // than the previous behavior.
   const authorizeUrl = `${issuer}/protocol/openid-connect/auth?${params}`;
   const topWindow = window.top ?? window;
   try {

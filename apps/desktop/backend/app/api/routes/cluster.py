@@ -7,7 +7,7 @@ through here keeps it there and gives the desktop one origin.
 
 What this deliberately does NOT do
 ----------------------------------
-It holds no credential of its own and makes no authorisation decision. Every
+It holds no credential of its own and makes no authorization decision. Every
 request forwards the CALLER's bearer token, and the usher decides -- from that
 person's relations in OpenFGA -- which tiles they may open. Nothing is
 substituted when it cannot be asked: a desktop with no usher configured, or

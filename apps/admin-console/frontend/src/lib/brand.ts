@@ -58,7 +58,7 @@ function setIcon(href: string) {
 
 /**
  * Loads the brand: the stylesheet at once, so the first paint already has the
- * brand's colours, and the identity after. Called once, before the first
+ * brand's colors, and the identity after. Called once, before the first
  * render.
  */
 export function loadBrand(): void {

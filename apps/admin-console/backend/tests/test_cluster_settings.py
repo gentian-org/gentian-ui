@@ -4,7 +4,7 @@ The same rule as the tile list, for the same reason: the console holds no
 credential and decides nothing. The caller's own token goes to the director,
 which asks whether that person may audit or configure the cluster, and
 whatever it answers comes back unchanged -- including a refusal. A console
-that softened a 403 into an empty screen would be inventing an authorisation
+that softened a 403 into an empty screen would be inventing an authorization
 answer it has no standing to give.
 
 The write is a commit, not a save. 202 with a commit means git has the change
@@ -62,7 +62,7 @@ def _fake_client(monkeypatch, responder, seen: dict):
     return FakeClient
 
 
-CATALOGUE = {
+CATALOG = {
     "cluster": "demo",
     "settings": [
         {
@@ -76,11 +76,11 @@ CATALOGUE = {
 }
 
 
-def test_the_catalogue_and_the_values_arrive_together(monkeypatch):
+def test_the_catalog_and_the_values_arrive_together(monkeypatch):
     seen: dict = {}
     _fake_client(
         monkeypatch,
-        lambda m, url: httpx.Response(200, json=CATALOGUE, request=httpx.Request(m, url)),
+        lambda m, url: httpx.Response(200, json=CATALOG, request=httpx.Request(m, url)),
         seen,
     )
     client = TestClient(_app(_settings()))

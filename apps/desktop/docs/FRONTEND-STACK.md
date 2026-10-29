@@ -4,7 +4,7 @@
 first-party Gentian UI.
 
 Primary driver: coding agents produce more reliable code on React/TSX than Vue SFCs.
-See `gentian-app-template/docs/FRONTEND-STACK.md` for the full greenfield rationale.
+See [gentian-apps/apps/_template/docs/FRONTEND-STACK.md](https://github.com/gentian-org/gentian-apps/blob/develop/apps/_template/docs/FRONTEND-STACK.md) for the full greenfield rationale.
 
 ## Canonical libraries
 

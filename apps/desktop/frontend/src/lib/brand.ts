@@ -58,7 +58,7 @@ function setIcon(href: string) {
 
 /**
  * Loads the brand: the stylesheet at once, so the first paint already has the
- * brand's colours, and the identity after. Called once, before the first
+ * brand's colors, and the identity after. Called once, before the first
  * render.
  */
 export function loadBrand(): void {
@@ -67,7 +67,7 @@ export function loadBrand(): void {
   const sheet = document.createElement("link");
   sheet.rel = "stylesheet";
   sheet.href = base + "brand.css";
-  // The browser's own chrome takes the brand's primary colour too, once the
+  // The browser's own chrome takes the brand's primary color too, once the
   // stylesheet that defines it has arrived.
   sheet.onload = () => {
     const primary = getComputedStyle(document.documentElement).getPropertyValue("--brand-color-brand-500").trim();

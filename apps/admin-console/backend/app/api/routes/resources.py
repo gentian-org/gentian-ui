@@ -47,7 +47,7 @@ async def resource_plans(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """The catalogue as it applies to this tenant and this person. Whether the
+    """The catalog as it applies to this tenant and this person. Whether the
     person chooses for themselves or for the cluster is the usher's call,
     made from the graph; the screen asserts nothing about it."""
     answer = await director.read(

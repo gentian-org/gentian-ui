@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import tileCatalogue from "../../public/tiles/catalogue.json";
+import tileCatalog from "../../public/tiles/catalogue.json";
 import { PERSON_TILE_TYPES, personTileFileError, tileIconUrl } from "@/lib/tiles";
 import { TileImage } from "@/shell/TileImage";
 
@@ -57,7 +57,7 @@ export function CustomizeTileModal({
     return () => URL.revokeObjectURL(url);
   }, [iconFile]);
 
-  const availableIcons = Object.keys(tileCatalogue.tiles);
+  const availableIcons = Object.keys(tileCatalog.tiles);
 
   function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];

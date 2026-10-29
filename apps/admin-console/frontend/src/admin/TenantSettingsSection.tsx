@@ -13,7 +13,7 @@ import "./admin.css";
 /**
  * Who the tenant is: Tenant Settings.
  *
- * What an app needs to set itself up for this organisation rather than a
+ * What an app needs to set itself up for this organization rather than a
  * placeholder: its names, country, languages, currency, clock, address and
  * numbers. Each is declared in the tenant's manifest; the director commits
  * them and a component whose profile asks is told them. An app reads them

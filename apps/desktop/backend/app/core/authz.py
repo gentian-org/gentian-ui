@@ -1,6 +1,6 @@
 """Authorization helpers (OpenFGA / AuthZEN PEP).
 
-Same API as gentian-app-template/backend/app/core/authz.py — see docs/SECURITY.md.
+Same API as gentian-apps/apps/_template/backend/app/core/authz.py — see docs/SECURITY.md.
 """
 
 from typing import Any, Callable

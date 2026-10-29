@@ -55,7 +55,7 @@ function formatTime(value: string | null): string {
   return formatDateTime(value);
 }
 
-/** The phase colour: an export is fine, working, or broken — nothing in between. */
+/** The phase color: an export is fine, working, or broken — nothing in between. */
 function phaseBadgeClass(phase: string): string {
   if (phase === "Ready") {
     return "admin-console__badge admin-console__badge--ok";
@@ -330,7 +330,7 @@ export function ExportSection({ tenant }: BackupSectionProps) {
                 {backup.phase === "Ready" && (
                   // A plain link, not a fetch: the bundle can be gigabytes and
                   // the browser's own download handles that; the session
-                  // cookie the edge set is what authorises it.
+                  // cookie the edge set is what authorizes it.
                   <a
                     className="admin-console__btn admin-console__btn--primary"
                     href={`/api/v1/admin/backups/${encodeURIComponent(backup.name)}/download?tenant=${encodeURIComponent(tenant)}`}
