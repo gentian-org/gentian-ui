@@ -6,7 +6,7 @@
 `apps/desktop/` (login hub, desktop/mobile bases, app launcher, iframe window host)
 `apps/admin-console/` (the administration console, a director client; its own
 conventions are in `apps/admin-console/docs/AGENTS.md`) and `apps/concierge/`. All dogfood
-[gentian-app-template](https://github.com/gentian-org/gentian-app-template) — same
+the app template [gentian-apps/apps/_template](https://github.com/gentian-org/gentian-apps/tree/develop/apps/_template) — same
 backend/frontend/chart layout and security modules. This repo is the **kernel shell**
 instance; see template `docs/AGENTS.md` for catalogue-app specifics (`profile/`, AppProfile
 publish flow). See [README.md](README.md) for scope and layout.

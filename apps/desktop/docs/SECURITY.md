@@ -1,7 +1,7 @@
 # Security conventions — gentian-ui (kernel shell)
 
 Implements the same mandatory controls as
-[gentian-app-template/docs/SECURITY.md](https://github.com/gentian-org/gentian-app-template/blob/main/docs/SECURITY.md).
+[gentian-apps/apps/_template/docs/SECURITY.md](https://github.com/gentian-org/gentian-apps/blob/develop/apps/_template/docs/SECURITY.md).
 Read that document for the full M1–M27 checklist; this file maps template modules
 to this repo and notes kernel-specific deployment differences.
 

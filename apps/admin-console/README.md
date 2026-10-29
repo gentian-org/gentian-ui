@@ -3,7 +3,8 @@
 The console an MSP employee or an IT administrator uses to configure a tenant
 and, for a platform administrator, the cluster underneath. It is a component
 of the platform, built from
-[gentian-app-template](https://github.com/gentian-org/gentian-app-template),
+the app template
+[gentian-apps/apps/_template](https://github.com/gentian-org/gentian-apps/tree/develop/apps/_template),
 and a client of the gentian-os director: every screen reads through the
 director and writes through it, and what a person may see or change is the
 director's answer from the authorization graph. The console itself holds no

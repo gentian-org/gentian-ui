@@ -3,7 +3,7 @@
 The desktop of Gentian OS — login hub, desktop/mobile bases, app launcher, and
 iframe window host. One of the two apps in gentian-ui; the administration
 console is the other (`../admin-console`). Canonical scaffold for Gentian-built UI — same stack as
-[gentian-app-template](https://github.com/gentian-org/gentian-app-template)
+the app template [gentian-apps/apps/_template](https://github.com/gentian-org/gentian-apps/tree/develop/apps/_template)
 (catalogue apps and kernel shell).
 
 ## What it does, and what it does not
@@ -32,7 +32,7 @@ Local dev uses `AUTH_DISABLED=true` and `VITE_AUTH_DISABLED=true` (see
 ## Layout
 
 ```
-backend/          shell-api (FastAPI) — same modules as gentian-app-template
+backend/          shell-api (FastAPI) — same modules as gentian-apps/apps/_template
 frontend/
   design-system/  Brand tokens (gentian-theme.css)
   public/fonts/   Self-hosted webfonts
