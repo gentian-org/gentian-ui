@@ -28,7 +28,7 @@ JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
 
 
 def png(width: int = 128, height: int | None = None) -> bytes:
-    """A real PNG of one colour, as small as the format allows."""
+    """A real PNG of one color, as small as the format allows."""
     height = width if height is None else height
 
     def chunk(kind: bytes, data: bytes) -> bytes:

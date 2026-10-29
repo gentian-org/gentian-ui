@@ -26,14 +26,14 @@ to this repo and notes kernel-specific deployment differences.
 
 ## Kernel-specific differences
 
-| Topic | Catalogue app (template) | Kernel shell (this repo) |
+| Topic | Catalog app (template) | Kernel shell (this repo) |
 |-------|--------------------------|---------------------------|
 | Deploy | AppProfile + tenant install | `gentian-os` ApplicationSet |
 | Gateway | Tenant Gateway | `kernel-public-gateway` in `gentian-kernel` |
 | Host | `{subDomain}.{tenantDomain}` | `portal.{kernelDomain}` |
 | Identity env | `TENANT_ID`, `TENANT_NAMESPACE` | `KERNEL_DOMAIN` |
-| RBAC | Optional namespace Role | ClusterRole for catalogue APIs (`rbac.create: true`) |
-| No `profile/` | — | Correct — not a catalogue app |
+| RBAC | Optional namespace Role | ClusterRole for catalog APIs (`rbac.create: true`) |
+| No `profile/` | — | Correct — not a catalog app |
 
 ## The assistant and the model gateway
 

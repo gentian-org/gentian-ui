@@ -101,7 +101,7 @@ platform:
   # The name of the zone's realm.
   realm: ""
   # "kernel" for the platform's own zone, "tenant" for a customer's. A component
-  # whose behaviour differs between the two decides from this.
+  # whose behavior differs between the two decides from this.
   zoneKind: ""
   # The tenant's first declared language, for what the console renders before
   # a person has chosen one. Empty is English.

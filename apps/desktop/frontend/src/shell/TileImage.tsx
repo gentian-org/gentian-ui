@@ -31,19 +31,19 @@ export function TileImage({ icon, className, alt = "", style }: TileImageProps) 
       return;
     }
     let objectUrl: string | null = null;
-    let cancelled = false;
+    let canceled = false;
     fetch(src, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => (res.ok ? res.blob() : Promise.reject(new Error(String(res.status)))))
       .then((blob) => {
-        if (cancelled) return;
+        if (canceled) return;
         objectUrl = URL.createObjectURL(blob);
         setDrawn(objectUrl);
       })
       .catch(() => {
-        if (!cancelled) setDrawn(tileIconUrl(FALLBACK_GLYPH));
+        if (!canceled) setDrawn(tileIconUrl(FALLBACK_GLYPH));
       });
     return () => {
-      cancelled = true;
+      canceled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [src, token, withBearer]);

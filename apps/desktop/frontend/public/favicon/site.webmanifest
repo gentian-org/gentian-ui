@@ -1,7 +1,7 @@
 {
   "name": "Gentian",
   "short_name": "Gentian",
-  "description": "Gentian — your personalised cloud workspace",
+  "description": "Gentian — your personalized cloud workspace",
   "start_url": "/login/",
   "scope": "/",
   "display": "standalone",

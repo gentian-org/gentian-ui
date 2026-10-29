@@ -44,7 +44,7 @@ async function applyConfig() {
 }
 
 // What the cluster calls itself and its logo, from the brand the operator
-// publishes beside this page; the colours arrive by stylesheet. Without it
+// publishes beside this page; the colors arrive by stylesheet. Without it
 // the page is the platform's own.
 async function applyBrand() {
   try {

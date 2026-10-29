@@ -1,4 +1,4 @@
-"""The cluster's own catalogue screen: a relay, and nothing more.
+"""The cluster's own catalog screen: a relay, and nothing more.
 
 What is worth pinning here is not the plumbing but the DIVISION. Which
 editions are listed, which entries may be installed and which digest is

@@ -232,9 +232,9 @@ function classWord(t: T, cls: string): string {
 /**
  * Whether a leftover sign-in configuration still decides anything. It is the
  * one kind of leftover that can: an app's sign-in clients are configured from
- * the one sign-in configuration labelled with that app's name (an
- * extension's, from its parent app's), and from no other. A piece labelled
- * for an installed app is in effect; with a second piece labelled for the
+ * the one sign-in configuration labeled with that app's name (an
+ * extension's, from its parent app's), and from no other. A piece labeled
+ * for an installed app is in effect; with a second piece labeled for the
  * same app it is contested, and the app's sign-in clients are refused until
  * one of the two is removed.
  */

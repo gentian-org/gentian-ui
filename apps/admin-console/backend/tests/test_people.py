@@ -1,6 +1,6 @@
 """People and groups, relayed to the registrar.
 
-What these assert is the relay's shape rather than Keycloak's behaviour: the
+What these assert is the relay's shape rather than Keycloak's behavior: the
 registrar is the one that holds a credential and decides, and a test here that
 pretended otherwise would be testing a second implementation of a decision
 that has one home.

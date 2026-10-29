@@ -369,7 +369,7 @@ function RepositoriesPanel({
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<{ name: string } & RepositoryInput>({
     name: "",
-    // apps, not deployments: an additive catalogue alongside the cluster's is
+    // apps, not deployments: an additive catalog alongside the cluster's is
     // what a tenant adds. deployments repoints what everything reconciles from,
     // which the API guards with a retype — offering it as an equal choice here
     // would invite the dangerous one by accident.

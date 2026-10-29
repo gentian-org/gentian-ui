@@ -103,7 +103,7 @@ def test_customization_is_asked_of_the_usher(monkeypatch):
 def test_platform_security_is_the_clusters_view_with_the_declared_allowlist(monkeypatch):
     """The screen edits the allowlist, so the list it starts from is the one
     git declares -- the director's -- and not the one that last synced. What
-    the catalogue asks for is the cluster's view, the usher's."""
+    the catalog asks for is the cluster's view, the usher's."""
     synced = [{"profile": "old", "policy": "p", "scope": "s"}]
     declared = [
         {"profile": "old", "policy": "p", "scope": "s"},

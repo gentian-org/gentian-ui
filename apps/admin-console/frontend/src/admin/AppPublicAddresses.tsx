@@ -371,7 +371,7 @@ function ActionsCell({
  *
  * An entry for the cluster's main address also shows the director's rule in
  * full, as the read carried it, and a box that starts unticked. Only that
- * box sends the acknowledgement; typing the entry does not. Without a rule
+ * box sends the acknowledgment; typing the entry does not. Without a rule
  * from the director there is nothing to acknowledge, and nothing is sent.
  *
  * A refusal is shown here, in the director's words, and the dialog stays.

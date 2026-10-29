@@ -24,7 +24,7 @@ function shortDigest(digest: string) {
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 /**
- * The cluster's own catalogues — the fallback, and it is meant to look like
+ * The cluster's own catalogs — the fallback, and it is meant to look like
  * one.
  *
  * The App Store is the route to an app. It knows what an app is for, what it
@@ -39,7 +39,7 @@ const messageOf = (err: unknown) => (err instanceof Error ? err.message : String
  * second, worse shop would pull people away from the one that is maintained,
  * and every field it could add here is a field that would go stale. What it
  * shows is what a cluster can actually vouch for on its own: what is in its
- * catalogues, at which version, in which edition, and whether it can be
+ * catalogs, at which version, in which edition, and whether it can be
  * installed from here.
  *
  * Where it may, the row installs it: the entry's coordinate and digest go back
@@ -109,7 +109,7 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
   const sources = sourcesQuery.data?.catalogues ?? [];
   const storeUrl = sourcesQuery.data?.storeUrl ?? "";
 
-  // The first catalogue, until somebody picks another. Not a stored default:
+  // The first catalog, until somebody picks another. Not a stored default:
   // a cluster with one source should not need a click to see it.
   useEffect(() => {
     if (!selected && sources.length > 0) {
@@ -142,11 +142,11 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
                 <a href={storeUrl} target="_blank" rel="noreferrer">
                   {t("catalogue.appStore")}</a>
                 . This page is the plain fallback: what is in this cluster&rsquo;s own
-                catalogue sources, for when the store is not the answer.
+                catalog sources, for when the store is not the answer.
               </>
             ) : (
               <>
-                This cluster belongs to no App Store, so its own catalogue sources are all
+                This cluster belongs to no App Store, so its own catalog sources are all
                 there is.
               </>
             )}

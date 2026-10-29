@@ -161,7 +161,7 @@ async def delete_person_tile(
 # ── which one a tile shows ──────────────────────────────────────────────────
 
 
-async def _catalogue(token: str | None, settings: Settings) -> list[dict] | None:
+async def _catalog(token: str | None, settings: Settings) -> list[dict] | None:
     """The tiles the usher answers this person for this desktop's tenant, or
     None when it cannot be asked or does not answer."""
     if not settings.usher_url or not settings.gentian_tenant or not token:
@@ -186,7 +186,7 @@ def _names(tiles: list[dict]) -> list[str]:
 
 
 def _profile_picture(tile_id: str, tiles: list[dict] | None) -> Picture | str | None:
-    """The profile's own picture for a tile, from the catalogue: PNG bytes,
+    """The profile's own picture for a tile, from the catalog: PNG bytes,
     the name of one of the desktop's own glyphs, or None. A picture in any
     other form is not drawn."""
     icon = next(
@@ -220,15 +220,15 @@ async def get_tile(
     if picture is None and (app := tile_store.app_of(tile_id, tenant)) is not None:
         picture = tile_store.tenant_tile(tenant, app)
         # Off an app's main entry the tenant's picture is shown only where
-        # the app has none, which the catalogue says.
+        # the app has none, which the catalog says.
         if picture is not None and not tile_store.is_main_entry(tile_id):
-            tiles = await _catalogue(token, settings)
+            tiles = await _catalog(token, settings)
             if tiles is None or tile_store.pictured_app_of(tile_id, tenant, _names(tiles)) != app:
                 picture = None
     if picture is not None:
         return _picture(picture)
     if tiles is None:
-        tiles = await _catalogue(token, settings)
+        tiles = await _catalog(token, settings)
     default = _profile_picture(tile_id, tiles)
     if isinstance(default, Picture):
         return _picture(default)

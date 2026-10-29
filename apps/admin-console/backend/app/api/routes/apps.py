@@ -33,7 +33,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 # An app's name, or an entry's, as the director accepts it. Checked here because it lands in a
 # URL path: a name with a dot-dot in it would address a different route of the
-# director than the one written below. Not an authorisation check.
+# director than the one written below. Not an authorization check.
 _NAME = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 
 # A purge is one request, answered when it is over: the operator gives itself
@@ -138,7 +138,7 @@ class ExposureApproval(BaseModel):
     console's dialog, and the kind of entry the dialog showed them. A field this does not name is refused here rather than
     dropped, so nothing reaches the director that the dialog did not show --
     its review date among them, which stays the director's default. The types
-    are strict: a word that merely looks like a yes is not the acknowledgement
+    are strict: a word that merely looks like a yes is not the acknowledgment
     of the main address's rule.
     """
 

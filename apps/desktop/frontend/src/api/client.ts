@@ -92,7 +92,7 @@ export type ClusterTile = {
   displayName: string;
   /**
    * Translations of the label, keyed by locale ("de_DE"). Optional: a
-   * catalogue with none renders from displayName alone.
+   * catalog with none renders from displayName alone.
    */
   displayNames?: Record<string, string>;
   description: string;

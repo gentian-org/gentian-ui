@@ -2,10 +2,10 @@ import type { AppWriteResult } from "@/api/apps";
 import { apiFetch } from "@/api/client";
 
 /**
- * The cluster's own catalogues (AD-14).
+ * The cluster's own catalogs (AD-14).
  *
  * Deliberately thin, and the thinness is the design rather than an omission.
- * A catalogue source publishes an index of coordinates, versions, editions and
+ * A catalog source publishes an index of coordinates, versions, editions and
  * digests — no display name, no description, no icon, no price. Those are the
  * App Store's, they are what it is for, and a cluster reproducing them badly
  * would compete with a screen somebody else keeps current.

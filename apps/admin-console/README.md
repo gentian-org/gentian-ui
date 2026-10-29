@@ -100,7 +100,7 @@ left to the command.
 
 Nothing is installed from the console. Apps come from the App Store, or from
 `kubectl gentian apps install` where no store is available: the cluster renders
-no catalogue of its own. The Catalogues screen and its routes are kept and not
+no catalog of its own. The Catalogs screen and its routes are kept and not
 shown (`SHOW_CATALOGUES` in `frontend/src/admin/AdminConsole.tsx`).
 
 ## Local development

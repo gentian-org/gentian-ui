@@ -6,7 +6,7 @@ name: admin-console
 # installed by the operator from a ComponentProfile gentian-os ships.
 #
 # Moved here from gentian-apps, where it was built by apps-ci.yaml: the console
-# is the platform's own UI, like the desktop, not a catalogue app.
+# is the platform's own UI, like the desktop, not a catalog app.
 
 # A branch is checked as a pull request, and what is merged is checked and
 # published as a push. Not both: a branch that ran on its push and again on its
@@ -302,7 +302,7 @@ jobs:
     # The console is a component: the platform installs it per tenant from
     # a chart the operator resolves through provider-helm, which pulls from a
     # registry and not from git. So the chart is published as an OCI
-    # artefact, versioned like the images -- a moving prerelease per branch
+    # artifact, versioned like the images -- a moving prerelease per branch
     # the profile can follow on a dev cluster, and an immutable one per
     # commit for anything that pins.
     runs-on: ubuntu-latest
@@ -359,7 +359,7 @@ jobs:
 
   # The one status the branch rules require. It passes when every job above
   # succeeded or was skipped because this pull request gave it nothing to do,
-  # and fails when any of them failed or was cancelled. `changes` itself must
+  # and fails when any of them failed or was canceled. `changes` itself must
   # have run: a decision that was skipped is not a decision.
   gate:
     name: admin-console gate

@@ -16,10 +16,10 @@ import { Trans, useTranslation } from "react-i18next";
  * Three things make this screen different from the rest of the console today,
  * and they are the pattern the other screens are meant to follow:
  *
- * 1. It holds no catalogue. Every setting on the page, what it means and what
+ * 1. It holds no catalog. Every setting on the page, what it means and what
  *    it accepts, comes from the director's answer. A setting added to the
  *    claim's schema appears here with no release of this console.
- * 2. It holds no credential and makes no authorisation decision. The caller's
+ * 2. It holds no credential and makes no authorization decision. The caller's
  *    own token goes to the director, which asks the authorization store
  *    whether that person may read or change the cluster. A 403 is rendered as
  *    a refusal, not hidden behind a disabled button.
@@ -77,7 +77,7 @@ export function ClusterSettingsSection() {
   const pending = Object.keys(draft).length;
 
   // Group by the first segment of the path, which is how the claim itself is
-  // organised: certificates together, mail together. No mapping table here --
+  // organized: certificates together, mail together. No mapping table here --
   // a new group appears because the director returned one.
   const groups = new Map<string, ClusterSetting[]>();
   for (const setting of settings) {

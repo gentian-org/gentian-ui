@@ -2,7 +2,7 @@
 /* =========================================================================
    Admin Console — the component layer over the Gentian design tokens.
 
-   Every colour, radius, font and easing here resolves to a token from
+   Every color, radius, font and easing here resolves to a token from
    frontend/design-system/gentian-theme.css. If something is needed that no
    token carries, add the token there rather than a literal here — a literal
    is how the console drifts away from the rest of the shell.
@@ -458,7 +458,7 @@
   margin: 0.75rem 0 0;
 }
 
-/* The timestamp column of a history card aligns with its title, not centred. */
+/* The timestamp column of a history card aligns with its title, not centered. */
 .admin-console__card-aside--top {
   align-items: flex-start;
   white-space: nowrap;
@@ -654,7 +654,7 @@
   filter: brightness(0.9);
 }
 
-/* A write committed and waiting for the cluster: grey whatever its kind,
+/* A write committed and waiting for the cluster: gray whatever its kind,
    until the change it asked for has been applied. */
 .admin-console__btn--waiting,
 .admin-console__btn--waiting:disabled {
@@ -780,7 +780,7 @@
   overflow: auto;
 }
 
-/* A labelled stack: caption above, control below. */
+/* A labeled stack: caption above, control below. */
 .admin-console__stack {
   display: grid;
   gap: 0.75rem;
@@ -1533,7 +1533,7 @@
 /* A native <dialog> opened with showModal(): it holds focus and the page
    behind it is inert, so only its own look is defined here. */
 .admin-console__dialog {
-  /* The base reset zeroes every margin; a modal dialog centres by auto. */
+  /* The base reset zeroes every margin; a modal dialog centers by auto. */
   margin: auto;
   width: min(34rem, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);

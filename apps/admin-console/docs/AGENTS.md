@@ -15,7 +15,7 @@ client of the gentian-os director. Read the top-level README first.
 * **Relay verbatim.** `backend/app/core/director.py` forwards the caller's own
   token and hands back the director's status and body unchanged, including a
   refusal. A 403 means the caller does not hold the relation; softening it here
-  would be the console inventing an authorisation answer it may not give.
+  would be the console inventing an authorization answer it may not give.
 * **Screens follow relations, never a role string.** `/api/v1/admin/context`
   is built from the director's `tenants/{t}/me` and `clusters/{c}/me`. A screen
   appears because of what those answers say and for no other reason. Hiding a
@@ -23,7 +23,7 @@ client of the gentian-os director. Read the top-level README first.
 * **The design is the desktop's.** Screens keep the shape they had in the
   desktop; the flat tab strip in `frontend/src/admin/AdminConsole.tsx` is the
   console's structure. Change what a screen reads and writes, not how the
-  console is organised, unless asked.
+  console is organized, unless asked.
 * **The profile lives with the platform.** This repository ships no
   ComponentProfile. The platform's statement about this component is in
   gentian-os, and the facts of the cluster arrive through its value mapping.

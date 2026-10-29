@@ -2,7 +2,7 @@
 
 This is the change-management half of an audit trail, and it needs no store of
 its own: every change to declared state is already a commit that the director
-authored as the person whose token authorised it, trailered with the relation
+authored as the person whose token authorized it, trailered with the relation
 and object that permitted the change and the request id that started it. So
 "who changed this tenant's backup policy in March, and under what authority"
 is a git question.

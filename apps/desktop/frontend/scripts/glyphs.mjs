@@ -2,14 +2,14 @@
 // The desktop's own tile glyphs, as the PNGs a browser is given.
 //
 // The SVGs in assets/glyph-templates/ are templates and nothing else: no page
-// ever draws one. This rasterises each to public/tiles/<id>.png at SIZE x SIZE
+// ever draws one. This rasterizes each to public/tiles/<id>.png at SIZE x SIZE
 // and writes public/tiles/catalogue.json, the list "customize tile" offers,
-// from the template catalogue beside them. Run it after changing a template
+// from the template catalog beside them. Run it after changing a template
 // and commit what it wrote:
 //
 //   npm run glyphs
 //
-// --check fails when a committed PNG or the catalogue is missing or no longer
+// --check fails when a committed PNG or the catalog is missing or no longer
 // what its template renders to.
 
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
@@ -31,7 +31,7 @@ const ids = readdirSync(templates)
 
 const missing = Object.keys(source.tiles).filter((id) => !ids.includes(id));
 if (missing.length) {
-  console.error(`the catalogue names glyphs that have no template: ${missing.join(", ")}`);
+  console.error(`the catalog names glyphs that have no template: ${missing.join(", ")}`);
   process.exit(1);
 }
 
@@ -42,7 +42,7 @@ function render(id) {
     .asPng();
 }
 
-const catalogue = {
+const catalog = {
   version: 3,
   license: source.license,
   size: SIZE,
@@ -50,7 +50,7 @@ const catalogue = {
     Object.entries(source.tiles).map(([id, tile]) => [id, { label: tile.label, glyph: `${id}.png` }]),
   ),
 };
-const catalogueText = `${JSON.stringify(catalogue, null, 2)}\n`;
+const catalogText = `${JSON.stringify(catalog, null, 2)}\n`;
 
 const stale = [];
 if (!check) mkdirSync(out, { recursive: true });
@@ -63,9 +63,9 @@ for (const id of ids) {
     writeFileSync(target, png);
   }
 }
-const catalogueTarget = join(out, "catalogue.json");
+const catalogTarget = join(out, "catalogue.json");
 if (check) {
-  if (!existsSync(catalogueTarget) || readFileSync(catalogueTarget, "utf8") !== catalogueText) {
+  if (!existsSync(catalogTarget) || readFileSync(catalogTarget, "utf8") !== catalogText) {
     stale.push("catalogue.json");
   }
   if (stale.length) {
@@ -74,6 +74,6 @@ if (check) {
   }
   console.log(`${ids.length} glyphs match their templates`);
 } else {
-  writeFileSync(catalogueTarget, catalogueText);
+  writeFileSync(catalogTarget, catalogText);
   console.log(`${ids.length} glyphs written to public/tiles at ${SIZE}x${SIZE}`);
 }

@@ -5,7 +5,7 @@ import "./admin.css";
 import { useTranslation } from "react-i18next";
 import { formatDateTime } from "@/lib/format";
 
-/** The usher's words for an attempt, and the catalogue key that says each. */
+/** The usher's words for an attempt, and the catalog key that says each. */
 const OUTCOME_KEYS: Record<string, string> = {
   accepted: "outcomeAccepted",
   failed: "outcomeFailed",

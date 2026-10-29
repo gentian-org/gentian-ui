@@ -41,8 +41,8 @@ async def cluster_settings(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """What this cluster is configured with, catalogue and values together, so
-    the screen renders from one answer and holds no catalogue of its own."""
+    """What this cluster is configured with, catalog and values together, so
+    the screen renders from one answer and holds no catalog of its own."""
     return await director.forward(
         settings, "GET", _cluster_path(settings, "/settings"), bearer_of(credentials)
     )
@@ -55,7 +55,7 @@ async def updates(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """Which installed apps, in every tenant, are behind the build their
-    catalogue offers, and what keeps them there: the director's report, read
+    catalog offers, and what keeps them there: the director's report, read
     under `can_audit` on the cluster. The policy and whether its window is
     open now come with it."""
     return await director.forward(
@@ -71,7 +71,7 @@ async def move_outdated(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """Move every outdated app -- or those of the tenants and apps the body
-    names -- to the newest build its catalogue offers. The cluster
+    names -- to the newest build its catalog offers. The cluster
     administrator's act (`can_configure`); each move exports first, verifies
     after and rolls back by itself, and the report says how each went."""
     return await director.forward(

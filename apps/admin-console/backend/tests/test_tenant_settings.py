@@ -1,7 +1,7 @@
 """Tenant Settings saves one form as the director's three declarations.
 
 Country first, because the director fills an empty currency from it; then the
-languages; then the organisation with the display name. The first refusal is
+languages; then the organization with the display name. The first refusal is
 the answer, and what follows it is not sent.
 """
 

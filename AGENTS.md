@@ -8,7 +8,7 @@
 conventions are in `apps/admin-console/docs/AGENTS.md`) and `apps/concierge/`. All dogfood
 the app template [gentian-apps/apps/_template](https://github.com/gentian-org/gentian-apps/tree/develop/apps/_template) — same
 backend/frontend/chart layout and security modules. This repo is the **kernel shell**
-instance; see template `docs/AGENTS.md` for catalogue-app specifics (`profile/`, AppProfile
+instance; see template `docs/AGENTS.md` for catalog-app specifics (`profile/`, AppProfile
 publish flow). See [README.md](README.md) for scope and layout.
 
 ## Build & deployment — CI/GitOps only

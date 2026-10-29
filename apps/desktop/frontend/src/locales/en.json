@@ -43,7 +43,7 @@
     "backgroundUpdated": "Desktop background updated.",
     "backgroundRestored": "Restored default desktop background.",
     "languageHint": "Choose the language of the desktop. Apps keep their own.",
-    "languageTenant": "My organisation's language ({{language}})"
+    "languageTenant": "My organization's language ({{language}})"
   },
   "account": {
     "title": "Account",

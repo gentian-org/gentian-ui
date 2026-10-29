@@ -22,8 +22,8 @@ export function kernelDomainOf(hostname) {
   return String(hostname || "").toLowerCase();
 }
 
-/** Normalises an address, or returns "" when it is not one. */
-export function normaliseAddress(input) {
+/** Normalizes an address, or returns "" when it is not one. */
+export function normalizeAddress(input) {
   const address = String(input || "").trim().toLowerCase();
   return ADDRESS.test(address) ? address : "";
 }
@@ -43,7 +43,7 @@ function desktopOf(tenant, kernelDomain) {
  *   {kind: "unknown", address}        on no workspace this page can place
  */
 export function routeAddress(input, kernelDomain) {
-  const address = normaliseAddress(input);
+  const address = normalizeAddress(input);
   if (!address) return { kind: "invalid" };
   const domain = address.slice(address.lastIndexOf("@") + 1);
   if (domain === kernelDomain) {

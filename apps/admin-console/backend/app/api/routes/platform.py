@@ -1,4 +1,4 @@
-"""Integrations, platform security, how much customisation is carried, and
+"""Integrations, platform security, how much customization is carried, and
 what the cluster last reported about itself.
 
 Four screens, all reads of live state, all relayed from the usher. What an
@@ -58,12 +58,12 @@ async def platform_security_policy(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """What the cluster permits to escape its default posture, and what the
-    catalogue asks of it. The difference between the two lists is the point:
+    catalog asks of it. The difference between the two lists is the point:
     a profile asking for something not permitted is refused at deploy time,
     and seeing that before installing beats finding out afterwards.
 
     Two services answer, because the screen does two things with it. What
-    the catalogue asks for is the cluster's view and the usher's. The
+    the catalog asks for is the cluster's view and the usher's. The
     allowlist is the list the screen EDITS, so it is the one git declares,
     which is the director's: read from the cluster it would be the last thing
     that synced, and an edit made on top of that would drop a change
