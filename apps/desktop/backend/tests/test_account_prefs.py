@@ -197,8 +197,10 @@ async def _check(url: str):
 
 @pytest.mark.asyncio
 async def test_check_iframe_answers_for_a_tile(monkeypatch):
-    _framing(monkeypatch, [{"url": TILE}], lambda _r: httpx.Response(200))
-    assert (await _check(TILE + "index.php")).json() == {"embeddable": True}
+    asked = _framing(monkeypatch, [{"url": TILE}], lambda _r: httpx.Response(200))
+    assert (await _check(TILE + "index.php?x=1")).json() == {"embeddable": True}
+    # The tile's own address, not the one the caller wrote.
+    assert asked == [TILE]
 
 
 @pytest.mark.asyncio

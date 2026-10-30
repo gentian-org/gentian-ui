@@ -321,21 +321,25 @@ async def check_iframe_embeddable(
     settings: Settings = Depends(get_settings),
 ) -> dict:
     """Whether a tile's page can be framed. Only of a host this person's
-    tiles name: anything else is not for this server to fetch."""
+    tiles name, and asked at the address the tile names: nothing the caller
+    wrote is fetched."""
     tiles = await _catalog(credentials.credentials if credentials else None, settings)
     if tiles is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "The tile catalog is unavailable")
-    tile_hosts = {urlparse(str(t.get("url") or "")).hostname for t in tiles} - {None}
+    tile_urls = {
+        urlparse(u).hostname: u for t in tiles if (u := str(t.get("url") or ""))
+    }
     target = urlparse(url)
-    if target.scheme != "https" or target.hostname not in tile_hosts:
+    tile_url = tile_urls.get(target.hostname)
+    if target.scheme != "https" or tile_url is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the address of a tile")
-    known_hosts = tile_hosts | {settings.idp_public_host}
+    known_hosts = {h for h in tile_urls if h} | {settings.idp_public_host}
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         async with httpx.AsyncClient(headers=headers) as client:
-            resp = await _answer_of(client, url, known_hosts)
+            resp = await _answer_of(client, tile_url, known_hosts)
             if resp is None or resp.status_code in {401, 403}:
                 return {"embeddable": False}
 
