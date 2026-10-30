@@ -18,7 +18,7 @@ CI and catalog review should fail if any are missing.
 |---|-------------|-----|
 | M1 | **Validate OIDC bearer tokens on every user-facing API route** | `Depends(get_current_user)` on all `/api/v1/*` handlers that return or mutate tenant/user data |
 | M2 | **`AUTH_DISABLED` only in local dev** | Must be `false` in cluster; chart sets it from `auth.disabled: false` |
-| M3 | **Validate JWT issuer, signature, and expiry** | Use `core/auth.py` JWKS path — do not roll custom token parsing |
+| M3 | **Validate JWT issuer, signature, and expiry** | Use `gentian_app_runtime.auth` — do not roll custom token parsing |
 | M4 | **Scope operations to the authenticated tenant** | Read `TENANT_ID` / claims; never trust client-supplied tenant IDs without matching the token |
 
 Public unauthenticated endpoints are limited to **`/healthz`** and **`/readyz`** only.
@@ -126,11 +126,11 @@ Until then, M1–M4 + M26 are the minimum authorization bar.
 
 | Area | Path |
 |------|------|
-| JWT validation (M1–M4) | `backend/app/core/auth.py`, `backend/app/core/tenant.py` |
+| JWT validation (M1–M4) | `gentian_app_runtime.auth`, `gentian_app_runtime.tenant` |
 | Log redaction (M7) | `backend/app/core/logging_middleware.py` |
 | Health probes (M8) | `backend/app/api/routes/health.py` |
 | CORS (M9) | `backend/app/core/config.py`, `chart/values.yaml` |
-| Origin check on POST/PUT/PATCH/DELETE (forged cross-site requests) | `backend/app/core/origin_check.py` — the rule and what it leaves open are in its docstring; `CSRF_TRUSTED_ORIGINS` allow-lists further origins, empty by default |
+| Origin check on POST/PUT/PATCH/DELETE (forged cross-site requests) | `gentian_app_runtime.origin_check` — the rule and what it leaves open are in its docstring; `CSRF_TRUSTED_ORIGINS` allow-lists further origins, empty by default |
 | OpenFGA PEP stub (M22, S1) | `backend/app/core/authz.py`, `backend/app/core/openfga_client.py` |
 | Tenant DB scoping (M26) | `backend/app/db/session.py` |
 | Resource limits (M27) | `chart/values.yaml`, `chart/values-production.yaml.example` |
