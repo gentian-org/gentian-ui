@@ -6,6 +6,7 @@ import { AppMenuSlot } from "@/shell/AppMenuSlot";
 import { NotificationInbox } from "@/shell/NotificationInbox";
 import { AiWidget } from "@/shell/AiWidget";
 import { AppsGridIcon, MenuIcon, TrayButton } from "@/shell/TrayButton";
+import { moveToSlot, quickBarOrder } from "@/lib/quickBar";
 import { usePrefsStore, type DesktopTile } from "@/stores/prefs";
 
 import { useTranslation } from "react-i18next";
@@ -57,56 +58,39 @@ export function AppMenu({
   const updateCustomPrefs = usePrefsStore((s) => s.updateCustomPrefs);
   const desktopTiles = usePrefsStore((s) => s.customPrefs.desktopTiles) || [];
 
-  // Apps the user has never seen must still reach the quick bar. menuAppIds is a
-  // fixed list written the first time someone reorders or pins anything; without
-  // this, every app provisioned afterwards is silently absent from the bar, because
-  // it simply is not in the list. Appending keeps their ordering and adds the new
-  // ones at the end — the same place they would have been had they never customized.
-  const pinned = new Set(menuAppIds || []);
-  const removed = new Set(menuRemovedAppIds || []);
-  const effectiveMenuAppIds = menuAppIds
-    ? [...menuAppIds, ...apps.map((a) => a.id).filter((id) => !pinned.has(id) && !removed.has(id))]
-    : null;
+  const appIds = apps.map((a) => a.id);
 
-  const visibleItems: MenuItem[] = effectiveMenuAppIds
-    ? effectiveMenuAppIds
-        .map((id): MenuItem | null => {
-          if (id.startsWith("link:")) {
-            const tileId = id.substring(5);
-            const tile = desktopTiles.find((t) => t.id === tileId);
-            if (tile) {
-              return {
-                id,
-                title: tile.title,
-                icon: tile.icon,
-                isLink: true,
-                url: tile.url,
-                openMode: tile.openMode,
-              };
-            }
-            return null;
-          } else {
-            const app = apps.find((a) => a.id === id);
-            if (app) {
-              return {
-                id: app.id,
-                title: app.title,
-                icon: app.icon,
-                isLink: false,
-                app,
-              };
-            }
-            return null;
-          }
-        })
-        .filter((item): item is MenuItem => item !== null)
-    : apps.map((app) => ({
-        id: app.id,
-        title: app.title,
-        icon: app.icon,
-        isLink: false,
-        app,
-      }));
+  const visibleItems: MenuItem[] = quickBarOrder(menuAppIds, menuRemovedAppIds, appIds)
+    .map((id): MenuItem | null => {
+      if (id.startsWith("link:")) {
+        const tileId = id.substring(5);
+        const tile = desktopTiles.find((t) => t.id === tileId);
+        if (tile) {
+          return {
+            id,
+            title: tile.title,
+            icon: tile.icon,
+            isLink: true,
+            url: tile.url,
+            openMode: tile.openMode,
+          };
+        }
+        return null;
+      } else {
+        const app = apps.find((a) => a.id === id);
+        if (app) {
+          return {
+            id: app.id,
+            title: app.title,
+            icon: app.icon,
+            isLink: false,
+            app,
+          };
+        }
+        return null;
+      }
+    })
+    .filter((item): item is MenuItem => item !== null);
 
   useEffect(() => {
     if (!userMenuOpen) {
@@ -137,21 +121,9 @@ export function AppMenu({
     return slots.length;
   }
 
-  /**
-   * Insert `id` into `ids` so that, among the currently *visible* slots, it ends up
-   * at `insertAt`. Anchoring on the neighboring item's id (rather than splicing at
-   * `insertAt` directly) keeps this correct even when `ids` holds entries that
-   * aren't currently visible (uninstalled apps, revoked access, deleted link tiles) —
-   * otherwise those hidden entries shift the raw array index space away from the
-   * visible-slot index space `insertAt` was measured in, e.g. making a drop aimed at
-   * the very end land one slot short of it.
-   */
+  /** Insert `id` at slot `insertAt` of the slots shown; see moveToSlot. */
   function insertIdAtVisibleIndex(ids: string[], id: string, insertAt: number): string[] {
-    const next = ids.filter((existingId) => existingId !== id);
-    const anchorItem = visibleItems[insertAt];
-    const anchorIdx = anchorItem ? next.indexOf(anchorItem.id) : -1;
-    next.splice(anchorIdx === -1 ? next.length : anchorIdx, 0, id);
-    return next;
+    return moveToSlot(ids, id, visibleItems.map((item) => item.id), insertAt);
   }
 
   function handleTrackDragOver(e: React.DragEvent) {
@@ -188,7 +160,7 @@ export function AppMenu({
         const itemId = data.id;
 
         void updateCustomPrefs((prev) => {
-          const currentIds = [...(prev.menuAppIds || apps.map((a) => a.id))];
+          const currentIds = quickBarOrder(prev.menuAppIds, prev.menuRemovedAppIds, appIds);
           return {
             ...prev,
             menuAppIds: insertIdAtVisibleIndex(currentIds, itemId, insertAt),
@@ -202,7 +174,7 @@ export function AppMenu({
         const itemId = tile.type === "app" && tile.appId ? tile.appId : `link:${tile.id}`;
 
         void updateCustomPrefs((prev) => {
-          const currentIds = [...(prev.menuAppIds || apps.map((a) => a.id))];
+          const currentIds = quickBarOrder(prev.menuAppIds, prev.menuRemovedAppIds, appIds);
           const nextIds = insertIdAtVisibleIndex(currentIds, itemId, insertAt);
           // Remove from desktop (MOVE semantics)
           const nextDesktopTiles = (prev.desktopTiles || []).filter((t) => t.id !== data.id);
@@ -213,7 +185,7 @@ export function AppMenu({
         const dragId = data.id;
 
         void updateCustomPrefs((prev) => {
-          const currentIds = [...(prev.menuAppIds || apps.map((a) => a.id))];
+          const currentIds = quickBarOrder(prev.menuAppIds, prev.menuRemovedAppIds, appIds);
           if (currentIds.indexOf(dragId) === -1) return prev;
           return { ...prev, menuAppIds: insertIdAtVisibleIndex(currentIds, dragId, insertAt) };
         });
@@ -227,7 +199,7 @@ export function AppMenu({
 
   function handleUnpin(itemId: string) {
     void updateCustomPrefs((prev) => {
-      const currentIds = prev.menuAppIds || apps.map((a) => a.id);
+      const currentIds = prev.menuAppIds || appIds;
       return {
         ...prev,
         menuAppIds: currentIds.filter((id) => id !== itemId),
