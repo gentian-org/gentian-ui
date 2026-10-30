@@ -1,6 +1,12 @@
+import asyncio
+import ipaddress
+import socket
+
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 from fastapi.responses import Response
+from fastapi.security import HTTPAuthorizationCredentials
 
+from app.api.routes.tiles import _bearer, _catalog
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
 from app.core.gentian_groups import user_is_platform_admin, user_is_tenant_admin
@@ -272,18 +278,65 @@ def _frame_ancestors_allows(csp: str, parent_origin: str) -> bool:
     return False
 
 
+_MAX_HOPS = 5
+
+
+async def _is_public(host: str) -> bool:
+    """Whether every address `host` resolves to is on the public internet."""
+    try:
+        answers = await asyncio.get_running_loop().getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+    except OSError:
+        return False
+    return bool(answers) and all(ipaddress.ip_address(a[4][0]).is_global for a in answers)
+
+
+async def _answer_of(
+    client: httpx.AsyncClient, url: str, known_hosts: set[str]
+) -> httpx.Response | None:
+    """What `url` answers at the end of its redirects, or None where one of
+    them leaves https, or leaves the hosts the platform names for an address
+    that is not public. Those hosts are exempt because inside a cluster they
+    resolve to the edge's private address."""
+    for _ in range(_MAX_HOPS):
+        parsed = httpx.URL(url)
+        if parsed.scheme != "https":
+            return None
+        if parsed.host not in known_hosts and not await _is_public(parsed.host):
+            return None
+        resp = await client.head(url, timeout=2.0)
+        if resp.status_code in {404, 405}:
+            resp = await client.get(url, timeout=2.0)
+        if resp.next_request is None:
+            return resp
+        url = str(resp.next_request.url)
+    return None
+
+
 @router.get("/check-iframe")
-async def check_iframe_embeddable(url: str, request: Request) -> dict:
+async def check_iframe_embeddable(
+    url: str,
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    """Whether a tile's page can be framed. Only of a host this person's
+    tiles name: anything else is not for this server to fetch."""
+    tiles = await _catalog(credentials.credentials if credentials else None, settings)
+    if tiles is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "The tile catalog is unavailable")
+    tile_hosts = {urlparse(str(t.get("url") or "")).hostname for t in tiles} - {None}
+    target = urlparse(url)
+    if target.scheme != "https" or target.hostname not in tile_hosts:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not the address of a tile")
+    known_hosts = tile_hosts | {settings.idp_public_host}
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         async with httpx.AsyncClient(headers=headers) as client:
-            resp = await client.head(url, timeout=2.0, follow_redirects=True)
-            if resp.status_code in {404, 405}:
-                resp = await client.get(url, timeout=2.0, follow_redirects=True)
-            
-            if resp.status_code in {401, 403}:
+            resp = await _answer_of(client, url, known_hosts)
+            if resp is None or resp.status_code in {401, 403}:
                 return {"embeddable": False}
 
             resp_headers = resp.headers
@@ -303,5 +356,5 @@ async def check_iframe_embeddable(url: str, request: Request) -> dict:
             if not _frame_ancestors_allows(csp, parent):
                 return {"embeddable": False}
             return {"embeddable": True}
-    except Exception:
-        return {"embeddable": True}
+    except (httpx.HTTPError, httpx.InvalidURL):
+        return {"embeddable": False}
