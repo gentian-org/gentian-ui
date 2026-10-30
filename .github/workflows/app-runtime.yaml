@@ -1,0 +1,67 @@
+name: app-runtime
+
+# The package the platform's apps share (packages/app-runtime). A tag
+# app-runtime-v<version> publishes its wheel as a release of this repository,
+# which is the address an app's lockfile pins, with the wheel's hash.
+on:
+  push:
+    branches:
+      - develop
+    tags:
+      - "app-runtime-v*"
+    paths:
+      - "packages/app-runtime/**"
+      - ".github/workflows/app-runtime.yaml"
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths:
+      - "packages/app-runtime/**"
+      - ".github/workflows/app-runtime.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/app-runtime
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          version: "0.13.3"
+
+      - name: Test
+        run: |
+          uv sync --locked --extra dev
+          uv run ruff check src tests
+          uv run ruff format --check .
+          uv run python -m pytest -q
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/app-runtime-v')
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          version: "0.13.3"
+
+      - name: Publish the wheel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          declared="app-runtime-v$(uv version --short --project packages/app-runtime)"
+          test "$TAG" = "$declared"
+          uv build --wheel --project packages/app-runtime -o dist
+          gh release create "$TAG" dist/*.whl --title "$TAG" --notes "gentian-app-runtime ${TAG#app-runtime-v}"
