@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     project_name: str = "Gentian Shell"
     api_v1_str: str = "/api/v1"
-    environment: str = Field(default="local", alias="ENVIRONMENT")
+    environment: str = Field(default="production", alias="ENVIRONMENT")
 
     kernel_domain: str = Field(default="gentian.local", alias="KERNEL_DOMAIN")
     kernel_realm: str = Field(default="kernel", alias="KERNEL_REALM")

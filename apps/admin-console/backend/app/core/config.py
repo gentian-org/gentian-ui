@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     project_name: str = "Gentian Administration Console"
     api_v1_str: str = "/api/v1"
-    environment: str = Field(default="local", alias="ENVIRONMENT")
+    environment: str = Field(default="production", alias="ENVIRONMENT")
 
     # Identifies this app to the extension loader. Plugins register under the
     # entry-point group "gentian.admin-console.<app_id>.plugins", so a plugin written for one
