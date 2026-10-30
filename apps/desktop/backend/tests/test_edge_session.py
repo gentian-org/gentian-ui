@@ -8,7 +8,7 @@ decides no admin: it renders the verdict.
 
 import httpx
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.routes import session

@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from gentian_app_runtime.origin_check import OriginCheckMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
@@ -15,7 +16,6 @@ from app.api.routes import (
 )
 from app.core.config import get_settings
 from app.core.logging_middleware import RedactingAccessLogMiddleware
-from app.core.origin_check import OriginCheckMiddleware
 from app.db.engine import init_portal_database
 
 settings = get_settings()

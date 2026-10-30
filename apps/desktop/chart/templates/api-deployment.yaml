@@ -76,6 +76,10 @@ spec:
             - name: OIDC_ISSUER
               value: {{ .Values.auth.issuer | quote }}
             {{- end }}
+            {{- if and .Values.auth.audience (not (hasKey (default dict .Values.api.env) "OIDC_AUDIENCE")) }}
+            - name: OIDC_AUDIENCE
+              value: {{ .Values.auth.audience | quote }}
+            {{- end }}
             {{- if .Values.tenant }}
             - name: GENTIAN_TENANT
               value: {{ .Values.tenant | quote }}

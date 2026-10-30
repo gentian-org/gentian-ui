@@ -111,6 +111,9 @@ auth:
   # The issuer the forwarded token is verified against in edge mode: the
   # zone's realm on the identity provider. The operator sets it.
   issuer: ""
+  # The audience that token must carry: the director's, because that is who
+  # the zone's token is minted for. The operator sets it.
+  audience: ""
 
 openfga:
   apiUrl: ""

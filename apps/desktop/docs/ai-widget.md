@@ -58,7 +58,7 @@ gateway's administrator key and it does not call the Kubernetes API.
 
 **Who may use it:** every signed-in member who can open the desktop. There is
 no further restriction, and there never was one. The request must come from
-the desktop's own origin (`app/core/origin_check.py`).
+the desktop's own origin (`gentian_app_runtime.origin_check`).
 
 Because one key serves every member of the tenant, the API decides everything
 about the call but the conversation:

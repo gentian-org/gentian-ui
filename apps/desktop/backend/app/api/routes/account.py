@@ -12,7 +12,6 @@ from app.services.keycloak_account import (
     change_password,
     get_profile,
     list_sessions,
-    realm_for_user,
     revoke_all_sessions,
     revoke_session,
     update_profile,

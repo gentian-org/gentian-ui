@@ -101,8 +101,6 @@ class Settings(BaseSettings):
     # OpenFGA with the caller's own token (gentian-os S7A.6 and S7A.17).
     keycloak_admin_url: str | None = Field(default=None, alias="KEYCLOAK_ADMIN_URL")
 
-    portal_bff_client_id: str = Field(default="gentian-portal-bff", alias="PORTAL_BFF_CLIENT_ID")
-    portal_bff_client_secret: str | None = Field(default=None, alias="PORTAL_BFF_CLIENT_SECRET")
 
     matrix_bridge_password: str | None = Field(default=None, alias="MATRIX_BRIDGE_PASSWORD")
 
@@ -177,11 +175,20 @@ class Settings(BaseSettings):
         return f"{base}/protocol/openid-connect/userinfo" if base else None
 
     @property
-    def oidc_expected_client_id(self) -> str | None:
+    def expected_audience(self) -> str | None:
+        """What a bearer must be for: the configured audience, else the client."""
         return self.oidc_audience or self.oidc_client_id
 
+    @property
+    def tenant_id(self) -> str:
+        return self.gentian_tenant or ""
+
+    @property
+    def is_edge(self) -> bool:
+        return self.edge_session
+
     # Origins, besides this API's own, whose pages may send it state-changing
-    # requests (app/core/origin_check.py). Comma-separated, scheme://host[:port].
+    # requests (gentian_app_runtime.origin_check). Comma-separated, scheme://host[:port].
     # Empty by default: behind the edge the bundle and the API share one
     # origin and nothing else has any business here. Local development with
     # the Vite proxy names http://localhost:5173, because the proxy rewrites
