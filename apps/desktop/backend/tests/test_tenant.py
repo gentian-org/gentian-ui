@@ -36,7 +36,11 @@ def test_the_claim_is_the_local_development_fallback():
 
 
 def test_production_without_a_tenant_is_refused():
-    s = _settings(ENVIRONMENT="production", AUTH_DISABLED="false")
+    s = _settings(
+        ENVIRONMENT="production",
+        AUTH_DISABLED="false",
+        OIDC_ISSUER="https://id.desk.gentian.org/auth/realms/demo",
+    )
     # A component deployed without being told which tenant it serves. Serving
     # the kernel domain's preferences to a tenant's people is worse than
     # serving nobody, so this refuses rather than guessing.

@@ -76,7 +76,7 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> dict[str, Any]:
     settings = get_settings()
-    if settings.auth_disabled or not settings.oidc_issuer:
+    if settings.auth_disabled:
         return {
             "sub": "dev-user",
             "preferred_username": "dev-user",

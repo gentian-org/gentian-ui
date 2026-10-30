@@ -348,7 +348,7 @@ jobs:
           test "$(grep -c 'tag: "${{ steps.chart.outputs.image }}"' apps/desktop/chart/values.yaml)" = 2
       - name: Lint and package
         run: |
-          helm lint apps/desktop/chart
+          helm lint apps/desktop/chart --set auth.issuer=https://id.example.org/auth/realms/x
           helm package apps/desktop/chart --version "${{ steps.chart.outputs.immutable }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-immutable
           # The moving chart's appVersion is the immutable version it is a
           # copy of: a cluster that follows the branch reads the pin off the

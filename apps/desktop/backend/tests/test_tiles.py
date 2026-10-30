@@ -51,6 +51,7 @@ OTHER_PNG = png(64)
 def _settings(**over) -> Settings:
     values = {
         "AUTH_DISABLED": "false",
+        "OIDC_ISSUER": "https://id.desk.gentian.org/auth/realms/acme",
         "KERNEL_DOMAIN": "desk.gentian.org",
         "USHER_URL": "http://usher.test:8080",
         "GENTIAN_TENANT": TENANT,
