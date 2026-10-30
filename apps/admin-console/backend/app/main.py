@@ -6,7 +6,10 @@ answer, and hands the answer back unchanged. Whatever a person may see or
 change here is decided by the director from the authorization graph.
 """
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
+from gentian_app_runtime.extensions import loader
+from gentian_app_runtime.extensions.routes import extensions_router
+from gentian_app_runtime.origin_check import OriginCheckMiddleware
 
 from app.api.routes import (
     admin,
@@ -17,7 +20,6 @@ from app.api.routes import (
     catalogue,
     cluster,
     credentials,
-    extensions,
     health,
     notifications,
     people,
@@ -28,10 +30,9 @@ from app.api.routes import (
     session,
     tenant_settings,
 )
+from app.core.auth import get_current_user
 from app.core.config import get_settings
 from app.core.logging_middleware import RedactingAccessLogMiddleware
-from app.core.origin_check import OriginCheckMiddleware
-from app.extensions import loader
 
 settings = get_settings()
 
@@ -68,6 +69,12 @@ app.include_router(notifications.router, prefix=settings.api_v1_str)
 app.include_router(approvals.router, prefix=settings.api_v1_str)
 app.include_router(admin.router, prefix=settings.api_v1_str)
 app.include_router(credentials.router, prefix=settings.api_v1_str)
-app.include_router(extensions.router, prefix=settings.api_v1_str)
 
-loader.mount_routes(extension_registry, app, settings.api_v1_str)
+# What is loaded and where it comes from, and what plugins add, is for a
+# signed-in person as everything else here is.
+_signed_in = [Depends(get_current_user)]
+app.include_router(
+    extensions_router(lambda: extension_registry, dependencies=_signed_in),
+    prefix=settings.api_v1_str,
+)
+loader.mount_routes(extension_registry, app, settings.api_v1_str, dependencies=_signed_in)

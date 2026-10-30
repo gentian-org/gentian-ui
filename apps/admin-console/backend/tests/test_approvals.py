@@ -77,7 +77,10 @@ def test_the_list_is_the_ushers_answer_for_the_cluster_untouched(monkeypatch):
     assert answer.status_code == 200
     assert answer.json() == body
     # The usher's cluster route, as the caller.
-    assert (seen["method"], seen["url"]) == ("GET", "http://usher.test:8080/v1/clusters/demo/approvals")
+    assert (seen["method"], seen["url"]) == (
+        "GET",
+        "http://usher.test:8080/v1/clusters/demo/approvals",
+    )
     assert seen["auth"] == "Bearer officer-token"
 
 
@@ -95,7 +98,10 @@ def test_an_approval_goes_to_the_directors_privilege_route_for_the_requests_tena
     answer = _client().put(
         "/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root",
         headers=_person,
-        json={"reason": "reviewed the image; bounded to the pilot", "expiresAt": "2027-01-31T00:00:00Z"},
+        json={
+            "reason": "reviewed the image; bounded to the pilot",
+            "expiresAt": "2027-01-31T00:00:00Z",
+        },
     )
     assert answer.status_code == 202
     assert answer.json() == {"status": "updated", "commit": "abc"}
@@ -103,13 +109,18 @@ def test_an_approval_goes_to_the_directors_privilege_route_for_the_requests_tena
         "PUT",
         "http://director.test:8080/v1/tenants/acme/privileges/crm/podSecurity/run-as-root",
     )
-    assert seen["json"] == {"reason": "reviewed the image; bounded to the pilot", "expiresAt": "2027-01-31T00:00:00Z"}
+    assert seen["json"] == {
+        "reason": "reviewed the image; bounded to the pilot",
+        "expiresAt": "2027-01-31T00:00:00Z",
+    }
     assert seen["auth"] == "Bearer officer-token"
 
 
 def test_the_directors_refusal_of_an_approval_comes_back_as_it_is(monkeypatch):
     seen: dict = {}
-    refusal = {"error": "a podSecurity privilege weakens what protects the node; approving one is the security officer's"}
+    refusal = {
+        "error": "a podSecurity privilege weakens what protects the node; approving one is the security officer's"
+    }
     _fake_client(monkeypatch, refusal, seen, status=403)
     answer = _client().put(
         "/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root",
@@ -124,8 +135,14 @@ def test_the_directors_refusal_of_an_approval_comes_back_as_it_is(monkeypatch):
     "path, body",
     [
         ("/api/v1/admin/approvals/acme/crm/hostNetwork/x", {"reason": "long enough indeed"}),
-        ("/api/v1/admin/approvals/Acme/crm/podSecurity/run-as-root", {"reason": "long enough indeed"}),
-        ("/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root", {"reason": "long enough", "install": "x"}),
+        (
+            "/api/v1/admin/approvals/Acme/crm/podSecurity/run-as-root",
+            {"reason": "long enough indeed"},
+        ),
+        (
+            "/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root",
+            {"reason": "long enough", "install": "x"},
+        ),
         ("/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root", {}),
     ],
 )
@@ -145,7 +162,11 @@ def test_a_decline_goes_to_the_directors_action_on_the_app_for_the_requests_tena
         "profile": "crm",
         "install": "crm",
         "privilege": "podSecurity/run-as-root",
-        "request": {"declinedBy": "sam@example.com", "declinedAt": "2026-10-21T10:00:00Z", "declineReason": "no root on shared nodes"},
+        "request": {
+            "declinedBy": "sam@example.com",
+            "declinedAt": "2026-10-21T10:00:00Z",
+            "declineReason": "no root on shared nodes",
+        },
     }
     _fake_client(monkeypatch, recorded, seen, status=202)
     answer = _client().post(
@@ -159,13 +180,18 @@ def test_a_decline_goes_to_the_directors_action_on_the_app_for_the_requests_tena
         "POST",
         "http://director.test:8080/v1/tenants/acme/apps/crm/actions/decline-privilege",
     )
-    assert seen["json"] == {"privilege": "podSecurity/run-as-root", "reason": "no root on shared nodes"}
+    assert seen["json"] == {
+        "privilege": "podSecurity/run-as-root",
+        "reason": "no root on shared nodes",
+    }
     assert seen["auth"] == "Bearer officer-token"
 
 
 def test_the_directors_refusal_of_a_decline_comes_back_as_it_is(monkeypatch):
     seen: dict = {}
-    refusal = {"error": "a podSecurity privilege weakens what protects the node; approving one is the security officer's"}
+    refusal = {
+        "error": "a podSecurity privilege weakens what protects the node; approving one is the security officer's"
+    }
     _fake_client(monkeypatch, refusal, seen, status=403)
     answer = _client().post(
         "/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root/decline",
@@ -179,9 +205,18 @@ def test_the_directors_refusal_of_a_decline_comes_back_as_it_is(monkeypatch):
 @pytest.mark.parametrize(
     "path, body",
     [
-        ("/api/v1/admin/approvals/acme/crm/hostNetwork/x/decline", {"reason": "long enough indeed"}),
-        ("/api/v1/admin/approvals/Acme/crm/podSecurity/run-as-root/decline", {"reason": "long enough indeed"}),
-        ("/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root/decline", {"reason": "long enough", "expiresAt": "x"}),
+        (
+            "/api/v1/admin/approvals/acme/crm/hostNetwork/x/decline",
+            {"reason": "long enough indeed"},
+        ),
+        (
+            "/api/v1/admin/approvals/Acme/crm/podSecurity/run-as-root/decline",
+            {"reason": "long enough indeed"},
+        ),
+        (
+            "/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root/decline",
+            {"reason": "long enough", "expiresAt": "x"},
+        ),
         ("/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root/decline", {}),
     ],
 )
