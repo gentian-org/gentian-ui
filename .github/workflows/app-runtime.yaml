@@ -20,6 +20,9 @@ on:
       - "packages/app-runtime/**"
       - ".github/workflows/app-runtime.yaml"
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest

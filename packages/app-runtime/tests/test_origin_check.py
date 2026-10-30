@@ -46,7 +46,10 @@ def test_foreign_origin_is_refused(method):
     )
     assert r.status_code == 403
     assert r.json()["reason"] == "origin_mismatch"
-    assert "evil.example.com" in r.json()["detail"]
+    assert r.json()["detail"] == (
+        "Refused: this request was sent by a page on another origin "
+        "(https://evil.example.com), not by this application."
+    )
 
 
 @pytest.mark.parametrize(
