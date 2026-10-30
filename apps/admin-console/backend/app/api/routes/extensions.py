@@ -7,8 +7,9 @@ cluster hotfix.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.core.auth import get_current_user
 from app.core.dropins import describe_dropins, dropin_dir
 from app.extensions.api import EXTENSION_API_VERSION, SUPPORTED_MAJOR_VERSIONS
 
@@ -16,7 +17,7 @@ router = APIRouter(tags=["extensions"])
 
 
 @router.get("/extensions")
-def list_extensions() -> dict:
+def list_extensions(_user: dict = Depends(get_current_user)) -> dict:
     """Report loaded plugins, load failures, and applied config drop-ins."""
     from app.main import extension_registry  # local import avoids a circular import
 
