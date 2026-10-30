@@ -19,8 +19,8 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import HTTPException
+from gentian_app_runtime import auth
 
-from app.core import auth
 from app.core.config import Settings
 
 ISSUER = "https://id.example.test/auth/realms/kernel"
@@ -146,7 +146,7 @@ def test_under_edge_the_tenant_is_the_platforms_not_the_tokens(keypair):
     """The zone's token carries no tenant claim, and in production the pkce
     rule would refuse it as missing one. Under edge the component is in the
     tenant the platform put it in, and the edge decided entry."""
-    from app.core.tenant import assert_tenant_access
+    from gentian_app_runtime.tenant import assert_tenant_access
 
     s = settings(ENVIRONMENT="production", TENANT_ID="acme")
     claims = auth.decode_token(token(keypair, tenant=None), s)
@@ -156,7 +156,7 @@ def test_under_edge_the_tenant_is_the_platforms_not_the_tokens(keypair):
 
 
 def test_under_pkce_a_mismatched_tenant_claim_is_still_refused():
-    from app.core.tenant import assert_tenant_access
+    from gentian_app_runtime.tenant import assert_tenant_access
 
     s = settings(AUTH_MODE="pkce", TENANT_ID="acme")
     with pytest.raises(HTTPException) as refused:

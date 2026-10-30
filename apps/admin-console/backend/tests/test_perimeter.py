@@ -24,7 +24,9 @@ def test_the_surface_and_the_history_are_the_directors(monkeypatch):
     seen: dict = {}
     _fake_client(
         monkeypatch,
-        lambda m, url: httpx.Response(200, json={"tenant": "platform", "changes": []}, request=httpx.Request(m, url)),
+        lambda m, url: httpx.Response(
+            200, json={"tenant": "platform", "changes": []}, request=httpx.Request(m, url)
+        ),
         seen,
     )
     client = TestClient(_app())
@@ -41,10 +43,14 @@ def test_the_surface_and_the_history_are_the_directors(monkeypatch):
 def test_a_refusal_arrives_as_it_came(monkeypatch):
     _fake_client(
         monkeypatch,
-        lambda m, url: httpx.Response(403, json={"error": "forbidden"}, request=httpx.Request(m, url)),
+        lambda m, url: httpx.Response(
+            403, json={"error": "forbidden"}, request=httpx.Request(m, url)
+        ),
         {},
     )
-    r = TestClient(_app()).get("/api/v1/admin/perimeter/history", headers={"Authorization": "Bearer member"})
+    r = TestClient(_app()).get(
+        "/api/v1/admin/perimeter/history", headers={"Authorization": "Bearer member"}
+    )
     assert r.status_code == 403
 
 
@@ -52,7 +58,9 @@ def test_traffic_is_the_ushers(monkeypatch):
     seen: dict = {}
     _fake_client(
         monkeypatch,
-        lambda m, url: httpx.Response(200, json={"totals": [], "series": []}, request=httpx.Request(m, url)),
+        lambda m, url: httpx.Response(
+            200, json={"totals": [], "series": []}, request=httpx.Request(m, url)
+        ),
         seen,
     )
     app = FastAPI()
@@ -60,7 +68,10 @@ def test_traffic_is_the_ushers(monkeypatch):
     settings = _settings()
     settings.usher_url = "http://usher.test:8080"
     app.dependency_overrides[get_settings] = lambda: settings
-    r = TestClient(app).get("/api/v1/admin/perimeter/traffic?from=2026-10-01T00:00:00Z", headers={"Authorization": "Bearer approver"})
+    r = TestClient(app).get(
+        "/api/v1/admin/perimeter/traffic?from=2026-10-01T00:00:00Z",
+        headers={"Authorization": "Bearer approver"},
+    )
     assert r.status_code == 200
     assert seen["url"] == "http://usher.test:8080/v1/tenants/platform/perimeter/traffic"
     assert seen["auth"] == "Bearer approver"

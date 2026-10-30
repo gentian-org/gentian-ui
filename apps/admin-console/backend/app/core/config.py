@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     cors_origins: str = Field(default="http://localhost:5173", alias="BACKEND_CORS_ORIGINS")
 
     # Origins, besides this API's own, whose pages may send it state-changing
-    # requests (app/core/origin_check.py). Comma-separated, scheme://host[:port].
+    # requests (gentian_app_runtime.origin_check). Comma-separated, scheme://host[:port].
     # Empty by default: behind the edge the bundle and the API share one
     # origin and nothing else has any business here. Local development with
     # the Vite proxy names http://localhost:5173, because the proxy rewrites
@@ -122,6 +122,6 @@ def get_dropin_config() -> dict:
     ``auth_disabled`` or ``cors_origins``. Read feature configuration from here;
     read security configuration from ``get_settings()``.
     """
-    from app.core.dropins import load_dropins
+    from gentian_app_runtime.dropins import load_dropins
 
     return load_dropins()

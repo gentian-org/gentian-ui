@@ -8,8 +8,7 @@ One test at the end asks the real application, to prove the rule is wired in.
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from app.core.origin_check import OriginCheckMiddleware
+from gentian_app_runtime.origin_check import OriginCheckMiddleware
 
 HOST = "admin.acme.example.org"
 

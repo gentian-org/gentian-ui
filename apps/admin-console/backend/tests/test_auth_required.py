@@ -28,9 +28,17 @@ def test_the_anonymous_path_needs_the_local_opt_out(monkeypatch):
     assert Settings(_env_file=None, AUTH_DISABLED="true", OIDC_ISSUER="").auth_disabled
 
 
-def test_the_extensions_route_requires_a_caller():
-    from app.api.routes.extensions import router
-    from app.core.auth import get_current_user
+def test_the_extensions_report_needs_a_signed_in_person(monkeypatch):
+    from fastapi.testclient import TestClient
 
-    route = next(r for r in router.routes if r.path == "/extensions")
-    assert get_current_user in [d.call for d in route.dependant.dependencies]
+    from app.core import config
+
+    monkeypatch.setenv("AUTH_DISABLED", "false")
+    monkeypatch.setenv("OIDC_ISSUER", "https://id.example.test/auth/realms/kernel")
+    config.get_settings.cache_clear()
+    from app.main import app
+
+    try:
+        assert TestClient(app).get("/api/v1/extensions").status_code == 401
+    finally:
+        config.get_settings.cache_clear()
