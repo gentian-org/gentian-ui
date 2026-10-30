@@ -1,5 +1,6 @@
 import io
 
+import httpx
 import pytest
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
@@ -164,14 +165,122 @@ def test_frame_ancestors_allows_listed_origin():
     assert allows(store, "") is True
 
 
-@pytest.mark.asyncio
-async def test_check_iframe_embeddable():
+TILE = "https://cloud.acme.example/"
+
+
+def _framing(monkeypatch, tiles, handler=None):
+    """The route with `tiles` as the person's catalog and `handler` answering
+    what it fetches; a call is recorded, and without a handler it fails."""
+    async def catalog(_token, _settings):
+        return tiles
+
+    asked: list[str] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        asked.append(str(request.url))
+        assert handler is not None, f"fetched {request.url}"
+        return handler(request)
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(prefs_routes, "_catalog", catalog)
+    monkeypatch.setattr(
+        prefs_routes.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(answer), **kw)
+    )
+    return asked
+
+
+async def _check(url: str):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        res = await client.get("/api/v1/prefs/check-iframe?url=https://www.google.com")
-        assert res.status_code == 200
-        data = res.json()
-        assert "embeddable" in data
+        return await client.get("/api/v1/prefs/check-iframe", params={"url": url})
+
+
+@pytest.mark.asyncio
+async def test_check_iframe_answers_for_a_tile(monkeypatch):
+    asked = _framing(monkeypatch, [{"url": TILE}], lambda _r: httpx.Response(200))
+    assert (await _check(TILE + "index.php?x=1")).json() == {"embeddable": True}
+    # The tile's own address, not the one the caller wrote.
+    assert asked == [TILE]
+
+
+@pytest.mark.asyncio
+async def test_check_iframe_says_no_where_the_page_refuses_framing(monkeypatch):
+    _framing(
+        monkeypatch, [{"url": TILE}], lambda _r: httpx.Response(200, headers={"X-Frame-Options": "DENY"})
+    )
+    assert (await _check(TILE)).json() == {"embeddable": False}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "url",
+    ["https://attacker.example/", "http://cloud.acme.example/", "http://10.0.0.1/"],
+)
+async def test_check_iframe_fetches_only_a_tiles_host(monkeypatch, url):
+    asked = _framing(monkeypatch, [{"url": TILE}])
+    assert (await _check(url)).status_code == 403
+    assert asked == []
+
+
+@pytest.mark.asyncio
+async def test_check_iframe_without_a_catalog_fetches_nothing(monkeypatch):
+    asked = _framing(monkeypatch, None)
+    assert (await _check(TILE)).status_code == 503
+    assert asked == []
+
+
+@pytest.mark.asyncio
+async def test_check_iframe_needs_a_person(monkeypatch):
+    from app.core.auth import get_current_user
+
+    asked = _framing(monkeypatch, [{"url": TILE}])
+
+    def nobody():
+        raise HTTPException(status_code=401)
+
+    app.dependency_overrides[get_current_user] = nobody
+    try:
+        assert (await _check(TILE)).status_code == 401
+    finally:
+        app.dependency_overrides.pop(get_current_user)
+    assert asked == []
+
+
+@pytest.mark.asyncio
+async def test_check_iframe_does_not_follow_a_redirect_inside(monkeypatch):
+    def redirect(_request):
+        return httpx.Response(302, headers={"Location": "https://127.0.0.1/admin"})
+
+    asked = _framing(monkeypatch, [{"url": TILE}], redirect)
+    assert (await _check(TILE)).json() == {"embeddable": False}
+    assert asked == [TILE]
+
+
+@pytest.mark.asyncio
+async def test_check_iframe_follows_a_redirect_to_the_sign_in_host(monkeypatch):
+    """Inside a cluster the sign-in host resolves to the edge's private
+    address, like the tiles' hosts."""
+    from app.core.config import get_settings
+
+    sign_in = f"https://{get_settings().idp_public_host}/auth"
+
+    def answer(request):
+        if str(request.url) == TILE:
+            return httpx.Response(302, headers={"Location": sign_in})
+        return httpx.Response(200)
+
+    asked = _framing(monkeypatch, [{"url": TILE}], answer)
+    assert (await _check(TILE)).json() == {"embeddable": True}
+    assert asked == [TILE, sign_in]
+
+
+@pytest.mark.asyncio
+async def test_check_iframe_says_no_when_the_page_cannot_be_reached(monkeypatch):
+    def down(request):
+        raise httpx.ConnectError("refused", request=request)
+
+    _framing(monkeypatch, [{"url": TILE}], down)
+    assert (await _check(TILE)).json() == {"embeddable": False}
 
 
 def _auth_settings() -> Settings:
