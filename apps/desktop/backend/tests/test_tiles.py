@@ -18,6 +18,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.routes import cluster, tiles
+from gentian_app_runtime import auth as runtime_auth
+
 from app.core import auth
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
@@ -187,7 +189,7 @@ def verifying(monkeypatch, usher):
         seen["token"] = token
         return seen["relations"]
 
-    monkeypatch.setattr(auth, "_decode_token", decode)
+    monkeypatch.setattr(runtime_auth, "decode_token", decode)
     monkeypatch.setattr(auth, "fetch_tenant_relations", relations)
 
     app = FastAPI()

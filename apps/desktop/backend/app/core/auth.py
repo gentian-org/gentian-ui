@@ -1,75 +1,21 @@
+"""Who the caller is: the token is verified by gentian_app_runtime.auth, against
+this desktop's one realm and the audience it was told to require.
+
+What is added here is the desktop's own: the local-development user, and what
+the caller holds on this desktop's tenant.
+"""
+
 from typing import Any
 
 import httpx
-import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from gentian_app_runtime.auth import current_user
 
 from app.core.config import Settings, get_settings
 
 _bearer = HTTPBearer(auto_error=False)
-
-
-def _validate_client_id(claims: dict[str, Any], settings: Settings) -> None:
-    """Accept tokens from the public portal client or the BFF ROPC client."""
-    expected = [settings.oidc_expected_client_id, settings.portal_bff_client_id]
-    expected = [client_id for client_id in expected if client_id]
-    if not expected:
-        return
-    aud = claims.get("aud")
-    audiences = aud if isinstance(aud, list) else [aud] if aud else []
-    azp = claims.get("azp")
-    if any(client_id in audiences or azp == client_id for client_id in expected):
-        return
-    raise jwt.InvalidAudienceError("Token audience does not match portal client")
-
-
-def _issuer_allowed(issuer: str, settings: Settings) -> bool:
-    normalized = issuer.rstrip("/")
-    kernel = (settings.oidc_issuer or "").rstrip("/")
-    if kernel and normalized == kernel:
-        return True
-    external_prefix = f"https://id.{settings.kernel_domain}/auth/realms/"
-    if normalized.startswith(external_prefix):
-        return True
-    if settings.keycloak_admin_url:
-        internal_prefix = settings.keycloak_admin_url.rstrip("/") + "/realms/"
-        if normalized.startswith(internal_prefix):
-            return True
-    return False
-
-
-def _jwks_url_for_issuer(issuer: str, settings: Settings) -> str:
-    issuer = issuer.rstrip("/")
-    if settings.keycloak_admin_url and "/realms/" in issuer:
-        realm_path = issuer[issuer.index("/realms/") :]
-        return settings.keycloak_admin_url.rstrip("/") + realm_path + "/protocol/openid-connect/certs"
-    return f"{issuer}/protocol/openid-connect/certs"
-
-
-def _decode_token(token: str, settings: Settings) -> dict[str, Any]:
-    unverified = jwt.decode(token, options={"verify_signature": False})
-    issuer = (unverified.get("iss") or "").rstrip("/")
-    if not _issuer_allowed(issuer, settings):
-        raise jwt.InvalidIssuerError("Token issuer is not trusted")
-
-    jwks_url = _jwks_url_for_issuer(issuer, settings)
-    jwks = httpx.get(jwks_url, timeout=10.0).json()
-    header = jwt.get_unverified_header(token)
-    kid = header.get("kid")
-    key = next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
-    if key is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unknown signing key")
-    public_key = jwt.algorithms.RSAAlgorithm.from_jwk(key)
-    claims = jwt.decode(
-        token,
-        public_key,
-        algorithms=["RS256"],
-        issuer=issuer,
-        options={"verify_aud": False},
-    )
-    _validate_client_id(claims, settings)
-    return claims
+_verified = current_user(lambda: get_settings())
 
 
 async def get_current_user(
@@ -85,14 +31,7 @@ async def get_current_user(
             "tenant": "demo",
             "groups": ["gentian:tenant:demo:admins", "gentian:tenant:demo:members"],
         }
-    if credentials is None or not credentials.credentials:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    try:
-        claims = _decode_token(credentials.credentials, settings)
-    except jwt.PyJWTError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
-        ) from exc
+    claims = await _verified(credentials)
 
     # Behind the edge, and only behind the edge.
     #

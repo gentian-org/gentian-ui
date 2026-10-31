@@ -9,7 +9,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.core.origin_check import OriginCheckMiddleware
+from gentian_app_runtime.origin_check import OriginCheckMiddleware
 
 HOST = "desk.acme.example.org"
 
