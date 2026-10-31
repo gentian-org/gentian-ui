@@ -661,6 +661,12 @@
   background: var(--gtn-paper-0);
 }
 
+.shell-window__shield {
+  position: absolute;
+  inset: 40px 0 0;
+  z-index: 1;
+}
+
 .shell-window__body--component {
   display: flex;
   flex-direction: column;
