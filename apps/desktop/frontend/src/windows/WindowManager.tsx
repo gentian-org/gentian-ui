@@ -120,6 +120,10 @@ export function WindowManager() {
             win={win}
             onIframeLoad={() => handleIframeLoad(win, advanceWindowNavigation)}
           />
+          {/* A press inside an iframe never reaches this page, so the content
+              of a window that is not the active one is covered: the press lands
+              here and raises the window, and the cover goes with it. */}
+          {win.url && !win.focused && <div className="shell-window__shield" />}
           <WindowResizeHandles
             win={win}
             onPointerDown={onHandlePointerDown}

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { createWindowGeometry, maximizedGeometry, type WindowGeometry } from "@/lib/windows";
+import { minimized, stateOnRaise } from "@/lib/windowState";
 
 export type WindowVisualState = "normal" | "minimized" | "maximized";
 
@@ -22,6 +23,8 @@ export type ShellWindow = {
   /** Saved when maximizing so restore returns to the prior size. */
   restoreGeometry: WindowGeometry;
   state: WindowVisualState;
+  /** What a minimized window goes back to. */
+  minimizedFrom?: Exclude<WindowVisualState, "minimized">;
   zIndex: number;
   focused: boolean;
   isHidden?: boolean;
@@ -99,7 +102,7 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
         // Instead of removing, we hide it!
         return {
           windows: state.windows.map((w) =>
-            w.id === id ? { ...w, isHidden: true, state: "minimized" as const, focused: false } : w
+            w.id === id ? { ...w, ...minimized(w), isHidden: true, focused: false } : w
           ),
         };
       }
@@ -118,7 +121,7 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
           if (w.id !== id) return { ...w, focused: false };
           return {
             ...w,
-            state: "normal" as const,
+            state: stateOnRaise(w),
             zIndex: nextZ,
             focused: true,
             isHidden: false,
@@ -140,7 +143,7 @@ export const useWindowsStore = create<WindowsState>((set, get) => ({
   minimizeWindow: (id) =>
     set((state) => ({
       windows: state.windows.map((w) =>
-        w.id === id ? { ...w, state: "minimized" as const, focused: false } : w,
+        w.id === id ? { ...w, ...minimized(w), focused: false } : w,
       ),
     })),
   maximizeWindow: (id) =>
