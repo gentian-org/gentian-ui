@@ -404,7 +404,7 @@ export function fetchPlatformSecurityPolicy() {
   return apiFetch<PlatformSecurityPolicy>("/admin/platform/security-policy");
 }
 
-// Customization ladder debt report — see docs/app-customization.md §8.3 in
+// Customization ladder debt report — see docs/guides/app-customization.md §8.3 in
 // gentian-os. Read live from Customization CRs; the operator computes
 // reviewOverdue/upstreamStale/targetVersionDrift/rungAboveRecommended on status.
 export type CustomizationRecord = {
@@ -448,7 +448,7 @@ export function fetchCustomizationDebtReport() {
 }
 
 // What the cluster last reported about what it runs, and what became of the
-// attempt -- see docs/design/operations.md §6.2 in gentian-os. The usher
+// attempt -- see docs/concepts/operations.md §6.2 in gentian-os. The usher
 // answers it to whoever holds can_audit on the cluster.
 export type UsageStatisticsOutcome = "accepted" | "failed" | "not-sent" | "sending";
 

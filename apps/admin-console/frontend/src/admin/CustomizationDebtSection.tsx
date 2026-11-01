@@ -9,7 +9,7 @@ const RUNGS = ["L0", "L1", "L2", "L3", "L4", "L5", "L6"] as const;
 const CARRIED_FROM = 4;
 
 /**
- * The customization debt report — see gentian-os/docs/app-customization.md §8.3.
+ * The customization debt report — see gentian-os/docs/guides/app-customization.md §8.3.
  *
  * Reads live Customization CRs. The headline number is "carried deltas" (records
  * at L4 or above): that count is the one meant to trend down over time, the same
@@ -47,7 +47,7 @@ export function CustomizationDebtSection() {
                 code: <code />,
                 ladder: (
                   <a
-                    href="https://github.com/gentian-org/gentian-os/blob/main/docs/app-customization.md"
+                    href="https://github.com/gentian-org/gentian-os/blob/main/docs/guides/app-customization.md"
                     target="_blank"
                     rel="noreferrer"
                   />

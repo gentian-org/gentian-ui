@@ -370,7 +370,7 @@ export async function updateClusterModels(settings: ModelSettings): Promise<Clus
 
 /**
  * One installed app in the cluster's update report (gentian-os
- * docs/plans/versioning.md §4.2): the build git pins, the build the cluster
+ * docs/concepts/versioning.md §4.2): the build git pins, the build the cluster
  * runs, the newest build its catalog offers, the mode it moves under and
  * what keeps it where it is.
  */

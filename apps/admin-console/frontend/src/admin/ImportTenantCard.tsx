@@ -13,8 +13,8 @@ import {
 import "./admin.css";
 
 /**
- * A tenant from a bundle: the way back for an export (sovereignty-concept.md
- * §4.3). The file is uploaded, the director opens its manifest with the key
+ * A tenant from a bundle: the way back for an export (gentian-os
+ * docs/concepts/data-lifecycle.md §4). The file is uploaded, the director opens its manifest with the key
  * typed here and says what it holds -- the tenant, and the custom domain it
  * was on, which is kept unless unticked -- then declares the tenant from it
  * and restores once the operator has provisioned the shells. The card

@@ -11,7 +11,7 @@ function shortDigest(digest?: string): string {
 }
 
 /**
- * The update report (gentian-os docs/plans/versioning.md §4.2): every
+ * The update report (gentian-os docs/concepts/versioning.md §4.2): every
  * installed app of every tenant against the build its catalog offers, the
  * mode it moves under and what keeps it where it is -- and the one action,
  * moving the outdated ones to the newest build, whoever introduced the lag.

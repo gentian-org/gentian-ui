@@ -19,7 +19,7 @@ No `profile/` in any app: the profiles live in gentian-os, with the platform
 that installs them. A store's interface on the cluster (an App Store app) is
 not one of these: it is installed from a catalog like any other app, as
 Aluvian's is from catalogue.aluvian.io, against the store contract gentian-os
-defines (`docs/design/store-contract.md`). See [AGENTS.md](AGENTS.md) for conventions.
+defines (`docs/concepts/store-contract.md`). See [AGENTS.md](AGENTS.md) for conventions.
 
 ## License
 
