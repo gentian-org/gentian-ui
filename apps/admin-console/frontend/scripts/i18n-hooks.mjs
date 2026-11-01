@@ -15,7 +15,8 @@
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import ts from "typescript";
+// TypeScript 7 has no compiler API in JavaScript; the extractor parses with 5.
+import ts from "typescript-compiler-api";
 
 const SRC = "src";
 
