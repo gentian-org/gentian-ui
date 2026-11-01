@@ -46,7 +46,7 @@ chart/            Kernel Helm chart (portal.<domain>)
 
 ## Related
 
-- [docs/architecture.md](docs/architecture.md) — target shell behavior
+- [docs/overview/architecture.md](docs/overview/architecture.md) — target shell behavior
 - [docs/FRONTEND-STACK.md](docs/FRONTEND-STACK.md) — why React
 - [../../AGENTS.md](../../AGENTS.md) — conventions for coding agents
 

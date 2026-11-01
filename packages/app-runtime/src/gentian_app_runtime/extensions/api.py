@@ -4,7 +4,7 @@ Everything in this module is **public API**: plugins written against it must kee
 working across minor releases. That promise is the whole point — an app whose
 extension surface changes without warning forces its consumers back down to
 patching or forking, which is exactly what the customization ladder exists to
-avoid (see gentian-os/docs/app-customization.md, principle P7).
+avoid (see gentian-os/docs/guides/app-customization.md, principle P7).
 
 Versioning policy
 -----------------

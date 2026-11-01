@@ -1,6 +1,6 @@
 """Read L1 drop-in configuration fragments.
 
-Implements the precedence chain from gentian-os/docs/app-customization.md §2.2:
+Implements the precedence chain from gentian-os/docs/guides/app-customization.md §2.2:
 
     image defaults
       -> chart values.yaml
