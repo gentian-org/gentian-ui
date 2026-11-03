@@ -2,7 +2,7 @@
   "cleanUrls": false,
   "headers": [
     {
-      "source": "**/*",
+      "source": "{**/*,**/..*/*}",
       "headers": [
         {
           "key": "Cache-Control",
@@ -32,7 +32,7 @@
       ]
     },
     {
-      "source": "branding/**",
+      "source": "branding/{**,..*/*}",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
