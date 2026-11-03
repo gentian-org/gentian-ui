@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
  * One export, now, to the cluster's own storage, encrypted to a key the
- * tenant chooses -- the sovereign half of backup (gentian-os docs/concepts/sovereignty.md §3).
+ * tenant chooses -- the tenant's half of backup (gentian-os docs/concepts/data-ownership.md §3).
  * Scheduled backups, destinations and recovery are the Operations Console's;
  * this screen promotes it beside the list.
  */
