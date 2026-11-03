@@ -76,7 +76,11 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Routing tests
+      - name: Install the test dependencies
+        working-directory: apps/concierge
+        run: npm ci
+
+      - name: Routing and header tests
         working-directory: apps/concierge
         run: npm test
 
