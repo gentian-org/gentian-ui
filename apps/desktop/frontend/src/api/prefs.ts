@@ -128,5 +128,5 @@ export function applyTemplate(templateId: string, targetUserSub: string) {
 }
 
 export function checkIframeEmbeddable(url: string) {
-  return apiFetch<{ embeddable: boolean }>(`/prefs/check-iframe?url=${encodeURIComponent(url)}`);
+  return apiFetch<{ embeddable: boolean | null }>(`/prefs/check-iframe?url=${encodeURIComponent(url)}`);
 }

@@ -322,7 +322,8 @@ async def check_iframe_embeddable(
 ) -> dict:
     """Whether a tile's page can be framed. Only of a host this person's
     tiles name, and asked at the address the tile names: nothing the caller
-    wrote is fetched."""
+    wrote is fetched. False only where the page refuses framing; null where
+    the check could not tell, which leaves it to the browser."""
     tiles = await _catalog(credentials.credentials if credentials else None, settings)
     if tiles is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "The tile catalog is unavailable")
@@ -341,7 +342,7 @@ async def check_iframe_embeddable(
         async with httpx.AsyncClient(headers=headers) as client:
             resp = await _answer_of(client, tile_url, known_hosts)
             if resp is None or resp.status_code in {401, 403}:
-                return {"embeddable": False}
+                return {"embeddable": None}
 
             resp_headers = resp.headers
             x_frame = resp_headers.get("x-frame-options", "").lower()
@@ -361,4 +362,4 @@ async def check_iframe_embeddable(
                 return {"embeddable": False}
             return {"embeddable": True}
     except (httpx.HTTPError, httpx.InvalidURL):
-        return {"embeddable": False}
+        return {"embeddable": None}

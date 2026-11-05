@@ -252,7 +252,7 @@ async def test_check_iframe_does_not_follow_a_redirect_inside(monkeypatch):
         return httpx.Response(302, headers={"Location": "https://127.0.0.1/admin"})
 
     asked = _framing(monkeypatch, [{"url": TILE}], redirect)
-    assert (await _check(TILE)).json() == {"embeddable": False}
+    assert (await _check(TILE)).json() == {"embeddable": None}
     assert asked == [TILE]
 
 
@@ -275,12 +275,22 @@ async def test_check_iframe_follows_a_redirect_to_the_sign_in_host(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_check_iframe_says_no_when_the_page_cannot_be_reached(monkeypatch):
+@pytest.mark.parametrize("error", [httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout])
+async def test_check_iframe_cannot_tell_when_the_page_cannot_be_reached(monkeypatch, error):
+    """A check that times out says nothing about framing: the window must
+    not be blanked for it."""
+
     def down(request):
-        raise httpx.ConnectError("refused", request=request)
+        raise error("unreachable", request=request)
 
     _framing(monkeypatch, [{"url": TILE}], down)
-    assert (await _check(TILE)).json() == {"embeddable": False}
+    assert (await _check(TILE)).json() == {"embeddable": None}
+
+
+@pytest.mark.asyncio
+async def test_check_iframe_cannot_tell_behind_a_sign_in_it_does_not_carry(monkeypatch):
+    _framing(monkeypatch, [{"url": TILE}], lambda _r: httpx.Response(401))
+    assert (await _check(TILE)).json() == {"embeddable": None}
 
 
 def _auth_settings() -> Settings:
