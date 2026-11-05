@@ -17,9 +17,25 @@ import {
 import "./admin.css";
 import { formatDateTime } from "@/lib/format";
 
-const ROLES: ClusterRole[] = ["securityOfficer", "auditor", "perimeterApprover", "serviceAdmin", "sharedAppsAdmin"];
+const ROLES: ClusterRole[] = [
+  "securityOfficer",
+  "auditor",
+  "perimeterApprover",
+  "serviceAdmin",
+  "sharedAppsAdmin",
+  "breakGlass",
+];
 /** The roles a non-platform tenant's administrator may hold; the rest are the platform tenant's people's. */
 const TENANT_ADMIN_ROLES: ClusterRole[] = ["securityOfficer", "auditor", "perimeterApprover"];
+
+/**
+ * How a role's end is asked for. Break-glass has to end, and within hours
+ * rather than days: the director refuses it without an expiry, and the
+ * operator takes it away at that time. Every other role may end on a day.
+ */
+export function untilOf(role: ClusterRole): { required: boolean; type: "date" | "datetime-local" } {
+  return role === "breakGlass" ? { required: true, type: "datetime-local" } : { required: false, type: "date" };
+}
 
 /** Where a holder's role applies, as the director decides it. */
 function scopeOf(role: ClusterRole, entry: RoleCandidates) {
@@ -28,7 +44,7 @@ function scopeOf(role: ClusterRole, entry: RoleCandidates) {
 
 /**
  * Who holds a cluster role by name: an account of a tenant's realm, declared
- * on the Cluster claim with a reason and an optional expiry. The holder signs
+ * on the Cluster claim with a reason and an expiry, which break-glass requires. The holder signs
  * in to their own tenant and works in its admin console. The director answers
  * the list (can_audit) and commits a change (can_configure); the picker is the
  * registrar's list: the platform tenant's people, and every other tenant's
@@ -116,6 +132,7 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
       .map((a) => ({ key: `${entry.tenant}/${a.id}`, tenant: entry.tenant, scope: scopeOf(role, entry), admin: a })),
   );
   const picked = candidates.find((c) => c.key === choice);
+  const until = untilOf(role);
   const unreadable = tenants.filter((entry) => entry.unavailable).map((entry) => entry.tenant);
   const groups: PlatformRoleMembers[] = membersQuery.data?.roles ?? [];
   const shownRoles: string[] = [...ROLES, ...groups.map((g) => g.role).filter((r) => !(ROLES as string[]).includes(r))];
@@ -271,7 +288,7 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
               className="admin-console__form"
               onSubmit={(event) => {
                 event.preventDefault();
-                if (!picked || !reason.trim()) return;
+                if (!picked || !reason.trim() || (until.required && !expires)) return;
                 addMutation.mutate({
                   role,
                   tenant: picked.tenant,
@@ -291,6 +308,7 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
                   onChange={(e) => {
                     setRole(e.target.value as ClusterRole);
                     setChoice("");
+                    setExpires("");
                   }}
                 >
                   {ROLES.map((r) => (
@@ -344,9 +362,18 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
                 />
               </div>
               <div className="admin-console__field">
-                <label htmlFor="role-holder-expires">{t("clusterRoles.expiresOptional")}</label>
-                <input id="role-holder-expires" type="date" value={expires} onChange={(e) => setExpires(e.target.value)} />
+                <label htmlFor="role-holder-expires">
+                  {t(until.required ? "clusterRoles.expiresRequired" : "clusterRoles.expiresOptional")}
+                </label>
+                <input
+                  id="role-holder-expires"
+                  type={until.type}
+                  value={expires}
+                  onChange={(e) => setExpires(e.target.value)}
+                  required={until.required}
+                />
               </div>
+              {role === "breakGlass" ? <p className="admin-console__hint">{t("clusterRoles.breakGlassHint")}</p> : null}
               {candidates.length === 0 ? <p className="admin-console__empty">{t("clusterRoles.noCandidates")}</p> : null}
               {unreadable.length > 0 ? (
                 <p className="admin-console__hint">
@@ -357,7 +384,7 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
                 <button
                   type="submit"
                   className="admin-console__btn admin-console__btn--primary"
-                  disabled={!picked || !reason.trim() || addMutation.isPending}
+                  disabled={!picked || !reason.trim() || (until.required && !expires) || addMutation.isPending}
                 >
                   {t("clusterRoles.addButton")}
                 </button>

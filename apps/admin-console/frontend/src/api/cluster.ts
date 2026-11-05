@@ -373,7 +373,13 @@ export function setAppUpdateMode(tenant: string, profile: string, mode: string) 
 // --- The cluster roles held by name (iam.md 1.1c) ---------------------------
 
 /** A cluster role an account can hold by name. */
-export type ClusterRole = "securityOfficer" | "auditor" | "perimeterApprover" | "serviceAdmin" | "sharedAppsAdmin";
+export type ClusterRole =
+  | "securityOfficer"
+  | "auditor"
+  | "perimeterApprover"
+  | "serviceAdmin"
+  | "sharedAppsAdmin"
+  | "breakGlass";
 
 /**
  * One holder of a cluster role, as the Cluster claim declares it: an account
