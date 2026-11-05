@@ -9,7 +9,6 @@ the director answers a list under a key.
 """
 
 import httpx
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -101,52 +100,40 @@ def test_the_plans_arrive_as_the_bare_list_the_screen_reads(monkeypatch):
     )
     assert r.status_code == 200
     assert r.json() == plans
-    # No selfService flag: whether this person chooses for themselves is the
-    # director's decision from the graph, not the screen's assertion.
     assert not seen["params"]
 
 
-def test_choosing_a_plan_is_a_commit(monkeypatch):
+def test_no_plan_is_chosen_here(monkeypatch):
+    """A tenant is moved by the cluster's administrators; this screen writes
+    nothing and the director is not asked."""
     seen: dict = {}
-    _fake_client(
-        monkeypatch,
-        _answer(
-            202,
-            {
-                "status": "updated",
-                "tenant": "platform",
-                "plan": "nodes-4",
-                "previousPlan": "nodes-2",
-                "commit": "a1b2c3",
-                "message": "committed",
-            },
-        ),
-        seen,
-    )
+    _fake_client(monkeypatch, _answer(202, {"status": "updated"}), seen)
     r = TestClient(_app(_settings())).put(
         "/api/v1/admin/resources",
         json={"plan": "nodes-4", "force": False},
         headers={"Authorization": "Bearer t"},
     )
-    assert r.status_code == 202
-    assert r.json()["previousPlan"] == "nodes-2"
-    assert seen["method"] == "PUT"
-    # The one write of this screen: a commit, so the director's, not the usher's.
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/resources"
-    assert seen["json"] == {"plan": "nodes-4", "force": False}
-    assert seen["auth"] == "Bearer t"
+    assert r.status_code in (404, 405)
+    assert "url" not in seen
 
 
-@pytest.mark.parametrize("status", [403, 402, 409, 404])
-def test_the_directors_refusal_is_passed_through_unchanged(monkeypatch, status):
-    """403 included: whether this person may set the plan is the director's
-    answer, and 409 is the downgrade guard, which the screen offers to
-    force only to someone the director will then allow to."""
-    _fake_client(monkeypatch, _answer(status, {"error": "refused"}), {})
-    r = TestClient(_app(_settings())).put(
-        "/api/v1/admin/resources", json={"plan": "nodes-1"}, headers={"Authorization": "Bearer t"}
+def test_the_ordering_notice_comes_with_the_state(monkeypatch):
+    seen: dict = {}
+    state = {
+        "tenant": "platform",
+        "plan": "nodes-2",
+        "ordering": {
+            "text": {"en": "Order in the Center"},
+            "url": "https://center.example/platform",
+        },
+    }
+    _fake_client(monkeypatch, _answer(200, state), seen)
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/resources", headers={"Authorization": "Bearer t"}
     )
-    assert r.status_code == status
+    assert r.status_code == 200
+    assert r.json()["ordering"]["url"] == "https://center.example/platform"
+    assert seen["url"] == "http://usher.test:8090/v1/tenants/platform/resources"
 
 
 def test_history_queries_travel_with_the_request(monkeypatch):
@@ -186,7 +173,6 @@ def test_the_clusters_view_is_every_tenants_state(monkeypatch):
 
 def test_resources_is_no_longer_a_screen_the_console_cannot_show():
     assert admin.screen_for("GET", "/admin/resources") is None
-    assert admin.screen_for("PUT", "/admin/resources") is None
     assert admin.screen_for("GET", "/admin/resources/plans") is None
 
 

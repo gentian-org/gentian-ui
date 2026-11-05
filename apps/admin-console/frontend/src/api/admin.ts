@@ -721,6 +721,17 @@ export type ResourceState = {
   /** Where `actual` came from, or why it is missing. */
   actualSource: string;
   installedApps: number;
+  /** Where the tenant orders another plan, as the cluster states it. */
+  ordering?: PlanOrdering;
+};
+
+/** The cluster's notice on ordering another plan: a text by language and at
+ *  most one action, the url already naming the tenant. */
+export type PlanOrdering = {
+  text: Record<string, string>;
+  url?: string;
+  email?: string;
+  phone?: string;
 };
 
 export type ResourcePlan = {
@@ -729,19 +740,13 @@ export type ResourcePlan = {
   description: string;
   tier: number;
   productSku: string;
+  units?: number;
+  retired?: boolean;
   quotas: Record<string, string>;
   current: boolean;
   selectable: boolean;
   /** Why `selectable` is false, in the reader's terms. */
   blocked: string;
-};
-
-export type ResourcePlanChange = {
-  status: string;
-  tenant: string;
-  plan: string;
-  previousPlan: string;
-  message: string;
 };
 
 export type ResourceSample = {
@@ -781,13 +786,6 @@ export function fetchResourceState(tenant?: string) {
 
 export function fetchResourcePlans(tenant?: string) {
   return apiFetch<ResourcePlan[]>(`/admin/resources/plans${tenantQuery(tenant)}`);
-}
-
-export function changeResourcePlan(plan: string, tenant?: string, force = false) {
-  return apiFetch<ResourcePlanChange>(`/admin/resources${tenantQuery(tenant)}`, {
-    method: "PUT",
-    body: JSON.stringify({ plan, force }),
-  });
 }
 
 export function fetchResourceUsage(

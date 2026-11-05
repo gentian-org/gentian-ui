@@ -381,9 +381,8 @@
     "redirectingToSignIn": "Weiterleitung zur Anmeldung …"
   },
   "resources": {
-    "aWorkspaceRunsUnderA": "Ein Arbeitsbereich läuft unter einer Obergrenze — wie viel CPU, Arbeitsspeicher und Speicherplatz seine Apps zusammen beanspruchen dürfen. Ein Tarifwechsel committet die neue Obergrenze in das Deployments-Repository, denselben Weg, den auch eine App-Installation nimmt, sodass das Laufende und das Verbuchte nie auseinandergehen.",
+    "aWorkspaceRunsUnderA": "Ein Arbeitsbereich läuft unter einer Obergrenze — wie viel CPU, Arbeitsspeicher und Speicherplatz seine Apps zusammen beanspruchen dürfen. Die Administratoren dieses Clusters wechseln den Tarif, und die Änderung wird mit dem Laufenden verbucht, sodass beides nie auseinandergeht.",
     "allTenants": "Alle Mandanten",
-    "applying": "Wird angewendet …",
     "apps": "Apps",
     "billedPlanIntervals": "Abgerechnete Tarifabschnitte",
     "ceiling": "Obergrenze",
@@ -395,7 +394,6 @@
     "custom": "benutzerdefiniert",
     "days": "Tage",
     "drifted": "abgewichen",
-    "force": "Erzwingen",
     "from": "Von",
     "headroom": "Spielraum",
     "headroom2": "Spielraum",
@@ -418,8 +416,6 @@
     "plan2": "Tarif",
     "plan3": "Tarif",
     "plans": "Tarife",
-    "plansLeadAdmin": "Den Tarif eines Mandanten zu ändern ist ein Commit in das Deployments-Repository, das Argo CD bei der nächsten Synchronisation anwendet.",
-    "plansLeadTenant": "Wählen Sie den Tarif, unter dem dieser Arbeitsbereich laufen soll. Ein größerer Tarif wirkt, sobald die Änderung synchronisiert ist; ein kleinerer wird abgelehnt, solange mehr in Verwendung ist, als er zulässt.",
     "range30d": "30 Tage",
     "range365d": "12 Monate",
     "range7d": "7 Tage",
@@ -427,9 +423,7 @@
     "refresh": "Aktualisieren",
     "resource": "Ressource",
     "resources": "Ressourcen",
-    "shrinkConfirm": "{{tenant}} trotzdem auf {{plan}} verkleinern?\n\n{{blocked}}\n\nLaufende Pods laufen weiter, aber der Cluster wird sich weigern, neu gestartete wieder zu erzeugen, bis der Verbrauch passt.",
     "sku": "SKU",
-    "switchToThisPlan": "Auf diesen Tarif wechseln",
     "tenant": "Mandant",
     "theClusterOverviewCouldNot": "Die Cluster-Übersicht konnte nicht geladen werden.",
     "theResourcesApiCouldNot": "Die Ressourcen-API war nicht erreichbar. Tarife und Verbrauch sind bis dahin nicht verfügbar.",
@@ -439,7 +433,12 @@
     "timeRange": "Zeitraum",
     "to": "Bis",
     "unavailable": "nicht verfügbar",
-    "whatThisWindowResolvesTo": "Worauf dieser Zeitraum für die Abrechnung hinausläuft: jede Strecke, die der Arbeitsbereich auf einem Tarif verbracht hat, und die dabei geltende SKU."
+    "whatThisWindowResolvesTo": "Worauf dieser Zeitraum für die Abrechnung hinausläuft: jede Strecke, die der Arbeitsbereich auf einem Tarif verbracht hat, und die dabei geltende SKU.",
+    "plansLead": "Die Tarife, die dieser Cluster anbietet. Ihr Arbeitsbereich läuft unter dem als aktuell markierten; bei einem Tarif, der nicht fassen würde, was er betreibt, steht der Grund.",
+    "askForAnotherPlan": "Für einen anderen Tarif wenden Sie sich an die Administratoren dieses Clusters.",
+    "orderAnotherPlan": "Anderen Tarif bestellen",
+    "writeTo": "An {{email}} schreiben",
+    "call": "{{phone}} anrufen"
   },
   "securityPolicies": {
     "allowRememberMe": "„Angemeldet bleiben“ erlauben",
