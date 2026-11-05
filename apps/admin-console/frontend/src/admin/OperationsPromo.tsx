@@ -11,8 +11,9 @@ const OPERATIONS_PROFILES = ["operations-console-ee", "operations-console"];
  * The Operations Console, promoted or linked.
  *
  * Export is this console's; scheduled backups, external destinations,
- * recovery on a click and drills are the Operations Console's, an add-on
- * installed from the store. When it is installed this card is the way there;
+ * recovery on a click, drills and importing a tenant from a bundle are the
+ * Operations Console's, an add-on installed from the store. When it is
+ * installed this card is the way there;
  * when it is not, it says what it would give this tenant. The free path above
  * it always works on its own.
  *
@@ -36,6 +37,7 @@ export function OperationsPromo() {
         <li>{t("export.opsScheduled")}</li>
         <li>{t("export.opsRemote")}</li>
         <li>{t("export.opsRecovery")}</li>
+        <li>{t("export.opsImport")}</li>
       </ul>
       <div className="admin-console__promo-action">
         {operations?.ready ? (

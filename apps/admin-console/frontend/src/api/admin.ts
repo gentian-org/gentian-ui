@@ -619,6 +619,8 @@ export type Backup = {
   quiesced: string[];
   apps: BackupAppStatus[];
   message: string;
+  /** The schedule that took this export; absent for one a person started. */
+  schedule?: string;
 };
 
 /** Where one manual backup is written. Mirrors TenantExport.spec.destination. */
