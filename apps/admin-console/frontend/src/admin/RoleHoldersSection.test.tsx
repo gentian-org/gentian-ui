@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import "@/lib/i18n";
-import { RoleHoldersSection } from "./RoleHoldersSection";
+import { RoleHoldersSection, untilOf } from "./RoleHoldersSection";
 
 // The director's and the registrar's answers as they are served.
 const holders = {
@@ -131,6 +131,16 @@ describe("RoleHoldersSection", () => {
     const html = render();
     expect(html).toContain('id="role-holder-reason"');
     expect(html).toContain('id="role-holder-expires"');
+  });
+
+  it("offers break-glass, which has to end at a time", () => {
+    const html = render();
+    const start = html.indexOf('id="role-holder-role"');
+    const roles = html.slice(start, html.indexOf("</select>", start));
+    expect(roles).toContain('value="breakGlass"');
+    expect(html).toContain("Break-glass");
+    expect(untilOf("breakGlass")).toEqual({ required: true, type: "datetime-local" });
+    expect(untilOf("auditor")).toEqual({ required: false, type: "date" });
   });
 
   it("says which realms could not be read", () => {

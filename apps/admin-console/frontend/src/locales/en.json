@@ -1133,6 +1133,8 @@
     "scope": "Scope",
     "scopeIs": "The role applies to:",
     "expiresOptional": "Until (optional)",
+    "expiresRequired": "Until",
+    "breakGlassHint": "Break-glass lets its holder change the waiver allowlist and edit raw configuration. It has to end: the operator takes it away at the time given, and every grant is recorded in the audit log.",
     "expired": "Expired",
     "notAdministrator": "Not in effect: no longer an administrator of {{tenant}}"
   },

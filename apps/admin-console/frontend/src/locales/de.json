@@ -1133,6 +1133,8 @@
     "scope": "Geltungsbereich",
     "scopeIs": "Die Rolle gilt für:",
     "expiresOptional": "Bis (optional)",
+    "expiresRequired": "Bis",
+    "breakGlassHint": "Break-glass erlaubt, die Ausnahmeliste zu ändern und die Konfiguration direkt zu bearbeiten. Die Rolle muss enden: Der Operator entzieht sie zum angegebenen Zeitpunkt, und jede Vergabe wird im Audit-Log festgehalten.",
     "expired": "Abgelaufen",
     "notAdministrator": "Nicht wirksam: nicht mehr Administrator von {{tenant}}"
   },
