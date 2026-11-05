@@ -1,12 +1,12 @@
 """A tenant's resources: read from the usher, changed at the director.
 
 The Resources screen shows the ceiling the cluster enforces for a tenant, what
-is committed under it, the plans it may move to, and its history, and lets
-whoever may set the plan choose one. Every read here is live state and is
-relayed to the usher as the caller, which has the operator's answers and
-decides from the authorization graph whether this person may see them; the
-one write, choosing a plan, is a commit the director makes as the person, and
-the operator learns the plan from git like every other change to a tenant.
+is committed under it, the cluster's plans, its history, and where to order
+another plan. Every read here is live state and is relayed to the usher as the
+caller, which has the operator's answers and decides from the authorization
+graph whether this person may see them. Nothing is written here: a tenant is
+moved by the cluster's administrators, and the notice the state carries
+(``ordering``) says where to ask.
 
 Which tenant is asked is the screen's choice: a tenant administrator's own,
 or, for a platform operator managing from the cluster's view, any tenant of
@@ -47,30 +47,11 @@ async def resource_plans(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """The catalog as it applies to this tenant and this person. Whether the
-    person chooses for themselves or for the cluster is the usher's call,
-    made from the graph; the screen asserts nothing about it."""
+    """The cluster's plans as they apply to this tenant, for reading."""
     answer = await director.read(
         settings, _tenant_path(settings, tenant, "/plans"), bearer_of(credentials)
     )
     return director.unwrapped(answer, "plans")
-
-
-@router.put("")
-async def change_resource_plan(
-    body: dict,
-    tenant: str | None = Query(default=None),
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    """Choose a plan. 202 with a commit means git has it and the cluster does
-    not yet; 200 means the tenant is on that plan already. A plan the tenant
-    does not fit under is 409, one it is not entitled to 402, and forcing
-    past the guard is refused for anyone who may not configure the cluster."""
-    return await director.forward(
-        settings, "PUT", _tenant_path(settings, tenant), bearer_of(credentials), json_body=body
-    )
 
 
 @router.get("/usage")

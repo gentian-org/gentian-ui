@@ -908,6 +908,25 @@
 
 /* ── Feedback ────────────────────────────────────────────────────────────── */
 
+/* Where a tenant orders another plan: the cluster's own words and its one
+   action, framed like a card so it reads as the cluster speaking. */
+.admin-console__notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--gtn-border);
+  border-radius: var(--gtn-r3);
+  background: var(--gtn-paper-0);
+}
+
+.admin-console__notice > p {
+  flex: 1 1 18rem;
+  margin: 0;
+}
+
 .admin-console__hint {
   color: var(--gtn-ink-4);
   font-size: 0.8125rem;

@@ -1,12 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
-  changeResourcePlan,
   fetchResourcePlans,
   fetchResourceReport,
   fetchResourceState,
   fetchResourceUsage,
   fetchTenantResourceStates,
+  type PlanOrdering,
   type ResourcePlan,
   type ResourceState,
 } from "@/api/admin";
@@ -73,9 +73,6 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
   // what this holds.
   const [selected, setSelected] = useState(tenant);
   const [range, setRange] = useState<RangeId>("30d");
-  const [pending, setPending] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const overviewQuery = useQuery({
     queryKey: ["admin", "resources", "tenants"],
@@ -105,26 +102,6 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
     queryFn: () => fetchResourceReport(historyWindow, selected),
   });
 
-  const changeMutation = useMutation({
-    mutationFn: ({ plan, force }: { plan: string; force: boolean }) =>
-      changeResourcePlan(plan, selected, force),
-    onSuccess: (result) => {
-      setError(null);
-      setPending(null);
-      setSuccess(
-        result.status === "unchanged"
-          ? `${selected} is already on ${result.plan}.`
-          : `${selected} moved to ${result.plan}. ${result.message}`,
-      );
-      void queryClient.invalidateQueries({ queryKey: ["admin", "resources"] });
-    },
-    onError: (err: Error) => {
-      setSuccess(null);
-      setPending(null);
-      setError(err.message);
-    },
-  });
-
   const state = stateQuery.data;
   const plans = plansQuery.data ?? [];
   const samples = usageQuery.data?.samples ?? [];
@@ -142,13 +119,6 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
     return [...seen].sort();
   }, [samples]);
 
-  function requestChange(plan: ResourcePlan, force: boolean) {
-    setError(null);
-    setSuccess(null);
-    setPending(plan.name);
-    changeMutation.mutate({ plan: plan.name, force });
-  }
-
   return (
     <section>
       <header className="admin-console__section-head">
@@ -164,9 +134,6 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
         >
           {t("resources.refresh")}</button>
       </header>
-
-      {error && <p className="admin-console__error">{error}</p>}
-      {success && <p className="admin-console__success">{success}</p>}
 
       {isPlatformAdmin && (
         <div className="admin-console__subsection">
@@ -209,11 +176,7 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                           type="button"
                           className="admin-console__btn admin-console__btn--quiet"
                           disabled={row.tenant === selected}
-                          onClick={() => {
-                            setSelected(row.tenant);
-                            setError(null);
-                            setSuccess(null);
-                          }}
+                          onClick={() => setSelected(row.tenant)}
                         >
                           {row.tenant === selected ? "Selected" : "Manage"}
                         </button>
@@ -328,9 +291,8 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
 
       <div className="admin-console__subsection">
         <h3 className="admin-console__subsection-title">{t("resources.plans")}</h3>
-        <p className="admin-console__lead">
-          {t(isPlatformAdmin ? "resources.plansLeadAdmin" : "resources.plansLeadTenant")}
-        </p>
+        <p className="admin-console__lead">{t("resources.plansLead")}</p>
+        {state && <OrderingNotice ordering={state.ordering} />}
 
         {plansQuery.isLoading && <p className="admin-console__loading">{t("resources.loading3")}</p>}
         {plansQuery.data?.length === 0 && (
@@ -367,44 +329,6 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                 {plan.blocked && <p className="admin-console__hint">{plan.blocked}</p>}
               </div>
 
-              <div className="admin-console__card-aside admin-console__card-aside--top">
-                {!plan.current && (
-                  <button
-                    type="button"
-                    className="admin-console__btn admin-console__btn--primary"
-                    disabled={!plan.selectable || changeMutation.isPending}
-                    onClick={() => requestChange(plan, false)}
-                  >
-                    {t(pending === plan.name ? "resources.applying" : "resources.switchToThisPlan")}
-                  </button>
-                )}
-                {/* Force exists only for a platform operator, and only where the
-                    plan is blocked. Shrinking below current use does not fail
-                    loudly — the cluster refuses the next pod create, so
-                    everything runs until something restarts and then does not
-                    come back. That is a decision, not a retry. */}
-                {isPlatformAdmin && !plan.current && !plan.selectable && plan.blocked && (
-                  <button
-                    type="button"
-                    className="admin-console__btn admin-console__btn--danger"
-                    disabled={changeMutation.isPending}
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          t("resources.shrinkConfirm", {
-                            tenant: selected,
-                            plan: planLabel(plan),
-                            blocked: plan.blocked,
-                          }),
-                        )
-                      ) {
-                        requestChange(plan, true);
-                      }
-                    }}
-                  >
-                    {t("resources.force")}</button>
-                )}
-              </div>
             </article>
           ))}
         </div>
@@ -515,5 +439,38 @@ function TenantHeadroom({ state }: { state: ResourceState }) {
           </span>
         ))}
     </span>
+  );
+}
+
+/** Where a tenant orders another plan, as the cluster's administrators state
+ * it: the text in the reader's language (English, else the first, when theirs
+ * is not there) and its one action. Without a notice, the tenant asks the
+ * cluster's administrators. */
+function OrderingNotice({ ordering }: { ordering?: PlanOrdering }) {
+  const { t, i18n } = useTranslation();
+  if (!ordering) {
+    return <p className="admin-console__hint">{t("resources.askForAnotherPlan")}</p>;
+  }
+  const language = (i18n.resolvedLanguage ?? i18n.language ?? "en").slice(0, 2);
+  const text = ordering.text[language] ?? ordering.text.en ?? Object.values(ordering.text)[0] ?? "";
+  return (
+    <div className="admin-console__notice">
+      <p>{text}</p>
+      {ordering.url && (
+        <a className="admin-console__btn admin-console__btn--primary" href={ordering.url} target="_blank" rel="noreferrer">
+          {t("resources.orderAnotherPlan")}
+        </a>
+      )}
+      {ordering.email && (
+        <a className="admin-console__btn" href={`mailto:${ordering.email}`}>
+          {t("resources.writeTo", { email: ordering.email })}
+        </a>
+      )}
+      {ordering.phone && (
+        <a className="admin-console__btn" href={`tel:${ordering.phone.replace(/\s+/g, "")}`}>
+          {t("resources.call", { phone: ordering.phone })}
+        </a>
+      )}
+    </div>
   );
 }

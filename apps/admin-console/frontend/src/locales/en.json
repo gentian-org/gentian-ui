@@ -375,9 +375,8 @@
     "whoHoldsWhat": "Who holds what"
   },
   "resources": {
-    "aWorkspaceRunsUnderA": "A workspace runs under a ceiling — how much CPU, memory and storage its apps may claim between them. Changing plan commits the new ceiling to the deployments repository, the same path an app install takes, so what is running and what is recorded never disagree.",
+    "aWorkspaceRunsUnderA": "A workspace runs under a ceiling — how much CPU, memory and storage its apps may claim between them. The administrators of this cluster move it to another plan, and the change is recorded with what is running, so the two never disagree.",
     "allTenants": "All tenants",
-    "applying": "Applying…",
     "apps": "Apps",
     "billedPlanIntervals": "Billed plan intervals",
     "ceiling": "Ceiling",
@@ -389,7 +388,6 @@
     "custom": "custom",
     "days": "Days",
     "drifted": "drifted",
-    "force": "Force",
     "from": "From",
     "headroom": "Headroom",
     "headroom2": "Headroom",
@@ -412,8 +410,6 @@
     "plan2": "Plan",
     "plan3": "Plan",
     "plans": "Plans",
-    "plansLeadAdmin": "Changing a tenant's plan commits to the deployments repository and Argo CD applies it on the next sync.",
-    "plansLeadTenant": "Pick the plan this workspace should run on. A larger plan takes effect once the change syncs; a smaller one is refused while more than it allows is in use.",
     "range30d": "30 days",
     "range365d": "12 months",
     "range7d": "7 days",
@@ -421,9 +417,7 @@
     "refresh": "Refresh",
     "resource": "Resource",
     "resources": "Resources",
-    "shrinkConfirm": "Shrink {{tenant}} to {{plan}} anyway?\n\n{{blocked}}\n\nRunning pods keep running, but the cluster will refuse to recreate any that restart until usage fits.",
     "sku": "SKU",
-    "switchToThisPlan": "Switch to this plan",
     "tenant": "Tenant",
     "theClusterOverviewCouldNot": "The cluster overview could not be loaded.",
     "theResourcesApiCouldNot": "The resources API could not be reached. Plans and usage are unavailable until it is.",
@@ -433,7 +427,12 @@
     "timeRange": "Time range",
     "to": "To",
     "unavailable": "unavailable",
-    "whatThisWindowResolvesTo": "What this window resolves to for invoicing: each stretch the workspace spent on one plan, and the SKU in effect over it."
+    "whatThisWindowResolvesTo": "What this window resolves to for invoicing: each stretch the workspace spent on one plan, and the SKU in effect over it.",
+    "plansLead": "The plans this cluster offers. Your workspace runs on the one marked current; a plan that would not hold what it runs says why.",
+    "askForAnotherPlan": "To move to another plan, ask the administrators of this cluster.",
+    "orderAnotherPlan": "Order another plan",
+    "writeTo": "Write to {{email}}",
+    "call": "Call {{phone}}"
   },
   "securityPolicies": {
     "allowRememberMe": "Allow remember me",
