@@ -226,60 +226,6 @@ export async function fetchPendingAdminInvitations(): Promise<string[]> {
   return (body.pending ?? []).map((entry) => entry.tenant);
 }
 
-/** Where an uploaded bundle went. */
-export type BundleRef = { bucket: string; prefix: string; endpoint?: string; region?: string };
-
-export async function uploadBundle(file: File): Promise<BundleRef> {
-  const body = await apiFetch<{ bundle: BundleRef }>("/cluster/bundles", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-tar" },
-    body: file,
-  });
-  return body.bundle;
-}
-
-export type BundleDecryption = { passphrase?: string; identity?: string };
-
-/** What a bundle's manifest says, as far as the import card shows it. */
-export type BundleManifest = {
-  tenant: string;
-  export?: string;
-  createdAt?: string;
-  /** The custom domain a TenantDomain bound the tenant to when it was taken. */
-  customDomain?: string;
-};
-
-export async function inspectBundle(bundle: BundleRef, decryption: BundleDecryption): Promise<BundleManifest> {
-  const body = await apiFetch<{ manifest: BundleManifest }>("/cluster/bundles/inspect", {
-    method: "POST",
-    body: JSON.stringify({ bundle, decryption }),
-  });
-  return body.manifest;
-}
-
-export type ImportStatus = {
-  tenant: string;
-  phase: "declared" | "provisioning" | "awaiting-key" | "restoring" | "ready" | "failed";
-  message?: string;
-  commit?: string;
-  restore?: string;
-  passwordResetRequired?: boolean;
-  /** The bundle's custom domain, declared again with the tenant. */
-  customDomain?: string;
-};
-
-/** keepCustomDomain: whether the bundle's custom domain is declared again. */
-export function importTenant(bundle: BundleRef, decryption: BundleDecryption, keepCustomDomain: boolean) {
-  return apiFetch<ImportStatus>("/cluster/tenants/import", {
-    method: "POST",
-    body: JSON.stringify({ bundle, decryption, keepCustomDomain }),
-  });
-}
-
-export function fetchImportStatus(tenant: string) {
-  return apiFetch<ImportStatus>(`/cluster/tenants/${encodeURIComponent(tenant)}/import`);
-}
-
 /** A model the cluster serves from its own weights: one entry of spec.llm.instances. */
 export type ModelInstance = {
   name: string;
