@@ -236,13 +236,13 @@ def test_both_writes_are_commits(monkeypatch):
         headers={"Authorization": "Bearer t"},
     )
     assert r.status_code == 202
-    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/platform-security"
+    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/platform-security/waivers"
 
 
 def test_a_refused_waiver_change_is_the_models_answer(monkeypatch):
-    """`can_set_admission` is break-glass in model v1, so an ordinary
-    platform administrator is refused. That is correct, and the screen
-    shows the refusal rather than pretending the change landed."""
+    """The waiver allowlist is the security officer's (`can_approve`), so an
+    ordinary platform administrator is refused. That is correct, and the
+    screen shows the refusal rather than pretending the change landed."""
     _fake_client(monkeypatch, {"error": "forbidden"}, {}, status=403)
     r = TestClient(_app(_settings())).put(
         "/api/v1/admin/platform/security-policy",
