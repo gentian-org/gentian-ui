@@ -349,7 +349,7 @@
     "title2": "Titel"
   },
   "platformSecurity": {
-    "approveMacWaiversRequestedBy": "MAC-Ausnahmen genehmigen, die von ComponentProfiles aus dem Katalog angefordert werden. Workloads erhalten die Ausnahme-Pod-Labels nur, wenn das Profil die Anforderung deklariert und der Cluster sie zulässt.",
+    "approveMacWaiversRequestedBy": "Welche Pod-Security-Ausnahmen dieser Cluster zulässt, für die Profile des Katalogs, die eine verlangen. Eine Ausnahme gilt für eine Installation erst, wenn der Cluster sie hier zulässt und die Sicherheitsbeauftragte sie unter Genehmigungen für diese Installation genehmigt hat; die Genehmigung trägt sie hier ein, wenn sie fehlt.",
     "approved": "Genehmigt",
     "carries": "Umfasst",
     "catalogueWaiverRequests": "Ausnahmeanforderungen aus dem Katalog",
@@ -1133,7 +1133,7 @@
     "scopeIs": "Die Rolle gilt für:",
     "expiresOptional": "Bis (optional)",
     "expiresRequired": "Bis",
-    "breakGlassHint": "Break-glass erlaubt, die Ausnahmeliste zu ändern und die Konfiguration direkt zu bearbeiten. Die Rolle muss enden: Der Operator entzieht sie zum angegebenen Zeitpunkt, und jede Vergabe wird im Audit-Log festgehalten.",
+    "breakGlassHint": "Break-glass erlaubt, die Zulassungseinstellungen des Clusters zu ändern und die Konfiguration direkt zu bearbeiten. Die Rolle muss enden: Der Operator entzieht sie zum angegebenen Zeitpunkt, und jede Vergabe wird im Audit-Log festgehalten.",
     "expired": "Abgelaufen",
     "notAdministrator": "Nicht wirksam: nicht mehr Administrator von {{tenant}}"
   },
@@ -1169,7 +1169,8 @@
     "declineConfirm": "{{privilege}} ablehnen",
     "declineFailed": "Nicht abgelehnt:",
     "declined": "Abgelehnt. Die App wartet weiter; der Mandant sieht Ihren Grund.",
-    "notYoursPerimeter": "Ein Perimeter-Freigeber genehmigt dies."
+    "notYoursPerimeter": "Ein Perimeter-Freigeber genehmigt dies.",
+    "notAllowlisted": "Noch nicht auf der Ausnahmeliste des Clusters (<mono>{{entry}}</mono>); die Genehmigung trägt sie dort mit ein."
   },
   "tenantSettings": {
     "title": "Mandanteneinstellungen",

@@ -112,6 +112,15 @@ describe("ApprovalsSection", () => {
     expect(html).toContain("Decline…");
   });
 
+  it("says when a waiver is not yet on the cluster's allowlist, and not when it is", () => {
+    const waiver = { profile: "crm", policy: "gentian-require-non-root", scope: "web" };
+    const missing = render([{ ...approvals[0], waiver: { ...waiver, allowlisted: false } }], { canApproveNodePrivilege: true });
+    expect(missing).toContain("Not yet on the cluster");
+    expect(missing).toContain("crm/gentian-require-non-root/web");
+    const permitted = render([{ ...approvals[0], waiver: { ...waiver, allowlisted: true } }], { canApproveNodePrivilege: true });
+    expect(permitted).not.toContain("Not yet on the cluster");
+  });
+
   it("says so when nothing waits", () => {
     expect(render([], { canApproveNodePrivilege: true })).toContain("Nothing is waiting for an approval.");
   });

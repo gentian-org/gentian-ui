@@ -28,13 +28,26 @@ export type Approval = {
   declinedBy?: string | null;
   declinedAt?: string | null;
   declineReason?: string | null;
+  /**
+   * For a pod-security request: the cluster allowlist entry it needs beside
+   * the grant, and whether the cluster permits it already. Absent from an
+   * older backend, and for every other kind.
+   */
+  waiver?: WaiverAllowance | null;
 };
+
+export type WaiverAllowance = { profile: string; policy: string; scope: string; allowlisted: boolean };
 
 export function fetchApprovals() {
   return apiFetch<{ approvals: Approval[] }>("/admin/approvals");
 }
 
-export type NodePrivilegeApproval = { reason: string; expiresAt?: string };
+export type NodePrivilegeApproval = {
+  reason: string;
+  expiresAt?: string;
+  /** The allowlist entry a waiver lacks, added by the director with the grant. */
+  allowlist?: { profile: string; policy: string; scope: string };
+};
 
 /**
  * Approve one request for the tenant it was made in. The director decides

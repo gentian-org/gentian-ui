@@ -116,6 +116,24 @@ def test_an_approval_goes_to_the_directors_privilege_route_for_the_requests_tena
     assert seen["auth"] == "Bearer officer-token"
 
 
+def test_an_approval_carries_the_allowlist_entry_a_waiver_lacks(monkeypatch):
+    """A waiver the cluster does not permit yet is approved in one step: the
+    allowlist entry goes to the director with the grant."""
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "abc"}, seen, status=202)
+    entry = {"profile": "crm", "policy": "gentian-require-non-root", "scope": "web"}
+    answer = _client().put(
+        "/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root",
+        headers=_person,
+        json={"reason": "reviewed the image; bounded to the pilot", "allowlist": entry},
+    )
+    assert answer.status_code == 202
+    assert seen["json"] == {
+        "reason": "reviewed the image; bounded to the pilot",
+        "allowlist": entry,
+    }
+
+
 def test_the_directors_refusal_of_an_approval_comes_back_as_it_is(monkeypatch):
     seen: dict = {}
     refusal = {

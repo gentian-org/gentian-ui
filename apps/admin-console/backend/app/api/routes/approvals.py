@@ -58,6 +58,14 @@ async def approvals(
     )
 
 
+class AllowlistEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    profile: StrictStr
+    policy: StrictStr
+    scope: StrictStr
+
+
 class Approval(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -65,6 +73,10 @@ class Approval(BaseModel):
     reason: StrictStr
     # RFC 3339. Absent: the approval stands until somebody withdraws it.
     expiresAt: StrictStr | None = None
+    # For a pod-security waiver the cluster does not permit yet: the
+    # allowlist entry the request names, which the director adds with the
+    # grant, in one approval by the same person.
+    allowlist: AllowlistEntry | None = None
 
 
 @router.put("/{tenant}/{install}/{kind}/{name}")

@@ -20,7 +20,8 @@ const messageOf = (err: unknown) => (err instanceof Error ? err.message : String
  * requests they answer, the cluster's administrator sees all. The buttons
  * follow the director's answer to the right, and the director decides again.
  * A decline is the same right: it commits nothing and the app keeps
- * waiting, but whoever asked is told why.
+ * waiting, but whoever asked is told why. A pod-security waiver the
+ * cluster's allowlist lacks says so, and approving it adds the entry too.
  */
 export function ApprovalsSection() {
   const { t } = useTranslation();
@@ -68,6 +69,15 @@ export function ApprovalsSection() {
                   <td>
                     <div className="admin-console__mono">{approval.privilege}</div>
                     <div className="admin-console__hint">{approval.reason || t("approvals.noReason")}</div>
+                    {approval.waiver && !approval.waiver.allowlisted ? (
+                      <div className="admin-console__hint">
+                        <Trans
+                          i18nKey="approvals.notAllowlisted"
+                          values={{ entry: `${approval.waiver.profile}/${approval.waiver.policy}/${approval.waiver.scope}` }}
+                          components={mono}
+                        />
+                      </div>
+                    ) : null}
                   </td>
                   <td>
                     {approval.requestedBy ? (
@@ -144,6 +154,11 @@ function AnswerRequest({ approval }: { approval: Approval }) {
       approveNodePrivilege(approval, {
         reason: reason.trim(),
         ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
+        // A waiver the cluster does not permit yet: its allowlist entry is
+        // added in the same approval.
+        ...(approval.waiver && !approval.waiver.allowlisted
+          ? { allowlist: { profile: approval.waiver.profile, policy: approval.waiver.policy, scope: approval.waiver.scope } }
+          : {}),
       }),
     onSuccess: settle,
   });

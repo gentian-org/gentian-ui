@@ -9,12 +9,10 @@ because a second implementation of any of them is a second answer to the same
 question.
 
 The writes are commits, and the director's. Changing what an app may consume is declared state,
-committed under `can_grant`; changing which waivers the platform permits is
-the cluster's own security configuration, committed under `can_set_admission`
-— which model v1 binds to break-glass, so an ordinary platform administrator
-is refused it. That refusal is correct and the screen should say so: letting
-an app out of the pod-security baseline is meant to cost a deliberate
-elevation.
+committed under `can_grant`; changing which pod-security waivers the cluster
+permits is the security officer's (`can_approve`), who also approves each
+install's grant, so an ordinary platform administrator is refused it. That
+refusal is correct and the screen should say so.
 """
 
 import json
@@ -160,13 +158,13 @@ async def set_platform_security_policy(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Which waivers the cluster permits. Needs `can_set_admission`, which is
-    break-glass: a 403 here means the caller has not elevated, not that the
-    screen is broken."""
+    """Which pod-security waivers the cluster permits. The security officer's
+    (`can_approve`): a 403 here means the caller is not the security officer,
+    not that the screen is broken."""
     return await director.forward(
         settings,
         "PUT",
-        f"/v1/clusters/{director.cluster(settings)}/platform-security",
+        f"/v1/clusters/{director.cluster(settings)}/platform-security/waivers",
         bearer_of(credentials),
         json_body=body,
     )
