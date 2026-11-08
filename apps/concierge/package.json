@@ -7,6 +7,6 @@
     "test": "node --test test/*.test.js"
   },
   "devDependencies": {
-    "serve-handler": "6.1.6"
+    "serve-handler": "6.1.8"
   }
 }
