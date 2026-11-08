@@ -1,0 +1,147 @@
+{
+  "version": 3,
+  "license": "Tile glyphs derived from Lucide (ISC). Frame and palette: Gentian design system.",
+  "size": 128,
+  "tiles": {
+    "app": {
+      "label": "Application",
+      "glyph": "app.png"
+    },
+    "store": {
+      "label": "App Store",
+      "glyph": "store.png"
+    },
+    "mail": {
+      "label": "Mail",
+      "glyph": "mail.png"
+    },
+    "calendar": {
+      "label": "Calendar",
+      "glyph": "calendar.png"
+    },
+    "chat": {
+      "label": "Chat",
+      "glyph": "chat.png"
+    },
+    "video": {
+      "label": "Video",
+      "glyph": "video.png"
+    },
+    "contacts": {
+      "label": "Contacts",
+      "glyph": "contacts.png"
+    },
+    "files": {
+      "label": "Files",
+      "glyph": "files.png"
+    },
+    "wiki": {
+      "label": "Wiki",
+      "glyph": "wiki.png"
+    },
+    "tasks": {
+      "label": "Tasks",
+      "glyph": "tasks.png"
+    },
+    "projects": {
+      "label": "Projects",
+      "glyph": "projects.png"
+    },
+    "crm": {
+      "label": "CRM",
+      "glyph": "crm.png"
+    },
+    "erp": {
+      "label": "ERP",
+      "glyph": "erp.png"
+    },
+    "admin": {
+      "label": "Admin",
+      "glyph": "admin.png"
+    },
+    "users": {
+      "label": "Users",
+      "glyph": "users.png"
+    },
+    "groups": {
+      "label": "Groups",
+      "glyph": "groups.png"
+    },
+    "announcements": {
+      "label": "Announcements",
+      "glyph": "announcements.png"
+    },
+    "settings": {
+      "label": "Settings",
+      "glyph": "settings.png"
+    },
+    "database": {
+      "label": "Database",
+      "glyph": "database.png"
+    },
+    "notes": {
+      "label": "Notes",
+      "glyph": "notes.png"
+    },
+    "analytics": {
+      "label": "Analytics",
+      "glyph": "analytics.png"
+    },
+    "documents": {
+      "label": "Documents",
+      "glyph": "documents.png"
+    },
+    "spreadsheet": {
+      "label": "Spreadsheet",
+      "glyph": "spreadsheet.png"
+    },
+    "presentation": {
+      "label": "Presentation",
+      "glyph": "presentation.png"
+    },
+    "link": {
+      "label": "Link",
+      "glyph": "link.png"
+    },
+    "finance": {
+      "label": "Finance",
+      "glyph": "finance.png"
+    },
+    "inventory": {
+      "label": "Inventory",
+      "glyph": "inventory.png"
+    },
+    "globe": {
+      "label": "Globe",
+      "glyph": "globe.png"
+    },
+    "cluster": {
+      "label": "Cluster",
+      "glyph": "cluster.png"
+    },
+    "sync": {
+      "label": "Deployments",
+      "glyph": "sync.png"
+    },
+    "identity": {
+      "label": "Identity",
+      "glyph": "identity.png"
+    },
+    "hammer": {
+      "label": "Hammer",
+      "glyph": "hammer.png"
+    },
+    "bulb": {
+      "label": "Light bulb",
+      "glyph": "bulb.png"
+    },
+    "kube": {
+      "label": "Kubernetes",
+      "glyph": "kube.png"
+    },
+    "key": {
+      "label": "Key",
+      "glyph": "key.png"
+    }
+  }
+}

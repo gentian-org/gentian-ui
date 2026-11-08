@@ -1,0 +1,6 @@
+apiVersion: v2
+name: concierge
+description: The concierge of Gentian OS, the page on a cluster's bare domain that sends a person to the sign-in of their workspace
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

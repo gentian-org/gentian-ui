@@ -6,7 +6,7 @@ Report a vulnerability through GitHub's private vulnerability reporting:
 the *Security* tab of this repository, *Report a vulnerability*. The report
 reaches the maintainers only. Do not open a public issue for it.
 
-You get an acknowledgement within three business days and a first
+You get an acknowledgment within three business days and a first
 assessment within ten. A confirmed vulnerability is fixed in the supported
 versions and published as a GitHub security advisory, with credit to the
 reporter unless they prefer none. Disclosure is coordinated: ninety days

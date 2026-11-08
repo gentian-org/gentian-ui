@@ -1,0 +1,35 @@
+# The concierge: static files and nothing else. gentian-os installs it as a
+# component of the platform tenant and publishes it on the cluster's bare
+# domain from that tenant's DMZ.
+
+image:
+  repository: ghcr.io/gentian-org/concierge-web
+  # CI replaces this with the immutable tag of the build the chart came from.
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+# config.json, as the page reads it; see ../README.md.
+config:
+  # The directory the page looks an address up in when it is on a custom
+  # domain: one file per domain, named by the domain's SHA-256. The operator
+  # writes them into the ConfigMap named below.
+  lookup: /sign-in/lookup/
+
+# What the operator writes beside this release, in the same namespace. Both
+# are optional mounts, so the page starts before either exists.
+lookupConfigMap: concierge-lookup
+# brand.css, brand.json, brand.webmanifest and the brand's icons.
+brandingConfigMap: branding
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 48Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+nameOverride: ""
+fullnameOverride: ""

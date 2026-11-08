@@ -1,0 +1,344 @@
+# SPDX-License-Identifier: Apache-2.0
+"""The console's context comes from the director, not from the token.
+
+Which screens exist for a person is decided from two answers of the director:
+the tenant's verbs on the tenant this console runs in, and the cluster's
+verbs. A person the edge let in but who may not administer the tenant is
+refused here, as the refusal it is.
+"""
+
+import httpx
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from app.api.routes import admin
+from app.core import director
+from app.core.config import Settings, get_settings
+
+
+def _app(settings: Settings) -> FastAPI:
+    app = FastAPI()
+    app.include_router(admin.router, prefix="/api/v1")
+    app.dependency_overrides[get_settings] = lambda: settings
+    return app
+
+
+def _settings(**over) -> Settings:
+    env = {
+        "AUTH_DISABLED": "true",
+        "KERNEL_DOMAIN": "desk.gentian.org",
+        "KERNEL_REALM": "kernel",
+        "TENANT_ID": "platform",
+        "DIRECTOR_URL": "http://director.test:8080",
+        "GENTIAN_CLUSTER_ID": "demo",
+    }
+    env.update(over)
+    return Settings(**env)
+
+
+def _director(monkeypatch, answers: dict[str, dict]):
+    seen = []
+
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def request(self, method, url, params=None, json=None, headers=None):
+            seen.append((method, url, (headers or {}).get("Authorization")))
+            for suffix, body in answers.items():
+                if url.endswith(suffix):
+                    return httpx.Response(200, json=body, request=httpx.Request(method, url))
+            return httpx.Response(404, json={"error": "no"}, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(director.httpx, "AsyncClient", FakeClient)
+    return seen
+
+
+def test_a_platform_administrator_sees_the_platform_screens(monkeypatch):
+    seen = _director(
+        monkeypatch,
+        {
+            "/v1/tenants/platform/me": {"relations": {"can_administer": True, "can_enter": True}},
+            "/v1/clusters/demo/me": {"relations": {"can_configure": True, "can_audit": True}},
+        },
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer person"}
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["tenant"] == "platform" and body["realm"] == "kernel"
+    assert body["isPlatformAdmin"] is True and body["isTenantAdmin"] is True
+    assert body["availableTenants"] == ["platform"]
+    # Both questions were asked as the caller, with the caller's own token.
+    assert {u for _, u, _ in seen} == {
+        "http://director.test:8080/v1/tenants/platform/me",
+        "http://director.test:8080/v1/clusters/demo/me",
+    }
+    assert all(a == "Bearer person" for _, _, a in seen)
+
+
+def test_a_tenant_administrator_sees_no_platform_screens(monkeypatch):
+    _director(
+        monkeypatch,
+        {
+            "/v1/tenants/platform/me": {"relations": {"can_administer": True}},
+            "/v1/clusters/demo/me": {"relations": {"can_configure": False, "can_audit": False}},
+        },
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 200
+    assert r.json()["isPlatformAdmin"] is False
+
+
+def test_whether_the_person_may_publish_is_the_directors_answer(monkeypatch):
+    """The buttons that approve and withdraw a public address follow
+    can_expose as the director answers it for this tenant; absent is no."""
+    for relations, want in (
+        ({"can_administer": True, "can_expose": True}, True),
+        ({"can_administer": True, "can_expose": False}, False),
+        ({"can_administer": True}, False),
+    ):
+        _director(
+            monkeypatch,
+            {
+                "/v1/tenants/platform/me": {"relations": relations},
+                "/v1/clusters/demo/me": {"relations": {"can_configure": True}},
+            },
+        )
+        r = TestClient(_app(_settings())).get(
+            "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+        )
+        assert r.status_code == 200
+        assert r.json()["canExpose"] is want
+
+
+def test_whether_the_person_may_grant_is_the_directors_answer(monkeypatch):
+    """The buttons that approve and withdraw an integration follow can_grant
+    as the director answers it for this tenant; absent is no."""
+    for relations, want in (
+        ({"can_administer": True, "can_grant": True}, True),
+        ({"can_administer": True, "can_grant": False}, False),
+        ({"can_administer": True}, False),
+    ):
+        _director(
+            monkeypatch,
+            {
+                "/v1/tenants/platform/me": {"relations": relations},
+                "/v1/clusters/demo/me": {"relations": {}},
+            },
+        )
+        r = TestClient(_app(_settings())).get(
+            "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+        )
+        assert r.status_code == 200
+        assert r.json()["canGrant"] is want
+
+
+def test_whether_the_person_may_approve_a_privilege_is_the_directors_answer(monkeypatch):
+    """The button that approves an app's egress request follows
+    can_approve_privilege as the director answers it; absent is no."""
+    for relations, want in (
+        ({"can_administer": True, "can_approve_privilege": True}, True),
+        ({"can_administer": True, "can_approve_privilege": False}, False),
+        ({"can_administer": True}, False),
+    ):
+        _director(
+            monkeypatch,
+            {
+                "/v1/tenants/platform/me": {"relations": relations},
+                "/v1/clusters/demo/me": {"relations": {}},
+            },
+        )
+        r = TestClient(_app(_settings())).get(
+            "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+        )
+        assert r.status_code == 200
+        assert r.json()["canApprovePrivilege"] is want
+
+
+def test_whether_the_person_may_approve_a_node_privilege_is_the_directors_answer(monkeypatch):
+    """The button that approves a podSecurity or clusterRoles request follows
+    the cluster's can_approve -- the security officer's -- as the director
+    answers it; absent is no, and the tenant's own approval right is not it."""
+    for tenant_rel, cluster_rel, want in (
+        ({"can_administer": True}, {"can_approve": True}, True),
+        ({"can_administer": True}, {"can_approve": False}, False),
+        ({"can_administer": True}, {}, False),
+        ({"can_administer": True, "can_approve_privilege": True}, {"can_configure": True}, False),
+    ):
+        _director(
+            monkeypatch,
+            {
+                "/v1/tenants/platform/me": {"relations": tenant_rel},
+                "/v1/clusters/demo/me": {"relations": cluster_rel},
+            },
+        )
+        r = TestClient(_app(_settings())).get(
+            "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+        )
+        assert r.status_code == 200
+        assert r.json()["canApproveNodePrivilege"] is want
+
+
+def test_whether_the_person_may_read_the_cluster_roles_is_the_directors_answer(monkeypatch):
+    for cluster_rel, want in (({"can_audit": True}, True), ({}, False)):
+        _director(
+            monkeypatch,
+            {
+                "/v1/tenants/platform/me": {"relations": {"can_administer": True}},
+                "/v1/clusters/demo/me": {"relations": cluster_rel},
+            },
+        )
+        r = TestClient(_app(_settings())).get(
+            "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+        )
+        assert r.status_code == 200
+        assert r.json()["canAuditCluster"] is want
+
+
+def test_someone_the_edge_let_in_but_who_may_not_administer_is_refused(monkeypatch):
+    _director(
+        monkeypatch,
+        {
+            "/v1/tenants/platform/me": {"relations": {"can_administer": False, "can_enter": True}},
+            "/v1/clusters/demo/me": {"relations": {}},
+        },
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 403
+
+
+def test_without_a_director_the_console_says_so():
+    r = TestClient(_app(_settings(DIRECTOR_URL=None))).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 503
+
+
+def test_a_screen_not_yet_mapped_says_which_one():
+    """Every route a not-yet-mapped screen calls answers 501 and names the
+    screen, so the console shows that rather than a spinner. A route nobody
+    calls is a plain 404.
+
+    Groups are no longer one of them: the director reads them through its
+    per-realm Keycloak credential and people.py serves them, so the entry was
+    removed rather than left to outlive its reason. What the Notifications
+    screen still lacks is narrower and belongs to the notify action, which
+    takes a tenant audience and no group.
+    """
+    client = TestClient(_app(_settings()))
+    r = client.get("/api/v1/admin/audit-events", headers={"Authorization": "Bearer t"})
+    assert r.status_code == 501 and "Audit" in r.json()["detail"]
+    r = client.post("/api/v1/admin/backup-keys", headers={"Authorization": "Bearer t"})
+    assert r.status_code == 404
+    r = client.get("/api/v1/admin/members", headers={"Authorization": "Bearer t"})
+    assert r.status_code == 404
+
+
+def test_app_states_are_asked_of_the_usher_and_not_swallowed_by_the_catch_all(monkeypatch):
+    """The route was declared below the catch-all once, which answered
+    "No such route." before it was reached."""
+    seen = _director(monkeypatch, {"/apps/status": {"tenant": "platform", "apps": []}})
+    r = TestClient(_app(_settings(USHER_URL="http://usher.test:8090"))).get(
+        "/api/v1/admin/apps/status", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 200
+    assert r.json() == {"tenant": "platform", "apps": []}
+    assert seen == [("GET", "http://usher.test:8090/v1/tenants/platform/apps/status", "Bearer t")]
+
+
+def test_app_states_without_an_usher_say_so_and_ask_nobody(monkeypatch):
+    seen = _director(monkeypatch, {})
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/apps/status", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 503
+    assert "USHER_URL" in r.json()["detail"]
+    assert not seen
+
+
+def test_the_catch_all_is_the_last_route_of_its_router(monkeypatch):
+    """Routes are matched in the order they are declared, so anything below
+    the catch-all is unreachable. Asked of the assembled app as well, where
+    the order of the routers matters as much as the order within one."""
+    paths = [route.path for route in admin.router.routes]
+    assert paths.index("/admin/{rest:path}") == len(paths) - 1
+
+    from app.main import app
+
+    _director(monkeypatch, {"/apps/status": {"tenant": "platform", "apps": []}})
+    app.dependency_overrides[get_settings] = lambda: _settings(USHER_URL="http://usher.test:8090")
+    try:
+        r = TestClient(app).get("/api/v1/admin/apps/status", headers={"Authorization": "Bearer t"})
+    finally:
+        app.dependency_overrides.pop(get_settings, None)
+    assert r.status_code == 200
+
+
+def test_the_security_officer_is_let_in_for_the_approvals_screen_alone(monkeypatch):
+    """The one widening of the entry: cluster#can_approve without
+    can_administer opens the console with isTenantAdmin false. Nothing of the
+    tenant's is granted by it; the director refuses every other read."""
+    _director(
+        monkeypatch,
+        {
+            "/v1/tenants/platform/me": {"relations": {"can_enter": True}},
+            "/v1/clusters/demo/me": {"relations": {"can_approve": True, "can_configure": True}},
+        },
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer officer"}
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["isTenantAdmin"] is False
+    assert body["canApproveNodePrivilege"] is True
+    # Not a platform administrator either: the platform screens need the
+    # tenant's console entered as its administrator, as before.
+    assert body["isPlatformAdmin"] is False
+    assert body["canApprovePrivilege"] is False and body["canExpose"] is False
+
+
+def test_the_perimeter_approver_is_let_in_for_the_approvals_screen_alone(monkeypatch):
+    """cluster#can_approve_perimeter without can_administer opens the console
+    the same way, for the egress requests on the Approvals screen."""
+    _director(
+        monkeypatch,
+        {
+            "/v1/tenants/platform/me": {"relations": {"can_enter": True}},
+            "/v1/clusters/demo/me": {"relations": {"can_approve_perimeter": True}},
+        },
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer petra"}
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["isTenantAdmin"] is False
+    assert body["canApprovePerimeter"] is True
+    assert body["canApproveNodePrivilege"] is False and body["isPlatformAdmin"] is False
+
+
+def test_a_cluster_administrator_who_is_not_a_security_officer_is_still_refused(monkeypatch):
+    _director(
+        monkeypatch,
+        {
+            "/v1/tenants/platform/me": {"relations": {"can_enter": True}},
+            "/v1/clusters/demo/me": {"relations": {"can_configure": True, "can_audit": True}},
+        },
+    )
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 403

@@ -1,0 +1,397 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+import { apiFetch } from "@/api/client";
+
+/**
+ * The tenant's installed apps, as git declares them, and what is done to one.
+ *
+ * What the cluster has made of them is a different answer from a different
+ * service (`fetchAppStates` in admin.ts, the usher's). The Apps screen joins
+ * the two and says so where they disagree.
+ */
+
+/** One entry of the tenant's apps list as git records it. */
+export type DeclaredApp = {
+  profile: string;
+  /** The build the install is pinned to, when it was installed at one. */
+  digest?: string;
+  addons?: string[];
+  /** The build each pinned add-on was installed at; an add-on with no entry is not pinned. */
+  addonPins?: { name: string; digest: string; catalogue?: string }[];
+  /** Installed for everyone: every member has access by default. */
+  defaultGrant?: boolean;
+  /** The add-ons for everyone; each add-on has its own access, and one with no entry is given per person. */
+  addonGrants?: { name: string; defaultGrant?: boolean }[];
+  /**
+   * The catalog the build was fetched from. Git records it; the director
+   * does not serve it yet, so this is absent today and shown as such.
+   */
+  catalogue?: string;
+};
+
+export function fetchDeclaredApps() {
+  return apiFetch<{ tenant: string; apps: DeclaredApp[] }>("/admin/apps");
+}
+
+/**
+ * The director's answer to a write of an app's entry. A commit:
+ * `commit` is there when git changed and absent when the tenant already was
+ * as asked (`already_installed`, `not_installed`).
+ */
+export type AppWriteResult = {
+  status: string;
+  commit?: string;
+};
+
+/**
+ * State whether an installed app is for everyone. Only that travels: the
+ * entry's pinned build is left as it is.
+ */
+export function setAppForEveryone(profile: string, everyone: boolean) {
+  return apiFetch<AppWriteResult>(`/admin/apps/${encodeURIComponent(profile)}/access`, {
+    method: "PUT",
+    body: JSON.stringify({ everyone }),
+  });
+}
+
+/**
+ * State whether one add-on of an installed app is for everyone. An add-on is
+ * entitled on its own; the rest of the app's add-ons stay as they are.
+ */
+export function setAddonForEveryone(profile: string, addon: string, everyone: boolean) {
+  return apiFetch<AppWriteResult>(
+    `/admin/apps/${encodeURIComponent(profile)}/addons/${encodeURIComponent(addon)}/access`,
+    { method: "PUT", body: JSON.stringify({ everyone }) },
+  );
+}
+
+/**
+ * Remove an app. The app and its sign-in client go; its files, database,
+ * object storage, stored credentials and access group are kept, and a later
+ * install finds them again.
+ */
+export function uninstallApp(profile: string) {
+  return apiFetch<AppWriteResult>(`/admin/apps/${encodeURIComponent(profile)}`, {
+    method: "DELETE",
+  });
+}
+
+/** One uninstalled app that still holds data, as the cluster reports it. */
+export type RetainedApp = {
+  profile: string;
+  state: string;
+  /**
+   * Whether the app's profile is still on the cluster. Without it nothing
+   * says which stores the app had, and a purge of it is refused.
+   */
+  profileAvailable: boolean;
+  /** Per kind of data: `present`, `absent` or `unknown`. */
+  kinds: Record<string, string>;
+  /** The volume claims counted as the app's files. */
+  volumes?: string[];
+};
+
+/** The uninstalled apps that still hold data: what a purge of each would destroy. */
+export type RetainedApps = {
+  tenant: string;
+  apps: RetainedApp[];
+  /** Per kind, why the read reports it as unknown. */
+  unknown?: Record<string, string>;
+};
+
+export function fetchRetainedApps() {
+  return apiFetch<RetainedApps>("/admin/apps/retained");
+}
+
+/**
+ * What the cluster answered to a purge that was not refused and did not fail.
+ * Only `complete: true` means everything the app could hold was destroyed.
+ */
+export type AppPurgeResult = {
+  status: string;
+  message?: string;
+  complete?: boolean;
+  /** The kinds of data that are now gone. */
+  destroyed?: string[];
+  /** The kinds the purge did not look at, and which may still be there. */
+  notExamined?: string[];
+};
+
+/**
+ * Destroy the data an uninstalled app left behind. Not undone. One request,
+ * answered when the purge is over, which can take several minutes; nothing
+ * here gives up before the answer. The cluster refuses it for an app the
+ * tenant still has, and a purge that did not finish says where it stopped.
+ */
+export function purgeAppData(profile: string) {
+  return apiFetch<AppPurgeResult>("/admin/apps/purge", {
+    method: "POST",
+    body: JSON.stringify({ profile }),
+  });
+}
+
+/** One approved privilege, as git records the approval. */
+export type PrivilegeGrant = {
+  /** The component the grant is for. */
+  install: string;
+  /** `<kind>/<name>`, naming one request of the app's profile. */
+  privilege: string;
+  approver: string;
+  approvedAt: string;
+  reason: string;
+  expiresAt?: string;
+};
+
+export function fetchTenantPrivileges() {
+  return apiFetch<{ tenant: string; privileges: PrivilegeGrant[] }>("/admin/apps/privileges");
+}
+
+/** What an approver states: why, and optionally until when (RFC 3339). */
+export type PrivilegeApprovalRequest = { reason: string; expiresAt?: string };
+
+/**
+ * Answer one request an app makes beyond the default posture, `<kind>/<name>`
+ * as the app's state names it. A commit; whether the person may is the
+ * director's answer, by the kind.
+ */
+export function approvePrivilege(install: string, privilege: string, body: PrivilegeApprovalRequest) {
+  const [kind, name] = privilege.split("/", 2);
+  return apiFetch<AppWriteResult>(
+    `/admin/apps/privileges/${encodeURIComponent(install)}/${encodeURIComponent(kind)}/${encodeURIComponent(name ?? "")}`,
+    { method: "PUT", body: JSON.stringify(body) },
+  );
+}
+
+/** The registry's record of an approved entry: by whom, when, until when, why. */
+export type ExposureApproval = {
+  owner: string;
+  publishedAt?: string;
+  reviewAt: string;
+  expiresAt?: string;
+  reason?: string;
+  lastReviewedBy?: string;
+  lastReviewedAt?: string;
+};
+
+/**
+ * One entry an app declares for the internet, as the director reads it from
+ * the app's profile, with what approving it publishes and whether it was.
+ */
+export type ExposureEntry = {
+  /** The app or add-on the entry belongs to. */
+  install: string;
+  exposureName: string;
+  /** `requested`, `approved`, `reviewDue`, `expired` or `unmatched`. */
+  state: string;
+  /**
+   * What approving the entry allows: `public`, `publicAppCredential` or
+   * `signInAppAuthorization`. Absent from a director older than kinds, where
+   * every entry is a public address. Sent back with an approval, so the
+   * director refuses it if the entry has come to declare another kind.
+   */
+  kind?: string;
+  /** The kind in the director's own few words. Shown as it came. */
+  kindLabel?: string;
+  /**
+   * False for an entry behind sign-in, which approving does not publish.
+   * Absent from an older director: a public address.
+   */
+  publicAddress?: boolean;
+  /** The caller's `Authorization` header reaches the app once approved. */
+  passesCredential?: boolean;
+  /** The limit per client address on a public address: the director's sentence. */
+  rateLimit?: string;
+  /** The address without scheme; absent when it is published nowhere. */
+  host?: string;
+  paths?: string[];
+  denyPaths?: string[];
+  authMode?: string;
+  /** The profile declares that nobody signs in. */
+  anyoneWithoutSignIn?: boolean;
+  /** Who can reach it, and what approving it allows, in the director's own sentences. */
+  access?: string;
+  /** The entry is for the cluster's bare domain. */
+  mainAddress?: boolean;
+  /**
+   * What the director says an approver must know before a website goes on
+   * the main address. Shown as it came; nothing here holds a copy.
+   */
+  mainAddressRule?: string;
+  /**
+   * Why it has no address, why it matches nothing, or why an earlier approval
+   * does not cover it any more: the director's words.
+   */
+  note?: string;
+  approval?: ExposureApproval;
+};
+
+/**
+ * What the tenant's apps ask to have on the internet and what was approved.
+ * `entries` is absent from a director older than this screen.
+ */
+export function fetchTenantExposures() {
+  return apiFetch<{ tenant: string; entries?: ExposureEntry[] }>("/admin/apps/exposures");
+}
+
+/**
+ * The same registry, as the perimeter's approvers read it (can_expose): an
+ * approver who is not otherwise a member of the tenant sees what they approve.
+ */
+export function fetchPerimeterExposures() {
+  return apiFetch<{ tenant: string; entries?: ExposureEntry[] }>("/admin/perimeter/exposures");
+}
+
+/** One publication, review or withdrawal, from the commit that made it. */
+export type PerimeterChange = {
+  commit: string;
+  author: { Name: string; Email: string };
+  at: string;
+  summary: string;
+  throughPlatform: boolean;
+  principal?: string;
+  decision?: string;
+  requestId?: string;
+};
+
+/** Requests by response class. */
+export type TrafficCounts = { requests: number; "2xx": number; "3xx": number; "4xx": number; "5xx": number };
+
+/** What one published path carried over the window. */
+export type TrafficRow = TrafficCounts & { component: string; exposure: string; path: string };
+
+export type Traffic = {
+  tenant: string;
+  from: string;
+  to: string;
+  stepSeconds: number;
+  totals: TrafficRow[];
+  series: (TrafficCounts & { at: string })[];
+  covers: string;
+};
+
+/** What the tenant's public paths carried, from the edge's counters. */
+export function fetchPerimeterTraffic(from: Date, to: Date, stepSeconds: number) {
+  const q = new URLSearchParams({ from: from.toISOString(), to: to.toISOString(), stepSeconds: String(stepSeconds) });
+  return apiFetch<Traffic>(`/admin/perimeter/traffic?${q}`);
+}
+
+/** Who published, reviewed or withdrew which entry, and when. */
+export function fetchPerimeterHistory() {
+  return apiFetch<{ tenant: string; changes: PerimeterChange[]; covers: string }>("/admin/perimeter/history");
+}
+
+/**
+ * What an approval may say. `apex` and `acknowledgeMainAddressRule` are for
+ * an entry on the cluster's main address and travel only for one; the
+ * console's backend refuses any other field.
+ */
+export type ExposureApprovalRequest = {
+  /** The kind the dialog showed, as the read gave it. */
+  kind?: string;
+  /** RFC 3339. Absent: the entry stays until it is withdrawn. */
+  expiresAt?: string;
+  reason?: string;
+  apex?: boolean;
+  acknowledgeMainAddressRule?: boolean;
+};
+
+const entryPath = (install: string, name: string) =>
+  `/admin/apps/exposures/${encodeURIComponent(install)}/${encodeURIComponent(name)}`;
+
+/**
+ * Approve one entry, or review one that is approved. A commit: `commit` is
+ * there when git changed and absent when the entry already was as asked
+ * (`unchanged`). Whether the person may is the director's answer.
+ */
+export function approveExposure(install: string, name: string, body: ExposureApprovalRequest) {
+  return apiFetch<AppWriteResult>(entryPath(install, name), { method: "PUT", body: JSON.stringify(body) });
+}
+
+/** Take one entry off the internet, or take back what else was approved for it. A commit, like the approval. */
+export function withdrawExposure(install: string, name: string) {
+  return apiFetch<AppWriteResult>(entryPath(install, name), { method: "DELETE" });
+}
+
+/**
+ * Whether a leftover sign-in configuration is still read. An app's sign-in
+ * clients are configured from the one piece labeled with the app's name (an
+ * extension's, from its parent app's) and from no other piece.
+ */
+export type ResidueOIDC = {
+  /**
+   * `yes`: the only piece labeled for an installed app. `contested`: another
+   * piece is labeled for the same app, and the app's sign-in clients are
+   * refused until one of the two is removed.
+   * `no`: no installed app's label.
+   */
+  effective: string;
+  /** The client ids this piece configures, when it is in effect. */
+  clients?: string[];
+  /** The client ids this piece holds, refused while another piece is labeled for the same app. */
+  contested?: string[];
+  /** The installed app whose label this piece carries, and whose sign-in reads it. */
+  composition?: string;
+};
+
+/** One piece a newer build left on the cluster, as the cluster lists it. */
+export type ResidueItem = {
+  kind: string;
+  name: string;
+  namespace?: string;
+  /** The app or add-on the piece names. */
+  profile?: string;
+  /** `dropped` or `orphaned`. */
+  class: string;
+  /** Why it is listed, in the cluster's words. */
+  reason: string;
+  /** When the piece was created; when it stopped being used is recorded nowhere. */
+  created?: string;
+  /** Whether the removal would take this piece at all, and why not. */
+  removable: boolean;
+  notRemovable?: string;
+  /** Only on a sign-in configuration piece. */
+  oidc?: ResidueOIDC;
+};
+
+/** What newer builds of one app, and of its active add-ons, left behind. */
+export type AppResidue = {
+  tenant: string;
+  profile: string;
+  profiles: string[];
+  residue: ResidueItem[];
+  /**
+   * Who may delete a piece: `tenant` where this tenant is the cluster's only
+   * one, `platform` everywhere else. The server's word; nothing here works
+   * it out.
+   */
+  removableBy: string;
+  /** What the cluster could not establish, and so what the list may be missing. */
+  incomplete?: string[];
+};
+
+export function fetchAppResidue(profile: string) {
+  return apiFetch<AppResidue>(`/admin/apps/${encodeURIComponent(profile)}/residue`);
+}
+
+/**
+ * The cluster's answer to a removal it did not refuse. `deleted` means the
+ * piece is gone; `deleting` means the cluster took the deletion and still
+ * holds the piece. Nothing else is success.
+ */
+export type ResidueRemoval = {
+  status: string;
+  message?: string;
+};
+
+/**
+ * Delete one leftover piece from the cluster. Not undone. `profile` is the
+ * app or add-on the piece names; `confirm` is its name typed again.
+ */
+export function removeAppResidue(
+  profile: string,
+  piece: { kind: string; name: string; namespace?: string; confirm: string },
+) {
+  return apiFetch<ResidueRemoval>(`/admin/apps/${encodeURIComponent(profile)}/residue/remove`, {
+    method: "POST",
+    body: JSON.stringify(piece),
+  });
+}

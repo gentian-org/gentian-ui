@@ -1,0 +1,66 @@
+# Security conventions — gentian-ui (kernel shell)
+
+Implements the same mandatory controls as
+[gentian-apps/apps/_template/docs/SECURITY.md](https://github.com/gentian-org/gentian-apps/blob/develop/apps/_template/docs/SECURITY.md).
+Read that document for the full M1–M27 checklist; this file maps template modules
+to this repo and notes kernel-specific deployment differences.
+
+## Template parity (implemented here)
+
+| Requirement | Location |
+|-------------|----------|
+| M1–M3 OIDC + JWT | `backend/app/core/auth.py`, `frontend/src/auth/` |
+| M4 tenant context | `backend/app/core/tenant.py` (JWT claims, not `TENANT_ID` env) |
+| M7 log redaction | `backend/app/core/logging_middleware.py` |
+| M8 health probes | `backend/app/api/routes/health.py` |
+| M9 CORS | `backend/app/core/config.py`, `chart/values.yaml` |
+| Origin check on POST/PUT/PATCH/DELETE (forged cross-site requests) | `gentian_app_runtime.origin_check` — the rule and what it leaves open are in its docstring; `CSRF_TRUSTED_ORIGINS` allow-lists further origins, empty by default |
+| M11–M13 pod hardening | `chart/templates/_helpers.tpl` |
+| M16–M17 Gateway API | `chart/templates/httproute.yaml` |
+| M22 / S1 OpenFGA PEP | `backend/app/core/authz.py`, `openfga_client.py` |
+| AuthZEN PEP (Stage 2) | Enabled by default on fresh installs (`openfga.authzenEnabled` + OpenFGA `experimentals: [authzen]`). BFF uses `/access/v1/evaluation` instead of native `/check`. |
+| M26 DB scoping stub | `backend/app/db/session.py` |
+| M27 resource limits | `chart/values.yaml`, `values-production.yaml.example` |
+| Frontend bearer token | `frontend/src/api/client.ts` |
+| Protected shell routes | `frontend/src/auth/RequireAuth.tsx`, `router.tsx` |
+
+## Kernel-specific differences
+
+| Topic | Catalog app (template) | Kernel shell (this repo) |
+|-------|--------------------------|---------------------------|
+| Deploy | AppProfile + tenant install | `gentian-os` ApplicationSet |
+| Gateway | Tenant Gateway | `kernel-public-gateway` in `gentian-kernel` |
+| Host | `{subDomain}.{tenantDomain}` | `portal.{kernelDomain}` |
+| Identity env | `TENANT_ID`, `TENANT_NAMESPACE` | `KERNEL_DOMAIN` |
+| RBAC | Optional namespace Role | ClusterRole for catalog APIs (`rbac.create: true`) |
+| No `profile/` | — | Correct — not a catalog app |
+
+## The assistant and the model gateway
+
+The desktop's API relays a signed-in person's chat to the platform's model
+gateway (`backend/app/api/routes/llm.py`, described in
+[ai-widget.md](./ai-widget.md)).
+
+- **The credential is this tenant's desktop's own key**, generated and
+  registered by the platform and mounted from the Secret
+  `llm-credentials-desktop`. The desktop does not hold the gateway's
+  administrator key, another app's key, or any Kubernetes authority to read
+  one.
+- **Every member who can open the desktop can use it.** The key cannot tell
+  them apart, so the API sends the person's subject as the request's end user,
+  builds the upstream request from an allow-list, calls two fixed paths, caps
+  the request size, the conversation length and `max_tokens`, and forwards
+  none of the browser's headers.
+- **Neither the key nor the gateway's address reaches the browser or a log.**
+- **Left open:** no limit or budget per person, and none on the key itself.
+
+## Local dev
+
+Copy `backend/.env.example` → `backend/.env` and `frontend/.env.example` →
+`frontend/.env.local`, or use `docker-compose.dev.yaml` which sets
+`AUTH_DISABLED=true` and `VITE_AUTH_DISABLED=true`.
+
+## Related
+
+- [docs/overview/architecture.md](./architecture.md) — shell UX and API surface
+- [gentian-os/docs/security/design.md](https://github.com/gentian-org/gentian-os/blob/main/docs/security/design.md)

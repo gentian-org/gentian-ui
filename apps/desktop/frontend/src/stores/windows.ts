@@ -1,0 +1,218 @@
+import { create } from "zustand";
+import { createWindowGeometry, maximizedGeometry, type WindowGeometry } from "@/lib/windows";
+import { minimized, stateOnRaise } from "@/lib/windowState";
+
+export type WindowVisualState = "normal" | "minimized" | "maximized";
+
+// The panels this shell renders itself. The administration console is not one
+// of them any more: it is a component at admin.<zone>, opened in a window like
+// every other tile.
+export type ShellWindowBuiltin = "account" | "settings";
+
+export type ShellWindow = {
+  id: string;
+  appId: string;
+  title: string;
+  /** Iframe address for external apps; omitted for built-in React surfaces. */
+  url?: string;
+  /** When set, render a first-party component instead of an iframe. */
+  builtinComponent?: ShellWindowBuiltin;
+  /** When set, navigate the iframe to this URL after the current IdP bootstrap page loads. */
+  pendingUrl?: string;
+  geometry: WindowGeometry;
+  /** Saved when maximizing so restore returns to the prior size. */
+  restoreGeometry: WindowGeometry;
+  state: WindowVisualState;
+  /** What a minimized window goes back to. */
+  minimizedFrom?: Exclude<WindowVisualState, "minimized">;
+  zIndex: number;
+  focused: boolean;
+  isHidden?: boolean;
+  /** Closing hides the window instead: an app opened at mount (gentianos.io/portal-preopen). */
+  keepAlive?: boolean;
+};
+
+type OpenWindowInput = {
+  id: string;
+  appId: string;
+  title: string;
+  url?: string;
+  builtinComponent?: ShellWindowBuiltin;
+  pendingUrl?: string;
+  geometry?: WindowGeometry;
+  isHidden?: boolean;
+  keepAlive?: boolean;
+  state?: WindowVisualState;
+};
+
+type WindowsState = {
+  windows: ShellWindow[];
+  nextZIndex: number;
+  openWindow: (win: OpenWindowInput) => void;
+  closeWindow: (id: string) => void;
+  focusWindow: (id: string) => void;
+  openOrFocusWindow: (win: OpenWindowInput) => void;
+  minimizeWindow: (id: string) => void;
+  maximizeWindow: (id: string) => void;
+  restoreWindow: (id: string) => void;
+  moveWindow: (id: string, x: number, y: number) => void;
+  resizeWindow: (id: string, geometry: WindowGeometry) => void;
+  advanceWindowNavigation: (id: string) => void;
+  setWindowUrl: (id: string, url: string) => void;
+};
+
+const BASE_Z = 100;
+
+export const useWindowsStore = create<WindowsState>((set, get) => ({
+  windows: [],
+  nextZIndex: BASE_Z,
+  openWindow: (win) =>
+    set((state) => {
+      const nextZ = state.nextZIndex + 1;
+      const visibleCount = state.windows.filter((w) => w.state !== "minimized" && !w.isHidden).length;
+      const geometry = win.geometry ?? createWindowGeometry(visibleCount);
+      const isHidden = win.isHidden ?? false;
+      const winState = win.state ?? ("normal" as const);
+      return {
+        nextZIndex: nextZ,
+        windows: [
+          ...state.windows.map((w) => ({ ...w, focused: false })),
+          {
+            id: win.id,
+            appId: win.appId,
+            title: win.title,
+            url: win.url,
+            builtinComponent: win.builtinComponent,
+            pendingUrl: win.pendingUrl,
+            geometry,
+            restoreGeometry: geometry,
+            zIndex: nextZ,
+            focused: winState !== "minimized",
+            state: winState,
+            isHidden,
+            keepAlive: win.keepAlive,
+          },
+        ],
+      };
+    }),
+  closeWindow: (id) =>
+    set((state) => {
+      const win = state.windows.find((w) => w.id === id);
+      if (win?.keepAlive) {
+        // Instead of removing, we hide it!
+        return {
+          windows: state.windows.map((w) =>
+            w.id === id ? { ...w, ...minimized(w), isHidden: true, focused: false } : w
+          ),
+        };
+      }
+      return {
+        windows: state.windows.filter((w) => w.id !== id),
+      };
+    }),
+  focusWindow: (id) =>
+    set((state) => {
+      const target = state.windows.find((w) => w.id === id);
+      if (!target) return state;
+      const nextZ = state.nextZIndex + 1;
+      return {
+        nextZIndex: nextZ,
+        windows: state.windows.map((w) => {
+          if (w.id !== id) return { ...w, focused: false };
+          return {
+            ...w,
+            state: stateOnRaise(w),
+            zIndex: nextZ,
+            focused: true,
+            isHidden: false,
+          };
+        }),
+      };
+    }),
+  openOrFocusWindow: (win) => {
+    const existing = get().windows.find((w) => w.appId === win.appId);
+    if (existing) {
+      if (win.url) {
+        get().setWindowUrl(existing.id, win.url);
+      }
+      get().focusWindow(existing.id);
+      return;
+    }
+    get().openWindow(win);
+  },
+  minimizeWindow: (id) =>
+    set((state) => ({
+      windows: state.windows.map((w) =>
+        w.id === id ? { ...w, ...minimized(w), focused: false } : w,
+      ),
+    })),
+  maximizeWindow: (id) =>
+    set((state) => {
+      const nextZ = state.nextZIndex + 1;
+      return {
+        nextZIndex: nextZ,
+        windows: state.windows.map((w) => {
+          if (w.id !== id) return { ...w, focused: false };
+          if (w.state === "maximized") {
+            return {
+              ...w,
+              state: "normal" as const,
+              geometry: w.restoreGeometry,
+              zIndex: nextZ,
+              focused: true,
+            };
+          }
+          return {
+            ...w,
+            state: "maximized" as const,
+            restoreGeometry: w.state === "normal" ? w.geometry : w.restoreGeometry,
+            geometry: maximizedGeometry(),
+            zIndex: nextZ,
+            focused: true,
+          };
+        }),
+      };
+    }),
+  restoreWindow: (id) =>
+    set((state) => {
+      const win = state.windows.find((w) => w.id === id);
+      if (!win) return state;
+      if (win.state === "maximized") {
+        get().maximizeWindow(id);
+        return get();
+      }
+      return {
+        windows: state.windows.map((w) =>
+          w.id === id ? { ...w, state: "normal" as const, geometry: w.restoreGeometry } : w,
+        ),
+      };
+    }),
+  moveWindow: (id, x, y) =>
+    set((state) => ({
+      windows: state.windows.map((w) => {
+        if (w.id !== id || w.state === "maximized") return w;
+        const geometry = { ...w.geometry, x, y };
+        return { ...w, geometry, restoreGeometry: geometry };
+      }),
+    })),
+  resizeWindow: (id, geometry) =>
+    set((state) => ({
+      windows: state.windows.map((w) => {
+        if (w.id !== id || w.state === "maximized") return w;
+        return { ...w, geometry, restoreGeometry: geometry };
+      }),
+    })),
+  advanceWindowNavigation: (id) =>
+    set((state) => ({
+      windows: state.windows.map((w) => {
+        if (w.id !== id || !w.pendingUrl) {
+          return w;
+        }
+        return { ...w, url: w.pendingUrl, pendingUrl: undefined };
+      }),
+    })),
+  setWindowUrl: (id, url) =>
+    set((state) => ({
+      windows: state.windows.map((w) => (w.id === id ? { ...w, url } : w)),
+    })),
+}));

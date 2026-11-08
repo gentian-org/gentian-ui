@@ -1,0 +1,190 @@
+{
+  "version": 2,
+  "license": "Tile glyphs derived from Lucide (ISC). Frame and palette: Gentian design system.",
+  "frame": {
+    "size": 52,
+    "radius": 10,
+    "glyphSize": 24,
+    "glyphInset": 14,
+    "bg": "#ECE8DF",
+    "glyphColor": "#262696",
+    "border": "rgba(20, 21, 46, 0.08)"
+  },
+  "tiles": {
+    "app": {
+      "label": "Application",
+      "bg": "#ECE8DF",
+      "glyph": "app.svg"
+    },
+    "store": {
+      "label": "App Store",
+      "bg": "#ECE8DF",
+      "glyph": "store.svg"
+    },
+    "mail": {
+      "label": "Mail",
+      "bg": "#ECE8DF",
+      "glyph": "mail.svg"
+    },
+    "calendar": {
+      "label": "Calendar",
+      "bg": "#ECE8DF",
+      "glyph": "calendar.svg"
+    },
+    "chat": {
+      "label": "Chat",
+      "bg": "#ECE8DF",
+      "glyph": "chat.svg"
+    },
+    "video": {
+      "label": "Video",
+      "bg": "#ECE8DF",
+      "glyph": "video.svg"
+    },
+    "contacts": {
+      "label": "Contacts",
+      "bg": "#ECE8DF",
+      "glyph": "contacts.svg"
+    },
+    "files": {
+      "label": "Files",
+      "bg": "#ECE8DF",
+      "glyph": "files.svg"
+    },
+    "wiki": {
+      "label": "Wiki",
+      "bg": "#ECE8DF",
+      "glyph": "wiki.svg"
+    },
+    "tasks": {
+      "label": "Tasks",
+      "bg": "#ECE8DF",
+      "glyph": "tasks.svg"
+    },
+    "projects": {
+      "label": "Projects",
+      "bg": "#ECE8DF",
+      "glyph": "projects.svg"
+    },
+    "crm": {
+      "label": "CRM",
+      "bg": "#ECE8DF",
+      "glyph": "crm.svg"
+    },
+    "erp": {
+      "label": "ERP",
+      "bg": "#ECE8DF",
+      "glyph": "erp.svg"
+    },
+    "admin": {
+      "label": "Admin",
+      "bg": "#ECE8DF",
+      "glyph": "admin.svg"
+    },
+    "users": {
+      "label": "Users",
+      "bg": "#ECE8DF",
+      "glyph": "users.svg"
+    },
+    "groups": {
+      "label": "Groups",
+      "bg": "#ECE8DF",
+      "glyph": "groups.svg"
+    },
+    "announcements": {
+      "label": "Announcements",
+      "bg": "#ECE8DF",
+      "glyph": "announcements.svg"
+    },
+    "settings": {
+      "label": "Settings",
+      "bg": "#ECE8DF",
+      "glyph": "settings.svg"
+    },
+    "database": {
+      "label": "Database",
+      "bg": "#ECE8DF",
+      "glyph": "database.svg"
+    },
+    "notes": {
+      "label": "Notes",
+      "bg": "#ECE8DF",
+      "glyph": "notes.svg"
+    },
+    "analytics": {
+      "label": "Analytics",
+      "bg": "#ECE8DF",
+      "glyph": "analytics.svg"
+    },
+    "documents": {
+      "label": "Documents",
+      "bg": "#ECE8DF",
+      "glyph": "documents.svg"
+    },
+    "spreadsheet": {
+      "label": "Spreadsheet",
+      "bg": "#ECE8DF",
+      "glyph": "spreadsheet.svg"
+    },
+    "presentation": {
+      "label": "Presentation",
+      "bg": "#ECE8DF",
+      "glyph": "presentation.svg"
+    },
+    "link": {
+      "label": "Link",
+      "bg": "#ECE8DF",
+      "glyph": "link.svg"
+    },
+    "finance": {
+      "label": "Finance",
+      "bg": "#ECE8DF",
+      "glyph": "finance.svg"
+    },
+    "inventory": {
+      "label": "Inventory",
+      "bg": "#ECE8DF",
+      "glyph": "inventory.svg"
+    },
+    "globe": {
+      "label": "Globe",
+      "bg": "#ECE8DF",
+      "glyph": "globe.svg"
+    },
+    "cluster": {
+      "label": "Cluster",
+      "bg": "#ECE8DF",
+      "glyph": "cluster.svg"
+    },
+    "sync": {
+      "label": "Deployments",
+      "bg": "#ECE8DF",
+      "glyph": "sync.svg"
+    },
+    "identity": {
+      "label": "Identity",
+      "bg": "#ECE8DF",
+      "glyph": "identity.svg"
+    },
+    "hammer": {
+      "label": "Hammer",
+      "bg": "#ECE8DF",
+      "glyph": "hammer.svg"
+    },
+    "bulb": {
+      "label": "Light bulb",
+      "bg": "#ECE8DF",
+      "glyph": "bulb.svg"
+    },
+    "kube": {
+      "label": "Kubernetes",
+      "bg": "#ECE8DF",
+      "glyph": "kube.svg"
+    },
+    "key": {
+      "label": "Key",
+      "bg": "#ECE8DF",
+      "glyph": "key.svg"
+    }
+  }
+}

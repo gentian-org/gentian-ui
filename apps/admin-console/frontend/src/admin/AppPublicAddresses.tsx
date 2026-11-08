@@ -1,0 +1,787 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { TFunction } from "i18next";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Trans, useTranslation } from "react-i18next";
+import { fetchAdminContext } from "@/api/admin";
+import {
+  approveExposure,
+  fetchPerimeterExposures,
+  fetchTenantExposures,
+  withdrawExposure,
+  type AppWriteResult,
+  type ExposureApprovalRequest,
+  type ExposureEntry,
+} from "@/api/apps";
+import { ApiError } from "@/api/client";
+import "./admin.css";
+import { formatDate } from "@/lib/format";
+
+const mono = { mono: <span className="admin-console__mono" /> };
+
+const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/** What the director said, as it said it, when the answer carried a reason. */
+const refusalOf = (err: unknown) => (err instanceof ApiError && err.detail ? err.detail : messageOf(err));
+
+const day = (value?: string) => (value ? formatDate(value) : "");
+
+/**
+ * Whether approving the entry publishes something. An entry behind sign-in
+ * that asks to keep the app's own Authorization header is listed here too and
+ * publishes nothing; a director older than that names no kinds, and
+ * everything it lists is a public address.
+ */
+const isPublic = (entry: ExposureEntry) => entry.publicAddress !== false;
+
+/** An entry as the command names it: `<app instance>/<entry>`. */
+const nameOf = (entry: ExposureEntry) => `${entry.install}/${entry.exposureName}`;
+
+/**
+ * What this screen offers for an entry. The director decides whether an
+ * approval or a withdrawal is taken; this only decides what is worth asking.
+ *
+ * An approval is offered where the director gives an address, because the
+ * dialog shows that address and an entry without one would be published
+ * nowhere. An entry the director can name and not describe -- a component the
+ * platform itself ships -- is left to the command, in both directions: what
+ * a withdrawal would take down cannot be shown here.
+ */
+function offeredFor(entry: ExposureEntry): {
+  approve: "approve" | "review" | null;
+  withdraw: boolean;
+  why: "nowhere" | "notShown" | null;
+} {
+  if (entry.state === "unmatched") return { approve: null, withdraw: true, why: null };
+  const known = ["requested", "approved", "reviewDue", "expired"].includes(entry.state);
+  if (!known) return { approve: null, withdraw: false, why: null };
+  if (!entry.authMode) return { approve: null, withdraw: false, why: "notShown" };
+  const withdraw = entry.state === "approved" || entry.state === "reviewDue";
+  if (!entry.host) return { approve: null, withdraw, why: "nowhere" };
+  const approve = entry.state === "requested" || entry.state === "expired" ? "approve" : "review";
+  return { approve, withdraw, why: null };
+}
+
+/** What the director answered to the last approval or withdrawal here. */
+type Done = { kind: "approved" | "reviewed" | "withdrawn"; name: string; result: AppWriteResult; publicAddress: boolean };
+
+/**
+ * Public addresses and requests: what this app, and the add-ons switched on
+ * inside it, ask to have on the internet, and whether that was approved --
+ * and, in the same list, an entry behind sign-in that asks to keep the app's
+ * own Authorization header, which the same person approves and which
+ * publishes nothing. What each kind means is the director's text, shown as
+ * it came.
+ *
+ * The director's answer, read from the app's profile and the tenant's
+ * registry in git: for each entry the address it is published at, its paths,
+ * whether anybody signs in, and its state -- requested, approved by whom and
+ * until when, due for review, or expired.
+ *
+ * A person the director says may publish for the tenant (can_expose, read
+ * with the console's context) is offered approving and withdrawing. That
+ * answer only decides which buttons are drawn: the director asks again on
+ * every request, and its refusal is shown as it came.
+ *
+ * Not shown at all for an app that declares nothing for the internet, which
+ * is most of them, and while that is not known yet.
+ */
+export function AppPublicAddresses({ app, addons }: { app: string; addons: string[] }) {
+  const { t } = useTranslation();
+  const names = new Set([app, ...addons]);
+  return (
+    <PublicAddressList
+      source="apps"
+      app={app}
+      include={(entry) => names.has(entry.install)}
+      title={t("apps.publicTitle")}
+      lead={<Trans i18nKey="apps.publicLead" components={mono} />}
+    />
+  );
+}
+
+/** Where a list of entries is read from: the tenant's registry as any member
+ *  reads it (can_view), or as the perimeter's approvers do (can_expose). */
+type Source = "apps" | "perimeter";
+
+const exposuresKey = (source: Source) => ["admin", source, "exposures"];
+
+/**
+ * The entries one list shows, with what may be done to each. The Apps screen
+ * shows one app's; the Perimeter tab the tenant's, split by what is waiting
+ * for a decision and what is published. Every list refreshes every other
+ * after a change: they are views of one registry.
+ */
+export function PublicAddressList({
+  source,
+  include,
+  app,
+  title,
+  lead,
+  empty,
+}: {
+  source: Source;
+  include: (entry: ExposureEntry) => boolean;
+  /** The app the list is about, when it is about one; otherwise each entry names its app. */
+  app?: string;
+  title: string;
+  lead?: ReactNode;
+  /** Said when nothing matches; without it the list is not shown at all. */
+  empty?: string;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const query = useQuery({
+    queryKey: exposuresKey(source),
+    queryFn: () => (source === "perimeter" ? fetchPerimeterExposures() : fetchTenantExposures()),
+  });
+  // The same read the console opens with, so this asks nothing twice.
+  const context = useQuery({
+    queryKey: ["admin", "context"],
+    queryFn: () => fetchAdminContext(),
+  });
+  const canExpose = context.data?.canExpose === true;
+  const tenant = query.data?.tenant ?? "";
+
+  // The entry the dialog is about, as it was listed when the dialog opened:
+  // what is shown there is what is approved.
+  const [asking, setAsking] = useState<ExposureEntry | null>(null);
+  const [done, setDone] = useState<Done | null>(null);
+  const [failed, setFailed] = useState<{ name: string; message: string } | null>(null);
+
+  const refresh = () =>
+    Promise.all(
+      (["apps", "perimeter"] as const).map((other) =>
+        queryClient.invalidateQueries({ queryKey: exposuresKey(other) }),
+      ),
+    ).then(() => queryClient.invalidateQueries({ queryKey: ["admin", "perimeter", "history"] }));
+
+  const approve = useMutation({
+    mutationFn: ({ entry, body }: { entry: ExposureEntry; body: ExposureApprovalRequest }) =>
+      approveExposure(entry.install, entry.exposureName, body),
+    onSuccess: (result, { entry }) => {
+      const reviewed = entry.state === "approved" || entry.state === "reviewDue";
+      setDone({ kind: reviewed ? "reviewed" : "approved", name: nameOf(entry), result, publicAddress: isPublic(entry) });
+      setAsking(null);
+      void refresh();
+    },
+  });
+  const withdraw = useMutation({
+    mutationFn: (entry: ExposureEntry) => withdrawExposure(entry.install, entry.exposureName),
+    onSuccess: (result, entry) => {
+      setDone({ kind: "withdrawn", name: nameOf(entry), result, publicAddress: isPublic(entry) });
+      void refresh();
+    },
+    onError: (err, entry) => setFailed({ name: nameOf(entry), message: refusalOf(err) }),
+  });
+
+  const open = (entry: ExposureEntry) => {
+    approve.reset();
+    setDone(null);
+    setFailed(null);
+    setAsking(entry);
+  };
+  const askWithdraw = (entry: ExposureEntry) => {
+    const values = { name: nameOf(entry), tenant, address: entry.host ? `https://${entry.host}` : "" };
+    const question =
+      entry.state === "unmatched"
+        ? t("apps.publicWithdrawConfirmUnmatched", values)
+        : !isPublic(entry)
+          ? t("apps.publicWithdrawConfirmSignIn", values)
+          : entry.host
+          ? t("apps.publicWithdrawConfirm", values)
+          : t("apps.publicWithdrawConfirmNoAddress", values);
+    if (!window.confirm(question)) return;
+    setDone(null);
+    setFailed(null);
+    withdraw.mutate(entry);
+  };
+
+  const entries = (query.data?.entries ?? []).filter(include);
+
+  if (query.isError) {
+    return (
+      <div className="admin-console__subsection">
+        <h3 className="admin-console__subsection-title">{title}</h3>
+        <p className="admin-console__error">
+          {t("apps.publicUnavailable")} {messageOf(query.error)}
+        </p>
+      </div>
+    );
+  }
+  if (entries.length === 0 && !done && !empty) return null;
+
+  return (
+    <div className="admin-console__subsection">
+      <h3 className="admin-console__subsection-title">{title}</h3>
+      {lead ? <p className="admin-console__hint">{lead}</p> : null}
+      {query.isSuccess && entries.length === 0 && empty ? <p className="admin-console__hint">{empty}</p> : null}
+      {context.isSuccess && !canExpose ? <p className="admin-console__hint">{t("apps.publicNotApprover")}</p> : null}
+      {done ? <DoneNotice done={done} /> : null}
+      {entries.length > 0 ? (
+        <div className="admin-console__table-wrap">
+          <table className="admin-console__table">
+            <thead>
+              <tr>
+                <th>{t("apps.publicAddress")}</th>
+                <th>{t("apps.publicPaths")}</th>
+                <th>{t("apps.publicSignIn")}</th>
+                <th>{t("apps.publicState")}</th>
+                {canExpose ? <th>{t("apps.publicActions")}</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={nameOf(entry)}>
+                  <td>
+                    <AddressCell entry={entry} app={app} />
+                  </td>
+                  <td>
+                    <PathsCell entry={entry} />
+                  </td>
+                  <td>{signInOf(t, entry)}</td>
+                  <td>
+                    <StateCell entry={entry} />
+                  </td>
+                  {canExpose ? (
+                    <td>
+                      <ActionsCell
+                        entry={entry}
+                        busy={withdraw.isPending || approve.isPending}
+                        failed={failed?.name === nameOf(entry) ? failed.message : null}
+                        onApprove={() => open(entry)}
+                        onWithdraw={() => askWithdraw(entry)}
+                      />
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      {asking ? (
+        <ApproveDialog
+          entry={asking}
+          tenant={tenant}
+          pending={approve.isPending}
+          refusal={approve.isError ? refusalOf(approve.error) : null}
+          onConfirm={(body) => approve.mutate({ entry: asking, body })}
+          onClose={() => setAsking(null)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** What the director answered, said once. With a commit, git has the change and the cluster does not yet. */
+function DoneNotice({ done }: { done: Done }) {
+  const { kind, name, result, publicAddress } = done;
+  const values = { name, commit: (result.commit ?? "").slice(0, 8), status: result.status };
+  if (!result.commit) {
+    return (
+      <p className="admin-console__hint" role="status">
+        {kind === "withdrawn" ? (
+          <Trans i18nKey="apps.publicOutcomeNotPublished" values={values} components={mono} />
+        ) : (
+          <Trans i18nKey="apps.publicOutcomeUnchanged" values={values} components={mono} />
+        )}
+      </p>
+    );
+  }
+  return (
+    <p className="admin-console__success" role="status">
+      {kind === "approved" ? (
+        publicAddress ? (
+          <Trans i18nKey="apps.publicOutcomeApproved" values={values} components={mono} />
+        ) : (
+          <Trans i18nKey="apps.publicOutcomeApprovedSignIn" values={values} components={mono} />
+        )
+      ) : kind === "reviewed" ? (
+        <Trans i18nKey="apps.publicOutcomeReviewed" values={values} components={mono} />
+      ) : publicAddress ? (
+        <Trans i18nKey="apps.publicOutcomeWithdrawn" values={values} components={mono} />
+      ) : (
+        <Trans i18nKey="apps.publicOutcomeWithdrawnSignIn" values={values} components={mono} />
+      )}
+    </p>
+  );
+}
+
+function ActionsCell({
+  entry,
+  busy,
+  failed,
+  onApprove,
+  onWithdraw,
+}: {
+  entry: ExposureEntry;
+  busy: boolean;
+  /** The director's refusal of this entry's withdrawal, in its words. */
+  failed: string | null;
+  onApprove: () => void;
+  onWithdraw: () => void;
+}) {
+  const { t } = useTranslation();
+  const offered = offeredFor(entry);
+  return (
+    <>
+      <div className="admin-console__actions">
+        {offered.approve ? (
+          <button type="button" className="admin-console__btn" disabled={busy} aria-haspopup="dialog" onClick={onApprove}>
+            {offered.approve === "approve" ? t("apps.publicApprove") : t("apps.publicReview")}
+          </button>
+        ) : null}
+        {offered.withdraw ? (
+          <button type="button" className="admin-console__btn admin-console__btn--danger" disabled={busy} onClick={onWithdraw}>
+            {t("apps.publicWithdraw")}
+          </button>
+        ) : null}
+      </div>
+      {offered.why === "nowhere" ? <div className="admin-console__hint">{t("apps.publicNoApproveNowhere")}</div> : null}
+      {offered.why === "notShown" ? (
+        <div className="admin-console__hint">
+          <Trans i18nKey="apps.publicNoActionNotShown" components={mono} />
+        </div>
+      ) : null}
+      {failed ? (
+        <div className="admin-console__error" role="alert">
+          <p>
+            <strong>{t("apps.publicWithdrawRefused")}</strong>
+          </p>
+          <p>{failed}</p>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Approving one entry, or reviewing an approved one, behind its name typed
+ * out.
+ *
+ * It shows what the command shows before it sends anything: the kind of
+ * entry in the director's words, the address, the paths and that nothing
+ * else at the address is published, the paths never published, who can reach
+ * it and what approving allows in the director's sentences, the limit that
+ * applies, and what the approval so far says. For an entry behind sign-in it
+ * says first that nothing is put on the internet. Typing the entry is the confirmation, as for the
+ * console's other acts that a click is too easy for: this one puts something
+ * on the internet.
+ *
+ * An entry for the cluster's main address also shows the director's rule in
+ * full, as the read carried it, and a box that starts unticked. Only that
+ * box sends the acknowledgment; typing the entry does not. Without a rule
+ * from the director there is nothing to acknowledge, and nothing is sent.
+ *
+ * A refusal is shown here, in the director's words, and the dialog stays.
+ */
+function ApproveDialog({
+  entry,
+  tenant,
+  pending,
+  refusal,
+  onConfirm,
+  onClose,
+}: {
+  entry: ExposureEntry;
+  tenant: string;
+  pending: boolean;
+  refusal: string | null;
+  onConfirm: (body: ExposureApprovalRequest) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const ref = useRef<HTMLDialogElement>(null);
+  const [typed, setTyped] = useState("");
+  const [expires, setExpires] = useState("");
+  const [reason, setReason] = useState("");
+  const [acknowledged, setAcknowledged] = useState(false);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => dialog?.close();
+  }, []);
+
+  const name = nameOf(entry);
+  const publicAddress = isPublic(entry);
+  const main = entry.mainAddress === true;
+  const rule = entry.mainAddressRule ?? "";
+  const review = entry.state === "approved" || entry.state === "reviewDue";
+  const approval = entry.approval;
+  const paths = entry.paths ?? [];
+  const denied = entry.denyPaths ?? [];
+  const values = { entry: entry.exposureName, app: entry.install, tenant, name };
+  const confirmed = typed.trim() === name && (!main || (rule !== "" && acknowledged));
+
+  const send = () => {
+    if (!confirmed || pending) return;
+    const body: ExposureApprovalRequest = {};
+    // The kind that is shown here, so the director refuses the approval if
+    // the app's entry has come to declare another one meanwhile.
+    if (entry.kind) body.kind = entry.kind;
+    if (reason.trim()) body.reason = reason.trim();
+    // A day is the end of that day, UTC, as the command reads it.
+    if (expires) body.expiresAt = `${expires}T23:59:59Z`;
+    if (main) {
+      body.apex = true;
+      body.acknowledgeMainAddressRule = acknowledged;
+    }
+    onConfirm(body);
+  };
+
+  return (
+    <dialog
+      ref={ref}
+      className="admin-console__dialog"
+      aria-labelledby="public-approve-title"
+      onCancel={(e) => {
+        e.preventDefault();
+        if (!pending) onClose();
+      }}
+    >
+      <form
+        className="admin-console__dialog-body"
+        onSubmit={(e) => {
+          e.preventDefault();
+          send();
+        }}
+      >
+        <h3 id="public-approve-title" className="admin-console__dialog-title">
+          {review ? (
+            <Trans i18nKey="apps.publicReviewTitle" values={values} components={mono} />
+          ) : (
+            <Trans i18nKey="apps.publicApproveTitle" values={values} components={mono} />
+          )}
+        </h3>
+        <p className="admin-console__lead">
+          {!publicAddress ? (
+            review ? (
+              <Trans i18nKey="apps.publicReviewIntroSignIn" values={values} components={mono} />
+            ) : (
+              <Trans i18nKey="apps.publicApproveIntroSignIn" values={values} components={mono} />
+            )
+          ) : review ? (
+            <Trans i18nKey="apps.publicReviewIntro" values={values} components={mono} />
+          ) : entry.state === "expired" ? (
+            <Trans
+              i18nKey="apps.publicApproveIntroExpired"
+              values={{ ...values, until: day(approval?.expiresAt) }}
+              components={mono}
+            />
+          ) : (
+            <Trans i18nKey="apps.publicApproveIntro" values={values} components={mono} />
+          )}
+        </p>
+
+        <div>
+          {entry.kindLabel ? (
+            <div className="admin-console__edit-row">
+              <div className="admin-console__edit-row-label">{t("apps.publicKind")}</div>
+              {/* The director's words for the kind of entry. */}
+              <div className="admin-console__edit-row-value">{entry.kindLabel}</div>
+            </div>
+          ) : null}
+          <div className="admin-console__edit-row">
+            <div className="admin-console__edit-row-label">{t("apps.publicAddress")}</div>
+            <div className="admin-console__edit-row-value">
+              <span className="admin-console__mono">{`https://${entry.host ?? ""}`}</span>
+            </div>
+          </div>
+          <div className="admin-console__edit-row">
+            <div className="admin-console__edit-row-label">{t("apps.publicPaths")}</div>
+            <div className="admin-console__edit-row-value">
+              <span className="admin-console__mono">{paths.join("  ")}</span>
+              {publicAddress ? (
+                <div className="admin-console__hint">
+                  {paths.includes("/") ? t("apps.publicWholeAddress") : t("apps.publicOnlyThese")}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {publicAddress && denied.length > 0 ? (
+            <div className="admin-console__edit-row">
+              <div className="admin-console__edit-row-label">{t("apps.publicRefused")}</div>
+              <div className="admin-console__edit-row-value">
+                <span className="admin-console__mono">{denied.join("  ")}</span>
+                <div className="admin-console__hint">{t("apps.publicRefusedDetail")}</div>
+              </div>
+            </div>
+          ) : null}
+          <div className="admin-console__edit-row">
+            <div className="admin-console__edit-row-label">
+              {publicAddress ? t("apps.publicAccess") : t("apps.publicWhatChanges")}
+            </div>
+            {/* The director's sentences where it sent them. */}
+            <div className="admin-console__edit-row-value">{entry.access || signInOf(t, entry)}</div>
+          </div>
+          {entry.rateLimit ? (
+            <div className="admin-console__edit-row">
+              <div className="admin-console__edit-row-label">{t("apps.publicLimit")}</div>
+              {/* The director's sentence for the limit. */}
+              <div className="admin-console__edit-row-value">{entry.rateLimit}</div>
+            </div>
+          ) : null}
+          {entry.state !== "requested" && approval ? (
+            <div className="admin-console__edit-row">
+              <div className="admin-console__edit-row-label">{t("apps.publicSoFar")}</div>
+              <div className="admin-console__edit-row-value">
+                <Trans
+                  i18nKey="apps.publicApprovedBy"
+                  values={{ who: approval.owner, when: day(approval.publishedAt) }}
+                  components={mono}
+                />
+                <div>{t("apps.publicReviewBy", { review: day(approval.reviewAt) })}</div>
+                <div>
+                  {approval.expiresAt ? t("apps.publicUntil", { until: day(approval.expiresAt) }) : t("apps.publicNoEnd")}
+                </div>
+                {approval.reason ? <div>{t("apps.publicReason", { reason: approval.reason })}</div> : null}
+                <div className="admin-console__hint">{t("apps.publicSoFarReplaced")}</div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <label className="admin-console__label" htmlFor="public-approve-expires">
+          <span className="admin-console__label-text">{t("apps.publicExpiresLabel")}</span>
+          <input
+            id="public-approve-expires"
+            type="date"
+            value={expires}
+            disabled={pending}
+            onChange={(e) => setExpires(e.target.value)}
+          />
+        </label>
+        <p className="admin-console__hint">{t("apps.publicExpiresHint")}</p>
+        <label className="admin-console__label" htmlFor="public-approve-reason">
+          <span className="admin-console__label-text">{t("apps.publicReasonLabel")}</span>
+          <input
+            id="public-approve-reason"
+            type="text"
+            value={reason}
+            autoComplete="off"
+            disabled={pending}
+            onChange={(e) => setReason(e.target.value)}
+          />
+        </label>
+        <p className="admin-console__hint">{t("apps.publicRecorded")}</p>
+
+        {main ? (
+          <div className="admin-console__warning">
+            <p>
+              <strong>{t("apps.publicMainRuleTitle")}</strong>
+            </p>
+            {rule ? (
+              <>
+                {/* The director's rule, whole and as it came. */}
+                <p>{rule}</p>
+                <label className="admin-console__checkbox">
+                  <input
+                    type="checkbox"
+                    checked={acknowledged}
+                    disabled={pending}
+                    onChange={(e) => setAcknowledged(e.target.checked)}
+                  />
+                  <span>{t("apps.publicMainRuleAcknowledge")}</span>
+                </label>
+              </>
+            ) : (
+              <p>{t("apps.publicMainRuleMissing")}</p>
+            )}
+          </div>
+        ) : null}
+
+        <label className="admin-console__label" htmlFor="public-approve-confirm">
+          <span className="admin-console__label-text">
+            <Trans i18nKey="apps.publicTypeToConfirm" values={values} components={mono} />
+          </span>
+          <input
+            id="public-approve-confirm"
+            type="text"
+            value={typed}
+            autoComplete="off"
+            spellCheck={false}
+            disabled={pending}
+            onChange={(e) => setTyped(e.target.value)}
+          />
+        </label>
+
+        {refusal ? (
+          <div className="admin-console__error" role="alert">
+            <p>
+              <strong>{review ? t("apps.publicReviewRefused") : t("apps.publicApproveRefused")}</strong>
+            </p>
+            <p>{refusal}</p>
+          </div>
+        ) : null}
+
+        <div className="admin-console__dialog-footer" role={pending ? "status" : undefined}>
+          <button type="button" className="admin-console__btn admin-console__btn--quiet" disabled={pending} onClick={onClose}>
+            {t("apps.cancel")}
+          </button>
+          <button type="submit" className="admin-console__btn admin-console__btn--danger-solid" disabled={!confirmed || pending}>
+            {pending
+              ? t("apps.publicSending")
+              : review
+                ? t("apps.publicReviewConfirm")
+                : publicAddress
+                  ? t("apps.publicApproveConfirm")
+                  : t("apps.publicApproveConfirmSignIn")}
+          </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+function AddressCell({ entry, app }: { entry: ExposureEntry; app?: string }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {entry.host ? (
+        <span className="admin-console__mono">{`https://${entry.host}`}</span>
+      ) : (
+        <span>{t("apps.publicNoAddress")}</span>
+      )}
+      {entry.mainAddress ? (
+        <div>
+          <span className="admin-console__badge admin-console__badge--info">{t("apps.publicMainAddress")}</span>
+        </div>
+      ) : null}
+      <div className="admin-console__hint">
+        {app === undefined ? (
+          <Trans
+            i18nKey="apps.publicEntryOfApp"
+            values={{ entry: entry.exposureName, app: entry.install }}
+            components={mono}
+          />
+        ) : entry.install === app ? (
+          <Trans i18nKey="apps.publicEntry" values={{ entry: entry.exposureName }} components={mono} />
+        ) : (
+          <Trans
+            i18nKey="apps.publicEntryOfAddon"
+            values={{ entry: entry.exposureName, addon: entry.install }}
+            components={mono}
+          />
+        )}
+      </div>
+      {/* The kind of entry, in the director's own words. */}
+      {entry.kindLabel ? <div className="admin-console__hint">{entry.kindLabel}</div> : null}
+      {/* Why it has no address, or why an earlier approval does not cover it: the director's own words. */}
+      {entry.note && entry.state !== "unmatched" ? <div className="admin-console__hint">{entry.note}</div> : null}
+    </>
+  );
+}
+
+function PathsCell({ entry }: { entry: ExposureEntry }) {
+  const { t } = useTranslation();
+  const paths = entry.paths ?? [];
+  const denied = entry.denyPaths ?? [];
+  if (paths.length === 0) return <span>{t("apps.publicNotKnown")}</span>;
+  const whole = paths.includes("/");
+  const publicAddress = isPublic(entry);
+  return (
+    <>
+      <span className="admin-console__mono">{paths.join("  ")}</span>
+      {publicAddress ? (
+        <div className="admin-console__hint">
+          {whole ? t("apps.publicWholeAddress") : t("apps.publicOnlyThese")}
+        </div>
+      ) : null}
+      {publicAddress && denied.length > 0 ? (
+        <div className="admin-console__hint">
+          <Trans i18nKey="apps.publicNeverPublished" values={{ paths: denied.join("  ") }} components={mono} />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Who can reach the entry. The platform checks nobody at a public address;
+ * behind sign-in the session is required whatever the entry keeps.
+ */
+function signInOf(t: TFunction, entry: ExposureEntry) {
+  if (!entry.authMode) return t("apps.publicNotKnown");
+  if (!isPublic(entry)) return t("apps.publicSignInRequired");
+  if (entry.anyoneWithoutSignIn) return t("apps.publicAnyone");
+  if (entry.passesCredential) return t("apps.publicCredentialToApp");
+  return t("apps.publicCheckedByApp", { mode: entry.authMode });
+}
+
+function StateCell({ entry }: { entry: ExposureEntry }) {
+  const { t } = useTranslation();
+  const approval = entry.approval;
+  const approvedBy = approval ? (
+    <div>
+      <Trans
+        i18nKey="apps.publicApprovedBy"
+        values={{ who: approval.owner, when: day(approval.publishedAt) }}
+        components={mono}
+      />
+    </div>
+  ) : null;
+  const reason = approval?.reason ? (
+    <div className="admin-console__hint">{t("apps.publicReason", { reason: approval.reason })}</div>
+  ) : null;
+
+  switch (entry.state) {
+    case "requested":
+      return (
+        <>
+          <span className="admin-console__badge admin-console__badge--warn">{t("apps.publicRequested")}</span>
+          <div>{isPublic(entry) ? t("apps.publicRequestedDetail") : t("apps.publicRequestedDetailSignIn")}</div>
+        </>
+      );
+    case "approved":
+      return (
+        <>
+          <span className="admin-console__badge admin-console__badge--ok">{t("apps.publicApproved")}</span>
+          {approvedBy}
+          <div>{t("apps.publicReviewBy", { review: day(approval?.reviewAt) })}</div>
+          <div>
+            {approval?.expiresAt
+              ? t("apps.publicUntil", { until: day(approval.expiresAt) })
+              : t("apps.publicNoEnd")}
+          </div>
+          {reason}
+        </>
+      );
+    case "reviewDue":
+      return (
+        <>
+          <span className="admin-console__badge admin-console__badge--warn">{t("apps.publicReviewDue")}</span>
+          <div>{t("apps.publicReviewDueDetail", { review: day(approval?.reviewAt) })}</div>
+          {approvedBy}
+          <div>
+            {approval?.expiresAt
+              ? t("apps.publicUntil", { until: day(approval.expiresAt) })
+              : t("apps.publicNoEnd")}
+          </div>
+          {reason}
+        </>
+      );
+    case "expired":
+      return (
+        <>
+          <span className="admin-console__badge admin-console__badge--danger">{t("apps.publicExpired")}</span>
+          <div>{t("apps.publicExpiredDetail", { until: day(approval?.expiresAt) })}</div>
+          {approvedBy}
+          {reason}
+        </>
+      );
+    case "unmatched":
+      return (
+        <>
+          <span className="admin-console__badge admin-console__badge--warn">{t("apps.publicUnmatched")}</span>
+          {/* The director's own words for why. */}
+          {entry.note ? <div>{entry.note}</div> : null}
+          {approvedBy}
+        </>
+      );
+    default:
+      // A state this screen does not know is shown as the director named it.
+      return <span className="admin-console__mono">{entry.state}</span>;
+  }
+}

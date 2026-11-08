@@ -1,0 +1,36 @@
+{
+  "name": "gentian-shell-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "glyphs": "node scripts/glyphs.mjs",
+    "test": "node scripts/glyphs.mjs --check && node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.106.0",
+    "@tanstack/react-router": "^1.114.0",
+    "i18next": "^26.7.1",
+    "i18next-browser-languagedetector": "^8.3.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-i18next": "^17.1.12",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@tailwindcss/vite": "^4.3.4",
+    "@types/node": "^26.6.6",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react-swc": "^4.0.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  }
+}
