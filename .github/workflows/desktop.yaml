@@ -12,11 +12,12 @@ name: desktop
 # rolls a cluster over, via Argo CD Image Updater, so a branch that built an
 # image would deploy itself — which is the opposite of what a branch is for.
 #
-# Release tags (v*) publish too, as gentian-portal-*:<tag>. A production
+# Release tags (v*) publish too: the images as gentian-portal-*:<tag> and the
+# chart as the prerelease named after the tag (0.1.0-v0.5.0). A production
 # cluster pins a release rather than following a branch, and until tags built
 # images there was no release image to pin: prod ran develop-<sha> images and a
 # tag named only the source. The paths filter below does not apply to tag
-# pushes, so every release gets its images.
+# pushes, so every release gets its images and its chart.
 # A branch is checked as a pull request, and what is merged is checked and
 # published as a push. Not both: a branch that ran on its push and again on its
 # pull request did the same work twice. A branch without a pull request is not
@@ -355,11 +356,15 @@ jobs:
           # moving chart and installs the immutable one, since a Helm
           # release under an unchanged version string is never upgraded.
           helm package apps/desktop/chart --version "${{ steps.chart.outputs.moving }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-moving
+      # Pushed from the same refs as the images: develop, which a dev cluster
+      # follows, and the release tags, so a cluster that pins a release finds
+      # the chart (0.1.0-v0.5.0) and the images it names under that release
+      # and reads nothing from develop.
       - name: Log in to GHCR
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v'))
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
       - name: Push
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/develop'
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v'))
         run: |
           helm push /tmp/chart-immutable/*.tgz oci://ghcr.io/gentian-org/charts
           helm push /tmp/chart-moving/*.tgz oci://ghcr.io/gentian-org/charts
