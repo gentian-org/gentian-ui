@@ -370,6 +370,46 @@ export function setAppUpdateMode(tenant: string, profile: string, mode: string) 
   );
 }
 
+// --- The platform release the cluster runs (versioning.md §2.1) ------------
+
+/** spec.release as the Cluster claim declares it. */
+export type ReleaseSpec = { track?: string; version?: string; autoUpgrade?: string };
+
+/** status.release as the operator wrote it. */
+export type ReleaseStatus = {
+  state?: string;
+  message?: string;
+  desired?: string;
+  revision?: string;
+  image?: string;
+  appliedAt?: string;
+  available?: string;
+  pending?: string;
+  pendingNotes?: string;
+};
+
+export type ReleaseView = {
+  cluster: string;
+  spec: ReleaseSpec;
+  status?: ReleaseStatus;
+  platform?: { version?: string; versionLine?: string; build?: string; latestRelease?: string; latestReleaseNotes?: string };
+  window?: { start?: string; end?: string; timezone?: string };
+  windowOpen: boolean;
+  partial?: string;
+};
+
+export function fetchClusterRelease() {
+  return apiFetch<ReleaseView>("/cluster/release");
+}
+
+/** Run a release, or follow a branch: one signed commit by the director. */
+export function setClusterRelease(want: ReleaseSpec) {
+  return apiFetch<{ status: string; commit?: string }>("/cluster/release", {
+    method: "POST",
+    body: JSON.stringify(want),
+  });
+}
+
 // --- The cluster roles held by name (iam.md 1.1c) ---------------------------
 
 /** A cluster role an account can hold by name. */
