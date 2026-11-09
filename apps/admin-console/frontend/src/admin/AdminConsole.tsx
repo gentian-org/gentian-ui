@@ -11,6 +11,7 @@ import { CatalogueSection } from "@/admin/CatalogueSection";
 import { CredentialsSection } from "@/admin/CredentialsSection";
 import { CustomizationDebtSection } from "@/admin/CustomizationDebtSection";
 import { UpdatesSection } from "@/admin/UpdatesSection";
+import { ReleaseSection } from "@/admin/ReleaseSection";
 import { ClusterSettingsSection } from "@/admin/ClusterSettingsSection";
 import { GroupsSection } from "@/admin/GroupsSection";
 import { MembersSection } from "@/admin/MembersSection";
@@ -32,6 +33,7 @@ type AdminTab =
   | "approvals"
   | "tenantSettings"
   | "updates"
+  | "release"
   | "tenants"
   | "members"
   | "groups"
@@ -141,6 +143,9 @@ const TABS: {
   { id: "clusterRoles", labelKey: "tabClusterRoles", auditorOnly: true },
   { id: "customization", labelKey: "tabCustomization", platformOnly: true },
   { id: "updates", labelKey: "tabUpdates", platformOnly: true },
+  // The platform release the cluster runs, beside the apps' updates: the
+  // cluster administrator's, as the director refuses anybody else.
+  { id: "release", labelKey: "tabRelease", platformOnly: true },
   // What the cluster reports about itself. Read-only, and the usher decides
   // who may read it: this entry only keeps it out of a tenant's own console.
   { id: "usageStatistics", labelKey: "tabUsageStatistics", platformOnly: true },
@@ -288,6 +293,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <RoleHoldersSection canEdit={isPlatformAdmin} />
           ) : current === "customization" ? (
             <CustomizationDebtSection />
+          ) : current === "release" ? (
+            <ReleaseSection />
           ) : current === "updates" ? (
             <UpdatesSection />
           ) : current === "usageStatistics" ? (

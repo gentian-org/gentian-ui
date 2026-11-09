@@ -63,6 +63,43 @@ async def updates(
     )
 
 
+@router.get("/release")
+async def release(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """The platform release this cluster runs (gentian-os
+    docs/concepts/versioning.md §2.1): what the Cluster claim declares, what
+    the operator applied and what the release index offers under the
+    cluster's autoUpgrade mode, with the maintenance window. The director's
+    answer, read under `can_audit` on the cluster."""
+    return await director.forward(
+        settings, "GET", _cluster_path(settings, "/release"), bearer_of(credentials)
+    )
+
+
+@router.post("/release")
+async def set_release(
+    body: dict,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Move the cluster to a release ({"version": "vX.Y.Z", "autoUpgrade":
+    "none|patch|minor"}) or onto a branch ({"track": "<branch>"}). The cluster
+    administrator's act (`can_configure`): the director writes spec.release
+    and the catalog source as one signed commit, and the operator moves the
+    cluster from there."""
+    return await director.forward(
+        settings,
+        "POST",
+        _cluster_path(settings, "/actions/set-release"),
+        bearer_of(credentials),
+        json_body=body,
+    )
+
+
 @router.post("/updates/move")
 async def move_outdated(
     body: dict,
