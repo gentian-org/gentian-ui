@@ -170,6 +170,17 @@ def test_a_person_who_may_not_install_apps_may_not_set_or_remove_it(client, pers
     person.relations = relations
     assert put_tenant(client).status_code == 403
     assert client.delete("/api/v1/tenant-tiles/nextcloud", headers=BEARER).status_code == 403
+    assert client.get("/api/v1/tenant-tiles", headers=BEARER).status_code == 403
+
+
+def test_the_apps_with_a_tenants_tile_are_listed(client):
+    assert client.get("/api/v1/tenant-tiles", headers=BEARER).json() == {"apps": {}}
+    put_tenant(client, app="nextcloud")
+    put_tenant(client, app="odoo")
+    apps = client.get("/api/v1/tenant-tiles", headers=BEARER).json()["apps"]
+    assert sorted(apps) == ["nextcloud", "odoo"]
+    client.delete("/api/v1/tenant-tiles/odoo", headers=BEARER)
+    assert list(client.get("/api/v1/tenant-tiles", headers=BEARER).json()["apps"]) == ["nextcloud"]
 
 
 @pytest.fixture

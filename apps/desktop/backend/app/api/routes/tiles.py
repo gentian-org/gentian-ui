@@ -8,6 +8,7 @@ bundle; nothing is fetched from another origin when a tile is drawn.
     GET    /tiles/{tile}           the picture tile {tile} shows this person
     PUT    /person-tiles/{tile}    this person's own picture for tile {tile}
     DELETE /person-tiles/{tile}
+    GET    /tenant-tiles           the apps that have a tenant's picture
     PUT    /tenant-tiles/{app}     the tenant's picture for app {app}
     DELETE /tenant-tiles/{app}
 
@@ -93,6 +94,18 @@ def _require_install_right(user: dict, settings: Settings) -> None:
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Setting an app's tile for the tenant requires the right to install apps",
     )
+
+
+@router.get("/tenant-tiles")
+async def list_tenant_tiles(
+    user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    """The apps that have a tenant's tile, and when each was set. The App
+    Store reads it to find a picture it once set and the desktop no longer
+    has: after a restore, the desktop's database is what the bundle held."""
+    _require_install_right(user, settings)
+    return {"apps": tile_store.tenant_tile_versions(resolve_user_context(user, settings))}
 
 
 @router.put("/tenant-tiles/{app}", status_code=status.HTTP_204_NO_CONTENT)
