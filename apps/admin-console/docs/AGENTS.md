@@ -17,7 +17,7 @@ client of the gentian-os director. Read the top-level README first.
   refusal. A 403 means the caller does not hold the relation; softening it here
   would be the console inventing an authorization answer it may not give.
 * **Screens follow relations, never a role string.** `/api/v1/admin/context`
-  is built from the director's `tenants/{t}/me` and `clusters/{c}/me`. A screen
+  is built from the usher's `tenants/{t}/me` and `clusters/{c}/me`. A screen
   appears because of what those answers say and for no other reason. Hiding a
   screen is never what stops someone reaching what is behind it.
 * **The design is the desktop's.** Screens keep the shape they had in the

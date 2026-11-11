@@ -91,7 +91,7 @@ auth:
   # token. edge: the Gateway holds the session with the zone's one
   # confidential client and forwards the token (AD-13); the desktop holds no
   # token, no client secret, no Keycloak credential and no Kubernetes RBAC --
-  # what the caller may do is the director's answer. The v5 platform runs
+  # what the caller may do is the usher's answer. The v5 platform runs
   # every desktop this way.
   mode: pkce
   # The client whose tokens the API accepts: the bundle's own under pkce, the
@@ -160,16 +160,10 @@ llm:
   apiKeySecretName: ""
   apiKeySecretKey: OPENAI_API_KEY
 
-# The director: asked what the signed-in person holds on this desktop's
-# tenant, with that person's own token, and nothing else. The desktop relays
-# no write to it.
-director:
-  url: ""
-
-# The usher: what the desktop asks which tiles a person may open. Read-only,
-# on the cluster network, answered with the caller's own token. Set by the
-# operator; with none the tiles request answers 503, and the director is not
-# asked instead.
+# The usher: what the desktop asks which tiles a person may open and what
+# they hold on this desktop's tenant. Read-only, on the cluster network,
+# answered with the caller's own token. Set by the operator; with none the
+# tiles request answers 503 and the caller holds nothing.
 usher:
   url: ""
 

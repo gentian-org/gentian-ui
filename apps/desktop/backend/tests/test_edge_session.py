@@ -1,7 +1,7 @@
 """Behind the edge the desktop holds no authority of its own.
 
 The Gateway ran the code flow with the zone's client and forwards the token;
-what the caller may do on this tenant is the director's answer, relayed with
+what the caller may do on this tenant is the usher's answer, relayed with
 the caller's own token. This process reads no group, looks nothing up, and
 decides no admin: it renders the verdict.
 """
@@ -17,18 +17,18 @@ from app.core.config import Settings, get_settings
 from app.core.gentian_groups import user_is_platform_admin, user_is_tenant_admin
 
 
-def _settings(tenant: str = "platform", director_url: str | None = "http://director.test:8080") -> Settings:
+def _settings(tenant: str = "platform", usher_url: str | None = "http://usher.test:8080") -> Settings:
     return Settings(
         AUTH_DISABLED="false",
         AUTH_MODE="edge",
         KERNEL_DOMAIN="desk.gentian.org",
         OIDC_ISSUER="https://id.desk.gentian.org/auth/realms/kernel",
         GENTIAN_TENANT=tenant,
-        DIRECTOR_URL=director_url,
+        USHER_URL=usher_url,
     )
 
 
-class FakeDirector:
+class FakeUsher:
     def __init__(self, relations, status=200):
         self.relations, self.status, self.seen = relations, status, {}
 
@@ -52,23 +52,23 @@ class FakeDirector:
 
 
 @pytest.mark.anyio
-async def test_relations_come_from_the_director_with_the_callers_token(monkeypatch):
-    director = FakeDirector({"can_enter": True, "can_administer": True})
-    monkeypatch.setattr(auth.httpx, "AsyncClient", director)
+async def test_relations_come_from_the_usher_with_the_callers_token(monkeypatch):
+    usher = FakeUsher({"can_enter": True, "can_administer": True})
+    monkeypatch.setattr(auth.httpx, "AsyncClient", usher)
     rel = await auth.fetch_tenant_relations("person-token", _settings())
     assert rel == {"can_enter": True, "can_administer": True}
-    assert director.seen["url"] == "http://director.test:8080/v1/tenants/platform/me"
-    assert director.seen["auth"] == "Bearer person-token"
+    assert usher.seen["url"] == "http://usher.test:8080/v1/tenants/platform/me"
+    assert usher.seen["auth"] == "Bearer person-token"
 
 
 @pytest.mark.anyio
-async def test_a_director_that_refuses_or_is_absent_leaves_nothing(monkeypatch):
-    monkeypatch.setattr(auth.httpx, "AsyncClient", FakeDirector({}, status=403))
+async def test_an_usher_that_refuses_or_is_absent_leaves_nothing(monkeypatch):
+    monkeypatch.setattr(auth.httpx, "AsyncClient", FakeUsher({}, status=403))
     assert await auth.fetch_tenant_relations("t", _settings()) == {}
-    assert await auth.fetch_tenant_relations("t", _settings(director_url=None)) == {}
+    assert await auth.fetch_tenant_relations("t", _settings(usher_url=None)) == {}
 
 
-def test_admin_flags_are_the_directors_verdict_not_a_group():
+def test_admin_flags_are_the_ushers_verdict_not_a_group():
     admin = {"sub": "root", "tenant": "platform", "relations": {"can_administer": True}}
     member = {"sub": "mia", "tenant": "platform", "relations": {"can_administer": False}}
     tenant_admin = {"sub": "tom", "tenant": "acme", "relations": {"can_administer": True}}
@@ -79,7 +79,7 @@ def test_admin_flags_are_the_directors_verdict_not_a_group():
     # A tenant's admin is not the platform's, whatever groups a token carried.
     assert user_is_tenant_admin(tenant_admin, "acme")
     assert not user_is_platform_admin(tenant_admin)
-    # A group in the token does not promote anyone once the director has spoken.
+    # A group in the token does not promote anyone once the usher has spoken.
     assert not user_is_platform_admin({"sub": "x", "tenant": "platform", "groups": ["gentian:platform:admin"], "relations": {}})
 
 

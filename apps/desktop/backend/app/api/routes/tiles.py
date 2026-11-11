@@ -31,7 +31,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, 
 from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_signed_in_user
 from app.core.config import Settings, get_settings
 from app.core.tenant import resolve_user_context
 from app.services import tile_store
@@ -69,11 +69,19 @@ def _content_type(request: Request) -> str:
     return request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
 
 
-def _picture(picture: Picture) -> Response:
+# How long a browser keeps a picture. An address the tile list versioned
+# (`?v=`) changes when the picture does, so it is kept for a day; an
+# unversioned one for five minutes.
+VERSIONED_MAX_AGE = 86400
+UNVERSIONED_MAX_AGE = 300
+
+
+def _picture(picture: Picture, versioned: bool = False) -> Response:
+    max_age = VERSIONED_MAX_AGE if versioned else UNVERSIONED_MAX_AGE
     return Response(
         content=picture.data,
         media_type=picture.mime,
-        headers={"Cache-Control": "private, max-age=300", "X-Content-Type-Options": "nosniff"},
+        headers={"Cache-Control": f"private, max-age={max_age}", "X-Content-Type-Options": "nosniff"},
     )
 
 
@@ -220,12 +228,17 @@ def _profile_picture(tile_id: str, tiles: list[dict] | None) -> Picture | str | 
 @router.get("/tiles/{tile_id:path}")
 async def get_tile(
     tile_id: str = TileId,
+    v: str | None = None,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_signed_in_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """The picture tile `tile_id` shows this person: theirs, else the
-    tenant's for the app it is the main entry of, else the profile's."""
+    tenant's for the app it is the main entry of, else the profile's.
+
+    Asks nothing of what the person holds: which tiles they may open is the
+    usher's answer to the tile list, and a picture is the same for anybody
+    signed in to this tenant."""
     tenant = resolve_user_context(user, settings)
     token = credentials.credentials if credentials else None
     tiles: list[dict] | None = None
@@ -239,7 +252,7 @@ async def get_tile(
             if tiles is None or tile_store.pictured_app_of(tile_id, tenant, _names(tiles)) != app:
                 picture = None
     if picture is not None:
-        return _picture(picture)
+        return _picture(picture, versioned=bool(v))
     if tiles is None:
         tiles = await _catalog(token, settings)
     default = _profile_picture(tile_id, tiles)
