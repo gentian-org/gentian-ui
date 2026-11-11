@@ -281,7 +281,7 @@ def test_the_authorization_view_asks_the_right_scope(monkeypatch):
 
     r = client.get("/api/v1/admin/authorization", headers={"Authorization": "Bearer t"})
     assert r.status_code == 200
-    assert seen["url"] == "http://director.test:8080/v1/tenants/platform/authorization"
+    assert seen["url"] == "http://usher.test:8090/v1/tenants/platform/authorization"
     # The grants survive the relay: without them a reader sees "admin" and has
     # to go and read the model to learn what it means.
     assert r.json()["bindings"][0]["grants"] == ["can_view"]
@@ -290,7 +290,7 @@ def test_the_authorization_view_asks_the_right_scope(monkeypatch):
         "/api/v1/admin/authorization?scope=cluster", headers={"Authorization": "Bearer t"}
     )
     assert r.status_code == 200
-    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/authorization"
+    assert seen["url"] == "http://usher.test:8090/v1/clusters/demo/authorization"
 
 
 def test_a_refusal_of_the_cluster_scope_is_relayed_not_hidden(monkeypatch):
