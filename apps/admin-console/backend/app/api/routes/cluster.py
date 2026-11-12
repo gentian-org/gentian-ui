@@ -192,6 +192,49 @@ async def set_cluster_models(
     )
 
 
+@router.get("/tenants/{tenant}/model-access")
+async def tenant_model_access(
+    tenant: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What one tenant's apps may use at the model gateway: the providers it
+    opts in to, its budget, whether its administrators may change the
+    providers, and each of the cluster's models with whether the tenant may
+    use it. The cluster's auditor and the tenant's administrator may read it;
+    the director decides which."""
+    return await director.forward(
+        settings,
+        "GET",
+        _cluster_path(settings, f"/tenants/{tenant}/model-access"),
+        bearer_of(credentials),
+    )
+
+
+@router.put("/tenants/{tenant}/model-access")
+async def set_tenant_model_access(
+    tenant: str,
+    body: dict,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """The whole of the tenant's model access, as one commit by the director.
+
+    Sent as it came: a tenant's administrator sends the budget and the
+    delegation back as they were read, and the director refuses a body that
+    changes them (403). Nothing is filled in or dropped here, because a
+    budget this relay left out would be a budget removed."""
+    return await director.forward(
+        settings,
+        "PUT",
+        _cluster_path(settings, f"/tenants/{tenant}/model-access"),
+        bearer_of(credentials),
+        json_body=body,
+    )
+
+
 @router.get("/tenants")
 async def cluster_tenants(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),

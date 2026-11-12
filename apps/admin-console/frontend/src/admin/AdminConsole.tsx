@@ -15,6 +15,7 @@ import { ReleaseSection } from "@/admin/ReleaseSection";
 import { ClusterSettingsSection } from "@/admin/ClusterSettingsSection";
 import { GroupsSection } from "@/admin/GroupsSection";
 import { MembersSection } from "@/admin/MembersSection";
+import { ModelAccessSection } from "@/admin/ModelAccessSection";
 import { ModelsSection } from "@/admin/ModelsSection";
 import { IntegrationsSection } from "@/admin/IntegrationsSection";
 import { UsageStatisticsSection } from "@/admin/UsageStatisticsSection";
@@ -49,6 +50,7 @@ type AdminTab =
   | "audit"
   | "settings"
   | "models"
+  | "modelAccess"
   | "platform"
   | "clusterRoles"
   | "customization"
@@ -116,6 +118,11 @@ const TABS: {
   // asked of the platform, taking it away. Nothing is installed from here.
   { id: "apps", labelKey: "tabApps" },
   { id: "resources", labelKey: "tabResources" },
+  // Which models the tenant's apps may use beyond the cluster's own, and
+  // the tenant's budget there. Every administrator of the tenant sees it;
+  // what each may change is the director's answer, and the screen offers
+  // only that (ModelAccessSection).
+  { id: "modelAccess", labelKey: "tabModelAccess" },
   { id: "export", labelKey: "tabExport" },
   { id: "security", labelKey: "tabSecurity" },
   { id: "integrations", labelKey: "tabIntegrations" },
@@ -287,6 +294,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <ClusterSettingsSection />
           ) : current === "models" ? (
             <ModelsSection />
+          ) : current === "modelAccess" ? (
+            <ModelAccessSection tenant={tenant} isClusterAdmin={isPlatformAdmin} />
           ) : current === "platform" ? (
             <PlatformSecuritySection />
           ) : current === "clusterRoles" ? (

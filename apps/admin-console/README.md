@@ -71,6 +71,24 @@ provider address that is not a public https address. The tab also carries the
 switch for the gateway's own console, with a warning that it opens a public
 address.
 
+## Model access
+
+The Model access tab says which models one tenant's apps may use at the
+gateway: the external providers the tenant opts in to, an optional budget for
+all its apps together, and whether the tenant's administrators may choose the
+providers themselves. Models the cluster serves itself are always available.
+It reads and writes the tenant manifest's `spec.llm` through the director
+(`GET` / `PUT /v1/clusters/{c}/tenants/{t}/model-access`); there is one
+toggle per provider the cluster offers models of.
+
+The cluster's administrator (`isPlatformAdmin`, `can_configure` on the
+cluster) picks the tenant and changes all of it; clearing the budget form
+removes the budget. A tenant's administrator changes the providers while the
+delegation is on, and the screen sends the budget and the delegation back as
+it read them, because the `PUT` replaces the whole of `spec.llm` and the
+director refuses a body that changes either. Without the delegation the tab
+is read-only. A refusal is shown in the director's words.
+
 ## Apps
 
 The Apps tab is where a tenant's apps are administered; the desktop only shows
