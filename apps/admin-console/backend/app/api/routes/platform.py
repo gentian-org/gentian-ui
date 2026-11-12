@@ -199,7 +199,7 @@ async def authorization(
         cluster = settings.cluster_id
         if not cluster:
             # No cluster id configured means no object to ask about. Saying so
-            # is better than asking the director about the empty string.
+            # is better than asking the usher about the empty string.
             return Response(
                 status_code=501,
                 media_type="application/json",
@@ -209,4 +209,4 @@ async def authorization(
         path = f"/v1/clusters/{cluster}/authorization"
     else:
         path = f"/v1/tenants/{tenant or settings.tenant_id}/authorization"
-    return await director.forward(settings, "GET", path, bearer_of(credentials))
+    return await director.read(settings, path, bearer_of(credentials))

@@ -29,10 +29,9 @@ async def cluster_me(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """Which of the cluster's verbs this person holds. Every verb false is an
-    ordinary answer: it is what almost everyone who signs in gets."""
-    return await director.forward(
-        settings, "GET", _cluster_path(settings, "/me"), bearer_of(credentials)
-    )
+    ordinary answer: it is what almost everyone who signs in gets. The
+    usher answers it."""
+    return await director.read(settings, _cluster_path(settings, "/me"), bearer_of(credentials))
 
 
 @router.get("/settings")

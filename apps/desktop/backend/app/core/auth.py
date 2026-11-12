@@ -18,25 +18,47 @@ _bearer = HTTPBearer(auto_error=False)
 _verified = current_user(lambda: get_settings())
 
 
+_DEV_USER = {
+    "sub": "dev-user",
+    "preferred_username": "dev-user",
+    "name": "Dev User",
+    "email": "dev@gentian.local",
+    "tenant": "demo",
+    "groups": ["gentian:tenant:demo:admins", "gentian:tenant:demo:members"],
+}
+
+
+async def get_signed_in_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> dict[str, Any]:
+    """Who the caller is, and nothing they hold: for a route that decides
+    nothing on the caller's rights, such as a tile's picture, so that it
+    costs no round trip to the usher.
+
+    The relations are empty rather than absent: a route that asks them all
+    the same is refused, not sent down the older path that reads groups.
+    """
+    settings = get_settings()
+    if settings.auth_disabled:
+        return dict(_DEV_USER)
+    claims = await _verified(credentials)
+    claims["tenant"] = settings.gentian_tenant or ""
+    claims["relations"] = {}
+    return claims
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> dict[str, Any]:
     settings = get_settings()
     if settings.auth_disabled:
-        return {
-            "sub": "dev-user",
-            "preferred_username": "dev-user",
-            "name": "Dev User",
-            "email": "dev@gentian.local",
-            "tenant": "demo",
-            "groups": ["gentian:tenant:demo:admins", "gentian:tenant:demo:members"],
-        }
+        return dict(_DEV_USER)
     claims = await _verified(credentials)
 
     # Behind the edge, and only behind the edge.
     #
     # The token names no groups and this process holds no credential to look
-    # any up. The director answers what the caller holds on this desktop's
+    # any up. The usher answers what the caller holds on this desktop's
     # tenant, with the caller's own token, and every decision the shell makes
     # reads that answer.
     #
@@ -51,15 +73,15 @@ async def get_current_user(
 
 
 async def fetch_tenant_relations(token: str, settings: Settings) -> dict[str, bool]:
-    """What the caller holds on this desktop's tenant, as the director says.
+    """What the caller holds on this desktop's tenant, as the usher says.
 
-    Forwarded with the caller's own token: the director decides, this
-    process relays. A director that cannot be reached leaves the caller with
-    nothing, which is the safe direction.
+    Forwarded with the caller's own token: OpenFGA decides, the usher asks
+    it, this process relays. An usher that cannot be reached leaves the
+    caller with nothing, which is the safe direction.
     """
-    if not settings.director_url or not settings.gentian_tenant:
+    if not settings.usher_url or not settings.gentian_tenant:
         return {}
-    url = f"{settings.director_url.rstrip('/')}/v1/tenants/{settings.gentian_tenant}/me"
+    url = f"{settings.usher_url.rstrip('/')}/v1/tenants/{settings.gentian_tenant}/me"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(url, headers={"Authorization": f"Bearer {token}"})

@@ -36,14 +36,9 @@ class Settings(BaseSettings):
     def capability_set(self) -> set[str]:
         return {c.strip() for c in self.capabilities.split(",") if c.strip()}
 
-    # The director, on the cluster network. Asked one thing: what the caller
-    # holds on this desktop's tenant (`/v1/tenants/{t}/me`), with the caller's
-    # own token.
-    director_url: str | None = Field(default=None, alias="DIRECTOR_URL")
     # The usher, on the cluster network: the read-only service that answers
-    # which tiles this person may open on this tenant's desktop. It holds no
-    # authority; the tenant's own people are answered there, where the
-    # director answers only those who hold a relation on the cluster.
+    # which tiles this person may open on this tenant's desktop, and what
+    # they hold on it (`/v1/tenants/{t}/me`), with the caller's own token.
     usher_url: str | None = Field(default=None, alias="USHER_URL")
 
     # The model gateway, for the assistant on the desktop (docs/ai-widget.md).
@@ -107,7 +102,7 @@ class Settings(BaseSettings):
     auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
     # pkce: the bundle runs the code flow and sends its own bearer. edge: the
     # Gateway holds the session and forwards the zone client's token (AD-13);
-    # what the caller may do comes from the director, never from groups
+    # what the caller may do comes from the usher, never from groups
     # this process reads off the token or looks up itself.
     auth_mode: str = Field(default="pkce", alias="AUTH_MODE")
     # The tenant this desktop is the desktop of (a component of it). Behind
