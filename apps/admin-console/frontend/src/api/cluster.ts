@@ -315,6 +315,61 @@ export async function updateClusterModels(settings: ModelSettings): Promise<Clus
 }
 
 /**
+ * A tenant's cap at the model gateway, all its apps together. Each field is
+ * optional and one left out caps nothing; `maxBudget` is whole US dollars per
+ * `budgetDuration` (e.g. `30d`, `1mo`).
+ */
+export type ModelAccessBudget = {
+  maxBudget?: number;
+  budgetDuration?: string;
+  rpmLimit?: number;
+  tpmLimit?: number;
+};
+
+/**
+ * What a tenant's apps may use at the model gateway (Tenant.spec.llm), and
+ * each of the cluster's models with whether the tenant may use it. A model
+ * the cluster serves itself is always allowed; a provider's once the tenant
+ * names the provider.
+ */
+export type TenantModelAccess = {
+  tenant: string;
+  providers: string[];
+  /** Null when no budget is set. */
+  budget: ModelAccessBudget | null;
+  /** The tenant's administrators may change the providers. */
+  delegated: boolean;
+  models: (GatewayModel & { allowed: boolean })[];
+};
+
+/** The whole of spec.llm, as the director's PUT takes it. */
+export type TenantModelAccessBody = {
+  providers: string[];
+  budget?: ModelAccessBudget | null;
+  delegated: boolean;
+};
+
+export function modelAccessQueryKey(tenant: string) {
+  return ["cluster", "model-access", tenant] as const;
+}
+
+export function fetchTenantModelAccess(tenant: string) {
+  return apiFetch<TenantModelAccess>(`/cluster/tenants/${encodeURIComponent(tenant)}/model-access`);
+}
+
+/** The whole of the tenant's model access: a budget the body leaves out is removed. */
+export async function updateTenantModelAccess(
+  tenant: string,
+  body: TenantModelAccessBody,
+): Promise<ClusterSettingsWriteResult> {
+  const answer = await apiFetch<{ status: string; commit?: string }>(
+    `/cluster/tenants/${encodeURIComponent(tenant)}/model-access`,
+    { method: "PUT", body: JSON.stringify(body) },
+  );
+  return { ...answer, changed: Boolean(answer.commit) };
+}
+
+/**
  * One installed app in the cluster's update report (gentian-os
  * docs/concepts/versioning.md §4.2): the build git pins, the build the cluster
  * runs, the newest build its catalog offers, the mode it moves under and
