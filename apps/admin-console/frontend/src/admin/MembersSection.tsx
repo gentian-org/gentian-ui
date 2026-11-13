@@ -152,6 +152,15 @@ function groupItems(groups: DescribedGroup[]): ChecklistItem[] {
   return groups.map((g) => ({ key: g.path, label: g.label, section: g.kind }));
 }
 
+/**
+ * The groups an invitation offers. The tenant's members group is not among
+ * them: the registrar puts every invited person in it, because entering the
+ * tenant takes it.
+ */
+export function invitable(groups: DescribedGroup[]): DescribedGroup[] {
+  return groups.filter((g) => !(g.kind === "role" && g.label === "members"));
+}
+
 /** The part before the @ a person types: letters, digits, dots, dashes, underscores. */
 function sanitizeLocalPart(raw: string): string {
   return raw.toLowerCase().replace(/[^a-z0-9._-]/g, "");
@@ -340,7 +349,7 @@ function InviteCard({
           <span>{t("members.groups")}</span>
           <Checklist
             id="inv-groups"
-            items={groupItems(groups)}
+            items={groupItems(invitable(groups))}
             selected={new Set(chosen)}
             sectionLabel={(kind) => t(`groupPicker.kind_${kind}`)}
             onToggle={(path, on) => setChosen(on ? [...chosen, path] : chosen.filter((p) => p !== path))}
