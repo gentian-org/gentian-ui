@@ -233,7 +233,9 @@ def test_the_main_address_travels_only_as_the_person_sent_it(monkeypatch):
     assert seen["json"] == {"apex": True, "acknowledgeMainAddressRule": False}
 
 
-@pytest.mark.parametrize("kind", ["public", "publicAppCredential", "signInAppAuthorization"])
+@pytest.mark.parametrize(
+    "kind", ["public", "publicAppCredential", "signInAppAuthorization", "tokenEntry"]
+)
 def test_the_kind_the_dialog_showed_travels_with_the_approval(monkeypatch, kind):
     """What the person was shown is what they approve: the director refuses
     the approval if the entry has come to declare another kind."""

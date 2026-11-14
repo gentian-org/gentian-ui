@@ -183,10 +183,11 @@ export type ExposureEntry = {
   /** `requested`, `approved`, `reviewDue`, `expired` or `unmatched`. */
   state: string;
   /**
-   * What approving the entry allows: `public`, `publicAppCredential` or
-   * `signInAppAuthorization`. Absent from a director older than kinds, where
-   * every entry is a public address. Sent back with an approval, so the
-   * director refuses it if the entry has come to declare another kind.
+   * What approving the entry allows: `public`, `publicAppCredential`,
+   * `signInAppAuthorization` or `tokenEntry`. Absent from a director older
+   * than kinds, where every entry is a public address. Sent back with an
+   * approval, so the director refuses it if the entry has come to declare
+   * another kind.
    */
   kind?: string;
   /** The kind in the director's own few words. Shown as it came. */
