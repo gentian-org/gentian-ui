@@ -162,7 +162,7 @@ llm:
 
 # The contract `notices`, which the desktop provides: a component the tenant's
 # administrator granted the contract to puts a notice in a person's inbox
-# with POST /api/v1/notices, presenting the contract's credential as a
+# with POST /contracts/v1/notices, presenting the contract's credential as a
 # bearer. Set by the platform, for the desktop and for that component, never
 # by hand:
 #

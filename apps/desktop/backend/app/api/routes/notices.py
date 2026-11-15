@@ -2,9 +2,10 @@
 
 The desktop provides the contract. A component the tenant's administrator
 granted it to is told this address and the contract's credential by the
-platform, and presents the credential as a bearer. Nobody else has it: a
-person's token is not the credential, so a signed-in person who sends this
-request through the edge is answered 401 like anyone else without it.
+platform, and presents the credential as a bearer. Nobody else has it, and
+a person's token is not the credential. The route is at /contracts/v1/notices,
+outside the prefix the edge routes: it is reached from inside the cluster,
+over the network path the grant opens, and from nowhere else.
 
 The notice is stored for the tenant this desktop serves and for nobody
 outside it: the people it names, the groups of this tenant it names, or both.

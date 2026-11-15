@@ -87,6 +87,8 @@ app.include_router(cluster.router, prefix=settings.api_v1_str)
 app.include_router(prefs.router, prefix=settings.api_v1_str)
 app.include_router(account.router, prefix=settings.api_v1_str)
 app.include_router(notifications.router, prefix=settings.api_v1_str)
-app.include_router(notices.router, prefix=settings.api_v1_str)
 app.include_router(llm.router, prefix=settings.api_v1_str)
 app.include_router(tiles.router, prefix=settings.api_v1_str)
+# Not under the API's prefix, which the edge routes: a contract is called by
+# a component inside the cluster and is nothing a browser reaches.
+app.include_router(notices.router, prefix="/contracts/v1")

@@ -17,7 +17,7 @@ from app.services.sql_notification_store import SqlNotificationStore
 
 TENANT = "acme"
 KEY = "s3cr3t-contract-key"
-URL = "/api/v1/notices"
+URL = "/contracts/v1/notices"
 
 ADA = {
     "sub": "8f1c",
@@ -48,7 +48,7 @@ def _settings(**over) -> Settings:
 
 def _client(**over) -> TestClient:
     app = FastAPI()
-    app.include_router(notices.router, prefix="/api/v1")
+    app.include_router(notices.router, prefix="/contracts/v1")
     settings = _settings(**over)
     app.dependency_overrides[get_settings] = lambda: settings
     return TestClient(app)
@@ -76,7 +76,7 @@ def test_the_app_serves_the_route_at_its_path():
 
     response = TestClient(app).post(URL, json=_body(), headers=_auth())
     assert response.status_code == 503
-    assert "/api/v1/notices" in app.openapi()["paths"]
+    assert "/contracts/v1/notices" in app.openapi()["paths"]
 
 
 def test_no_key_set_answers_503():
@@ -233,3 +233,11 @@ def test_limits_are_inclusive():
 def test_no_tenant_stated_answers_503():
     response = _client(GENTIAN_TENANT="").post(URL, json=_body(), headers=_auth())
     assert response.status_code == 503
+
+
+def test_the_contract_is_outside_the_prefix_the_edge_routes() -> None:
+    from app.main import app
+
+    paths = list(app.openapi()["paths"])
+    assert "/contracts/v1/notices" in paths
+    assert not any(path.startswith("/api") and "notices" in path for path in paths)

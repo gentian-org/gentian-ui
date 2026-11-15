@@ -64,7 +64,7 @@ class Settings(BaseSettings):
 
     # The credential of the contract `notices`, which this desktop provides: a
     # component the tenant's administrator granted the contract to presents it
-    # to put a notice in a person's inbox (POST /api/v1/notices). The platform
+    # to put a notice in a person's inbox (POST /contracts/v1/notices). The platform
     # sets it for the desktop and for that component. Empty, no component has
     # been granted the contract and the route answers 503. Never logged.
     notices_key: SecretStr | None = Field(default=None, alias="NOTICES_KEY")
