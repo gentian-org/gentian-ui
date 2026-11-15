@@ -16,6 +16,10 @@ class NotificationAudience:
     scope: AudienceScope
     tenant: str | None = None
     groups: list[str] = field(default_factory=list)
+    # People the notice is for by name: each entry is a person's subject,
+    # username or email address. Kept inside the stored audience, so a row
+    # written before there were any reads as naming nobody.
+    people: list[str] = field(default_factory=list)
 
 
 @dataclass

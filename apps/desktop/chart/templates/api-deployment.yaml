@@ -21,6 +21,12 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/managed-by: {{ .Release.Service }}
         app.kubernetes.io/component: api
+      {{- if include "gentian-portal.noticesKey" . }}
+      annotations:
+        {{- /* The API reads the credential at start, so a credential the
+             platform replaces starts new pods. */}}
+        checksum/notices: {{ include "gentian-portal.noticesKey" . | sha256sum }}
+      {{- end }}
     spec:
       serviceAccountName: {{ include "gentian-portal.fullname" . }}
       securityContext:
@@ -110,6 +116,18 @@ spec:
               value: {{ .Values.llm.baseUrl | quote }}
             - name: LLM_API_KEY_FILE
               value: /var/run/gentian/llm/api-key
+            {{- end }}
+            {{- /* The credential of the contract `notices`, from the Secret
+                   this chart keeps it in (notices-secret.yaml). Only when the
+                   platform delivered one: otherwise the API is told nothing
+                   and answers that no component has been granted the
+                   contract. */}}
+            {{- if and (include "gentian-portal.noticesKey" .) (not (hasKey (default dict .Values.api.env) "NOTICES_KEY")) }}
+            - name: NOTICES_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gentian-portal.fullname" . }}-notices
+                  key: NOTICES_KEY
             {{- end }}
             {{- if .Values.openfga.apiUrl }}
             - name: OPENFGA_API_URL
