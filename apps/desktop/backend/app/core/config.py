@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     llm_max_messages: int = Field(default=40, alias="LLM_MAX_MESSAGES")
     llm_max_tokens: int = Field(default=1024, alias="LLM_MAX_TOKENS")
 
+    # The credential of the contract `notices`, which this desktop provides: a
+    # component the tenant's administrator granted the contract to presents it
+    # to put a notice in a person's inbox (POST /contracts/v1/notices). The platform
+    # sets it for the desktop and for that component. Empty, no component has
+    # been granted the contract and the route answers 503. Never logged.
+    notices_key: SecretStr | None = Field(default=None, alias="NOTICES_KEY")
+
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
     portal_shell_secrets_namespace: str = Field(
         default="platform-kernel",

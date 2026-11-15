@@ -160,6 +160,20 @@ llm:
   apiKeySecretName: ""
   apiKeySecretKey: OPENAI_API_KEY
 
+# The contract `notices`, which the desktop provides: a component the tenant's
+# administrator granted the contract to puts a notice in a person's inbox
+# with POST /contracts/v1/notices, presenting the contract's credential as a
+# bearer. Set by the platform, for the desktop and for that component, never
+# by hand:
+#
+#   key   the contract's credential. The chart keeps it in a Secret of its
+#         own and hands the API that Secret's key, so it is in no pod spec.
+#
+# Empty, the API is told nothing and the route answers 503: no component has
+# been granted the contract.
+notices:
+  key: ""
+
 # The usher: what the desktop asks which tiles a person may open and what
 # they hold on this desktop's tenant. Read-only, on the cluster network,
 # answered with the caller's own token. Set by the operator; with none the
