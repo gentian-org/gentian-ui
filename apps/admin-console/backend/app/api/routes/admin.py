@@ -43,35 +43,35 @@ class AdminContextResponse(BaseModel):
     isTenantAdmin: bool
     availableTenants: list[str]
     kernelDomain: str
-    # The director's answer to whether this person may put something of this
+    # The usher's answer to whether this person may put something of this
     # tenant on the internet or take it off (can_expose). It decides which
     # buttons the Apps screen offers and nothing else: the director asks again
     # on every approval and withdrawal.
     canExpose: bool = False
-    # The director's answer to whether this person may say what one app of
+    # The usher's answer to whether this person may say what one app of
     # this tenant may consume from another (can_grant). It decides whether
     # the Integrations screen offers approving and withdrawing; the director
     # asks again on every write.
     canGrant: bool = False
-    # The director's answer to whether this person may answer an app's egress
+    # The usher's answer to whether this person may answer an app's egress
     # request (can_approve_privilege, the tenant's perimeter approver's). It
     # decides whether the Apps screen offers approving; the director asks
     # again on every approval, and decides a podSecurity or clusterRoles
     # request by another right.
     canApprovePrivilege: bool = False
-    # The director's answer to whether this person may answer the requests
+    # The usher's answer to whether this person may answer the requests
     # that weaken what protects the node -- podSecurity, clusterRoles, every
     # kind that is not egress (cluster#can_approve, the security officer's).
     # Which kind needs which is the operator's answer on each pending request
     # (pendingPrivilegeApprovals), not decided here; the director asks again
     # on every approval.
     canApproveNodePrivilege: bool = False
-    # The director's answer to whether this person is the cluster's perimeter
+    # The usher's answer to whether this person is the cluster's perimeter
     # approver (cluster#can_approve_perimeter): they answer the egress
     # requests of every tenant on the Approvals screen. The director asks
     # again on every approval.
     canApprovePerimeter: bool = False
-    # The director's answer to whether this person may read who holds the
+    # The usher's answer to whether this person may read who holds the
     # cluster's roles (cluster#can_audit). It decides whether the Cluster
     # roles screen is shown; changing them needs can_configure.
     canAuditCluster: bool = False
@@ -81,10 +81,11 @@ class AdminContextResponse(BaseModel):
 
 
 async def _relations(settings: Settings, path: str, token: str) -> dict[str, bool]:
-    answer = await director.forward(settings, "GET", path, token)
+    """What the caller holds, as the usher answers it."""
+    answer = await director.read(settings, path, token)
     if answer.status_code != 200:
         raise HTTPException(
-            status_code=answer.status_code, detail=answer.body.decode() or "the director refused"
+            status_code=answer.status_code, detail=answer.body.decode() or "the usher refused"
         )
     import json
 

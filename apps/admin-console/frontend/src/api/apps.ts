@@ -183,10 +183,11 @@ export type ExposureEntry = {
   /** `requested`, `approved`, `reviewDue`, `expired` or `unmatched`. */
   state: string;
   /**
-   * What approving the entry allows: `public`, `publicAppCredential` or
-   * `signInAppAuthorization`. Absent from a director older than kinds, where
-   * every entry is a public address. Sent back with an approval, so the
-   * director refuses it if the entry has come to declare another kind.
+   * What approving the entry allows: `public`, `publicAppCredential`,
+   * `signInAppAuthorization` or `tokenEntry`. Absent from a director older
+   * than kinds, where every entry is a public address. Sent back with an
+   * approval, so the director refuses it if the entry has come to declare
+   * another kind.
    */
   kind?: string;
   /** The kind in the director's own few words. Shown as it came. */
@@ -209,11 +210,14 @@ export type ExposureEntry = {
   anyoneWithoutSignIn?: boolean;
   /** Who can reach it, and what approving it allows, in the director's own sentences. */
   access?: string;
-  /** The entry is for the cluster's bare domain. */
+  /**
+   * The entry is for a bare name: the cluster's main address, or the
+   * tenant's own zone or domain. `host` says which.
+   */
   mainAddress?: boolean;
   /**
    * What the director says an approver must know before a website goes on
-   * the main address. Shown as it came; nothing here holds a copy.
+   * a bare name. Shown as it came; nothing here holds a copy.
    */
   mainAddressRule?: string;
   /**
@@ -281,7 +285,7 @@ export function fetchPerimeterHistory() {
 
 /**
  * What an approval may say. `apex` and `acknowledgeMainAddressRule` are for
- * an entry on the cluster's main address and travel only for one; the
+ * an entry on a bare name and travel only for one; the
  * console's backend refuses any other field.
  */
 export type ExposureApprovalRequest = {

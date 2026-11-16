@@ -24,16 +24,16 @@ async def get_me(
     user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> dict[str, Any]:
-    """Who is signed in, and what the director says they hold here.
+    """Who is signed in, and what the usher says they hold here.
 
     No tiles. `shellApps` used to be built by reading every AppProfile in the
     cluster through the Kubernetes API, which needed a ServiceAccount that could
     read cluster-scoped custom resources -- so the desktop held a cluster
     identity in order to draw a list of icons. The tiles come from the
-    director's projected catalog now, which the shell reads separately, and
+    usher's projected catalog now, which the shell reads separately, and
     this process holds no Kubernetes credential at all (gentian-os S7A.6).
 
-    No groups either: the director answers what the caller holds on this
+    No groups either: the usher answers what the caller holds on this
     tenant, and a group in a token promotes nobody.
     """
     return {

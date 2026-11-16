@@ -21,9 +21,12 @@ from app.services.admin_notifications import AdminNotification, NotificationAudi
 def normalize_audience(audience: NotificationAudience, default_tenant: str) -> NotificationAudience:
     tenant = audience.tenant or default_tenant
     groups = list(audience.groups)
-    if audience.scope == "tenant" and not groups:
+    people = list(audience.people)
+    # A notice that names people and no group is for those people alone: the
+    # members' group is the default only for an audience that names nobody.
+    if audience.scope == "tenant" and not groups and not people:
         groups = [tenant_members_group(tenant)]
-    return NotificationAudience(scope=audience.scope, tenant=tenant, groups=groups)
+    return NotificationAudience(scope=audience.scope, tenant=tenant, groups=groups, people=people)
 
 
 def validate_publish_audience(
@@ -110,5 +113,35 @@ def notification_visible_to_user(
         if not user_is_platform_admin(user):
             return False
 
-    target_groups = audience.groups or [tenant_members_group(audience.tenant or notification.tenant)]
+    if audience_names_person(audience, user):
+        return True
+
+    target_groups = list(audience.groups)
+    # No group named means every member of the tenant -- unless the notice
+    # names people, and then it is for them and nobody else.
+    if not target_groups and not audience.people:
+        target_groups = [tenant_members_group(audience.tenant or notification.tenant)]
     return bool(user_groups.intersection(target_groups))
+
+
+def audience_names_person(audience: NotificationAudience, user: dict[str, Any]) -> bool:
+    """Whether one of the audience's people is this user.
+
+    An entry names a person by subject, by username or by email address. The
+    subject is compared as it is; a username and an address without regard to
+    case. A claim the token does not carry, or carries empty, matches nothing.
+    """
+    sub = _claim(user, "sub")
+    names = {name.casefold() for name in (_claim(user, "preferred_username"), _claim(user, "email")) if name}
+    for entry in audience.people:
+        entry = str(entry).strip()
+        if not entry:
+            continue
+        if (sub and entry == sub) or entry.casefold() in names:
+            return True
+    return False
+
+
+def _claim(user: dict[str, Any], name: str) -> str:
+    value = user.get(name)
+    return value.strip() if isinstance(value, str) else ""

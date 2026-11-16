@@ -44,3 +44,15 @@ when an older platform installs this chart.
 true
 {{- end -}}
 {{- end -}}
+
+{{/*
+The credential of the contract `notices`, as the platform delivered it; empty
+when it delivered none. Tolerant of values that are missing altogether, as
+they are when an older platform installs this chart.
+*/}}
+{{- define "gentian-portal.noticesKey" -}}
+{{- $notices := default dict .Values.notices -}}
+{{- with $notices.key -}}
+{{- toString . -}}
+{{- end -}}
+{{- end -}}

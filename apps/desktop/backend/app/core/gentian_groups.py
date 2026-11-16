@@ -117,7 +117,7 @@ PLATFORM_TENANT = "platform"
 
 
 def relations_of(user: dict[str, Any]) -> dict[str, bool] | None:
-    """The director's answer about this caller, when the edge session carries
+    """The usher's answer about this caller, when the edge session carries
     one. None means the caller was not identified that way (v4 groups)."""
     rel = user.get("relations")
     return rel if isinstance(rel, dict) else None

@@ -117,9 +117,7 @@ export function ApprovalsSection() {
                     {mayApprove(approval) ? (
                       <AnswerRequest approval={approval} />
                     ) : (
-                      <div className="admin-console__hint">
-                        {t(approval.approvedBy === "perimeter-approver" ? "approvals.notYoursPerimeter" : "approvals.notYours")}
-                      </div>
+                      <NotAnsweredHere approval={approval} />
                     )}
                   </td>
                 </tr>
@@ -129,6 +127,40 @@ export function ApprovalsSection() {
         </div>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * Whose a request is, for a reader who cannot answer it here. The usher
+ * names the approver; one this console has no button for is named as it is
+ * rather than passed off as the security officer's. Break-glass answers
+ * from the command line, so the command is shown.
+ */
+function NotAnsweredHere({ approval }: { approval: Approval }) {
+  const { t } = useTranslation();
+  if (approval.approvedBy === "perimeter-approver") {
+    return <div className="admin-console__hint">{t("approvals.notYoursPerimeter")}</div>;
+  }
+  if (approval.approvedBy === "security-officer") {
+    return <div className="admin-console__hint">{t("approvals.notYours")}</div>;
+  }
+  if (approval.approvedBy === "break-glass") {
+    return (
+      <div className="admin-console__hint">
+        <Trans
+          i18nKey="approvals.breakGlass"
+          values={{
+            command: `kubectl gentian apps approve ${approval.install} ${approval.privilege} --tenant ${approval.tenant} --reason "…"`,
+          }}
+          components={mono}
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="admin-console__hint">
+      <Trans i18nKey="approvals.otherApprover" values={{ who: approval.approvedBy }} components={mono} />
+    </div>
   );
 }
 

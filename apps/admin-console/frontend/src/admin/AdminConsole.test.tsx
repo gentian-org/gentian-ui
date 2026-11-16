@@ -56,6 +56,11 @@ describe("AdminConsole", () => {
     expect(tabs(base)).not.toContain("Approvals");
   });
 
+  it("shows Model access to every administrator of the tenant", () => {
+    expect(tabs(base)).toContain("Model access");
+    expect(tabs({ ...base, isPlatformAdmin: true })).toContain("Model access");
+  });
+
   it("shows a perimeter approver who does not administer the tenant the Approvals tab alone", () => {
     expect(tabs({ ...base, isTenantAdmin: false, canApprovePerimeter: true })).toEqual(["Approvals"]);
   });

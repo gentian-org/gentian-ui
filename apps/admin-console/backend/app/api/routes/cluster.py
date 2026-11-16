@@ -29,10 +29,9 @@ async def cluster_me(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """Which of the cluster's verbs this person holds. Every verb false is an
-    ordinary answer: it is what almost everyone who signs in gets."""
-    return await director.forward(
-        settings, "GET", _cluster_path(settings, "/me"), bearer_of(credentials)
-    )
+    ordinary answer: it is what almost everyone who signs in gets. The
+    usher answers it."""
+    return await director.read(settings, _cluster_path(settings, "/me"), bearer_of(credentials))
 
 
 @router.get("/settings")
@@ -60,6 +59,43 @@ async def updates(
     open now come with it."""
     return await director.forward(
         settings, "GET", _cluster_path(settings, "/updates"), bearer_of(credentials)
+    )
+
+
+@router.get("/release")
+async def release(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """The platform release this cluster runs (gentian-os
+    docs/concepts/versioning.md §2.1): what the Cluster claim declares, what
+    the operator applied and what the release index offers under the
+    cluster's autoUpgrade mode, with the maintenance window. The director's
+    answer, read under `can_audit` on the cluster."""
+    return await director.forward(
+        settings, "GET", _cluster_path(settings, "/release"), bearer_of(credentials)
+    )
+
+
+@router.post("/release")
+async def set_release(
+    body: dict,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Move the cluster to a release ({"version": "vX.Y.Z", "autoUpgrade":
+    "none|patch|minor"}) or onto a branch ({"track": "<branch>"}). The cluster
+    administrator's act (`can_configure`): the director writes spec.release
+    and the catalog source as one signed commit, and the operator moves the
+    cluster from there."""
+    return await director.forward(
+        settings,
+        "POST",
+        _cluster_path(settings, "/actions/set-release"),
+        bearer_of(credentials),
+        json_body=body,
     )
 
 
@@ -151,6 +187,49 @@ async def set_cluster_models(
         settings,
         "PUT",
         _cluster_path(settings, "/models"),
+        bearer_of(credentials),
+        json_body=body,
+    )
+
+
+@router.get("/tenants/{tenant}/model-access")
+async def tenant_model_access(
+    tenant: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What one tenant's apps may use at the model gateway: the providers it
+    opts in to, its budget, whether its administrators may change the
+    providers, and each of the cluster's models with whether the tenant may
+    use it. The cluster's auditor and the tenant's administrator may read it;
+    the director decides which."""
+    return await director.forward(
+        settings,
+        "GET",
+        _cluster_path(settings, f"/tenants/{tenant}/model-access"),
+        bearer_of(credentials),
+    )
+
+
+@router.put("/tenants/{tenant}/model-access")
+async def set_tenant_model_access(
+    tenant: str,
+    body: dict,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """The whole of the tenant's model access, as one commit by the director.
+
+    Sent as it came: a tenant's administrator sends the budget and the
+    delegation back as they were read, and the director refuses a body that
+    changes them (403). Nothing is filled in or dropped here, because a
+    budget this relay left out would be a budget removed."""
+    return await director.forward(
+        settings,
+        "PUT",
+        _cluster_path(settings, f"/tenants/{tenant}/model-access"),
         bearer_of(credentials),
         json_body=body,
     )

@@ -14,14 +14,15 @@ import zlib
 import httpx
 import jwt
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 
 from app.api.routes import cluster, tiles
 from gentian_app_runtime import auth as runtime_auth
 
 from app.core import auth
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_signed_in_user
 from app.core.config import Settings, get_settings
 
 TENANT = "acme"
@@ -132,6 +133,7 @@ def client(person, usher) -> TestClient:
     settings = _settings()
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_current_user] = person
+    app.dependency_overrides[get_signed_in_user] = person
     return TestClient(app, follow_redirects=False)
 
 
@@ -170,11 +172,22 @@ def test_a_person_who_may_not_install_apps_may_not_set_or_remove_it(client, pers
     person.relations = relations
     assert put_tenant(client).status_code == 403
     assert client.delete("/api/v1/tenant-tiles/nextcloud", headers=BEARER).status_code == 403
+    assert client.get("/api/v1/tenant-tiles", headers=BEARER).status_code == 403
+
+
+def test_the_apps_with_a_tenants_tile_are_listed(client):
+    assert client.get("/api/v1/tenant-tiles", headers=BEARER).json() == {"apps": {}}
+    put_tenant(client, app="nextcloud")
+    put_tenant(client, app="odoo")
+    apps = client.get("/api/v1/tenant-tiles", headers=BEARER).json()["apps"]
+    assert sorted(apps) == ["nextcloud", "odoo"]
+    client.delete("/api/v1/tenant-tiles/odoo", headers=BEARER)
+    assert list(client.get("/api/v1/tenant-tiles", headers=BEARER).json()["apps"]) == ["nextcloud"]
 
 
 @pytest.fixture
 def verifying(monkeypatch, usher):
-    """The real `get_current_user`, with token verification and the director
+    """The real `get_current_user`, with token verification and the usher
     stood in for, so what is checked is what the route does with them."""
     process = _settings(OIDC_ISSUER="https://id.desk.gentian.org/auth/realms/acme")
     monkeypatch.setattr(auth, "get_settings", lambda: process)
@@ -198,7 +211,7 @@ def verifying(monkeypatch, usher):
     return TestClient(app), seen
 
 
-def test_the_token_is_verified_and_the_director_asked_with_it(verifying):
+def test_the_token_is_verified_and_the_usher_asked_with_it(verifying):
     client, seen = verifying
     answer = client.put(
         "/api/v1/tenant-tiles/nextcloud",
@@ -215,6 +228,56 @@ def test_the_token_is_verified_and_the_director_asked_with_it(verifying):
         headers={"Authorization": "Bearer signed-token", "Content-Type": "image/png"},
     )
     assert answer.status_code == 403
+
+
+def test_a_picture_is_served_without_asking_what_the_person_holds(verifying):
+    client, seen = verifying
+    put = client.put(
+        "/api/v1/tenant-tiles/nextcloud",
+        content=PNG,
+        headers={"Authorization": "Bearer signed-token", "Content-Type": "image/png"},
+    )
+    assert put.status_code == 204
+    seen.pop("token")
+    signed = {"Authorization": "Bearer signed-token"}
+    answer = client.get("/api/v1/tiles/kernel-acme/nextcloud/web?v=t1", headers=signed)
+    assert answer.status_code == 200 and answer.content == PNG
+    assert "token" not in seen
+    # A versioned address changes with the picture, so it is kept a day.
+    assert answer.headers["cache-control"] == "private, max-age=86400"
+    assert client.get("/api/v1/tiles/kernel-acme/nextcloud/web", headers=signed).headers["cache-control"] == (
+        "private, max-age=300"
+    )
+    # Signed in is still required.
+    assert client.get("/api/v1/tiles/kernel-acme/nextcloud/web?v=t1").status_code == 401
+    assert client.get("/api/v1/tiles/kernel-acme/nextcloud/web?v=t1", headers={"Authorization": "Bearer forged"}).status_code == 401
+
+
+@pytest.mark.anyio
+async def test_a_signed_in_user_holds_nothing_until_asked(monkeypatch):
+    """Without the usher's answer a route deciding on relations refuses: they
+    are empty, not absent, so nothing falls back to reading groups."""
+    from app.core.gentian_groups import user_is_platform_admin, user_is_tenant_admin
+
+    process = _settings(OIDC_ISSUER="https://id.desk.gentian.org/auth/realms/acme")
+    monkeypatch.setattr(auth, "get_settings", lambda: process)
+    monkeypatch.setattr(
+        runtime_auth,
+        "decode_token",
+        lambda token, settings: {
+            "sub": "alice",
+            "iss": process.oidc_issuer,
+            "groups": ["gentian:tenant:acme:admins"],
+        },
+    )
+    user = await auth.get_signed_in_user(
+        HTTPAuthorizationCredentials(scheme="Bearer", credentials="signed-token")
+    )
+    assert user["relations"] == {}
+    assert not user_is_tenant_admin(user) and not user_is_platform_admin(user)
+    with pytest.raises(HTTPException) as refused:
+        tiles._require_install_right(user, process)
+    assert refused.value.status_code == 403
 
 
 def test_no_token_or_a_bad_one_is_refused_whatever_the_headers_say(verifying):

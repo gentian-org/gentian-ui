@@ -29,7 +29,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.core.auth import get_current_user
+from app.core.auth import get_signed_in_user
 from app.core.config import Settings, get_settings
 from app.services import tile_store
 
@@ -69,7 +69,7 @@ def _token(credentials: HTTPAuthorizationCredentials | None) -> str:
 @router.get("/tiles")
 async def cluster_tiles(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
+    _user: dict = Depends(get_signed_in_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """The tiles this person may open on this desktop.

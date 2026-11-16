@@ -64,7 +64,26 @@ function render(list: Approval[], context: Partial<AdminContext>) {
   );
 }
 
+// What lets an app write through the cluster's API: break-glass's.
+const breakGlass: Approval = {
+  tenant: "platform",
+  profile: "backup-scheduler-ee",
+  install: "backup-scheduler-ee",
+  privilege: "clusterRoles/tenant-exports",
+  approvedBy: "break-glass",
+};
+
 describe("ApprovalsSection", () => {
+  it("says a break-glass request is break-glass's, to the security officer too, and how it is answered", () => {
+    const html = render([breakGlass], { canApproveNodePrivilege: true, isPlatformAdmin: true });
+    expect(html).not.toContain("Approve…");
+    expect(html).not.toContain("security officer&#x27;s.");
+    expect(html).toContain("Only break-glass approves this");
+    expect(html).toContain("kubectl gentian apps approve backup-scheduler-ee clusterRoles/tenant-exports --tenant platform");
+    const unknown = render([{ ...breakGlass, approvedBy: "somebody-new" }], { isPlatformAdmin: true });
+    expect(unknown).toContain("somebody-new");
+  });
+
   it("lists every tenant's request with the profile's reason and who asked", () => {
     const html = render(approvals, { canApproveNodePrivilege: true });
     expect(html).toContain("acme");
@@ -73,7 +92,7 @@ describe("ApprovalsSection", () => {
     expect(html).toContain("tom@acme.example");
     expect(html).toContain("needed for the pilot");
     expect(html).toContain("clusterRoles/node-reader");
-    expect(html).toContain("Nobody has asked for it yet");
+    expect(html).toContain("No person asked for it");
     expect(html).toContain("A previous approval ran out");
   });
 

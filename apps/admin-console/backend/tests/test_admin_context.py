@@ -30,6 +30,7 @@ def _settings(**over) -> Settings:
         "KERNEL_REALM": "kernel",
         "TENANT_ID": "platform",
         "DIRECTOR_URL": "http://director.test:8080",
+        "USHER_URL": "http://usher.test:8080",
         "GENTIAN_CLUSTER_ID": "demo",
     }
     env.update(over)
@@ -78,8 +79,8 @@ def test_a_platform_administrator_sees_the_platform_screens(monkeypatch):
     assert body["availableTenants"] == ["platform"]
     # Both questions were asked as the caller, with the caller's own token.
     assert {u for _, u, _ in seen} == {
-        "http://director.test:8080/v1/tenants/platform/me",
-        "http://director.test:8080/v1/clusters/demo/me",
+        "http://usher.test:8080/v1/tenants/platform/me",
+        "http://usher.test:8080/v1/clusters/demo/me",
     }
     assert all(a == "Bearer person" for _, _, a in seen)
 
@@ -219,8 +220,8 @@ def test_someone_the_edge_let_in_but_who_may_not_administer_is_refused(monkeypat
     assert r.status_code == 403
 
 
-def test_without_a_director_the_console_says_so():
-    r = TestClient(_app(_settings(DIRECTOR_URL=None))).get(
+def test_without_an_usher_the_console_says_so():
+    r = TestClient(_app(_settings(USHER_URL=None))).get(
         "/api/v1/admin/context", headers={"Authorization": "Bearer t"}
     )
     assert r.status_code == 503
@@ -260,7 +261,7 @@ def test_app_states_are_asked_of_the_usher_and_not_swallowed_by_the_catch_all(mo
 
 def test_app_states_without_an_usher_say_so_and_ask_nobody(monkeypatch):
     seen = _director(monkeypatch, {})
-    r = TestClient(_app(_settings())).get(
+    r = TestClient(_app(_settings(USHER_URL=None))).get(
         "/api/v1/admin/apps/status", headers={"Authorization": "Bearer t"}
     )
     assert r.status_code == 503

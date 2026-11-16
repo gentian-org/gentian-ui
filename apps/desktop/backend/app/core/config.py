@@ -36,14 +36,9 @@ class Settings(BaseSettings):
     def capability_set(self) -> set[str]:
         return {c.strip() for c in self.capabilities.split(",") if c.strip()}
 
-    # The director, on the cluster network. Asked one thing: what the caller
-    # holds on this desktop's tenant (`/v1/tenants/{t}/me`), with the caller's
-    # own token.
-    director_url: str | None = Field(default=None, alias="DIRECTOR_URL")
     # The usher, on the cluster network: the read-only service that answers
-    # which tiles this person may open on this tenant's desktop. It holds no
-    # authority; the tenant's own people are answered there, where the
-    # director answers only those who hold a relation on the cluster.
+    # which tiles this person may open on this tenant's desktop, and what
+    # they hold on it (`/v1/tenants/{t}/me`), with the caller's own token.
     usher_url: str | None = Field(default=None, alias="USHER_URL")
 
     # The model gateway, for the assistant on the desktop (docs/ai-widget.md).
@@ -66,6 +61,13 @@ class Settings(BaseSettings):
     llm_max_request_bytes: int = Field(default=65536, alias="LLM_MAX_REQUEST_BYTES")
     llm_max_messages: int = Field(default=40, alias="LLM_MAX_MESSAGES")
     llm_max_tokens: int = Field(default=1024, alias="LLM_MAX_TOKENS")
+
+    # The credential of the contract `notices`, which this desktop provides: a
+    # component the tenant's administrator granted the contract to presents it
+    # to put a notice in a person's inbox (POST /contracts/v1/notices). The platform
+    # sets it for the desktop and for that component. Empty, no component has
+    # been granted the contract and the route answers 503. Never logged.
+    notices_key: SecretStr | None = Field(default=None, alias="NOTICES_KEY")
 
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
     portal_shell_secrets_namespace: str = Field(
@@ -107,7 +109,7 @@ class Settings(BaseSettings):
     auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
     # pkce: the bundle runs the code flow and sends its own bearer. edge: the
     # Gateway holds the session and forwards the zone client's token (AD-13);
-    # what the caller may do comes from the director, never from groups
+    # what the caller may do comes from the usher, never from groups
     # this process reads off the token or looks up itself.
     auth_mode: str = Field(default="pkce", alias="AUTH_MODE")
     # The tenant this desktop is the desktop of (a component of it). Behind
