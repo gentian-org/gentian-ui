@@ -218,7 +218,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
     );
   }
 
-  const { realm, isPlatformAdmin, canExpose, canApproveNodePrivilege, canApprovePerimeter, canAuditCluster } =
+  const { realm, isPlatformAdmin, canExpose, canApproveNodePrivilege, canApprovePerimeter, canApprovePrivilege, canAuditCluster } =
     contextQuery.data;
   // False only for the approver let in for the Approvals screen; a
   // backend older than that field answered nobody who did not administer.
@@ -229,7 +229,12 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
       (administers || entry.officerOnly) &&
       (!entry.platformOnly || isPlatformAdmin) &&
       (!entry.approverOnly || canExpose === true) &&
-      (!entry.officerOnly || canApproveNodePrivilege === true || canApprovePerimeter === true || isPlatformAdmin) &&
+      (!entry.officerOnly ||
+        canApproveNodePrivilege === true ||
+        canApprovePerimeter === true ||
+        isPlatformAdmin ||
+        // The tenant's perimeter approver answers its own apps' egress there.
+        (entry.id === "approvals" && administers && canApprovePrivilege === true)) &&
       (!entry.auditorOnly || canAuditCluster === true),
   );
   // Tenant Settings while the tenant is incomplete, otherwise Members, as it

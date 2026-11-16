@@ -2,8 +2,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { fetchPerimeterHistory, fetchPerimeterTraffic, type ExposureEntry } from "@/api/apps";
+import { fetchAdminContext, fetchAppStates } from "@/api/admin";
+import { fetchPerimeterHistory, fetchPerimeterTraffic, fetchTenantPrivileges, type ExposureEntry } from "@/api/apps";
 import { PublicAddressList } from "./AppPublicAddresses";
+import { AnswerRequest, tenantApprovals } from "./ApprovalsSection";
 import "./admin.css";
 import { formatDateTime, formatNumber } from "@/lib/format";
 
@@ -50,9 +52,122 @@ export function PerimeterSection() {
         lead={t("perimeter.surfaceLead")}
         empty={t("perimeter.surfaceNone")}
       />
+      <Outbound />
       <PerimeterTraffic />
       <PerimeterHistory />
     </section>
+  );
+}
+
+/**
+ * The tenant's way out: what its apps ask to reach beyond the tenant
+ * (egress, the perimeter approver's to answer) and what they were granted,
+ * by whom and why. The requests are what the cluster says of each app; the
+ * grants are git's. Answering is the director's, as on the Approvals and
+ * Apps screens.
+ */
+function Outbound() {
+  const { t } = useTranslation();
+  const statesQuery = useQuery({ queryKey: ["admin", "apps", "status"], queryFn: () => fetchAppStates() });
+  const grantsQuery = useQuery({ queryKey: ["admin", "apps", "privileges"], queryFn: () => fetchTenantPrivileges() });
+  const contextQuery = useQuery({ queryKey: ["admin", "context"], queryFn: () => fetchAdminContext() });
+  const waiting = tenantApprovals(statesQuery.data?.tenant, statesQuery.data?.apps ?? []).filter((a) =>
+    a.privilege.startsWith("egress/"),
+  );
+  const granted = (grantsQuery.data?.privileges ?? []).filter((g) => g.privilege.startsWith("egress/"));
+  const mayAnswer = contextQuery.data?.canApprovePrivilege === true;
+  const failed = statesQuery.isError ? statesQuery.error : grantsQuery.isError ? grantsQuery.error : null;
+
+  return (
+    <div className="admin-console__subsection">
+      <h3 className="admin-console__subsection-title">{t("perimeter.outboundTitle")}</h3>
+      <p className="admin-console__hint">{t("perimeter.outboundLead")}</p>
+      {statesQuery.isLoading || grantsQuery.isLoading ? (
+        <p className="admin-console__loading">{t("perimeter.outboundReading")}</p>
+      ) : null}
+      {failed ? (
+        <p className="admin-console__error">
+          {t("perimeter.outboundUnavailable")} {failed instanceof Error ? failed.message : String(failed)}
+        </p>
+      ) : null}
+      {statesQuery.isSuccess && grantsQuery.isSuccess && waiting.length === 0 && granted.length === 0 ? (
+        <p className="admin-console__hint">{t("perimeter.outboundNone")}</p>
+      ) : null}
+      {waiting.length > 0 || granted.length > 0 ? (
+        <div className="admin-console__table-wrap">
+          <table className="admin-console__table">
+            <thead>
+              <tr>
+                <th>{t("perimeter.outboundApp")}</th>
+                <th>{t("perimeter.outboundPrivilege")}</th>
+                <th>{t("perimeter.outboundState")}</th>
+                <th>{t("perimeter.outboundDetail")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {waiting.map((request) => (
+                <tr key={`waiting-${request.install}-${request.privilege}`}>
+                  <td className="admin-console__mono">{request.install}</td>
+                  <td>
+                    <div className="admin-console__mono">{request.privilege}</div>
+                    <div className="admin-console__hint">{request.reason || t("approvals.noReason")}</div>
+                  </td>
+                  <td>
+                    <span className="admin-console__badge admin-console__badge--warn">
+                      {t(request.declinedBy ? "perimeter.outboundDeclined" : "perimeter.outboundWaiting")}
+                    </span>
+                  </td>
+                  <td>
+                    {request.declinedBy ? (
+                      <div className="admin-console__hint">
+                        <Trans
+                          i18nKey="approvals.declinedBy"
+                          values={{
+                            who: request.declinedBy,
+                            when: request.declinedAt ? formatDateTime(request.declinedAt) : "",
+                            reason: request.declineReason ?? "",
+                          }}
+                          components={mono}
+                        />
+                      </div>
+                    ) : null}
+                    {mayAnswer ? (
+                      <AnswerRequest approval={request} />
+                    ) : (
+                      <div className="admin-console__hint">{t("approvals.notYoursPerimeter")}</div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {granted.map((grant) => (
+                <tr key={`granted-${grant.install}-${grant.privilege}`}>
+                  <td className="admin-console__mono">{grant.install}</td>
+                  <td className="admin-console__mono">{grant.privilege}</td>
+                  <td>
+                    <span className="admin-console__badge admin-console__badge--ok">{t("perimeter.outboundGranted")}</span>
+                  </td>
+                  <td>
+                    <div>
+                      <Trans
+                        i18nKey="perimeter.outboundGrantedBy"
+                        values={{ who: grant.approver, when: formatDateTime(grant.approvedAt) }}
+                        components={mono}
+                      />
+                    </div>
+                    <div>{grant.reason}</div>
+                    {grant.expiresAt ? (
+                      <div className="admin-console__hint">
+                        {t("perimeter.outboundExpires", { when: formatDateTime(grant.expiresAt) })}
+                      </div>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

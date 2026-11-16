@@ -1129,6 +1129,13 @@ export function fetchSettingsTemplates(tenant?: string) {
 export type PendingPrivilegeApproval = {
   privilege: string;
   approvedBy: "perimeter-approver" | "security-officer" | (string & {});
+  /** The profile's reason, and the request the tenant's administrator made. */
+  reason?: string | null;
+  requestedBy?: string | null;
+  requestedAt?: string | null;
+  note?: string | null;
+  /** When a grant for it ran out: approved once, waiting again. */
+  expiredAt?: string | null;
   /**
    * The approver's no, when one was said: who, when and why. The request is
    * still pending -- the app keeps waiting -- until somebody approves, or
