@@ -440,7 +440,14 @@
     "askForAnotherPlan": "Für einen anderen Tarif wenden Sie sich an die Administratoren dieses Clusters.",
     "orderAnotherPlan": "Anderen Tarif bestellen",
     "writeTo": "An {{email}} schreiben",
-    "call": "{{phone}} anrufen"
+    "call": "{{phone}} anrufen",
+    "moveToThisPlan": "Auf diesen Tarif wechseln",
+    "moving": "Wird gewechselt …",
+    "force": "Erzwingen",
+    "forceConfirm": "{{tenant}} trotzdem auf {{plan}} setzen?\n\n{{blocked}}\n\nLaufende Pods laufen weiter, aber einen Pod, der sich beendet, startet der Cluster erst wieder, wenn die Nutzung passt.",
+    "moved": "{{tenant}} wechselt auf {{plan}}. {{message}}",
+    "alreadyOn": "{{tenant}} ist bereits auf {{plan}}.",
+    "plansLeadAdmin": "Der Wechsel von {{tenant}} auf einen anderen Tarif wird im Deployment-Repository festgehalten; Argo CD übernimmt ihn bei der nächsten Synchronisierung."
   },
   "securityPolicies": {
     "allowRememberMe": "„Angemeldet bleiben“ erlauben",

@@ -2,13 +2,14 @@
 
 Same rule as the cluster's settings: the console holds no credential and
 decides nothing. The person's token goes to the director, which asks the
-graph whether they may view the tenant or set its plan, reads the cluster's
-answers from the operator, and commits the choice as the person. What comes
+graph whether they may view the tenant or move it to a plan, reads the
+cluster's answers from the operator, and commits the choice as the person. What comes
 back is passed on unchanged, except that the screen reads a bare list where
 the director answers a list under a key.
 """
 
 import httpx
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -103,18 +104,47 @@ def test_the_plans_arrive_as_the_bare_list_the_screen_reads(monkeypatch):
     assert not seen["params"]
 
 
-def test_no_plan_is_chosen_here(monkeypatch):
-    """A tenant is moved by the cluster's administrators; this screen writes
-    nothing and the director is not asked."""
+def test_moving_a_tenant_is_a_commit_at_the_director(monkeypatch):
     seen: dict = {}
-    _fake_client(monkeypatch, _answer(202, {"status": "updated"}), seen)
+    _fake_client(
+        monkeypatch,
+        _answer(
+            202,
+            {
+                "status": "updated",
+                "tenant": "team",
+                "plan": "nodes-2",
+                "previousPlan": "",
+                "commit": "a1b2c3",
+            },
+        ),
+        seen,
+    )
     r = TestClient(_app(_settings())).put(
-        "/api/v1/admin/resources",
-        json={"plan": "nodes-4", "force": False},
+        "/api/v1/admin/resources?tenant=team",
+        json={"plan": "nodes-2", "force": False},
         headers={"Authorization": "Bearer t"},
     )
-    assert r.status_code in (404, 405)
-    assert "url" not in seen
+    assert r.status_code == 202
+    assert r.json()["plan"] == "nodes-2"
+    assert seen["method"] == "PUT"
+    # The one write of this screen: a commit, so the director's, not the usher's.
+    assert seen["url"] == "http://director.test:8080/v1/clusters/demo/tenants/team/resources"
+    assert seen["json"] == {"plan": "nodes-2", "force": False}
+    assert seen["auth"] == "Bearer t"
+
+
+@pytest.mark.parametrize("status", [403, 404, 409])
+def test_the_directors_refusal_is_passed_through_unchanged(monkeypatch, status):
+    """403: whether this person may move a tenant is the director's answer
+    from the graph; 409 is the guard against a plan the tenant does not fit
+    under, which only Force passes."""
+    _fake_client(monkeypatch, _answer(status, {"error": "refused"}), {})
+    r = TestClient(_app(_settings())).put(
+        "/api/v1/admin/resources", json={"plan": "base"}, headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == status
+    assert r.json() == {"error": "refused"}
 
 
 def test_the_ordering_notice_comes_with_the_state(monkeypatch):

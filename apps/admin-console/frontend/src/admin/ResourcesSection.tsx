@@ -1,6 +1,7 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
+  changeResourcePlan,
   fetchResourcePlans,
   fetchResourceReport,
   fetchResourceState,
@@ -73,6 +74,9 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
   // what this holds.
   const [selected, setSelected] = useState(tenant);
   const [range, setRange] = useState<RangeId>("30d");
+  const [pending, setPending] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const overviewQuery = useQuery({
     queryKey: ["admin", "resources", "tenants"],
@@ -101,6 +105,35 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
     queryKey: ["admin", "resources", "report", selected, range],
     queryFn: () => fetchResourceReport(historyWindow, selected),
   });
+
+  // Moving a tenant is the cluster's administrators': the director commits
+  // it as the person after asking the graph, and refuses anyone else.
+  const changeMutation = useMutation({
+    mutationFn: ({ plan, force }: { plan: string; force: boolean }) =>
+      changeResourcePlan(plan, selected, force),
+    onSuccess: (result) => {
+      setError(null);
+      setPending(null);
+      setSuccess(
+        result.status === "unchanged" || !result.commit
+          ? t("resources.alreadyOn", { tenant: selected, plan: result.plan })
+          : t("resources.moved", { tenant: selected, plan: result.plan, message: result.message }),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["admin", "resources"] });
+    },
+    onError: (err: Error) => {
+      setSuccess(null);
+      setPending(null);
+      setError(err.message);
+    },
+  });
+
+  function moveTo(plan: ResourcePlan, force: boolean) {
+    setError(null);
+    setSuccess(null);
+    setPending(plan.name);
+    changeMutation.mutate({ plan: plan.name, force });
+  }
 
   const state = stateQuery.data;
   const plans = plansQuery.data ?? [];
@@ -134,6 +167,9 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
         >
           {t("resources.refresh")}</button>
       </header>
+
+      {error && <p className="admin-console__error">{error}</p>}
+      {success && <p className="admin-console__success">{success}</p>}
 
       {isPlatformAdmin && (
         <div className="admin-console__subsection">
@@ -176,7 +212,11 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                           type="button"
                           className="admin-console__btn admin-console__btn--quiet"
                           disabled={row.tenant === selected}
-                          onClick={() => setSelected(row.tenant)}
+                          onClick={() => {
+                            setSelected(row.tenant);
+                            setError(null);
+                            setSuccess(null);
+                          }}
                         >
                           {row.tenant === selected ? "Selected" : "Manage"}
                         </button>
@@ -291,8 +331,10 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
 
       <div className="admin-console__subsection">
         <h3 className="admin-console__subsection-title">{t("resources.plans")}</h3>
-        <p className="admin-console__lead">{t("resources.plansLead")}</p>
-        {state && <OrderingNotice ordering={state.ordering} />}
+        <p className="admin-console__lead">
+          {isPlatformAdmin ? t("resources.plansLeadAdmin", { tenant: selected }) : t("resources.plansLead")}
+        </p>
+        {state && !isPlatformAdmin && <OrderingNotice ordering={state.ordering} />}
 
         {plansQuery.isLoading && <p className="admin-console__loading">{t("resources.loading3")}</p>}
         {plansQuery.data?.length === 0 && (
@@ -328,6 +370,47 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                 </p>
                 {plan.blocked && <p className="admin-console__hint">{plan.blocked}</p>}
               </div>
+
+              {isPlatformAdmin && !plan.current && !plan.retired && (
+                <div className="admin-console__card-aside admin-console__card-aside--top">
+                  {plan.selectable ? (
+                    <button
+                      type="button"
+                      className="admin-console__btn admin-console__btn--primary"
+                      disabled={changeMutation.isPending}
+                      onClick={() => moveTo(plan, false)}
+                    >
+                      {t(pending === plan.name ? "resources.moving" : "resources.moveToThisPlan")}
+                    </button>
+                  ) : (
+                    /* A plan the tenant does not fit under. Shrinking below
+                       what it uses does not fail at once: the cluster refuses
+                       the next pod create, so everything runs until something
+                       restarts and then does not come back. A decision, asked
+                       for explicitly. */
+                    <button
+                      type="button"
+                      className="admin-console__btn admin-console__btn--danger"
+                      disabled={changeMutation.isPending}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            t("resources.forceConfirm", {
+                              tenant: selected,
+                              plan: planLabel(plan),
+                              blocked: plan.blocked,
+                            }),
+                          )
+                        ) {
+                          moveTo(plan, true);
+                        }
+                      }}
+                    >
+                      {t(pending === plan.name ? "resources.moving" : "resources.force")}
+                    </button>
+                  )}
+                </div>
+              )}
 
             </article>
           ))}

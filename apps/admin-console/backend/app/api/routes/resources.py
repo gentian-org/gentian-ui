@@ -4,9 +4,11 @@ The Resources screen shows the ceiling the cluster enforces for a tenant, what
 is committed under it, the cluster's plans, its history, and where to order
 another plan. Every read here is live state and is relayed to the usher as the
 caller, which has the operator's answers and decides from the authorization
-graph whether this person may see them. Nothing is written here: a tenant is
-moved by the cluster's administrators, and the notice the state carries
-(``ordering``) says where to ask.
+graph whether this person may see them. The one write, moving a tenant to a
+plan, is the cluster's administrators': a commit the director makes as the
+person, after asking the graph whether they may configure the cluster. A
+tenant administrator orders another plan where the notice the state carries
+(``ordering``) says.
 
 Which tenant is asked is the screen's choice: a tenant administrator's own,
 or, for a platform operator managing from the cluster's view, any tenant of
@@ -52,6 +54,24 @@ async def resource_plans(
         settings, _tenant_path(settings, tenant, "/plans"), bearer_of(credentials)
     )
     return director.unwrapped(answer, "plans")
+
+
+@router.put("")
+async def change_resource_plan(
+    body: dict,
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Move a tenant to a plan: ``{"plan": "<name>", "force": false}``.
+
+    202 with a commit means git has it and the cluster does not yet; 200 means
+    the tenant is on that plan already. A plan the tenant does not fit under
+    is 409 unless forced, and anyone who may not configure the cluster is
+    refused 403 by the director; both come back unchanged."""
+    path = f"/v1/clusters/{director.cluster(settings)}/tenants/{tenant or settings.tenant_id}/resources"
+    return await director.forward(settings, "PUT", path, bearer_of(credentials), json_body=body)
 
 
 @router.get("/usage")
