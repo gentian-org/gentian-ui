@@ -2,12 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
   changeResourcePlan,
+  clearResourcePlanRequest,
+  requestResourcePlan,
   fetchResourcePlans,
   fetchResourceReport,
   fetchResourceState,
   fetchResourceUsage,
   fetchTenantResourceStates,
   type PlanOrdering,
+  type PlanRequest,
   type ResourcePlan,
   type ResourceState,
 } from "@/api/admin";
@@ -128,6 +131,53 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
     },
   });
 
+  // What a tenant's administrator does instead: ask, and take it back. The
+  // cluster's administrator declines with the same call.
+  const requestMutation = useMutation({
+    mutationFn: ({ plan, reason }: { plan: string; reason: string }) =>
+      requestResourcePlan(plan, reason, selected),
+    onSuccess: (result) => {
+      setError(null);
+      setPending(null);
+      setSuccess(t("resources.requestSent", { plan: result.plan }));
+      void queryClient.invalidateQueries({ queryKey: ["admin", "resources"] });
+    },
+    onError: (err: Error) => {
+      setSuccess(null);
+      setPending(null);
+      setError(err.message);
+    },
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: () => clearResourcePlanRequest(selected),
+    onSuccess: () => {
+      setError(null);
+      setSuccess(isPlatformAdmin ? t("resources.declined", { tenant: selected }) : t("resources.withdrawn"));
+      void queryClient.invalidateQueries({ queryKey: ["admin", "resources"] });
+    },
+    onError: (err: Error) => {
+      setSuccess(null);
+      setError(err.message);
+    },
+  });
+
+  function requestPlan(plan: ResourcePlan) {
+    const reason = window.prompt(
+      t("resources.requestReasonPrompt", { tenant: selected, plan: planLabel(plan) }),
+      "",
+    );
+    if (reason === null) {
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    setPending(plan.name);
+    requestMutation.mutate({ plan: plan.name, reason });
+  }
+
+  const busy = changeMutation.isPending || requestMutation.isPending || clearMutation.isPending;
+
   function moveTo(plan: ResourcePlan, force: boolean) {
     setError(null);
     setSuccess(null);
@@ -201,6 +251,11 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                         )}
                         {row.drifted && (
                           <span className="admin-console__badge admin-console__badge--warn">{t("resources.drifted")}</span>
+                        )}
+                        {row.request && (
+                          <span className="admin-console__badge admin-console__badge--info">
+                            {t("resources.request")}: {row.request.plan}
+                          </span>
                         )}
                       </td>
                       <td>
@@ -335,6 +390,37 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
           {isPlatformAdmin ? t("resources.plansLeadAdmin", { tenant: selected }) : t("resources.plansLead")}
         </p>
         {state && !isPlatformAdmin && <OrderingNotice ordering={state.ordering} />}
+        {state?.request && (
+          <RequestNotice
+            request={state.request}
+            mine={!isPlatformAdmin}
+            busy={busy}
+            onApprove={() => {
+              const plan = plans.find((p) => p.name === state.request?.plan);
+              if (!plan) {
+                setError(t("resources.noSuchPlan", { plan: state.request?.plan }));
+              } else if (plan.selectable) {
+                moveTo(plan, false);
+              } else if (
+                !plan.retired &&
+                window.confirm(
+                  t("resources.forceConfirm", { tenant: selected, plan: planLabel(plan), blocked: plan.blocked }),
+                )
+              ) {
+                moveTo(plan, true);
+              }
+            }}
+            onClear={() => {
+              if (
+                isPlatformAdmin &&
+                !window.confirm(t("resources.declineConfirm", { tenant: selected, plan: state.request?.plan }))
+              ) {
+                return;
+              }
+              clearMutation.mutate();
+            }}
+          />
+        )}
 
         {plansQuery.isLoading && <p className="admin-console__loading">{t("resources.loading3")}</p>}
         {plansQuery.data?.length === 0 && (
@@ -377,7 +463,7 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                     <button
                       type="button"
                       className="admin-console__btn admin-console__btn--primary"
-                      disabled={changeMutation.isPending}
+                      disabled={busy}
                       onClick={() => moveTo(plan, false)}
                     >
                       {t(pending === plan.name ? "resources.moving" : "resources.moveToThisPlan")}
@@ -391,7 +477,7 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                     <button
                       type="button"
                       className="admin-console__btn admin-console__btn--danger"
-                      disabled={changeMutation.isPending}
+                      disabled={busy}
                       onClick={() => {
                         if (
                           window.confirm(
@@ -407,6 +493,22 @@ export function ResourcesSection({ tenant, isPlatformAdmin }: ResourcesSectionPr
                       }}
                     >
                       {t(pending === plan.name ? "resources.moving" : "resources.force")}
+                    </button>
+                  )}
+                </div>
+              )}
+              {!isPlatformAdmin && !plan.current && !plan.retired && (
+                <div className="admin-console__card-aside admin-console__card-aside--top">
+                  {state?.request?.plan === plan.name ? (
+                    <span className="admin-console__badge admin-console__badge--info">{t("resources.requested")}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="admin-console__btn"
+                      disabled={busy}
+                      onClick={() => requestPlan(plan)}
+                    >
+                      {t("resources.requestThisPlan")}
                     </button>
                   )}
                 </div>
@@ -553,6 +655,50 @@ function OrderingNotice({ ordering }: { ordering?: PlanOrdering }) {
         <a className="admin-console__btn" href={`tel:${ordering.phone.replace(/\s+/g, "")}`}>
           {t("resources.call", { phone: ordering.phone })}
         </a>
+      )}
+    </div>
+  );
+}
+
+/** A pending request: to its tenant's administrator, theirs to withdraw; to
+ * the cluster's administrator, theirs to approve (by moving the tenant) or
+ * decline. */
+function RequestNotice({
+  request,
+  mine,
+  busy,
+  onApprove,
+  onClear,
+}: {
+  request: PlanRequest;
+  mine: boolean;
+  busy: boolean;
+  onApprove: () => void;
+  onClear: () => void;
+}) {
+  const { t } = useTranslation();
+  const date = request.at ? formatDate(request.at) : "—";
+  return (
+    <div className="admin-console__notice">
+      <p>
+        {mine
+          ? t("resources.youRequested", { plan: request.plan, date })
+          : t("resources.someoneRequested", { by: request.by || "—", plan: request.plan, date })}
+      </p>
+      {request.reason && <p className="admin-console__hint">{t("resources.requestReason", { reason: request.reason })}</p>}
+      {mine ? (
+        <button type="button" className="admin-console__btn" disabled={busy} onClick={onClear}>
+          {t("resources.withdraw")}
+        </button>
+      ) : (
+        <>
+          <button type="button" className="admin-console__btn admin-console__btn--primary" disabled={busy} onClick={onApprove}>
+            {t("resources.approve")}
+          </button>
+          <button type="button" className="admin-console__btn admin-console__btn--danger" disabled={busy} onClick={onClear}>
+            {t("resources.decline")}
+          </button>
+        </>
       )}
     </div>
   );

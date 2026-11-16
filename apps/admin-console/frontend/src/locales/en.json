@@ -441,7 +441,22 @@
     "forceConfirm": "Move {{tenant}} to {{plan}} anyway?\n\n{{blocked}}\n\nRunning pods keep running, but the cluster refuses to start any that restart until usage fits.",
     "moved": "{{tenant}} moves to {{plan}}. {{message}}",
     "alreadyOn": "{{tenant}} is already on {{plan}}.",
-    "plansLeadAdmin": "Moving {{tenant}} to another plan commits it to the deployments repository, and Argo CD applies it on the next sync."
+    "plansLeadAdmin": "Moving {{tenant}} to another plan commits it to the deployments repository, and Argo CD applies it on the next sync.",
+    "requestThisPlan": "Request this plan",
+    "requested": "Requested",
+    "requestReasonPrompt": "Ask the administrators of this cluster to move {{tenant}} to {{plan}}. Why? (optional)",
+    "requestSent": "Your request for {{plan}} is with the administrators of this cluster.",
+    "youRequested": "You asked for {{plan}} on {{date}}.",
+    "someoneRequested": "{{by}} asked for {{plan}} on {{date}}.",
+    "requestReason": "Reason: {{reason}}",
+    "withdraw": "Withdraw",
+    "withdrawn": "The request is withdrawn.",
+    "approve": "Approve",
+    "decline": "Decline",
+    "declineConfirm": "Decline the request of {{tenant}} for {{plan}}?",
+    "declined": "The request of {{tenant}} is declined.",
+    "request": "Request",
+    "noSuchPlan": "There is no plan {{plan}} on this cluster any more."
   },
   "securityPolicies": {
     "allowRememberMe": "Allow remember me",

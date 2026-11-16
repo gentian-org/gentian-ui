@@ -74,6 +74,43 @@ async def change_resource_plan(
     return await director.forward(settings, "PUT", path, bearer_of(credentials), json_body=body)
 
 
+def _request_path(settings: Settings, tenant: str | None) -> str:
+    return (
+        f"/v1/clusters/{director.cluster(settings)}/tenants/"
+        f"{tenant or settings.tenant_id}/resources/request"
+    )
+
+
+@router.put("/request")
+async def request_resource_plan(
+    body: dict,
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """A tenant administrator asks for a plan: ``{"plan": "<name>", "reason": "..."}``.
+    The director commits the request as the person; the cluster's
+    administrators answer it by moving the tenant or declining."""
+    return await director.forward(
+        settings, "PUT", _request_path(settings, tenant), bearer_of(credentials), json_body=body
+    )
+
+
+@router.delete("/request")
+async def clear_resource_plan_request(
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Withdraw the tenant's request (its administrator) or decline it (the
+    cluster's); the director decides which from the caller's relations."""
+    return await director.forward(
+        settings, "DELETE", _request_path(settings, tenant), bearer_of(credentials)
+    )
+
+
 @router.get("/usage")
 async def resource_usage(
     tenant: str | None = Query(default=None),
