@@ -43,10 +43,10 @@ const plans: ResourcePlan[] = [
   },
 ];
 
-function render(isPlatformAdmin: boolean) {
+function render(isPlatformAdmin: boolean, state: Partial<ResourceState> = { plan: "base" }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(["admin", "resources", "plans", "team"], plans);
-  client.setQueryData(["admin", "resources", "state", "team"], { plan: "base" } as Partial<ResourceState>);
+  client.setQueryData(["admin", "resources", "state", "team"], state);
   return renderToString(
     <QueryClientProvider client={client}>
       <ResourcesSection tenant="team" isPlatformAdmin={isPlatformAdmin} />
@@ -66,5 +66,36 @@ describe("ResourcesSection", () => {
     expect(html).not.toContain("Move to this plan");
     expect(html).not.toContain(">Force<");
     expect(html).toContain("ask the administrators of this cluster");
+  });
+
+  it("lets a tenant administrator request a plan it is not on", () => {
+    const html = render(false);
+    // nodes-2 and tiny: a smaller plan may be asked for too.
+    expect(html.match(/Request this plan/g)?.length).toBe(2);
+  });
+
+  const request = {
+    plan: "nodes-2",
+    by: "tom@team.example",
+    at: "2026-11-16T14:00:00Z",
+    reason: "Odoo needs room",
+  };
+
+  it("shows the tenant administrator their pending request, to withdraw", () => {
+    const html = render(false, { plan: "base", request });
+    expect(html).toContain("You asked for nodes-2");
+    expect(html).toContain("Odoo needs room");
+    expect(html).toContain("Withdraw");
+    expect(html).toContain(">Requested<");
+    expect(html.match(/Request this plan/g)?.length).toBe(1);
+    expect(html).not.toContain(">Approve<");
+  });
+
+  it("shows the cluster administrator the request, to approve or decline", () => {
+    const html = render(true, { plan: "base", request });
+    expect(html).toContain("tom@team.example asked for nodes-2");
+    expect(html).toContain(">Approve<");
+    expect(html).toContain(">Decline<");
+    expect(html).not.toContain("Withdraw");
   });
 });

@@ -723,6 +723,17 @@ export type ResourceState = {
   installedApps: number;
   /** Where the tenant orders another plan, as the cluster states it. */
   ordering?: PlanOrdering;
+  /** The plan the tenant's administrator asked to be moved to, if pending. */
+  request?: PlanRequest;
+};
+
+/** A tenant administrator's pending request for another plan. */
+export type PlanRequest = {
+  plan: string;
+  by?: string;
+  /** RFC 3339. */
+  at?: string;
+  reason?: string;
 };
 
 /** The cluster's notice on ordering another plan: a text by language and at
@@ -803,6 +814,21 @@ export function changeResourcePlan(plan: string, tenant?: string, force = false)
   return apiFetch<ResourcePlanChange>(`/admin/resources${tenantQuery(tenant)}`, {
     method: "PUT",
     body: JSON.stringify({ plan, force }),
+  });
+}
+
+export function requestResourcePlan(plan: string, reason: string, tenant?: string) {
+  return apiFetch<{ status: string; plan: string; commit?: string }>(
+    `/admin/resources/request${tenantQuery(tenant)}`,
+    { method: "PUT", body: JSON.stringify({ plan, reason }) },
+  );
+}
+
+/** Withdraw (the tenant's administrator) or decline (the cluster's) the
+ *  tenant's pending request. */
+export function clearResourcePlanRequest(tenant?: string) {
+  return apiFetch<{ status: string }>(`/admin/resources/request${tenantQuery(tenant)}`, {
+    method: "DELETE",
   });
 }
 

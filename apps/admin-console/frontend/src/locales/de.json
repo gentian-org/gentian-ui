@@ -447,7 +447,22 @@
     "forceConfirm": "{{tenant}} trotzdem auf {{plan}} setzen?\n\n{{blocked}}\n\nLaufende Pods laufen weiter, aber einen Pod, der sich beendet, startet der Cluster erst wieder, wenn die Nutzung passt.",
     "moved": "{{tenant}} wechselt auf {{plan}}. {{message}}",
     "alreadyOn": "{{tenant}} ist bereits auf {{plan}}.",
-    "plansLeadAdmin": "Der Wechsel von {{tenant}} auf einen anderen Tarif wird im Deployment-Repository festgehalten; Argo CD übernimmt ihn bei der nächsten Synchronisierung."
+    "plansLeadAdmin": "Der Wechsel von {{tenant}} auf einen anderen Tarif wird im Deployment-Repository festgehalten; Argo CD übernimmt ihn bei der nächsten Synchronisierung.",
+    "requestThisPlan": "Diesen Tarif anfragen",
+    "requested": "Angefragt",
+    "requestReasonPrompt": "Die Administratoren dieses Clusters bitten, {{tenant}} auf {{plan}} zu setzen. Warum? (optional)",
+    "requestSent": "Ihre Anfrage für {{plan}} liegt bei den Administratoren dieses Clusters.",
+    "youRequested": "Sie haben am {{date}} {{plan}} angefragt.",
+    "someoneRequested": "{{by}} hat am {{date}} {{plan}} angefragt.",
+    "requestReason": "Begründung: {{reason}}",
+    "withdraw": "Zurückziehen",
+    "withdrawn": "Die Anfrage ist zurückgezogen.",
+    "approve": "Genehmigen",
+    "decline": "Ablehnen",
+    "declineConfirm": "Die Anfrage von {{tenant}} für {{plan}} ablehnen?",
+    "declined": "Die Anfrage von {{tenant}} ist abgelehnt.",
+    "request": "Anfrage",
+    "noSuchPlan": "Einen Tarif {{plan}} gibt es auf diesem Cluster nicht mehr."
   },
   "securityPolicies": {
     "allowRememberMe": "„Angemeldet bleiben“ erlauben",

@@ -147,6 +147,33 @@ def test_the_directors_refusal_is_passed_through_unchanged(monkeypatch, status):
     assert r.json() == {"error": "refused"}
 
 
+def test_a_request_is_relayed_to_the_director(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, _answer(202, {"status": "updated", "plan": "nodes-2"}), seen)
+    client = TestClient(_app(_settings()))
+    r = client.put(
+        "/api/v1/admin/resources/request",
+        json={"plan": "nodes-2", "reason": "room"},
+        headers={"Authorization": "Bearer t"},
+    )
+    assert r.status_code == 202
+    assert seen["method"] == "PUT"
+    assert (
+        seen["url"]
+        == "http://director.test:8080/v1/clusters/demo/tenants/platform/resources/request"
+    )
+    assert seen["json"] == {"plan": "nodes-2", "reason": "room"}
+
+    r = client.delete(
+        "/api/v1/admin/resources/request?tenant=team", headers={"Authorization": "Bearer t"}
+    )
+    assert r.status_code == 202
+    assert seen["method"] == "DELETE"
+    assert (
+        seen["url"] == "http://director.test:8080/v1/clusters/demo/tenants/team/resources/request"
+    )
+
+
 def test_the_ordering_notice_comes_with_the_state(monkeypatch):
     seen: dict = {}
     state = {
