@@ -788,6 +788,24 @@ export function fetchResourcePlans(tenant?: string) {
   return apiFetch<ResourcePlan[]>(`/admin/resources/plans${tenantQuery(tenant)}`);
 }
 
+/** The director's answer to moving a tenant: 202 with a commit, or 200 when
+ *  the tenant is on that plan already. */
+export type ResourcePlanChange = {
+  status: string;
+  tenant: string;
+  plan: string;
+  previousPlan: string;
+  message: string;
+  commit?: string;
+};
+
+export function changeResourcePlan(plan: string, tenant?: string, force = false) {
+  return apiFetch<ResourcePlanChange>(`/admin/resources${tenantQuery(tenant)}`, {
+    method: "PUT",
+    body: JSON.stringify({ plan, force }),
+  });
+}
+
 export function fetchResourceUsage(
   params: { from?: string; to?: string; stepSeconds?: number } = {},
   tenant?: string,

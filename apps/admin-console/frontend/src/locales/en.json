@@ -434,7 +434,14 @@
     "askForAnotherPlan": "To move to another plan, ask the administrators of this cluster.",
     "orderAnotherPlan": "Order another plan",
     "writeTo": "Write to {{email}}",
-    "call": "Call {{phone}}"
+    "call": "Call {{phone}}",
+    "moveToThisPlan": "Move to this plan",
+    "moving": "Moving…",
+    "force": "Force",
+    "forceConfirm": "Move {{tenant}} to {{plan}} anyway?\n\n{{blocked}}\n\nRunning pods keep running, but the cluster refuses to start any that restart until usage fits.",
+    "moved": "{{tenant}} moves to {{plan}}. {{message}}",
+    "alreadyOn": "{{tenant}} is already on {{plan}}.",
+    "plansLeadAdmin": "Moving {{tenant}} to another plan commits it to the deployments repository, and Argo CD applies it on the next sync."
   },
   "securityPolicies": {
     "allowRememberMe": "Allow remember me",
