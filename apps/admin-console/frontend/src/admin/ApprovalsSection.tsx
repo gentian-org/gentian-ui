@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { fetchAdminContext } from "@/api/admin";
+import { fetchAdminContext, fetchAppStates, type AppState } from "@/api/admin";
 import { approveNodePrivilege, declineNodePrivilege, fetchApprovals, type Approval } from "@/api/approvals";
 import "./admin.css";
 import { formatDateTime } from "@/lib/format";
@@ -25,30 +25,55 @@ const messageOf = (err: unknown) => (err instanceof Error ? err.message : String
  */
 export function ApprovalsSection() {
   const { t } = useTranslation();
-  const approvalsQuery = useQuery({ queryKey: ["admin", "approvals"], queryFn: () => fetchApprovals() });
   const contextQuery = useQuery({ queryKey: ["admin", "context"], queryFn: () => fetchAdminContext() });
   const context = contextQuery.data;
+  // The cluster's list is read by the cluster's approvers and administrator
+  // alone (the usher refuses anybody else); the tenant's perimeter approver
+  // reads the requests of the tenant's own apps.
+  const ofCluster =
+    context?.isPlatformAdmin === true || context?.canApproveNodePrivilege === true || context?.canApprovePerimeter === true;
+  const ofTenant = context?.canApprovePrivilege === true;
+  const approvalsQuery = useQuery({
+    queryKey: ["admin", "approvals"],
+    queryFn: () => fetchApprovals(),
+    enabled: ofCluster,
+  });
+  const statesQuery = useQuery({
+    queryKey: ["admin", "apps", "status"],
+    queryFn: () => fetchAppStates(),
+    enabled: ofTenant,
+  });
+  const tenant = statesQuery.data?.tenant;
   const mayApprove = (approval: Approval) =>
     approval.approvedBy === "security-officer"
       ? context?.canApproveNodePrivilege === true
-      : approval.approvedBy === "perimeter-approver" && context?.canApprovePerimeter === true;
-  const approvals = (approvalsQuery.data?.approvals ?? []).filter(
+      : approval.approvedBy === "perimeter-approver" &&
+        (context?.canApprovePerimeter === true || (ofTenant && approval.tenant === tenant));
+  const listed = new Map<string, Approval>();
+  for (const approval of [
+    ...(approvalsQuery.data?.approvals ?? []),
+    ...tenantApprovals(statesQuery.data?.tenant, statesQuery.data?.apps ?? []),
+  ]) {
+    listed.set(`${approval.tenant}/${approval.install}/${approval.privilege}`, approval);
+  }
+  const approvals = [...listed.values()].filter(
     (approval) => context?.isPlatformAdmin === true || mayApprove(approval),
   );
+  const loading = approvalsQuery.isLoading || statesQuery.isLoading;
+  const failed = approvalsQuery.isError ? approvalsQuery.error : statesQuery.isError ? statesQuery.error : null;
+  const read = (!ofCluster || approvalsQuery.isSuccess) && (!ofTenant || statesQuery.isSuccess);
 
   return (
     <section className="admin-console__section">
       <h2 className="admin-console__section-title">{t("approvals.title")}</h2>
       <p className="admin-console__hint">{t("approvals.lead")}</p>
-      {approvalsQuery.isLoading ? <p className="admin-console__loading">{t("approvals.reading")}</p> : null}
-      {approvalsQuery.isError ? (
+      {loading ? <p className="admin-console__loading">{t("approvals.reading")}</p> : null}
+      {failed ? (
         <p className="admin-console__error">
-          {t("approvals.unavailable")} {messageOf(approvalsQuery.error)}
+          {t("approvals.unavailable")} {messageOf(failed)}
         </p>
       ) : null}
-      {approvalsQuery.isSuccess && approvals.length === 0 ? (
-        <p className="admin-console__hint">{t("approvals.none")}</p>
-      ) : null}
+      {read && approvals.length === 0 ? <p className="admin-console__hint">{t("approvals.none")}</p> : null}
       {approvals.length > 0 ? (
         <div className="admin-console__table-wrap">
           <table className="admin-console__table">
@@ -131,6 +156,35 @@ export function ApprovalsSection() {
 }
 
 /**
+ * The requests of the tenant's own apps, from what the cluster says of each
+ * (the usher's app states): the egress the tenant's perimeter approver
+ * answers, in the shape of the cluster's list. An add-on's requests are the
+ * add-on's own install's.
+ */
+export function tenantApprovals(tenant: string | undefined, apps: AppState[]): Approval[] {
+  if (!tenant) return [];
+  return apps.flatMap((app) =>
+    (app.pendingPrivilegeApprovals ?? [])
+      .filter((p) => p.approvedBy === "perimeter-approver")
+      .map((p) => ({
+        tenant,
+        profile: app.profile,
+        install: app.name || app.profile,
+        privilege: p.privilege,
+        approvedBy: p.approvedBy,
+        reason: p.reason,
+        requestedBy: p.requestedBy,
+        requestedAt: p.requestedAt,
+        note: p.note,
+        expiredAt: p.expiredAt,
+        declinedBy: p.declinedBy,
+        declinedAt: p.declinedAt,
+        declineReason: p.declineReason,
+      })),
+  );
+}
+
+/**
  * Whose a request is, for a reader who cannot answer it here. The usher
  * names the approver; one this console has no button for is named as it is
  * rather than passed off as the security officer's. Break-glass answers
@@ -170,7 +224,7 @@ function NotAnsweredHere({ approval }: { approval: Approval }) {
  * a decline, a reason and nothing committed. Either way the director's
  * refusal is shown as it worded it.
  */
-function AnswerRequest({ approval }: { approval: Approval }) {
+export function AnswerRequest({ approval }: { approval: Approval }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<"approve" | "decline" | null>(null);
@@ -180,6 +234,8 @@ function AnswerRequest({ approval }: { approval: Approval }) {
     setOpen(null);
     setReason("");
     void queryClient.invalidateQueries({ queryKey: ["admin", "approvals"] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "status"] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "privileges"] });
   };
   const approve = useMutation({
     mutationFn: () =>
