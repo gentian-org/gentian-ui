@@ -104,6 +104,10 @@ spec:
             - name: USHER_URL
               value: {{ .Values.usher.url | quote }}
             {{- end }}
+            {{- if and .Values.registrar.url (not (hasKey (default dict .Values.api.env) "REGISTRAR_URL")) }}
+            - name: REGISTRAR_URL
+              value: {{ .Values.registrar.url | quote }}
+            {{- end }}
             {{- /* The assistant on the desktop (docs/ai-widget.md). Told only
                    when the platform delivered all three: that there is a
                    gateway for this desktop, where it is, and which Secret

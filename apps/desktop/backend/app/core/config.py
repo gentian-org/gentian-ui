@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     # they hold on it (`/v1/tenants/{t}/me`), with the caller's own token.
     usher_url: str | None = Field(default=None, alias="USHER_URL")
 
+    # The registrar, on the cluster network: where a person makes, lists and
+    # revokes their own device passwords, with their own token
+    # (app/api/routes/devices.py).
+    registrar_url: str | None = Field(default=None, alias="REGISTRAR_URL")
+
     # The model gateway, for the assistant on the desktop (docs/ai-widget.md).
     #
     # The platform hands each tenant's desktop a key of its own at the gateway

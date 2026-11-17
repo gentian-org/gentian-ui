@@ -386,6 +386,8 @@ export type LoginRedirectOptions = {
    * app launches to reuse it.
    */
   issuer?: string;
+  /** Ask the realm for a sign-in even when a session is there (prompt=login). */
+  freshSignIn?: boolean;
 };
 
 /**
@@ -431,6 +433,9 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
   if (normalized.idpHint) {
     params.set("kc_idp_hint", normalized.idpHint);
   }
+  if (normalized.freshSignIn) {
+    params.set("prompt", "login");
+  }
 
   // Authenticate in the top-level window, never in a frame.
   //
@@ -462,6 +467,25 @@ export async function loginRedirect(options: LoginRedirectOptions | string = "/d
   } catch {
     window.location.href = authorizeUrl;
   }
+}
+
+/**
+ * A sign-in made now, for an act that asks for one moments before (making a
+ * device password). Behind the edge the session is the edge's, and the way to
+ * a new sign-in is to end it: the person signs in again, with whatever second
+ * factor the realm asks, and comes back to the desktop.
+ */
+export async function signInAgain(returnTo = "/desktop"): Promise<void> {
+  if (isEdgeSession()) {
+    const topWindow = window.top ?? window;
+    try {
+      topWindow.location.assign(EDGE_SIGN_OUT_PATH);
+    } catch {
+      window.location.assign(EDGE_SIGN_OUT_PATH);
+    }
+    return;
+  }
+  await loginRedirect({ returnTo, freshSignIn: true });
 }
 
 export async function logoutRedirect(): Promise<void> {
