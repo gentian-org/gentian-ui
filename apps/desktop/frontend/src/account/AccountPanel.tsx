@@ -9,11 +9,12 @@ import {
   updateAccountProfile,
 } from "@/api/account";
 import { accountConsoleUrl } from "@/auth/oidc";
+import { DevicesTab } from "@/account/DevicesTab";
 import "@/styles/shell-panel.css";
 
 import { useTranslation } from "react-i18next";
 import { formatDateTime } from "@/lib/locale";
-type AccountTab = "profile" | "password" | "security" | "sessions";
+type AccountTab = "profile" | "password" | "security" | "sessions" | "devices";
 
 type AccountPanelProps = {
   embedded?: boolean;
@@ -126,6 +127,7 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
               ["password", "Password"],
               ["security", "Security"],
               ["sessions", "Sessions"],
+              ["devices", "Devices"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -346,6 +348,7 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
               </table>
             </section>
           )}
+          {tab === "devices" && <DevicesTab />}
         </div>
       </div>
     </div>

@@ -181,6 +181,12 @@ notices:
 usher:
   url: ""
 
+# The registrar: where a person makes, lists and revokes their own device
+# passwords, answered with the caller's own token. Set by the operator; with
+# none the account panel's Devices tab answers 503.
+registrar:
+  url: ""
+
 # The chart's objects are <release>-gentian-portal-<part> unless a name is
 # given here. The operator installs the desktop as a component whose Release
 # carries the namespace in its name, and names the objects after the
