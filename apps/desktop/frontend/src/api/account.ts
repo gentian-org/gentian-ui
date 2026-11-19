@@ -62,13 +62,6 @@ export function updateAccountProfile(body: { firstName?: string; lastName?: stri
   });
 }
 
-export function changeAccountPassword(currentPassword: string, newPassword: string) {
-  return accountFetch<void>("/account/password", {
-    method: "POST",
-    body: JSON.stringify({ currentPassword, newPassword }),
-  });
-}
-
 export function fetchAccountSessions() {
   return accountFetch<AccountSession[]>("/account/sessions");
 }
