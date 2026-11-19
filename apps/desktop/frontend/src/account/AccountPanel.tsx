@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
-  changeAccountPassword,
   fetchAccountProfile,
   fetchAccountSessions,
   revokeAccountSession,
@@ -14,7 +13,7 @@ import "@/styles/shell-panel.css";
 
 import { useTranslation } from "react-i18next";
 import { formatDateTime } from "@/lib/locale";
-type AccountTab = "profile" | "password" | "security" | "sessions" | "devices";
+type AccountTab = "profile" | "security" | "sessions" | "devices";
 
 type AccountPanelProps = {
   embedded?: boolean;
@@ -33,9 +32,6 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
   const [tab, setTab] = useState<AccountTab>("profile");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,21 +54,6 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
       setFirstName(profile.firstName);
       setLastName(profile.lastName);
       await queryClient.invalidateQueries({ queryKey: ["account", "profile"] });
-    },
-    onError: (err: Error) => {
-      setMessage(null);
-      setError(err.message);
-    },
-  });
-
-  const passwordMutation = useMutation({
-    mutationFn: () => changeAccountPassword(currentPassword, newPassword),
-    onSuccess: () => {
-      setError(null);
-      setMessage(t("account.passwordChanged"));
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
     },
     onError: (err: Error) => {
       setMessage(null);
@@ -124,7 +105,6 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
           {(
             [
               ["profile", "Profile"],
-              ["password", "Password"],
               ["security", "Security"],
               ["sessions", "Sessions"],
               ["devices", "Devices"],
@@ -195,66 +175,6 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
                 disabled={profileMutation.isPending}
               >
                 Save profile
-              </button>
-            </form>
-          )}
-
-          {tab === "password" && (
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                setMessage(null);
-                setError(null);
-                if (newPassword !== confirmPassword) {
-                  setError(t("account.passwordMismatch"));
-                  return;
-                }
-                if (newPassword.length < 8) {
-                  setError(t("account.passwordTooShort"));
-                  return;
-                }
-                passwordMutation.mutate();
-              }}
-            >
-              <div className="shell-panel__field">
-                <label htmlFor="account-current-pw">{t("account.passwordCurrent")}</label>
-                <input
-                  id="account-current-pw"
-                  type="password"
-                  autoComplete="current-password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="shell-panel__field">
-                <label htmlFor="account-new-pw">{t("account.passwordNew")}</label>
-                <input
-                  id="account-new-pw"
-                  type="password"
-                  autoComplete="new-password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="shell-panel__field">
-                <label htmlFor="account-confirm-pw">{t("account.passwordConfirm")}</label>
-                <input
-                  id="account-confirm-pw"
-                  type="password"
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                className="shell-panel__btn shell-panel__btn--primary"
-                disabled={passwordMutation.isPending}
-              >
-                Change password
               </button>
             </form>
           )}
