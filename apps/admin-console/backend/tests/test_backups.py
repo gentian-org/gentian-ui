@@ -175,3 +175,76 @@ def test_without_an_usher_the_list_says_so_and_asks_nobody(monkeypatch):
     assert r.status_code == 503
     assert "USHER_URL" in r.json()["detail"]
     assert not seen
+
+
+def _policy_responder(policy: dict, calls: list):
+    def responder(method, url):
+        calls.append((method, url))
+        if method == "GET":
+            return httpx.Response(200, json=policy, request=httpx.Request(method, url))
+        return httpx.Response(200, json={"commit": "abc"}, request=httpx.Request(method, url))
+
+    return responder
+
+
+def test_the_policy_is_read_from_the_usher(monkeypatch):
+    seen: dict = {}
+    policy = {"scope": "tenant", "configured": False, "effectiveBeforeMove": "app"}
+    _fake_client(monkeypatch, _answer(200, policy), seen)
+    r = TestClient(_app(_settings())).get(
+        "/api/v1/admin/backup-policy", headers={"Authorization": "Bearer person"}
+    )
+    assert r.status_code == 200
+    assert r.json() == policy
+    assert seen["url"] == "http://usher.test:8090/v1/tenants/platform/backup-policy"
+
+
+def test_setting_before_move_keeps_what_the_policy_states(monkeypatch):
+    seen: dict = {}
+    calls: list = []
+    policy = {
+        "scope": "tenant",
+        "configured": True,
+        "destination": {"endpoint": "https://s3.example", "bucket": "b", "region": ""},
+        "encryption": {"mode": "recipients", "recipients": ["age1abc"]},
+        "beforeMove": "tenant",
+    }
+    _fake_client(monkeypatch, _policy_responder(policy, calls), seen)
+    r = TestClient(_app(_settings())).put(
+        "/api/v1/admin/backup-policy/before-move",
+        json={"beforeMove": "none"},
+        headers={"Authorization": "Bearer person"},
+    )
+    assert r.status_code == 200
+    assert calls[-1] == ("PUT", "http://director.test:8080/v1/tenants/platform/backup-policy")
+    assert seen["json"] == {
+        "destination": {"endpoint": "https://s3.example", "bucket": "b"},
+        "encryption": {"recipients": ["age1abc"]},
+        "beforeMove": "none",
+    }
+
+
+def test_inheriting_again_removes_a_policy_that_states_nothing_else(monkeypatch):
+    seen: dict = {}
+    calls: list = []
+    policy = {"scope": "tenant", "configured": True, "destination": {}, "beforeMove": "none"}
+    _fake_client(monkeypatch, _policy_responder(policy, calls), seen)
+    r = TestClient(_app(_settings())).put(
+        "/api/v1/admin/backup-policy/before-move",
+        json={"beforeMove": ""},
+        headers={"Authorization": "Bearer person"},
+    )
+    assert r.status_code == 200
+    assert calls[-1] == ("DELETE", "http://director.test:8080/v1/tenants/platform/backup-policy")
+
+
+def test_an_unknown_mode_is_refused(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, _answer(200, {}), seen)
+    r = TestClient(_app(_settings())).put(
+        "/api/v1/admin/backup-policy/before-move",
+        json={"beforeMove": "everything"},
+        headers={"Authorization": "Bearer person"},
+    )
+    assert r.status_code == 422
+    assert "url" not in seen
