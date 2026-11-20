@@ -1653,3 +1653,23 @@ fieldset.admin-console__choices > legend {
 .admin-console__traffic-bar--failed {
   background: #b42318;
 }
+
+/* ── Access ──────────────────────────────────────────────────────────────── */
+
+/* One role, or one source of permissions, and what it lets a person do. */
+.admin-console__access-role {
+  margin: 0 0 0.75rem;
+}
+
+.admin-console__access-role:last-child {
+  margin-bottom: 0;
+}
+
+.admin-console__access-list {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.admin-console__access-list li {
+  margin: 0.125rem 0;
+}
