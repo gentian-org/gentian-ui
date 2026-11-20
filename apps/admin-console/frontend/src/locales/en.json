@@ -716,6 +716,20 @@
     "opsInstall": "Install 'operations-console' from the App Store to get them.",
     "download": "Download"
   },
+  "beforeMove": {
+    "title": "Before an app update",
+    "lead": "Before an app moves to a newer version, the platform can copy its data first, so there is something to go back to if the update goes wrong. An app without data is never copied.",
+    "tenantTitle": "The app and the workspace",
+    "tenantBody": "The app's data and the workspace's own: its sign-in, the desktop's database and the mailboxes. Updates of different apps wait for each other.",
+    "appTitle": "The app alone",
+    "appBody": "Only the data of the app being updated. Updates of different apps run side by side.",
+    "noneTitle": "Nothing",
+    "noneBody": "No copy before an update. If an update goes wrong, the last backup is what there is to go back to.",
+    "inherited": "This is the cluster's setting.",
+    "locked": "The cluster's administrator sets this for every workspace.",
+    "useCluster": "Use the cluster's setting",
+    "saved": "Saved. It applies once the cluster has taken the change, usually within a few minutes."
+  },
   "usageStatistics": {
     "title": "Usage Statistics",
     "lead": "What this cluster reports about what it runs. The report contains no names or addresses, only addresses of the cluster and its tenants and counts.",

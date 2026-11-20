@@ -716,6 +716,20 @@
     "opsInstall": "Installieren Sie »operations-console« aus dem App Store.",
     "download": "Herunterladen"
   },
+  "beforeMove": {
+    "title": "Vor einem App-Update",
+    "lead": "Bevor eine App auf eine neuere Version wechselt, kann die Plattform zuerst ihre Daten kopieren, damit es etwas gibt, zu dem man zurückkehren kann, falls das Update schiefgeht. Eine App ohne Daten wird nie kopiert.",
+    "tenantTitle": "Die App und der Arbeitsbereich",
+    "tenantBody": "Die Daten der App und die des Arbeitsbereichs selbst: seine Anmeldung, die Datenbank des Desktops und die Postfächer. Updates verschiedener Apps warten aufeinander.",
+    "appTitle": "Nur die App",
+    "appBody": "Nur die Daten der App, die aktualisiert wird. Updates verschiedener Apps laufen nebeneinander.",
+    "noneTitle": "Nichts",
+    "noneBody": "Keine Kopie vor einem Update. Geht ein Update schief, ist die letzte Sicherung das, wozu man zurückkehren kann.",
+    "inherited": "Dies ist die Einstellung des Clusters.",
+    "locked": "Die Administration des Clusters legt dies für alle Arbeitsbereiche fest.",
+    "useCluster": "Einstellung des Clusters verwenden",
+    "saved": "Gespeichert. Es gilt, sobald der Cluster die Änderung übernommen hat, meist innerhalb weniger Minuten."
+  },
   "usageStatistics": {
     "title": "Nutzungsstatistik",
     "lead": "Was dieser Cluster darüber meldet, was auf ihm läuft. Die Meldung enthält keine Namen oder Anschriften, nur die Adressen des Clusters und seiner Mandanten sowie Zahlen.",

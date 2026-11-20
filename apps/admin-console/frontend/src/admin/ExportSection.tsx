@@ -4,7 +4,8 @@
  * tenant chooses, and downloaded as one file -- the tenant's way to take their
  * data with them (gentian-os docs/concepts/data-ownership.md §2). Only the
  * exports a person started are listed: backups, their schedules and their
- * recovery are the Operations Console's.
+ * recovery are the Operations Console's. Below them, what is exported before
+ * an app update (BeforeMoveChoice).
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -17,6 +18,7 @@ import {
   type BackupCreateBody,
 } from "@/api/admin";
 import { BackupKeyChoice, type KeyChoice, type KeyDecision } from "@/admin/BackupKeyChoice";
+import { BeforeMoveChoice } from "@/admin/BeforeMoveChoice";
 import "./admin.css";
 import { useTranslation } from "react-i18next";
 import { formatDateTime } from "@/lib/format";
@@ -281,6 +283,8 @@ export function ExportSection({ tenant }: ExportSectionProps) {
           ))}
         </div>
       )}
+
+      <BeforeMoveChoice tenant={tenant} />
     </section>
   );
 }

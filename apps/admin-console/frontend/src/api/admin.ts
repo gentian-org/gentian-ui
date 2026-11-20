@@ -696,6 +696,32 @@ export function fetchBackupKeyStatus() {
   return apiFetch<BackupKeyStatus>("/credentials/backup-identity");
 }
 
+/** What is exported before an app update (gentian-os versioning.md §5). */
+export type BeforeMove = "tenant" | "app" | "none";
+
+/** The part of the tenant's backup policy this console reads and sets. */
+export type BackupPolicy = {
+  configured: boolean;
+  /** Whether the cluster lets the tenant state a policy of its own. */
+  allowTenantOverride: boolean;
+  /** What the tenant states; absent when it inherits the cluster's. */
+  beforeMove?: BeforeMove;
+  /** What applies. */
+  effectiveBeforeMove: BeforeMove;
+};
+
+export function fetchBackupPolicy(tenant?: string) {
+  return apiFetch<BackupPolicy>(`/admin/backup-policy${tenantQuery(tenant)}`);
+}
+
+/** Set what is exported before an app update; "" inherits the cluster's. */
+export function setBeforeMove(beforeMove: BeforeMove | "", tenant?: string) {
+  return apiFetch<unknown>(`/admin/backup-policy/before-move${tenantQuery(tenant)}`, {
+    method: "PUT",
+    body: JSON.stringify({ beforeMove }),
+  });
+}
+
 // --- Resources ---------------------------------------------------------------
 
 export type ResourceHeadroom = {
