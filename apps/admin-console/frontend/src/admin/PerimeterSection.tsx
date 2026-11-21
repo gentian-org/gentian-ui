@@ -355,7 +355,6 @@ export function TrustedDomainsView({
                 id="trusted-domain"
                 type="text"
                 value={typed}
-                placeholder="example.org"
                 autoComplete="off"
                 spellCheck={false}
                 onChange={(e) => setTyped(e.target.value)}
