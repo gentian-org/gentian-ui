@@ -146,7 +146,7 @@ export function fetchTenantPrivileges() {
 }
 
 /** What an approver states: why, and optionally until when (RFC 3339). */
-export type PrivilegeApprovalRequest = { reason: string; expiresAt?: string };
+export type PrivilegeApprovalRequest = { reason?: string; expiresAt?: string };
 
 /**
  * Answer one request an app makes beyond the default posture, `<kind>/<name>`

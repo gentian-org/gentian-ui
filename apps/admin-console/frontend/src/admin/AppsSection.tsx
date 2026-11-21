@@ -942,7 +942,7 @@ function legacyApprover(privilege: string): string {
 }
 
 /**
- * Approve one waiting request: a reason in the approver's words, then one
+ * Approve one waiting request: a comment if the approver leaves one, then one
  * commit through the director. The director decides whether this person may
  * and records them as the approver; its refusal is shown as it worded it.
  */
@@ -952,7 +952,7 @@ function ApprovePrivilege({ install, privilege }: { install: string; privilege: 
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const approve = useMutation({
-    mutationFn: () => approvePrivilege(install, privilege, { reason: reason.trim() }),
+    mutationFn: () => approvePrivilege(install, privilege, reason.trim() ? { reason: reason.trim() } : {}),
     onSuccess: () => {
       setOpen(false);
       setReason("");
@@ -960,7 +960,6 @@ function ApprovePrivilege({ install, privilege }: { install: string; privilege: 
       void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "status"] });
     },
   });
-  const tooShort = reason.trim().length < 10;
 
   if (!open) {
     return (
@@ -976,7 +975,7 @@ function ApprovePrivilege({ install, privilege }: { install: string; privilege: 
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        if (!tooShort) approve.mutate();
+        approve.mutate();
       }}
     >
       <label className="admin-console__field">
@@ -984,10 +983,8 @@ function ApprovePrivilege({ install, privilege }: { install: string; privilege: 
         <textarea
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          required
-          minLength={10}
           maxLength={1000}
-          rows={3}
+          rows={2}
         />
       </label>
       <p className="admin-console__hint">{t("apps.privilegeApproveHint")}</p>
@@ -997,7 +994,7 @@ function ApprovePrivilege({ install, privilege }: { install: string; privilege: 
         </p>
       ) : null}
       <div className="admin-console__actions">
-        <button type="submit" className="admin-console__btn" disabled={tooShort || approve.isPending}>
+        <button type="submit" className="admin-console__btn" disabled={approve.isPending}>
           {t("apps.privilegeApproveConfirm", { privilege })}
         </button>
         <button

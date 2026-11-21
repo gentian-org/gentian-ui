@@ -121,6 +121,16 @@ def test_an_approval_goes_to_the_directors_privilege_route_as_given(monkeypatch)
     assert seen["auth"] == "Bearer person-token"
 
 
+def test_an_approval_needs_no_comment(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "abc"}, seen, status=202)
+    answer = _client().put(
+        "/api/v1/admin/apps/privileges/aluvian-commerce/egress/intake", headers=_person, json={}
+    )
+    assert answer.status_code == 202
+    assert seen["json"] == {}
+
+
 def test_the_directors_refusal_of_an_approval_comes_back_as_it_is(monkeypatch):
     seen: dict = {}
     refusal = {"error": "approving an egress request is the tenant administrator's"}
@@ -145,7 +155,6 @@ def test_the_directors_refusal_of_an_approval_comes_back_as_it_is(monkeypatch):
             "aluvian-commerce/egress/intake",
             {"reason": "because it needs it", "approver": "someone"},
         ),
-        ("aluvian-commerce/egress/intake", {}),
     ],
 )
 def test_an_approval_the_director_could_not_mean_is_refused_here(monkeypatch, path, body):
