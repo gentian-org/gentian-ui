@@ -161,6 +161,19 @@ export function approvePrivilege(install: string, privilege: string, body: Privi
   );
 }
 
+/**
+ * Take back one approval, `<kind>/<name>` as the grant names it. A commit:
+ * the app's request waits for an answer again. Whoever may approve the kind
+ * may withdraw it, which is the director's answer.
+ */
+export function withdrawPrivilege(install: string, privilege: string) {
+  const [kind, name] = privilege.split("/", 2);
+  return apiFetch<AppWriteResult>(
+    `/admin/apps/privileges/${encodeURIComponent(install)}/${encodeURIComponent(kind)}/${encodeURIComponent(name ?? "")}`,
+    { method: "DELETE" },
+  );
+}
+
 /** The registry's record of an approved entry: by whom, when, until when, why. */
 export type ExposureApproval = {
   owner: string;

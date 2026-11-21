@@ -117,6 +117,30 @@ async def approve_privilege(
     )
 
 
+@router.delete("/privileges/{install}/{kind}/{name}")
+async def withdraw_privilege(
+    install: str,
+    kind: Literal["egress", "podSecurity", "clusterRoles"],
+    name: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Take back one approval. A commit: the app's request waits for an
+    answer again, and the platform takes away what the approval gave.
+
+    The director's withdrawal for this console's tenant, as the person, with
+    no body. Whoever may approve the kind may withdraw it; that is the
+    director's to decide, and its answer arrives as it is.
+    """
+    return await director.forward(
+        settings,
+        "DELETE",
+        f"/v1/tenants/{settings.tenant_id}/privileges/{_name(install)}/{kind}/{_name(name)}",
+        bearer_of(credentials),
+    )
+
+
 @router.get("/exposures")
 async def exposures(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),

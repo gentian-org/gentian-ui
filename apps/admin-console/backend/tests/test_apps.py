@@ -121,6 +121,32 @@ def test_an_approval_goes_to_the_directors_privilege_route_as_given(monkeypatch)
     assert seen["auth"] == "Bearer person-token"
 
 
+def test_a_withdrawn_approval_goes_to_the_directors_privilege_route(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "abc"}, seen, status=202)
+    answer = _client().delete(
+        "/api/v1/admin/apps/privileges/aluvian-commerce/egress/intake", headers=_person
+    )
+    assert answer.status_code == 202
+    assert answer.json() == {"status": "updated", "commit": "abc"}
+    assert (seen["method"], seen["url"]) == (
+        "DELETE",
+        f"{_base}/privileges/aluvian-commerce/egress/intake",
+    )
+    assert seen["json"] is None
+    assert seen["auth"] == "Bearer person-token"
+
+
+def test_a_withdrawal_of_no_known_kind_never_reaches_the_director(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {}, seen)
+    answer = _client().delete(
+        "/api/v1/admin/apps/privileges/aluvian-commerce/hostNetwork/x", headers=_person
+    )
+    assert answer.status_code in (400, 422)
+    assert seen == {}
+
+
 def test_an_approval_needs_no_comment(monkeypatch):
     seen: dict = {}
     _fake_client(monkeypatch, {"status": "updated", "commit": "abc"}, seen, status=202)
