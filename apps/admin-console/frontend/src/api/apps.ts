@@ -269,6 +269,23 @@ export type PerimeterChange = {
   requestId?: string;
 };
 
+/** The domains trusted for this tenant alone, and whether the tenant may keep them. */
+export type TrustedDomains = { tenant: string; delegated: boolean; domains: string[] };
+
+export function fetchTrustedDomains() {
+  return apiFetch<TrustedDomains>("/admin/perimeter/trusted-domains");
+}
+
+/** Trust one more domain for the tenant. A commit; whether the person may is the director's answer. */
+export function trustDomain(domain: string) {
+  return apiFetch<AppWriteResult>(`/admin/perimeter/trusted-domains/${encodeURIComponent(domain)}`, { method: "PUT" });
+}
+
+/** Stop trusting one domain. A commit: a request it answered waits for an answer again. */
+export function stopTrustingDomain(domain: string) {
+  return apiFetch<AppWriteResult>(`/admin/perimeter/trusted-domains/${encodeURIComponent(domain)}`, { method: "DELETE" });
+}
+
 /** Requests by response class. */
 export type TrafficCounts = { requests: number; "2xx": number; "3xx": number; "4xx": number; "5xx": number };
 

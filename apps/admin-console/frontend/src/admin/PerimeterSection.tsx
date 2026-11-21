@@ -8,6 +8,9 @@ import {
   fetchPerimeterHistory,
   fetchPerimeterTraffic,
   fetchTenantPrivileges,
+  fetchTrustedDomains,
+  stopTrustingDomain,
+  trustDomain,
   withdrawPrivilege,
   type ExposureEntry,
   type PrivilegeGrant,
@@ -61,6 +64,7 @@ export function PerimeterSection() {
         empty={t("perimeter.surfaceNone")}
       />
       <Outbound />
+      <TrustedDomainList />
       <PerimeterTraffic />
       <PerimeterHistory />
     </section>
@@ -223,6 +227,157 @@ export function WithdrawGrant({ grant }: { grant: PrivilegeGrant }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** A domain as the director takes one: lower-case labels, at least two. */
+const DOMAIN = /^([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\.)+[a-z]([-a-z0-9]{0,61}[a-z0-9])?$/;
+
+const refusalOf = (err: unknown) =>
+  err instanceof ApiError && err.detail ? err.detail : err instanceof Error ? err.message : String(err);
+
+/**
+ * The domains trusted for this tenant alone: an egress request whose hosts
+ * are all in trusted domains is granted without a further answer. The
+ * perimeter approver adds and removes them while the cluster's administrator
+ * delegated the list to the tenant; the director decides both.
+ */
+function TrustedDomainList() {
+  const query = useQuery({ queryKey: ["admin", "perimeter", "trusted-domains"], queryFn: () => fetchTrustedDomains() });
+  const contextQuery = useQuery({ queryKey: ["admin", "context"], queryFn: () => fetchAdminContext() });
+  const { t } = useTranslation();
+  return (
+    <div className="admin-console__subsection">
+      <h3 className="admin-console__subsection-title">{t("perimeter.trustedTitle")}</h3>
+      <p className="admin-console__hint">{t("perimeter.trustedLead")}</p>
+      {query.isLoading ? <p className="admin-console__loading">{t("perimeter.outboundReading")}</p> : null}
+      {query.isError ? (
+        <p className="admin-console__error">
+          {t("perimeter.trustedUnavailable")} {refusalOf(query.error)}
+        </p>
+      ) : null}
+      {query.data ? (
+        <TrustedDomainsView
+          delegated={query.data.delegated}
+          domains={query.data.domains}
+          mayChange={contextQuery.data?.canApprovePrivilege === true}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** The list, and for whoever may change a delegated one, adding and removing. */
+export function TrustedDomainsView({
+  delegated,
+  domains,
+  mayChange,
+}: {
+  delegated: boolean;
+  domains: string[];
+  mayChange: boolean;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [typed, setTyped] = useState("");
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ["admin", "perimeter", "trusted-domains"] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "status"] });
+  };
+  const add = useMutation({
+    mutationFn: (domain: string) => trustDomain(domain),
+    onSuccess: () => {
+      setTyped("");
+      refresh();
+    },
+  });
+  const remove = useMutation({ mutationFn: (domain: string) => stopTrustingDomain(domain), onSuccess: refresh });
+  const domain = typed.trim().toLowerCase();
+  const editable = delegated && mayChange;
+  const askRemove = (name: string) => {
+    if (!window.confirm(t("perimeter.trustedRemoveConfirm", { domain: name }))) return;
+    add.reset();
+    remove.mutate(name);
+  };
+  const failed = add.isError ? add.error : remove.isError ? remove.error : null;
+
+  return (
+    <>
+      {!delegated ? <p className="admin-console__hint">{t("perimeter.trustedNotDelegated")}</p> : null}
+      {delegated && !mayChange ? <p className="admin-console__hint">{t("perimeter.trustedNotYours")}</p> : null}
+      {domains.length === 0 ? (
+        <p className="admin-console__hint">{t("perimeter.trustedNone")}</p>
+      ) : (
+        <div className="admin-console__table-wrap">
+          <table className="admin-console__table">
+            <thead>
+              <tr>
+                <th>{t("perimeter.trustedDomain")}</th>
+                {editable ? <th /> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {domains.map((name) => (
+                <tr key={name}>
+                  <td className="admin-console__mono">{name}</td>
+                  {editable ? (
+                    <td>
+                      <button
+                        type="button"
+                        className="admin-console__btn admin-console__btn--danger"
+                        disabled={remove.isPending}
+                        onClick={() => askRemove(name)}
+                      >
+                        {t("perimeter.trustedRemove")}
+                      </button>
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {editable ? (
+        <form
+          className="admin-console__form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!DOMAIN.test(domain)) return;
+            remove.reset();
+            add.mutate(domain);
+          }}
+        >
+          <div className="admin-console__field">
+            <label className="admin-console__label" htmlFor="trusted-domain">
+              <span className="admin-console__label-text">{t("perimeter.trustedAddLabel")}</span>
+              <input
+                id="trusted-domain"
+                type="text"
+                value={typed}
+                placeholder="example.org"
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(e) => setTyped(e.target.value)}
+              />
+            </label>
+            {domain !== "" && !DOMAIN.test(domain) ? (
+              <p className="admin-console__field-error">{t("perimeter.trustedInvalid")}</p>
+            ) : (
+              <p className="admin-console__hint">{t("perimeter.trustedAddHint")}</p>
+            )}
+          </div>
+          <button type="submit" className="admin-console__btn" disabled={!DOMAIN.test(domain) || add.isPending}>
+            {t(add.isPending ? "perimeter.trustedAdding" : "perimeter.trustedAdd")}
+          </button>
+        </form>
+      ) : null}
+      {failed ? (
+        <p className="admin-console__error">
+          {t("perimeter.trustedRefused")} {refusalOf(failed)}
+        </p>
+      ) : null}
+    </>
   );
 }
 
