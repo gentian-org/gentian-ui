@@ -409,7 +409,10 @@ def test_the_access_page_reads_the_usher_and_relays_its_answer(monkeypatch):
     for path, upstream in [
         ("/api/v1/admin/access/people/u1", f"{base}/platform/access/people/u1"),
         ("/api/v1/admin/access/people/u1?tenant=acme", f"{base}/acme/access/people/u1"),
-        ("/api/v1/admin/access/groups?group=gentian:tenant:platform:sales", f"{base}/platform/access/groups"),
+        (
+            "/api/v1/admin/access/groups?group=gentian:tenant:platform:sales",
+            f"{base}/platform/access/groups",
+        ),
         ("/api/v1/admin/access/apps/notes", f"{base}/platform/access/apps/notes"),
     ]:
         seen: dict = {}

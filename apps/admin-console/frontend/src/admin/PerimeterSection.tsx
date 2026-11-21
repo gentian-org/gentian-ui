@@ -1,9 +1,17 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { fetchAdminContext, fetchAppStates } from "@/api/admin";
-import { fetchPerimeterHistory, fetchPerimeterTraffic, fetchTenantPrivileges, type ExposureEntry } from "@/api/apps";
+import { ApiError } from "@/api/client";
+import {
+  fetchPerimeterHistory,
+  fetchPerimeterTraffic,
+  fetchTenantPrivileges,
+  withdrawPrivilege,
+  type ExposureEntry,
+  type PrivilegeGrant,
+} from "@/api/apps";
 import { PublicAddressList } from "./AppPublicAddresses";
 import { AnswerRequest, tenantApprovals } from "./ApprovalsSection";
 import "./admin.css";
@@ -160,11 +168,58 @@ function Outbound() {
                         {t("perimeter.outboundExpires", { when: formatDateTime(grant.expiresAt) })}
                       </div>
                     ) : null}
+                    {mayAnswer ? <WithdrawGrant grant={grant} /> : null}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Take back one grant. The director decides whether the person may, as it
+ * does for the approval; its refusal is shown as it came.
+ */
+export function WithdrawGrant({ grant }: { grant: PrivilegeGrant }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const withdraw = useMutation({
+    mutationFn: () => withdrawPrivilege(grant.install, grant.privilege),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "approvals"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "status"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "privileges"] });
+    },
+  });
+  const ask = () => {
+    if (!window.confirm(t("perimeter.outboundWithdrawConfirm", { app: grant.install, privilege: grant.privilege }))) return;
+    withdraw.mutate();
+  };
+  const refusal = withdraw.isError
+    ? withdraw.error instanceof ApiError && withdraw.error.detail
+      ? withdraw.error.detail
+      : withdraw.error instanceof Error
+        ? withdraw.error.message
+        : String(withdraw.error)
+    : null;
+  return (
+    <div>
+      <button
+        type="button"
+        className="admin-console__btn admin-console__btn--danger"
+        disabled={withdraw.isPending || withdraw.isSuccess}
+        onClick={ask}
+      >
+        {t(withdraw.isPending ? "perimeter.outboundWithdrawing" : "perimeter.outboundWithdraw")}
+      </button>
+      {withdraw.isSuccess ? <div className="admin-console__hint">{t("perimeter.outboundWithdrawn")}</div> : null}
+      {refusal ? (
+        <div className="admin-console__error">
+          {t("perimeter.outboundWithdrawRefused")} {refusal}
         </div>
       ) : null}
     </div>
