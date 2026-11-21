@@ -565,6 +565,72 @@ export function fetchAuthorization(scope: "cluster" | "tenant", tenant?: string)
   return apiFetch<AuthorizationView>(`/admin/authorization${query}`);
 }
 
+// The access page: what a person, a group or an app holds, read by the usher
+// from the rights store. Read-only. What a person holds is given from both
+// ends: the roles held with the group each is held through, and the store's
+// own answer to every permission, since the two do not always agree.
+
+/** One role held on one object. */
+export type HeldRole = {
+  role: string;
+  /** The Keycloak group it is held through; absent for a role held by name. */
+  group?: string;
+  byName?: boolean;
+  /** The permissions the role carries on this kind of object. */
+  carries: string[];
+};
+
+/** One permission on one object, for one person. */
+export type AccessPermission = {
+  name: string;
+  /** The rights store's own answer for this person. */
+  inEffect: boolean;
+  /**
+   * Where it comes from: `role` (a held role carries it; with inEffect false
+   * the model withholds it), `tenant` (on an app, it follows from what the
+   * person holds on the tenant), `elsewhere` (in effect, and nothing read
+   * here accounts for it). Absent: the person does not have it.
+   */
+  from?: "role" | "tenant" | "elsewhere" | (string & {});
+};
+
+export type ObjectAccess = {
+  object: string;
+  /** The profile, for an app. */
+  app?: string;
+  held: HeldRole[];
+  permissions: AccessPermission[];
+};
+
+export type PersonAccess = {
+  tenant: string;
+  subject: string;
+  /** The groups the rights store has the person in. */
+  groups: string[];
+  onTenant: ObjectAccess;
+  apps: ObjectAccess[];
+};
+
+export type GroupAccess = {
+  tenant: string;
+  group: string;
+  holds: { object: string; app?: string; role: string; carries: string[] }[];
+};
+
+export function fetchPersonAccess(id: string, tenant?: string) {
+  return apiFetch<PersonAccess>(`/admin/access/people/${encodeURIComponent(id)}${tenantQuery(tenant)}`);
+}
+
+export function fetchGroupAccess(group: string, tenant?: string) {
+  const params = new URLSearchParams({ group });
+  if (tenant) params.set("tenant", tenant);
+  return apiFetch<GroupAccess>(`/admin/access/groups?${params.toString()}`);
+}
+
+export function fetchAppAccess(profile: string, tenant?: string) {
+  return apiFetch<AuthorizationView>(`/admin/access/apps/${encodeURIComponent(profile)}${tenantQuery(tenant)}`);
+}
+
 export function fetchIntegrationsOverview(tenant?: string) {
   return apiFetch<IntegrationsOverview>(`/admin/integrations${tenantQuery(tenant)}`);
 }
@@ -1198,6 +1264,56 @@ export type AppState = {
    * component counts as installed.
    */
   origin?: "default" | "install";
+  /**
+   * The profile's trust tier, and what the profile has the component hold on
+   * people's behalf. Absent from an operator older than these fields, and for
+   * a component whose profile the cluster no longer has.
+   */
+  trustTier?: string;
+  holds?: AppHold[];
+  /**
+   * How the tenant's app administrators come to administer inside the app.
+   * Absent when the profile maps them to nothing: who administers inside it
+   * is then set in the app itself.
+   */
+  administrators?: AppAdministrators;
+  /** The app's add-ons the cluster holds a component for, each with its own. */
+  addons?: {
+    profile: string;
+    name: string;
+    trustTier?: string;
+    holds?: AppHold[];
+    administrators?: AppAdministrators;
+  }[];
+};
+
+/**
+ * The app administrator's role is one group of the sign-in service for the
+ * whole tenant, and not in the rights store: its members are made
+ * administrators inside each app by the app's own means, which this names.
+ */
+export type AppAdministrators = {
+  /** The group whose members they are. */
+  group: string;
+  /** How the membership reaches the app: `sync`, `token`, `sign-in`. */
+  ways: string[];
+  /** The in-app role the app's sync job puts them in. */
+  role?: string;
+  /** The app's roles a member's token carries. */
+  tokenRoles?: string[];
+};
+
+/**
+ * One thing a component holds on people's behalf, as the operator read it from
+ * the profile. `kind` is the operator's word for it; one this console does not
+ * know is shown as it came.
+ */
+export type AppHold = {
+  kind: string;
+  /** Whether the person has to be there: `present`, or `away` for also when not. */
+  presence?: "present" | "away" | (string & {});
+  /** What it concerns: entries, contracts, services, scopes or ways. */
+  names?: string[];
 };
 
 export function fetchAppStates() {

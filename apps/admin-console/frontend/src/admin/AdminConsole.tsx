@@ -27,6 +27,7 @@ import { RoleHoldersSection } from "@/admin/RoleHoldersSection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
 import { TenantSettingsSection } from "@/admin/TenantSettingsSection";
 import { TenantsSection } from "@/admin/TenantsSection";
+import { AccessSection } from "@/admin/AccessSection";
 import "./admin.css";
 import { useTranslation } from "react-i18next";
 
@@ -38,6 +39,7 @@ type AdminTab =
   | "tenants"
   | "members"
   | "groups"
+  | "access"
   | "apps"
   | "resources"
   | "export"
@@ -113,6 +115,9 @@ const TABS: {
   { id: "tenantSettings", labelKey: "tabTenantSettings" },
   { id: "members", labelKey: "tabMembers" },
   { id: "groups", labelKey: "tabGroups" },
+  // Who may do what, and why: what a person, a group or an app holds, as the
+  // rights store has it. Read-only, beside the two screens that change it.
+  { id: "access", labelKey: "tabAccess" },
   // What the tenant has installed, and everything done to an app after it is
   // installed: who may open it, what it exchanges with other apps, what it
   // asked of the platform, taking it away. Nothing is installed from here.
@@ -285,6 +290,8 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <MembersSection tenant={tenant} />
           ) : current === "groups" ? (
             <GroupsSection tenant={tenant} />
+          ) : current === "access" ? (
+            <AccessSection tenant={tenant} />
           ) : current === "apps" ? (
             <AppsSection tenant={tenant} onOpenIntegrations={() => setTab("integrations")} />
           ) : current === "security" ? (

@@ -16,6 +16,7 @@ refusal is correct and the screen should say so.
 """
 
 import json
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Query, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -209,4 +210,51 @@ async def authorization(
         path = f"/v1/clusters/{cluster}/authorization"
     else:
         path = f"/v1/tenants/{tenant or settings.tenant_id}/authorization"
+    return await director.read(settings, path, bearer_of(credentials))
+
+
+# --- The access page: what a person, a group or an app holds ----------------
+#
+# Three reads of the rights store, the usher's, under `can_manage_users`: the
+# relation that already reads who is in which group. The console composes
+# nothing here: the usher answers which roles are held through which group and
+# which permissions are in effect, and a refusal is relayed as it came.
+
+
+@router.get("/access/people/{person}")
+async def access_of_person(
+    person: str,
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What one person holds in the tenant and in each of its apps, and through what."""
+    path = f"/v1/tenants/{tenant or settings.tenant_id}/access/people/{quote(person, safe='')}"
+    return await director.read(settings, path, bearer_of(credentials))
+
+
+@router.get("/access/groups")
+async def access_of_group(
+    group: str = Query(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What one of the tenant's groups gives its members."""
+    path = f"/v1/tenants/{tenant or settings.tenant_id}/access/groups"
+    return await director.read(settings, path, bearer_of(credentials), params={"group": group})
+
+
+@router.get("/access/apps/{profile}")
+async def access_of_app(
+    profile: str,
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Who holds which role on one app, and what each role carries."""
+    path = f"/v1/tenants/{tenant or settings.tenant_id}/access/apps/{quote(profile, safe='')}"
     return await director.read(settings, path, bearer_of(credentials))

@@ -398,3 +398,36 @@ def test_the_usage_statistics_needs_a_token_before_anything_is_asked(monkeypatch
     r = TestClient(_app(_settings())).get("/api/v1/admin/platform/usage-statistics")
     assert r.status_code == 401
     assert seen == {}
+
+
+def test_the_access_page_reads_the_usher_and_relays_its_answer(monkeypatch):
+    """What a person, a group or an app holds is the usher's answer, under
+    `can_manage_users`. The console asks about the right tenant and passes the
+    answer through, a refusal included."""
+    client = TestClient(_app(_settings()))
+    base = "http://usher.test:8090/v1/tenants"
+    for path, upstream in [
+        ("/api/v1/admin/access/people/u1", f"{base}/platform/access/people/u1"),
+        ("/api/v1/admin/access/people/u1?tenant=acme", f"{base}/acme/access/people/u1"),
+        ("/api/v1/admin/access/groups?group=gentian:tenant:platform:sales", f"{base}/platform/access/groups"),
+        ("/api/v1/admin/access/apps/notes", f"{base}/platform/access/apps/notes"),
+    ]:
+        seen: dict = {}
+        _fake_client(monkeypatch, {"tenant": "platform"}, seen)
+        r = client.get(path, headers={"Authorization": "Bearer t"})
+        assert r.status_code == 200, path
+        assert r.json() == {"tenant": "platform"}
+        assert (seen["method"], seen["url"]) == ("GET", upstream)
+
+    seen = {}
+    _fake_client(monkeypatch, {"error": "forbidden"}, seen, status=403)
+    r = client.get("/api/v1/admin/access/people/u1", headers={"Authorization": "Bearer t"})
+    assert r.status_code == 403
+
+
+def test_a_persons_id_cannot_leave_its_path_segment(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {}, seen)
+    client = TestClient(_app(_settings()))
+    client.get("/api/v1/admin/access/people/a%3Fb", headers={"Authorization": "Bearer t"})
+    assert seen["url"] == "http://usher.test:8090/v1/tenants/platform/access/people/a%3Fb"
