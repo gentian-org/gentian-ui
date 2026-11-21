@@ -204,7 +204,7 @@ function NotAnsweredHere({ approval }: { approval: Approval }) {
         <Trans
           i18nKey="approvals.breakGlass"
           values={{
-            command: `kubectl gentian apps approve ${approval.install} ${approval.privilege} --tenant ${approval.tenant} --reason "…"`,
+            command: `kubectl gentian apps approve ${approval.install} ${approval.privilege} --tenant ${approval.tenant}`,
           }}
           components={mono}
         />
@@ -219,7 +219,7 @@ function NotAnsweredHere({ approval }: { approval: Approval }) {
 }
 
 /**
- * The officer's answer: an approval -- a reason in their words, an optional
+ * The officer's answer: an approval -- a comment if they leave one, an optional
  * end, then one commit through the director for the request's tenant -- or
  * a decline, a reason and nothing committed. Either way the director's
  * refusal is shown as it worded it.
@@ -240,7 +240,7 @@ export function AnswerRequest({ approval }: { approval: Approval }) {
   const approve = useMutation({
     mutationFn: () =>
       approveNodePrivilege(approval, {
-        reason: reason.trim(),
+        ...(reason.trim() ? { reason: reason.trim() } : {}),
         ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
         // A waiver the cluster does not permit yet: its allowlist entry is
         // added in the same approval.
@@ -254,7 +254,9 @@ export function AnswerRequest({ approval }: { approval: Approval }) {
     mutationFn: () => declineNodePrivilege(approval, { reason: reason.trim() }),
     onSuccess: settle,
   });
-  const tooShort = reason.trim().length < 10;
+  // A decline is shown to whoever asked, so it says why. An approval's
+  // comment is the approver's to leave or not.
+  const tooShort = open === "decline" && reason.trim().length < 10;
   const busy = approve.isPending || decline.isPending;
 
   if (approve.isSuccess) {
@@ -295,7 +297,14 @@ export function AnswerRequest({ approval }: { approval: Approval }) {
     >
       <label className="admin-console__field">
         <span>{t(declining ? "approvals.declineReasonLabel" : "approvals.reasonLabel")}</span>
-        <textarea value={reason} onChange={(event) => setReason(event.target.value)} required minLength={10} maxLength={1000} rows={3} />
+        <textarea
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          required={declining}
+          minLength={declining ? 10 : undefined}
+          maxLength={1000}
+          rows={declining ? 3 : 2}
+        />
       </label>
       {declining ? null : (
         <label className="admin-console__field">

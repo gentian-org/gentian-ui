@@ -69,8 +69,8 @@ class AllowlistEntry(BaseModel):
 class Approval(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # In the approver's own words; the director wants at least ten characters.
-    reason: StrictStr
+    # A comment the approver may leave.
+    reason: StrictStr | None = None
     # RFC 3339. Absent: the approval stands until somebody withdraws it.
     expiresAt: StrictStr | None = None
     # For a pod-security waiver the cluster does not permit yet: the

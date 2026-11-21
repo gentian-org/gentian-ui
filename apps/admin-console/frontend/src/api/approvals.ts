@@ -43,7 +43,7 @@ export function fetchApprovals() {
 }
 
 export type NodePrivilegeApproval = {
-  reason: string;
+  reason?: string;
   expiresAt?: string;
   /** The allowlist entry a waiver lacks, added by the director with the grant. */
   allowlist?: { profile: string; policy: string; scope: string };

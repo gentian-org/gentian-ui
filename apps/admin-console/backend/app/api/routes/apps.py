@@ -77,14 +77,14 @@ async def privileges(
 
 
 class PrivilegeApproval(BaseModel):
-    """What the approver states in the console: why, and optionally until
-    when. Who they are and when they answered come from the call, at the
+    """What the approver states in the console: a comment if they leave
+    one, and optionally until when. Who they are and when they answered come from the call, at the
     director. A field this does not name is refused rather than dropped."""
 
     model_config = ConfigDict(extra="forbid")
 
-    # In the approver's own words; the director wants at least ten characters.
-    reason: StrictStr
+    # A comment the approver may leave.
+    reason: StrictStr | None = None
     # RFC 3339. Absent: the approval stands until somebody withdraws it.
     expiresAt: StrictStr | None = None
 
