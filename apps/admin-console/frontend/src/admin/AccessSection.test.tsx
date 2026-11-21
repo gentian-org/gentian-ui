@@ -6,6 +6,7 @@ import "@/lib/i18n";
 import type { AppState, AuthorizationView, GroupAccess, PersonAccess } from "@/api/admin";
 import {
   AccessSection,
+  administeredBy,
   AppAccessView,
   GroupAccessView,
   holdsAnything,
@@ -142,7 +143,7 @@ describe("AccessSection", () => {
       [["admin", "access", "group", group], access],
       [["admin", "people", "group-members", group], { group, people: [{ id: "u1", username: "ada@acme.example" }] }],
     ];
-    const html = text(render(<GroupAccessView group={group} />, seed));
+    const html = text(render(<GroupAccessView group={group} tenant="acme" />, seed));
     expect(html).toContain("User of the app");
     expect(html).toContain("on the app notes");
     expect(html).toContain("Use the app");
@@ -150,7 +151,7 @@ describe("AccessSection", () => {
 
     const empty: GroupAccess = { tenant: "acme", group: "gentian:tenant:acme:sales", holds: [] };
     const none = text(
-      render(<GroupAccessView group={empty.group} />, [
+      render(<GroupAccessView group={empty.group} tenant="acme" />, [
         [["admin", "access", "group", empty.group], empty],
         [["admin", "people", "group-members", empty.group], { group: empty.group, people: [] }],
       ]),
@@ -180,6 +181,7 @@ describe("AccessSection", () => {
         { kind: "own-store", names: ["groups"] },
         { kind: "something-new", names: ["x"] },
       ],
+      administrators: { group: "gentian:tenant:acme:app-admins", ways: ["sync"], role: "admin" },
       addons: [{ profile: "notes-ai", name: "notes-ai", trustTier: "experimental" }],
     };
     const html = text(
@@ -188,8 +190,11 @@ describe("AccessSection", () => {
         [["admin", "apps", "status"], { tenant: "acme", apps: [state] }],
       ]),
     );
-    expect(html).toContain("Administrator of the app");
-    expect(html).toContain("nobody");
+    // The store's own administrator role is given to nobody and is not what
+    // administers the app: the row is left out, and the group is named.
+    expect(html).not.toContain("Administrator of the app");
+    expect(html).toContain("The members of the group app-admins:");
+    expect(html).toContain("Put in the app's own role admin.");
     expect(html).toContain("app:notes");
     expect(html).toContain("Trust tier: certified");
     expect(html).toContain("valid at this app and nowhere else");
@@ -200,6 +205,70 @@ describe("AccessSection", () => {
     // An add-on that holds nothing says so.
     expect(html).toContain("Add-on notes-ai");
     expect(html).toContain("Holds nothing on people's behalf.");
+  });
+
+  const odoo: AppState = {
+    profile: "odoo-base-ce",
+    name: "odoo",
+    ready: true,
+    phase: "ready",
+    addons: [
+      {
+        profile: "odoo-crm-ce",
+        name: "odoo-crm",
+        administrators: {
+          group: "gentian:tenant:acme:app-admins",
+          ways: ["token"],
+          tokenRoles: ["sales_team.group_sale_manager"],
+        },
+      },
+    ],
+  };
+  const plain: AppState = { profile: "wiki", name: "wiki", ready: true, phase: "ready" };
+
+  it("shows an app administrator what they administer, though the rights store has none of it", () => {
+    const person: PersonAccess = { ...visitor, subject: "u3", groups: ["gentian:tenant:acme:app-admins"] };
+    const html = text(
+      render(<PersonAccessView id="u3" tenant="acme" />, [
+        [["admin", "access", "person", "u3"], person],
+        [["admin", "apps", "status"], { tenant: "acme", apps: [odoo, plain] }],
+      ]),
+    );
+    expect(html).toContain("Administrator inside the tenant's apps");
+    expect(html).toContain("through the group app-admins");
+    expect(html).toContain("odoo-crm-ce");
+    expect(html).toContain("Given the app's roles sales_team.group_sale_manager at sign-in.");
+
+    // Somebody who is not in the group is shown nothing of it.
+    const other = text(
+      render(<PersonAccessView id="u2" tenant="acme" />, [
+        [["admin", "access", "person", "u2"], visitor],
+        [["admin", "apps", "status"], { tenant: "acme", apps: [odoo, plain] }],
+      ]),
+    );
+    expect(other).not.toContain("Administrator inside the tenant's apps");
+  });
+
+  it("says what the app administrators' group gives, and when an app has no administrator from the platform", () => {
+    const group = "gentian:tenant:acme:app-admins";
+    const html = text(
+      render(<GroupAccessView group={group} tenant="acme" />, [
+        [["admin", "access", "group", group], { tenant: "acme", group, holds: [] }],
+        [["admin", "people", "group-members", group], { group, people: [] }],
+        [["admin", "apps", "status"], { tenant: "acme", apps: [odoo, plain] }],
+      ]),
+    );
+    expect(html).toContain("Administrator inside the tenant's apps");
+    expect(html).not.toContain("Being in this group gives nothing by itself.");
+
+    const wiki = text(
+      render(<AppAccessView profile="wiki" tenant="acme" />, [
+        [["admin", "access", "app", "wiki"], { object: "app:acme/wiki", bindings: [], unheld: 0 }],
+        [["admin", "apps", "status"], { tenant: "acme", apps: [odoo, plain] }],
+      ]),
+    );
+    expect(wiki).toContain("The platform makes nobody an administrator inside this app.");
+    expect(administeredBy([odoo, plain], group).map((a) => a.profile)).toEqual(["odoo-crm-ce"]);
   });
 
   it("tells what is in effect from where", () => {

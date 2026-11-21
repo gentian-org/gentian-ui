@@ -1245,8 +1245,36 @@ export type AppState = {
    */
   trustTier?: string;
   holds?: AppHold[];
+  /**
+   * How the tenant's app administrators come to administer inside the app.
+   * Absent when the profile maps them to nothing: who administers inside it
+   * is then set in the app itself.
+   */
+  administrators?: AppAdministrators;
   /** The app's add-ons the cluster holds a component for, each with its own. */
-  addons?: { profile: string; name: string; trustTier?: string; holds?: AppHold[] }[];
+  addons?: {
+    profile: string;
+    name: string;
+    trustTier?: string;
+    holds?: AppHold[];
+    administrators?: AppAdministrators;
+  }[];
+};
+
+/**
+ * The app administrator's role is one group of the sign-in service for the
+ * whole tenant, and not in the rights store: its members are made
+ * administrators inside each app by the app's own means, which this names.
+ */
+export type AppAdministrators = {
+  /** The group whose members they are. */
+  group: string;
+  /** How the membership reaches the app: `sync`, `token`, `sign-in`. */
+  ways: string[];
+  /** The in-app role the app's sync job puts them in. */
+  role?: string;
+  /** The app's roles a member's token carries. */
+  tokenRoles?: string[];
 };
 
 /**

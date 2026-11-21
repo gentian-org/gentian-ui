@@ -1376,7 +1376,7 @@
     "onApp": "on the app",
     "whoIsInTheGroup": "Who is in it",
     "nobody": "nobody",
-    "whoOnTheApp": "Who holds what on this app",
+    "whoOnTheApp": "Who may use this app",
     "whoOnTheAppHint": "An administrator of the tenant also sets and reads the app's credentials, without being in a group of the app.",
     "role": "Role",
     "heldThrough": "Held through",
@@ -1425,6 +1425,15 @@
     "hold_own-store": "It keeps rights of its own, which this page does not show.",
     "hold_own-store_named": "It keeps rights of its own, which this page does not show, and is given the tenant's group memberships for them.",
     "hold_person-secrets": "It keeps one secret per person, such as a person's sign-in at a service outside the cluster.",
-    "hold_bridge-as-person_named": "It is a bridge whose calls are made as one person: {{names}}."
+    "hold_bridge-as-person_named": "It is a bridge whose calls are made as one person: {{names}}.",
+    "administratorInsideApps": "Administrator inside the tenant's apps",
+    "administratorInsideAppsHint": "This role is kept by the sign-in service, not by the rights store. A change of the group reaches an app at the person's next sign-in, or when the app's sync has run.",
+    "insideTheApp": "Inside the app",
+    "administers_sync": "Put in the app's own role {{role}}.",
+    "administers_token": "Given the app's roles {{roles}} at sign-in.",
+    "administers_sign-in": "Named to the app as an administrator at sign-in.",
+    "whoAdministersInside": "Who administers inside this app",
+    "membersOfGroup": "The members of the group {{group}}:",
+    "nobodyAdministersInside": "The platform makes nobody an administrator inside this app. Who administers inside it is set in the app itself."
   }
 }

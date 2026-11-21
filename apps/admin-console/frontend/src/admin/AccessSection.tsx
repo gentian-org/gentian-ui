@@ -11,7 +11,9 @@ import {
   fetchPersonAccess,
   fetchPersonGroups,
   type AccessPermission,
+  type AppAdministrators,
   type AppHold,
+  type AppState,
   type HeldRole,
   type ObjectAccess,
   type Person,
@@ -136,6 +138,95 @@ function ObjectRights({ access, tenant }: { access: ObjectAccess; tenant: string
   );
 }
 
+/** How one app's administrators are made, as sentences. */
+function AdministratorWays({ administrators }: { administrators: AppAdministrators }) {
+  const { t } = useTranslation();
+  return (
+    <ul className="admin-console__access-list">
+      {administrators.ways.map((way) => (
+        <li key={way}>
+          {t(`access.administers_${way}`, {
+            role: administrators.role ?? "",
+            roles: (administrators.tokenRoles ?? []).join(", "),
+            defaultValue: way,
+          })}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The apps and add-ons whose inside a group's members administer. */
+export function administeredBy(apps: AppState[], group: string) {
+  const out: { profile: string; administrators: AppAdministrators }[] = [];
+  for (const app of apps) {
+    if (app.administrators?.group === group) out.push({ profile: app.profile, administrators: app.administrators });
+    for (const addon of app.addons ?? []) {
+      if (addon.administrators?.group === group) {
+        out.push({ profile: addon.profile, administrators: addon.administrators });
+      }
+    }
+  }
+  return out.sort((a, b) => a.profile.localeCompare(b.profile));
+}
+
+/**
+ * What being an app administrator gives, for the groups among `groups` that
+ * are one. The role is not in the rights store, so the usher's answer has
+ * nothing of it; the operator says per app how the group's members are made
+ * administrators inside it.
+ */
+function AppAdministration({ groups, tenant }: { groups: string[]; tenant: string }) {
+  const { t } = useTranslation();
+  const states = useQuery({ queryKey: ["admin", "apps", "status"], queryFn: fetchAppStates });
+  const apps = states.data?.apps ?? [];
+  const held = groups
+    .map((group) => ({ group, administered: administeredBy(apps, group) }))
+    .filter((entry) => entry.administered.length > 0);
+  if (held.length === 0) return null;
+  return (
+    <>
+      {held.map(({ group, administered }) => (
+        <div key={group} className="admin-console__access-role">
+          <div>
+            <strong>{t("access.administratorInsideApps")}</strong>{" "}
+            <span className="admin-console__hint">{t("access.throughGroup", { group: groupLabel(group, tenant) })}</span>
+          </div>
+          <div className="admin-console__table-wrap">
+            <table className="admin-console__table">
+              <thead>
+                <tr>
+                  <th>{t("access.app")}</th>
+                  <th>{t("access.insideTheApp")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {administered.map(({ profile, administrators }) => (
+                  <tr key={profile}>
+                    <td>
+                      <code>{profile}</code>
+                    </td>
+                    <td>
+                      <AdministratorWays administrators={administrators} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+      <p className="admin-console__hint">{t("access.administratorInsideAppsHint")}</p>
+    </>
+  );
+}
+
+/** Whether a group is one whose members administer inside some app. */
+function useAdministers(group: string) {
+  const states = useQuery({ queryKey: ["admin", "apps", "status"], queryFn: fetchAppStates });
+  return administeredBy(states.data?.apps ?? [], group).length > 0;
+}
+
 export function PersonAccessView({ id, tenant }: { id: string; tenant: string }) {
   const { t } = useTranslation();
   const query = useQuery({
@@ -195,6 +286,7 @@ export function PersonAccessView({ id, tenant }: { id: string; tenant: string })
           ))}
         </p>
       ) : null}
+      <AppAdministration groups={access.groups} tenant={tenant} />
 
       <h3 className="admin-console__subsection-title">{t("access.groupsOfPerson")}</h3>
       {access.groups.length === 0 ? (
@@ -217,7 +309,7 @@ function personName(person: Person) {
   return person.name ? `${person.name} (${person.username})` : person.username;
 }
 
-export function GroupAccessView({ group }: { group: string }) {
+export function GroupAccessView({ group, tenant }: { group: string; tenant: string }) {
   const { t } = useTranslation();
   const query = useQuery({
     queryKey: ["admin", "access", "group", group],
@@ -228,13 +320,15 @@ export function GroupAccessView({ group }: { group: string }) {
     queryKey: ["admin", "people", "group-members", group],
     queryFn: () => fetchGroupMembers(group),
   });
+  const administers = useAdministers(group);
   if (query.isLoading) return <p className="admin-console__loading">{t("access.reading")}</p>;
   if (query.isError || !query.data) return <p className="admin-console__error">{t("access.cannotBeRead")}</p>;
   const holds = query.data.holds;
   return (
     <>
       <h3 className="admin-console__subsection-title">{t("access.whatTheGroupGives")}</h3>
-      {holds.length === 0 ? (
+      <AppAdministration groups={[group]} tenant={tenant} />
+      {administers ? null : holds.length === 0 ? (
         <p className="admin-console__empty">{t("access.groupGivesNothing")}</p>
       ) : (
         holds.map((hold) => (
@@ -308,6 +402,18 @@ function Holds({ holds, trustTier }: { holds?: AppHold[]; trustTier?: string }) 
   );
 }
 
+/** Who administers inside one app or add-on, and how they are made so. */
+function InsideAdministrators({ administrators, tenant }: { administrators?: AppAdministrators; tenant: string }) {
+  const { t } = useTranslation();
+  if (!administrators) return <p className="admin-console__empty">{t("access.nobodyAdministersInside")}</p>;
+  return (
+    <div className="admin-console__access-role">
+      <div>{t("access.membersOfGroup", { group: groupLabel(administrators.group, tenant) })}</div>
+      <AdministratorWays administrators={administrators} />
+    </div>
+  );
+}
+
 export function AppAccessView({ profile, tenant }: { profile: string; tenant: string }) {
   const { t } = useTranslation();
   const query = useQuery({
@@ -320,6 +426,11 @@ export function AppAccessView({ profile, tenant }: { profile: string; tenant: st
   if (query.isError || !query.data) return <p className="admin-console__error">{t("access.cannotBeRead")}</p>;
   const view = query.data;
   const state = states.data?.apps.find((app) => app.profile === profile);
+  // The rights store has a role for an app's administrator that nothing
+  // gives: who administers inside an app is the app administrators' group,
+  // shown below. A row saying "nobody" would be false, so it is left out
+  // unless somebody does hold it.
+  const bindings = view.bindings.filter((b) => b.relation !== "admin" || b.groups.length > 0);
   return (
     <>
       <h3 className="admin-console__subsection-title">{t("access.whoOnTheApp")}</h3>
@@ -333,7 +444,7 @@ export function AppAccessView({ profile, tenant }: { profile: string; tenant: st
             </tr>
           </thead>
           <tbody>
-            {view.bindings.map((binding) => (
+            {bindings.map((binding) => (
               <tr key={binding.relation}>
                 <td>{roleLabel(t, view.object, binding.relation)}</td>
                 <td>
@@ -356,6 +467,27 @@ export function AppAccessView({ profile, tenant }: { profile: string; tenant: st
         </table>
       </div>
       <p className="admin-console__hint">{t("access.whoOnTheAppHint")}</p>
+
+      <h3 className="admin-console__subsection-title">{t("access.whoAdministersInside")}</h3>
+      {states.isLoading ? (
+        <p className="admin-console__loading">{t("access.reading")}</p>
+      ) : !state ? (
+        <p className="admin-console__empty">{t("access.appStateUnknown")}</p>
+      ) : (
+        <>
+          <InsideAdministrators administrators={state.administrators} tenant={tenant} />
+          {(state.addons ?? [])
+            .filter((addon) => addon.administrators)
+            .map((addon) => (
+              <div key={addon.profile}>
+                <h4 className="admin-console__subsection-title">
+                  {t("access.addon")} <code>{addon.profile}</code>
+                </h4>
+                <InsideAdministrators administrators={addon.administrators} tenant={tenant} />
+              </div>
+            ))}
+        </>
+      )}
 
       <h3 className="admin-console__subsection-title">{t("access.whatTheAppHolds")}</h3>
       <p className="admin-console__hint">{t("access.whatTheAppHoldsHint")}</p>
@@ -448,7 +580,7 @@ export function AccessSection({ tenant }: { tenant: string }) {
       ) : kind === "person" ? (
         <PersonAccessView key={selected} id={selected} tenant={tenant} />
       ) : kind === "group" ? (
-        <GroupAccessView key={selected} group={selected} />
+        <GroupAccessView key={selected} group={selected} tenant={tenant} />
       ) : (
         <AppAccessView key={selected} profile={selected} tenant={tenant} />
       )}

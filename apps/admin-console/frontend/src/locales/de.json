@@ -1376,7 +1376,7 @@
     "onApp": "auf der App",
     "whoIsInTheGroup": "Wer darin ist",
     "nobody": "niemand",
-    "whoOnTheApp": "Wer auf dieser App was hält",
+    "whoOnTheApp": "Wer diese App verwenden darf",
     "whoOnTheAppHint": "Wer den Mandanten verwaltet, setzt und liest auch die Zugangsdaten der App, ohne in einer Gruppe der App zu sein.",
     "role": "Rolle",
     "heldThrough": "Gehalten über",
@@ -1425,6 +1425,15 @@
     "hold_own-store": "Sie führt eigene Rechte, die diese Seite nicht zeigt.",
     "hold_own-store_named": "Sie führt eigene Rechte, die diese Seite nicht zeigt, und erhält dafür die Gruppenzugehörigkeiten des Mandanten.",
     "hold_person-secrets": "Sie bewahrt ein Geheimnis je Person auf, etwa die Anmeldung einer Person bei einem Dienst außerhalb des Clusters.",
-    "hold_bridge-as-person_named": "Sie ist eine Brücke, deren Aufrufe als eine Person erfolgen: {{names}}."
+    "hold_bridge-as-person_named": "Sie ist eine Brücke, deren Aufrufe als eine Person erfolgen: {{names}}.",
+    "administratorInsideApps": "Verwaltet das Innere der Apps des Mandanten",
+    "administratorInsideAppsHint": "Diese Rolle führt der Anmeldedienst, nicht der Rechtespeicher. Eine Änderung der Gruppe erreicht eine App bei der nächsten Anmeldung der Person oder sobald der Abgleich der App gelaufen ist.",
+    "insideTheApp": "In der App",
+    "administers_sync": "Wird in die eigene Rolle {{role}} der App aufgenommen.",
+    "administers_token": "Erhält bei der Anmeldung die Rollen {{roles}} der App.",
+    "administers_sign-in": "Wird der App bei der Anmeldung als verwaltende Person genannt.",
+    "whoAdministersInside": "Wer das Innere dieser App verwaltet",
+    "membersOfGroup": "Die Mitglieder der Gruppe {{group}}:",
+    "nobodyAdministersInside": "Die Plattform macht niemanden zur verwaltenden Person in dieser App. Wer ihr Inneres verwaltet, wird in der App selbst festgelegt."
   }
 }
