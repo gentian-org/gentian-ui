@@ -469,6 +469,7 @@ export function setClusterRelease(want: ReleaseSpec) {
 
 /** A cluster role an account can hold by name. */
 export type ClusterRole =
+  | "admin"
   | "securityOfficer"
   | "auditor"
   | "perimeterApprover"
@@ -552,22 +553,6 @@ export type RoleCandidates = {
 /** Who could hold a role, from the registrar. */
 export function fetchRoleCandidates() {
   return apiFetch<{ cluster: string; complete: boolean; tenants: RoleCandidates[] }>("/cluster/role-candidates");
-}
-
-/** The members of the kernel Keycloak group one cluster role is held through. */
-export type PlatformRoleMembers = {
-  role: string;
-  group: string;
-  /** Null where the group could not be read; `unavailable` then says so. */
-  members: RolePerson[] | null;
-  unavailable?: boolean;
-};
-
-/** Who holds each cluster role through its group, from the registrar. Read only. */
-export function fetchPlatformRoleMembers() {
-  return apiFetch<{ cluster: string; complete: boolean; roles: PlatformRoleMembers[] }>(
-    "/cluster/platform-role-members",
-  );
 }
 
 /** One approved privilege exception of one tenant's app, as git has it. */

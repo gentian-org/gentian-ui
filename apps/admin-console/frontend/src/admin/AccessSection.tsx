@@ -5,55 +5,47 @@ import type { TFunction } from "i18next";
 import {
   fetchAppAccess,
   fetchAppStates,
-  fetchGroupAccess,
-  fetchGroupMembers,
   fetchPeople,
   fetchPersonAccess,
-  fetchPersonGroups,
+  fetchPositionAccess,
+  fetchPositions,
   type AccessPermission,
-  type AppAdministrators,
   type AppHold,
-  type AppState,
   type HeldRole,
+  type Holder,
   type ObjectAccess,
   type Person,
+  type TenantPosition,
 } from "@/api/admin";
-import { describeGroup } from "@/admin/groupLabels";
+import { allPositions, positionLabel, roleLabel } from "@/admin/positionLabels";
 
 /**
  * Who may do what in the tenant, and why.
  *
  * Read-only, and answered by the rights store, not worked out here: the usher
- * says which roles a person holds through which group and which permissions
- * are in effect for them, and this screen puts that into sentences. Where the
- * two disagree it says so -- a permission a group carries that is not in
- * effect, and one in effect that no group of the tenant accounts for -- since
- * those are the cases nobody can guess from the group lists.
+ * says which roles a person was given, through which position, and what is in
+ * effect for them, and this screen puts that into sentences. More is in
+ * effect than is held -- an app's administrator holds every role the app
+ * declares, a role on an add-on lets a person into its base, and some things
+ * follow from the tenant or the cluster -- and the screen says where each
+ * comes from, since those are the cases nobody can guess from a list.
  *
- * Nothing is given or taken here. People are put in groups on Members and
- * Groups, and an app's access is set on Apps.
+ * Nothing is given or taken here. People are given positions on People and
+ * Positions.
  */
 
-export type AccessKind = "person" | "group" | "app";
+export type AccessKind = "person" | "position" | "app";
 
-const KINDS: AccessKind[] = ["person", "group", "app"];
+const KINDS: AccessKind[] = ["person", "position", "app"];
 
-/** A group's name without the tenant's prefix, as the other screens show it. */
-function groupLabel(path: string, tenant: string) {
-  const described = describeGroup({ id: path, path, name: path }, tenant);
-  return described.kind === "app" ? `app:${described.label}` : described.label;
+/** The kind of thing an object of the rights store is: tenant, app. */
+function typeOf(object: string) {
+  return object.split(":")[0];
 }
 
-/** A role in words; one this console does not know stays as the model names it. */
-function roleLabel(t: TFunction, object: string, role: string) {
-  const type = object.split(":")[0];
-  return t(`access.role_${type}_${role}`, { defaultValue: role });
-}
-
-/** A permission in words, the same way. */
+/** A permission in words; one this console does not know stays as the model names it. */
 function permissionLabel(t: TFunction, object: string, name: string) {
-  const type = object.split(":")[0];
-  return t(`access.permission_${type}_${name}`, { defaultValue: name });
+  return t(`access.permission_${typeOf(object)}_${name}`, { defaultValue: name });
 }
 
 /** The permissions of an object that are in effect and come from `from`. */
@@ -64,6 +56,12 @@ export function inEffectFrom(access: ObjectAccess, from: string): AccessPermissi
 /** Whether a person holds or may do anything at all on an object. */
 export function holdsAnything(access: ObjectAccess) {
   return access.held.length > 0 || access.permissions.some((p) => p.inEffect);
+}
+
+/** The roles in effect on an object that the person was not given there: they follow from something else. */
+export function rolesThatFollow(access: ObjectAccess) {
+  const given = new Set(access.held.map((held) => held.role));
+  return access.roles.filter((role) => !given.has(role));
 }
 
 function Permissions({ object, names }: { object: string; names: string[] }) {
@@ -77,54 +75,70 @@ function Permissions({ object, names }: { object: string; names: string[] }) {
   );
 }
 
-/** One role a person holds, through what, and what of it is in effect. */
-function HeldRoleRow({ access, held, tenant }: { access: ObjectAccess; held: HeldRole; tenant: string }) {
+/** One role a person was given, how, and what it lets them do. */
+function HeldRoleRow({ access, held, own }: { access: ObjectAccess; held: HeldRole; own: TenantPosition[] }) {
   const { t } = useTranslation();
   const answer = new Map(access.permissions.map((p) => [p.name, p.inEffect]));
   const inEffect = held.carries.filter((name) => answer.get(name));
-  const withheld = held.carries.filter((name) => !answer.get(name));
   return (
     <div className="admin-console__access-role">
       <div>
-        <strong>{roleLabel(t, access.object, held.role)}</strong>{" "}
+        <strong>{roleLabel(t, typeOf(access.object), held.role)}</strong>{" "}
+        {held.declared ? <span className="admin-console__badge">{t("access.declaredRole")}</span> : null}{" "}
         <span className="admin-console__hint">
-          {held.group
-            ? t("access.throughGroup", { group: groupLabel(held.group, tenant) })
-            : t("access.byName")}
+          {held.position
+            ? t("access.throughPosition", { position: positionLabel(t, held.position, own) })
+            : t("access.givenDirectly")}
         </span>
+        {held.direct ? (
+          <>
+            {" "}
+            <span className="admin-console__badge admin-console__badge--warn">{t("access.exception")}</span>
+          </>
+        ) : null}
       </div>
       {inEffect.length > 0 ? <Permissions object={access.object} names={inEffect} /> : null}
-      {withheld.length > 0 ? (
-        <>
-          <p className="admin-console__hint">
-            <span className="admin-console__badge admin-console__badge--warn">{t("access.notInEffect")}</span>{" "}
-            {t(access.app ? "access.withheldOnApp" : "access.withheld")}
-          </p>
-          <Permissions object={access.object} names={withheld} />
-        </>
-      ) : null}
     </div>
   );
 }
 
 /** Everything a person holds on one object: the tenant, or one app. */
-function ObjectRights({ access, tenant }: { access: ObjectAccess; tenant: string }) {
+function ObjectRights({ access, own }: { access: ObjectAccess; own: TenantPosition[] }) {
   const { t } = useTranslation();
-  const fromTenant = inEffectFrom(access, "tenant");
+  const follows = rolesThatFollow(access);
+  const groups: { from: string; hint: string }[] = [
+    { from: "tenant", hint: t("access.fromTenant") },
+    { from: "app", hint: t("access.fromApp") },
+  ];
   const elsewhere = inEffectFrom(access, "elsewhere");
   return (
     <>
       {access.held.map((held) => (
-        <HeldRoleRow key={`${held.role}/${held.group ?? ""}`} access={access} held={held} tenant={tenant} />
+        <HeldRoleRow key={`${held.role}/${held.position ?? ""}`} access={access} held={held} own={own} />
       ))}
-      {fromTenant.length > 0 ? (
+      {follows.length > 0 ? (
         <div className="admin-console__access-role">
           <div>
-            <span className="admin-console__hint">{t("access.fromTenant")}</span>
+            <span className="admin-console__hint">{t("access.rolesThatFollow")}</span>{" "}
+            {follows.map((role) => (
+              <span key={role} className="admin-console__badge">
+                {roleLabel(t, typeOf(access.object), role)}
+              </span>
+            ))}
           </div>
-          <Permissions object={access.object} names={fromTenant.map((p) => p.name)} />
         </div>
       ) : null}
+      {groups.map(({ from, hint }) => {
+        const names = inEffectFrom(access, from).map((p) => p.name);
+        return names.length > 0 ? (
+          <div key={from} className="admin-console__access-role">
+            <div>
+              <span className="admin-console__hint">{hint}</span>
+            </div>
+            <Permissions object={access.object} names={names} />
+          </div>
+        ) : null;
+      })}
       {elsewhere.length > 0 ? (
         <div className="admin-console__access-role">
           <div>
@@ -138,102 +152,20 @@ function ObjectRights({ access, tenant }: { access: ObjectAccess; tenant: string
   );
 }
 
-/** How one app's administrators are made, as sentences. */
-function AdministratorWays({ administrators }: { administrators: AppAdministrators }) {
-  const { t } = useTranslation();
-  return (
-    <ul className="admin-console__access-list">
-      {administrators.ways.map((way) => (
-        <li key={way}>
-          {t(`access.administers_${way}`, {
-            role: administrators.role ?? "",
-            roles: (administrators.tokenRoles ?? []).join(", "),
-            defaultValue: way,
-          })}
-        </li>
-      ))}
-    </ul>
-  );
+/** The tenant's own positions, for their titles; none while they are being read. */
+function useOwnPositions() {
+  const query = useQuery({ queryKey: ["admin", "positions"], queryFn: () => fetchPositions() });
+  return query.data?.positions ?? [];
 }
 
-/** The apps and add-ons whose inside a group's members administer. */
-export function administeredBy(apps: AppState[], group: string) {
-  const out: { profile: string; administrators: AppAdministrators }[] = [];
-  for (const app of apps) {
-    if (app.administrators?.group === group) out.push({ profile: app.profile, administrators: app.administrators });
-    for (const addon of app.addons ?? []) {
-      if (addon.administrators?.group === group) {
-        out.push({ profile: addon.profile, administrators: addon.administrators });
-      }
-    }
-  }
-  return out.sort((a, b) => a.profile.localeCompare(b.profile));
-}
-
-/**
- * What being an app administrator gives, for the groups among `groups` that
- * are one. The role is not in the rights store, so the usher's answer has
- * nothing of it; the operator says per app how the group's members are made
- * administrators inside it.
- */
-function AppAdministration({ groups, tenant }: { groups: string[]; tenant: string }) {
-  const { t } = useTranslation();
-  const states = useQuery({ queryKey: ["admin", "apps", "status"], queryFn: fetchAppStates });
-  const apps = states.data?.apps ?? [];
-  const held = groups
-    .map((group) => ({ group, administered: administeredBy(apps, group) }))
-    .filter((entry) => entry.administered.length > 0);
-  if (held.length === 0) return null;
-  return (
-    <>
-      {held.map(({ group, administered }) => (
-        <div key={group} className="admin-console__access-role">
-          <div>
-            <strong>{t("access.administratorInsideApps")}</strong>{" "}
-            <span className="admin-console__hint">{t("access.throughGroup", { group: groupLabel(group, tenant) })}</span>
-          </div>
-          <div className="admin-console__table-wrap">
-            <table className="admin-console__table">
-              <thead>
-                <tr>
-                  <th>{t("access.app")}</th>
-                  <th>{t("access.insideTheApp")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {administered.map(({ profile, administrators }) => (
-                  <tr key={profile}>
-                    <td>
-                      <code>{profile}</code>
-                    </td>
-                    <td>
-                      <AdministratorWays administrators={administrators} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ))}
-      <p className="admin-console__hint">{t("access.administratorInsideAppsHint")}</p>
-    </>
-  );
-}
-
-/** Whether a group is one whose members administer inside some app. */
-function useAdministers(group: string) {
-  const states = useQuery({ queryKey: ["admin", "apps", "status"], queryFn: fetchAppStates });
-  return administeredBy(states.data?.apps ?? [], group).length > 0;
-}
-
-export function PersonAccessView({ id, tenant }: { id: string; tenant: string }) {
+export function PersonAccessView({ id }: { id: string }) {
   const { t } = useTranslation();
   const query = useQuery({
     queryKey: ["admin", "access", "person", id],
     queryFn: () => fetchPersonAccess(id),
     retry: false,
   });
+  const own = useOwnPositions();
   if (query.isLoading) return <p className="admin-console__loading">{t("access.reading")}</p>;
   if (query.isError || !query.data) return <p className="admin-console__error">{t("access.cannotBeRead")}</p>;
   const access = query.data;
@@ -241,9 +173,30 @@ export function PersonAccessView({ id, tenant }: { id: string; tenant: string })
   const without = access.apps.filter((app) => !holdsAnything(app));
   return (
     <>
+      <h3 className="admin-console__subsection-title">{t("access.positionsOfPerson")}</h3>
+      {access.positions.length === 0 ? (
+        <p className="admin-console__empty">{t("access.noPositions")}</p>
+      ) : (
+        <ul className="admin-console__access-list">
+          {access.positions.map((position) => (
+            <li key={position.name}>
+              <strong>{positionLabel(t, position.name, own)}</strong>
+              {position.through ? (
+                <>
+                  {" "}
+                  <span className="admin-console__hint">
+                    {t("access.includedBy", { position: positionLabel(t, position.through, own) })}
+                  </span>
+                </>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+
       <h3 className="admin-console__subsection-title">{t("access.inTheTenant")}</h3>
       {holdsAnything(access.onTenant) ? (
-        <ObjectRights access={access.onTenant} tenant={tenant} />
+        <ObjectRights access={access.onTenant} own={own} />
       ) : (
         <p className="admin-console__empty">{t("access.nothingInTheTenant")}</p>
       )}
@@ -267,7 +220,7 @@ export function PersonAccessView({ id, tenant }: { id: string; tenant: string })
                     <code>{app.app}</code>
                   </td>
                   <td>
-                    <ObjectRights access={app} tenant={tenant} />
+                    <ObjectRights access={app} own={own} />
                   </td>
                 </tr>
               ))}
@@ -286,21 +239,6 @@ export function PersonAccessView({ id, tenant }: { id: string; tenant: string })
           ))}
         </p>
       ) : null}
-      <AppAdministration groups={access.groups} tenant={tenant} />
-
-      <h3 className="admin-console__subsection-title">{t("access.groupsOfPerson")}</h3>
-      {access.groups.length === 0 ? (
-        <p className="admin-console__empty">{t("access.noGroups")}</p>
-      ) : (
-        <p>
-          {access.groups.map((group) => (
-            <span key={group} className="admin-console__badge">
-              {groupLabel(group, tenant)}
-            </span>
-          ))}
-        </p>
-      )}
-      <p className="admin-console__hint">{t("access.groupsOfPersonHint")}</p>
     </>
   );
 }
@@ -309,60 +247,111 @@ function personName(person: Person) {
   return person.name ? `${person.name} (${person.username})` : person.username;
 }
 
-export function GroupAccessView({ group, tenant }: { group: string; tenant: string }) {
+/** The people of the tenant by account id, for naming who holds something. */
+function usePeopleById() {
+  const people = useQuery({ queryKey: ["admin", "people", ""], queryFn: () => fetchPeople() });
+  return new Map((people.data?.people ?? []).map((person) => [person.id, person]));
+}
+
+/** A holder as a person reading the screen knows them. */
+function HolderBadge({ holder, own, people }: { holder: Holder; own: TenantPosition[]; people: Map<string, Person> }) {
+  const { t } = useTranslation();
+  if (holder.kind === "position") {
+    return <span className="admin-console__badge">{positionLabel(t, holder.name, own)}</span>;
+  }
+  if (holder.kind === "person") {
+    const person = people.get(holder.name);
+    return (
+      <span className="admin-console__badge admin-console__badge--warn">{person ? personName(person) : holder.name}</span>
+    );
+  }
+  return (
+    <span className="admin-console__badge">
+      <code>{holder.name}</code>
+    </span>
+  );
+}
+
+/**
+ * What one position is. `withoutHolders` leaves out who holds it, for a screen
+ * that lists them itself.
+ */
+export function PositionAccessView({ name, withoutHolders }: { name: string; withoutHolders?: boolean }) {
   const { t } = useTranslation();
   const query = useQuery({
-    queryKey: ["admin", "access", "group", group],
-    queryFn: () => fetchGroupAccess(group),
+    queryKey: ["admin", "access", "position", name],
+    queryFn: () => fetchPositionAccess(name),
     retry: false,
   });
-  const members = useQuery({
-    queryKey: ["admin", "people", "group-members", group],
-    queryFn: () => fetchGroupMembers(group),
-  });
-  const administers = useAdministers(group);
+  const own = useOwnPositions();
+  const people = usePeopleById();
   if (query.isLoading) return <p className="admin-console__loading">{t("access.reading")}</p>;
   if (query.isError || !query.data) return <p className="admin-console__error">{t("access.cannotBeRead")}</p>;
-  const holds = query.data.holds;
+  const position = query.data;
+  const description = own.find((p) => p.name === name)?.description;
   return (
     <>
-      <h3 className="admin-console__subsection-title">{t("access.whatTheGroupGives")}</h3>
-      <AppAdministration groups={[group]} tenant={tenant} />
-      {administers ? null : holds.length === 0 ? (
-        <p className="admin-console__empty">{t("access.groupGivesNothing")}</p>
+      {description ? <p className="admin-console__lead">{description}</p> : null}
+      <h3 className="admin-console__subsection-title">{t("access.whatThePositionHolds")}</h3>
+      {position.holds.length === 0 ? (
+        <p className="admin-console__empty">{t("access.positionHoldsNothing")}</p>
       ) : (
-        holds.map((hold) => (
+        position.holds.map((hold) => (
           <div key={`${hold.object}/${hold.role}`} className="admin-console__access-role">
             <div>
-              <strong>{roleLabel(t, hold.object, hold.role)}</strong>{" "}
+              <strong>{roleLabel(t, typeOf(hold.object), hold.role)}</strong>{" "}
+              {hold.declared ? <span className="admin-console__badge">{t("access.declaredRole")}</span> : null}{" "}
               {hold.app ? (
                 <span className="admin-console__hint">
                   {t("access.onApp")} <code>{hold.app}</code>
                 </span>
-              ) : null}
+              ) : (
+                <span className="admin-console__hint">{t("access.onTheTenant")}</span>
+              )}
             </div>
             <Permissions object={hold.object} names={hold.carries} />
           </div>
         ))
       )}
-      {holds.some((hold) => hold.app && hold.carries.length > 0) ? (
-        <p className="admin-console__hint">{t("access.groupWithheldHint")}</p>
+      {position.includes.length > 0 ? (
+        <p>
+          <span className="admin-console__hint">{t("access.includes")}</span>{" "}
+          {position.includes.map((included) => (
+            <span key={included} className="admin-console__badge">
+              {positionLabel(t, included, own)}
+            </span>
+          ))}
+        </p>
+      ) : null}
+      {position.includedIn.length > 0 ? (
+        <p>
+          <span className="admin-console__hint">{t("access.includedIn")}</span>{" "}
+          {position.includedIn.map((including) => (
+            <span key={including} className="admin-console__badge">
+              {positionLabel(t, including, own)}
+            </span>
+          ))}
+        </p>
       ) : null}
 
-      <h3 className="admin-console__subsection-title">{t("access.whoIsInTheGroup")}</h3>
-      {members.isLoading ? (
-        <p className="admin-console__loading">{t("access.reading")}</p>
-      ) : members.isError || !members.data ? (
-        <p className="admin-console__error">{t("access.membersCannotBeRead")}</p>
-      ) : members.data.people.length === 0 ? (
-        <p className="admin-console__empty">{t("access.nobody")}</p>
-      ) : (
-        <ul className="admin-console__access-list">
-          {members.data.people.map((person) => (
-            <li key={person.id}>{personName(person)}</li>
-          ))}
-        </ul>
+      {withoutHolders ? null : (
+        <>
+          <h3 className="admin-console__subsection-title">{t("access.whoHoldsThePosition")}</h3>
+          {position.holders.length === 0 ? (
+            <p className="admin-console__empty">{t("access.nobody")}</p>
+          ) : (
+            <ul className="admin-console__access-list">
+              {position.holders.map((id) => {
+                const person = people.get(id);
+                return <li key={id}>{person ? personName(person) : <code>{id}</code>}</li>;
+              })}
+            </ul>
+          )}
+        </>
       )}
+      {position.includedIn.length > 0 ? (
+        <p className="admin-console__hint">{t("access.holdersThroughInclusionHint")}</p>
+      ) : null}
     </>
   );
 }
@@ -402,19 +391,7 @@ function Holds({ holds, trustTier }: { holds?: AppHold[]; trustTier?: string }) 
   );
 }
 
-/** Who administers inside one app or add-on, and how they are made so. */
-function InsideAdministrators({ administrators, tenant }: { administrators?: AppAdministrators; tenant: string }) {
-  const { t } = useTranslation();
-  if (!administrators) return <p className="admin-console__empty">{t("access.nobodyAdministersInside")}</p>;
-  return (
-    <div className="admin-console__access-role">
-      <div>{t("access.membersOfGroup", { group: groupLabel(administrators.group, tenant) })}</div>
-      <AdministratorWays administrators={administrators} />
-    </div>
-  );
-}
-
-export function AppAccessView({ profile, tenant }: { profile: string; tenant: string }) {
+export function AppAccessView({ profile }: { profile: string }) {
   const { t } = useTranslation();
   const query = useQuery({
     queryKey: ["admin", "access", "app", profile],
@@ -422,15 +399,12 @@ export function AppAccessView({ profile, tenant }: { profile: string; tenant: st
     retry: false,
   });
   const states = useQuery({ queryKey: ["admin", "apps", "status"], queryFn: fetchAppStates });
+  const own = useOwnPositions();
+  const people = usePeopleById();
   if (query.isLoading) return <p className="admin-console__loading">{t("access.reading")}</p>;
   if (query.isError || !query.data) return <p className="admin-console__error">{t("access.cannotBeRead")}</p>;
   const view = query.data;
   const state = states.data?.apps.find((app) => app.profile === profile);
-  // The rights store has a role for an app's administrator that nothing
-  // gives: who administers inside an app is the app administrators' group,
-  // shown below. A row saying "nobody" would be false, so it is left out
-  // unless somebody does hold it.
-  const bindings = view.bindings.filter((b) => b.relation !== "admin" || b.groups.length > 0);
   return (
     <>
       <h3 className="admin-console__subsection-title">{t("access.whoOnTheApp")}</h3>
@@ -439,22 +413,23 @@ export function AppAccessView({ profile, tenant }: { profile: string; tenant: st
           <thead>
             <tr>
               <th>{t("access.role")}</th>
-              <th>{t("access.heldThrough")}</th>
+              <th>{t("access.heldBy")}</th>
               <th>{t("access.gives")}</th>
             </tr>
           </thead>
           <tbody>
-            {bindings.map((binding) => (
+            {view.bindings.map((binding) => (
               <tr key={binding.relation}>
-                <td>{roleLabel(t, view.object, binding.relation)}</td>
                 <td>
-                  {binding.groups.length === 0 ? (
+                  {roleLabel(t, typeOf(view.object), binding.relation)}{" "}
+                  {binding.declared ? <span className="admin-console__badge">{t("access.declaredRole")}</span> : null}
+                </td>
+                <td>
+                  {binding.holders.length === 0 ? (
                     <span className="admin-console__empty">{t("access.nobody")}</span>
                   ) : (
-                    binding.groups.map((group) => (
-                      <span key={group} className="admin-console__badge">
-                        {groupLabel(group, tenant)}
-                      </span>
+                    binding.holders.map((holder) => (
+                      <HolderBadge key={`${holder.kind}/${holder.name}`} holder={holder} own={own} people={people} />
                     ))
                   )}
                 </td>
@@ -467,27 +442,6 @@ export function AppAccessView({ profile, tenant }: { profile: string; tenant: st
         </table>
       </div>
       <p className="admin-console__hint">{t("access.whoOnTheAppHint")}</p>
-
-      <h3 className="admin-console__subsection-title">{t("access.whoAdministersInside")}</h3>
-      {states.isLoading ? (
-        <p className="admin-console__loading">{t("access.reading")}</p>
-      ) : !state ? (
-        <p className="admin-console__empty">{t("access.appStateUnknown")}</p>
-      ) : (
-        <>
-          <InsideAdministrators administrators={state.administrators} tenant={tenant} />
-          {(state.addons ?? [])
-            .filter((addon) => addon.administrators)
-            .map((addon) => (
-              <div key={addon.profile}>
-                <h4 className="admin-console__subsection-title">
-                  {t("access.addon")} <code>{addon.profile}</code>
-                </h4>
-                <InsideAdministrators administrators={addon.administrators} tenant={tenant} />
-              </div>
-            ))}
-        </>
-      )}
 
       <h3 className="admin-console__subsection-title">{t("access.whatTheAppHolds")}</h3>
       <p className="admin-console__hint">{t("access.whatTheAppHoldsHint")}</p>
@@ -512,27 +466,29 @@ export function AppAccessView({ profile, tenant }: { profile: string; tenant: st
   );
 }
 
-export function AccessSection({ tenant }: { tenant: string }) {
+export function AccessSection() {
   const { t } = useTranslation();
   const [kind, setKind] = useState<AccessKind>("person");
-  const [chosen, setChosen] = useState<Record<AccessKind, string>>({ person: "", group: "", app: "" });
+  const [chosen, setChosen] = useState<Record<AccessKind, string>>({ person: "", position: "", app: "" });
 
   const people = useQuery({ queryKey: ["admin", "people", ""], queryFn: () => fetchPeople() });
-  const groups = useQuery({ queryKey: ["admin", "people", "groups"], queryFn: () => fetchPersonGroups() });
+  const positions = useQuery({ queryKey: ["admin", "positions"], queryFn: () => fetchPositions() });
   const apps = useQuery({ queryKey: ["admin", "apps", "status"], queryFn: fetchAppStates });
 
   const options: Record<AccessKind, { value: string; label: string }[]> = {
     person: (people.data?.people ?? [])
       .map((person) => ({ value: person.id, label: personName(person) }))
       .sort((a, b) => a.label.localeCompare(b.label)),
-    group: (groups.data?.groups ?? [])
-      .map((group) => ({ value: group.path, label: groupLabel(group.path, tenant) }))
-      .sort((a, b) => a.label.localeCompare(b.label)),
+    position: allPositions(t, positions.data?.shipped ?? [], positions.data?.positions ?? []).map((position) => ({
+      value: position.name,
+      label: position.label,
+    })),
     app: (apps.data?.apps ?? [])
-      .map((app) => ({ value: app.profile, label: app.profile }))
+      .flatMap((app) => [app.profile, ...(app.addons ?? []).map((addon) => addon.profile)])
+      .map((profile) => ({ value: profile, label: profile }))
       .sort((a, b) => a.label.localeCompare(b.label)),
   };
-  const source = { person: people, group: groups, app: apps }[kind];
+  const source = { person: people, position: positions, app: apps }[kind];
   const selected = chosen[kind];
 
   return (
@@ -578,11 +534,11 @@ export function AccessSection({ tenant }: { tenant: string }) {
       ) : !selected ? (
         <p className="admin-console__empty">{t(`access.pick_${kind}`)}</p>
       ) : kind === "person" ? (
-        <PersonAccessView key={selected} id={selected} tenant={tenant} />
-      ) : kind === "group" ? (
-        <GroupAccessView key={selected} group={selected} tenant={tenant} />
+        <PersonAccessView key={selected} id={selected} />
+      ) : kind === "position" ? (
+        <PositionAccessView key={selected} name={selected} />
       ) : (
-        <AppAccessView key={selected} profile={selected} tenant={tenant} />
+        <AppAccessView key={selected} profile={selected} />
       )}
     </section>
   );

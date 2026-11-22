@@ -7,7 +7,7 @@ import {
   fetchAdminContext,
   fetchAppStates,
   fetchIntegrationsOverview,
-  fetchPersonGroups,
+  fetchPositions,
   type AdminContext,
   type AppState,
 } from "@/api/admin";
@@ -17,8 +17,9 @@ import {
   fetchRetainedApps,
   fetchTenantPrivileges,
   purgeAppData,
+  positionsOf,
   setAddonForEveryone,
-  setAppForEveryone,
+  setAppPositions,
   uninstallApp,
   type AppPurgeResult,
   type AppWriteResult,
@@ -28,8 +29,8 @@ import {
 import { ApiError } from "@/api/client";
 import { AppLeftovers } from "./AppLeftovers";
 import { AppPublicAddresses } from "./AppPublicAddresses";
-import { GroupMembers } from "./GroupMembers";
-import { describeGroups } from "./groupLabels";
+import { PositionChecklist, choosablePositions } from "./PositionChecklist";
+import { RoleHolders } from "./RoleHolders";
 import "./admin.css";
 import { formatDateTime } from "@/lib/format";
 
@@ -76,7 +77,13 @@ export function joinApps(declaredApps: DeclaredApp[], states: AppState[]): AppRo
 }
 
 /** What the director answered to the last write on this screen. */
-type Outcome = { kind: "access" | "uninstall"; app: string; everyone?: boolean; result: AppWriteResult };
+type Outcome = {
+  kind: "access" | "uninstall";
+  app: string;
+  everyone?: boolean;
+  positions?: string[];
+  result: AppWriteResult;
+};
 
 /**
  * The tenant's installed apps, and everything that is done to one after it
@@ -527,8 +534,9 @@ function StatePart({
  * alone. It is offered only for an app git declares, because the same request
  * for one git does not have would install it.
  *
- * Who has access now is who is in the app's group, and that is the registrar's
- * list, changed a person at a time.
+ * Who has access now is who holds a role on the app: mostly a position, whose
+ * holders are changed on Positions, and now and then one person who was given
+ * a role beside theirs (RoleHolders).
  */
 export function AccessPart({
   row,
@@ -542,36 +550,31 @@ export function AccessPart({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { profile, declared } = row;
-  const everyone = Boolean(declared?.defaultGrant);
-
-  const groupsQuery = useQuery({
-    queryKey: ["admin", "people", "groups"],
-    queryFn: () => fetchPersonGroups(),
-  });
-  // The app's group, found the way Members and Groups find it: by what the
-  // registrar's path says it is for, never by a name put together here.
-  const group = useMemo(
-    () =>
-      describeGroups(groupsQuery.data?.groups ?? [], tenant).find(
-        (g) => g.kind === "app" && g.label === profile,
-      ),
-    [groupsQuery.data, tenant, profile],
-  );
+  const positions = useQuery({ queryKey: ["admin", "positions"], queryFn: () => fetchPositions(), retry: false });
+  const own = positions.data?.positions ?? [];
+  const choosable = choosablePositions(own);
+  const given = positionsOf(declared);
+  // What is ticked and not yet saved; null while nothing was changed.
+  const [draft, setDraft] = useState<Set<string> | null>(null);
+  const selected = draft ?? new Set(given);
+  const next = choosable.filter((name) => selected.has(name));
+  const changed = draft !== null && [...next].sort().join() !== given.filter((n) => choosable.includes(n)).sort().join();
 
   const access = useMutation({
-    mutationFn: (next: boolean) => setAppForEveryone(profile, next),
-    onSuccess: (result, next) => {
-      onOutcome({ kind: "access", app: profile, everyone: next, result });
+    mutationFn: (names: string[]) => setAppPositions(profile, names),
+    onSuccess: (result, names) => {
+      setDraft(null);
+      onOutcome({ kind: "access", app: profile, positions: names, result });
       void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "declared"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "people"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "access"] });
     },
   });
 
-  function switchAccess() {
-    const question = everyone
-      ? t("apps.everyoneOffConfirm", { app: profile, tenant })
-      : t("apps.everyoneOnConfirm", { app: profile, tenant });
-    if (window.confirm(question)) access.mutate(!everyone);
+  function save() {
+    const taken = given.filter((name) => !next.includes(name));
+    if (taken.length === 0 || window.confirm(t("apps.positionsTakeConfirm", { app: profile, tenant, count: taken.length }))) {
+      access.mutate(next);
+    }
   }
 
   // A default component is the platform's: who may open it is decided for
@@ -590,17 +593,21 @@ export function AccessPart({
       <h3 className="admin-console__subsection-title">{t("apps.accessTitle")}</h3>
       {declared ? (
         <>
-          <p className="admin-console__lead">
-            {everyone ? t("apps.everyoneIsOn") : t("apps.everyoneIsOff")}
-          </p>
+          <p className="admin-console__hint">{t("apps.positionsLead")}</p>
+          <PositionChecklist
+            own={own}
+            selected={selected}
+            disabled={access.isPending || positions.isLoading}
+            onChange={setDraft}
+          />
           <div className="admin-console__actions">
             <button
               type="button"
-              className="admin-console__btn"
-              disabled={access.isPending}
-              onClick={switchAccess}
+              className="admin-console__btn admin-console__btn--primary"
+              disabled={!changed || access.isPending}
+              onClick={save}
             >
-              {everyone ? t("apps.everyoneSwitchOff") : t("apps.everyoneSwitchOn")}
+              {t("apps.positionsSave")}
             </button>
           </div>
           {access.isError ? <p className="admin-console__error">{messageOf(access.error)}</p> : null}
@@ -610,20 +617,8 @@ export function AccessPart({
       )}
 
       <h4 className="admin-console__group-title">{t("apps.peopleTitle")}</h4>
-      {groupsQuery.isLoading ? (
-        <p className="admin-console__hint">{t("apps.readingGroup")}</p>
-      ) : groupsQuery.isError ? (
-        <p className="admin-console__error">{messageOf(groupsQuery.error)}</p>
-      ) : group ? (
-        <>
-          <p className="admin-console__hint">
-            <Trans i18nKey="apps.peopleLead" values={{ group: group.path }} components={mono} />
-          </p>
-          <GroupMembers group={group} />
-        </>
-      ) : (
-        <p className="admin-console__hint">{t("apps.noGroupYet")}</p>
-      )}
+      <p className="admin-console__hint">{t("apps.peopleLead")}</p>
+      <RoleHolders profile={profile} />
 
       {(declared?.addons ?? []).length > 0 ? (
         <>
@@ -636,7 +631,6 @@ export function AccessPart({
               addon={addon}
               tenant={tenant}
               everyone={(declared?.addonGrants ?? []).some((g) => g.name === addon && g.defaultGrant)}
-              groups={groupsQuery.data?.groups ?? []}
               onOutcome={onOutcome}
             />
           ))}
@@ -647,37 +641,31 @@ export function AccessPart({
 }
 
 /**
- * One add-on's own access. An add-on is entitled by its own group, as an app
- * is: whether it is for everyone, and who is in its group, are the add-on's,
- * not the app's.
+ * One add-on's own access. An add-on is an app of its own, with roles of its
+ * own: whether it is for everyone, and who holds a role on it, are the
+ * add-on's, not the app's.
  */
 function AddonAccess({
   profile,
   addon,
   tenant,
   everyone,
-  groups,
   onOutcome,
 }: {
   profile: string;
   addon: string;
   tenant: string;
   everyone: boolean;
-  groups: Parameters<typeof describeGroups>[0];
   onOutcome: (outcome: Outcome) => void;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const group = useMemo(
-    () => describeGroups(groups, tenant).find((g) => g.kind === "app" && g.label === addon),
-    [groups, tenant, addon],
-  );
   const access = useMutation({
     mutationFn: (next: boolean) => setAddonForEveryone(profile, addon, next),
     onSuccess: (result, next) => {
       onOutcome({ kind: "access", app: addon, everyone: next, result });
       void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "declared"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "people"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "access"] });
     },
   });
   function switchAccess() {
@@ -698,7 +686,7 @@ function AddonAccess({
         </button>
       </div>
       {access.isError ? <p className="admin-console__error">{messageOf(access.error)}</p> : null}
-      {group ? <GroupMembers group={group} /> : <p className="admin-console__hint">{t("apps.addonNoGroupYet")}</p>}
+      <RoleHolders profile={addon} />
     </div>
   );
 }
@@ -1014,7 +1002,7 @@ function ApprovePrivilege({ install, privilege }: { install: string; privilege: 
  * Uninstall: removes the app and keeps its data.
  *
  * A commit, like the install was. The app and its sign-in client go; its
- * files, database, object storage, stored credentials and access group stay.
+ * files, database, object storage, stored credentials and the roles people hold on it stay.
  * Destroying those is a different act with a different name, offered
  * elsewhere on this screen and only once the app is gone -- so taking an app
  * away never takes its data with it by accident.
@@ -1075,9 +1063,16 @@ function UninstallPart({
  * one, the tenant already was as asked.
  */
 function OutcomeNotice({ outcome }: { outcome: Outcome }) {
-  const { app, result, kind, everyone } = outcome;
+  const { app, result, kind, everyone, positions } = outcome;
   const commit = (result.commit ?? "").slice(0, 8);
   const values = { app, commit, status: result.status };
+  if (kind === "access" && result.commit && positions) {
+    return (
+      <p className="admin-console__success">
+        <Trans i18nKey="apps.outcomePositions" values={values} components={mono} />
+      </p>
+    );
+  }
   if (kind === "access" && result.commit) {
     return (
       <p className="admin-console__success">

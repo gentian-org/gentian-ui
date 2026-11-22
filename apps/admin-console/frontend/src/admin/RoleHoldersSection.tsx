@@ -5,12 +5,10 @@ import { useTranslation } from "react-i18next";
 import {
   addRoleHolder,
   fetchGrantedPrivileges,
-  fetchPlatformRoleMembers,
   fetchRoleCandidates,
   fetchRoleHolders,
   removeRoleHolder,
   type ClusterRole,
-  type PlatformRoleMembers,
   type RoleCandidates,
   type RoleHolder,
 } from "@/api/cluster";
@@ -18,6 +16,7 @@ import "./admin.css";
 import { formatDateTime } from "@/lib/format";
 
 const ROLES: ClusterRole[] = [
+  "admin",
   "securityOfficer",
   "auditor",
   "perimeterApprover",
@@ -51,9 +50,10 @@ function scopeOf(role: ClusterRole, entry: RoleCandidates) {
  * administrators for the roles they may hold. `canEdit` only decides which
  * buttons are shown.
  *
- * Beside them, read only: who holds each role through its kernel Keycloak
- * group (the registrar's answer; the groups are managed in Keycloak), and
- * every tenant's granted privilege exceptions (the director's answer).
+ * The cluster's administrator is one of the roles, for people of the platform
+ * tenant; while nobody is named, the account the install made holds it and
+ * is not in the list. Beside them, read only: every tenant's granted
+ * privilege exceptions (the director's answer).
  */
 export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
   const { t } = useTranslation();
@@ -66,11 +66,6 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
     queryKey: ["admin", "platform", "role-candidates"],
     queryFn: () => fetchRoleCandidates(),
     enabled: canEdit,
-    retry: false,
-  });
-  const membersQuery = useQuery({
-    queryKey: ["admin", "platform", "role-members"],
-    queryFn: () => fetchPlatformRoleMembers(),
     retry: false,
   });
   const grantsQuery = useQuery({
@@ -134,9 +129,6 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
   const picked = candidates.find((c) => c.key === choice);
   const until = untilOf(role);
   const unreadable = tenants.filter((entry) => entry.unavailable).map((entry) => entry.tenant);
-  const groups: PlatformRoleMembers[] = membersQuery.data?.roles ?? [];
-  const shownRoles: string[] = [...ROLES, ...groups.map((g) => g.role).filter((r) => !(ROLES as string[]).includes(r))];
-  const roleOrder = shownRoles.filter((r, i) => shownRoles.indexOf(r) === i);
   const grants = grantsQuery.data?.privileges ?? [];
 
   return (
@@ -151,15 +143,15 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
       {error ? <p className="admin-console__error">{error}</p> : null}
       {notice ? <p className="admin-console__success">{notice}</p> : null}
 
-      {membersQuery.isError ? <p className="admin-console__hint">{t("clusterRoles.membersUnavailable")}</p> : null}
-      {roleOrder.map((r) => {
+      {ROLES.map((r) => {
         const ofRole = holders.filter((h) => h.role === r);
-        const named = (ROLES as string[]).includes(r);
         return (
           <div key={r}>
             <h3 className="admin-console__subsection-title">{t(`clusterRoles.role_${r}`, { defaultValue: r })}</h3>
-            {!named ? null : ofRole.length === 0 ? (
-              <p className="admin-console__empty">{t("clusterRoles.nobodyYet")}</p>
+            {ofRole.length === 0 ? (
+              <p className="admin-console__empty">
+                {t(r === "admin" ? "clusterRoles.nobodyAdministersYet" : "clusterRoles.nobodyYet")}
+              </p>
             ) : (
               <div className="admin-console__table-wrap">
                 <table className="admin-console__table">
@@ -219,24 +211,9 @@ export function RoleHoldersSection({ canEdit }: { canEdit: boolean }) {
                 </table>
               </div>
             )}
-            {groups
-              .filter((g) => g.role === r)
-              .map((g) => (
-                <div key={g.group}>
-                  <p className="admin-console__card-meta">
-                    {t("clusterRoles.throughGroup", { group: g.group })}{" "}
-                    {g.unavailable
-                      ? t("clusterRoles.groupUnavailable")
-                      : (g.members ?? []).length === 0
-                        ? t("clusterRoles.groupEmpty")
-                        : (g.members ?? []).map((m) => m.username + (m.email && m.email !== m.username ? ` <${m.email}>` : "")).join(", ")}
-                  </p>
-                </div>
-              ))}
           </div>
         );
       })}
-      {groups.length > 0 ? <p className="admin-console__hint">{t("clusterRoles.groupManaged")}</p> : null}
 
       <h3 className="admin-console__subsection-title">{t("clusterRoles.grantedTitle")}</h3>
       {grantsQuery.isLoading ? (

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { fetchAppStates } from "@/api/admin";
+import { fetchAppStates, fetchPositions } from "@/api/admin";
 import { uninstallApp, type AppWriteResult } from "@/api/apps";
 import {
   fetchCatalogueEntries,
@@ -11,10 +11,11 @@ import {
   type CatalogueEntry,
 } from "@/api/catalogue";
 import "./admin.css";
+import { PositionChecklist, choosablePositions } from "./PositionChecklist";
 import { Trans, useTranslation } from "react-i18next";
 
 /** What the last install or uninstall came to, in the director's own terms. */
-type Outcome = { app: string; result: AppWriteResult; everyone?: boolean };
+type Outcome = { app: string; result: AppWriteResult; positions?: string[] };
 
 const mono = { mono: <span className="admin-console__mono" /> };
 
@@ -69,16 +70,17 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
   });
   const installed = new Set((statesQuery.data?.apps ?? []).map((a) => a.profile));
 
-  // "For everyone" is part of the install itself: the director records it
-  // with the app, and the cluster gives every member access once the app is
+  // Who gets the app is part of the install itself: the director records
+  // the positions with the app, and their holders have it once the app is
   // ready. Nothing is left for this page to do afterwards.
   const installMutation = useMutation({
-    mutationFn: ({ entry, everyone, approve }: { entry: CatalogueEntry; everyone: boolean; approve: AskedEgress[] }) =>
-      installCatalogueEntry(entry, everyone, approve),
-    onSuccess: (result, { entry, everyone }) => {
+    mutationFn: ({ entry, positions, approve }: { entry: CatalogueEntry; positions: string[]; approve: AskedEgress[] }) =>
+      installCatalogueEntry(entry, positions, approve),
+    onSuccess: (result, { entry, positions }) => {
       setConfirming(null);
-      setOutcome({ app: entry.name, result, everyone });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "status"] });
+      setOutcome({ app: entry.name, result, positions });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "apps"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "access"] });
     },
   });
   const uninstallMutation = useMutation({
@@ -198,7 +200,7 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
           entry={confirming}
           pending={installMutation.isPending}
           error={installMutation.isError ? messageOf(installMutation.error) : undefined}
-          onConfirm={(everyone, approve) => installMutation.mutate({ entry: confirming, everyone, approve })}
+          onConfirm={(positions, approve) => installMutation.mutate({ entry: confirming, positions, approve })}
           onClose={() => setConfirming(null)}
         />
       ) : null}
@@ -215,13 +217,13 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
  */
 function OutcomeNotice({ outcome }: { outcome: Outcome }) {
   const { t } = useTranslation();
-  const { app, result, everyone } = outcome;
+  const { app, result, positions } = outcome;
   const commit = (result.commit ?? "").slice(0, 8);
   if (result.status === "installed" && result.commit) {
     return (
       <p className="admin-console__success">
         <Trans i18nKey="catalogue.outcomeInstalled" values={{ app, commit }} components={mono} />
-        {everyone ? <> {t("catalogue.outcomeEveryone")}</> : null}
+        {positions ? <> {t(whoGetsIt(positions), { count: positions.length })}</> : null}
       </p>
     );
   }
@@ -261,15 +263,21 @@ function OutcomeNotice({ outcome }: { outcome: Outcome }) {
   );
 }
 
+/** The sentence that says who gets an app installed for these positions. */
+export function whoGetsIt(positions: string[]) {
+  if (positions.includes("user")) return "catalogue.outcomeEveryone";
+  return positions.length > 0 ? "catalogue.outcomePositions" : "catalogue.outcomeNobody";
+}
+
 /**
  * Installing one entry, said back before it is done: which app, and which
  * build of it — the digest is what is installed, the name is only what it is
  * called.
  *
- * One choice rides along. Installing makes an app exist in the tenant; who
- * may open it is a separate matter. Plain "Install" leaves that to Members,
- * person by person; "Install for everyone" states it in the install itself,
- * and the cluster gives every member access once the app is ready.
+ * One question rides along: who gets the app. The tenant's positions are
+ * listed, all ticked; the box at the top ticks all or none. What is ticked
+ * is stated in the install itself, and the holders of those positions have
+ * the app once it is ready.
  */
 function InstallDialog({
   entry,
@@ -281,12 +289,17 @@ function InstallDialog({
   entry: CatalogueEntry;
   pending: boolean;
   error?: string;
-  onConfirm: (everyone: boolean, approve: AskedEgress[]) => void;
+  onConfirm: (positions: string[], approve: AskedEgress[]) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
-  const [everyone, setEveryone] = useState(false);
+  const positions = useQuery({ queryKey: ["admin", "positions"], queryFn: () => fetchPositions(), retry: false });
+  const own = positions.data?.positions ?? [];
+  const choosable = choosablePositions(own);
+  // Untouched, every position is ticked, the tenant's own once they are read.
+  const [chosen, setChosen] = useState<Set<string> | null>(null);
+  const selected = chosen ?? new Set(choosable);
   // Pre-selected for the perimeter approver: installing and approving is
   // one step for somebody who may do both. Unticking leaves the app waiting.
   const [approving, setApproving] = useState(true);
@@ -322,7 +335,7 @@ function InstallDialog({
         className="admin-console__dialog-body"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!pending) onConfirm(everyone, approving && mayApprove ? asks : []);
+          if (!pending) onConfirm(choosable.filter((name) => selected.has(name)), approving && mayApprove ? asks : []);
         }}
       >
         <h3 id="install-title" className="admin-console__dialog-title">
@@ -336,34 +349,10 @@ function InstallDialog({
           />
         </p>
 
-        <div className="admin-console__choices" role="radiogroup" aria-labelledby="install-title">
-          <label className={`admin-console__choice${everyone ? "" : " admin-console__choice--selected"}`}>
-            <input
-              type="radio"
-              name="install-access"
-              checked={!everyone}
-              disabled={pending}
-              onChange={() => setEveryone(false)}
-            />
-            <span>
-              <span className="admin-console__choice-title">{t("catalogue.installPlain")}</span>
-              <span className="admin-console__choice-desc">{t("catalogue.installPlainBody")}</span>
-            </span>
-          </label>
-          <label className={`admin-console__choice${everyone ? " admin-console__choice--selected" : ""}`}>
-            <input
-              type="radio"
-              name="install-access"
-              checked={everyone}
-              disabled={pending}
-              onChange={() => setEveryone(true)}
-            />
-            <span>
-              <span className="admin-console__choice-title">{t("catalogue.installEveryone")}</span>
-              <span className="admin-console__choice-desc">{t("catalogue.installEveryoneBody")}</span>
-            </span>
-          </label>
-        </div>
+        <h4 className="admin-console__group-title">{t("catalogue.installWho")}</h4>
+        <p className="admin-console__hint">{t("catalogue.installWhoBody")}</p>
+        <PositionChecklist own={own} selected={selected} disabled={pending || positions.isLoading} onChange={setChosen} />
+        {positions.isError ? <p className="admin-console__hint">{t("catalogue.installOwnPositionsUnread")}</p> : null}
 
         <InstallAsks
           asks={asks}
@@ -379,8 +368,12 @@ function InstallDialog({
           <button type="button" className="admin-console__btn admin-console__btn--quiet" disabled={pending} onClick={onClose}>
             {t("catalogue.cancel")}
           </button>
-          <button type="submit" className="admin-console__btn admin-console__btn--primary" disabled={pending}>
-            {everyone ? t("catalogue.installEveryone") : t("catalogue.installAction")}
+          <button
+            type="submit"
+            className="admin-console__btn admin-console__btn--primary"
+            disabled={pending || positions.isLoading}
+          >
+            {t("catalogue.installAction")}
           </button>
         </div>
       </form>

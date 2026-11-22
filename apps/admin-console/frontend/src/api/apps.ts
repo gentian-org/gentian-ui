@@ -17,8 +17,10 @@ export type DeclaredApp = {
   addons?: string[];
   /** The build each pinned add-on was installed at; an add-on with no entry is not pinned. */
   addonPins?: { name: string; digest: string; catalogue?: string }[];
-  /** Installed for everyone: every member has access by default. */
+  /** Given to the position User: every person of the tenant has it. */
   defaultGrant?: boolean;
+  /** The further positions the app is given to. */
+  positions?: string[];
   /** The add-ons for everyone; each add-on has its own access, and one with no entry is given per person. */
   addonGrants?: { name: string; defaultGrant?: boolean }[];
   /**
@@ -42,14 +44,19 @@ export type AppWriteResult = {
   commit?: string;
 };
 
+/** The positions an app's entry gives it to, User among them when it is for everyone. */
+export function positionsOf(app: Pick<DeclaredApp, "defaultGrant" | "positions"> | undefined) {
+  return [...(app?.defaultGrant ? ["user"] : []), ...(app?.positions ?? []).filter((name) => name !== "user")];
+}
+
 /**
- * State whether an installed app is for everyone. Only that travels: the
+ * State the positions an installed app is given to. Only that travels: the
  * entry's pinned build is left as it is.
  */
-export function setAppForEveryone(profile: string, everyone: boolean) {
+export function setAppPositions(profile: string, positions: string[]) {
   return apiFetch<AppWriteResult>(`/admin/apps/${encodeURIComponent(profile)}/access`, {
     method: "PUT",
-    body: JSON.stringify({ everyone }),
+    body: JSON.stringify({ positions }),
   });
 }
 
@@ -66,7 +73,7 @@ export function setAddonForEveryone(profile: string, addon: string, everyone: bo
 
 /**
  * Remove an app. The app and its sign-in client go; its files, database,
- * object storage, stored credentials and access group are kept, and a later
+ * object storage, stored credentials and the roles people hold on it are kept, and a later
  * install finds them again.
  */
 export function uninstallApp(profile: string) {

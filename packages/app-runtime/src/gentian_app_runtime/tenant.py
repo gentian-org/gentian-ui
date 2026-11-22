@@ -22,21 +22,12 @@ class TenantSettings(Protocol):
 
 
 def extract_tenant_from_claims(claims: dict[str, Any]) -> str | None:
-    """Resolve tenant id from standard Gentian / Keycloak claim shapes."""
+    """The tenant a token names in a claim of its own, or None. A group or a
+    username names nobody's tenant."""
     for key in ("tenant", "tenant_id", "tenantId"):
         value = claims.get(key)
         if value:
             return str(value)
-
-    groups = claims.get("groups") or claims.get("realm_access", {}).get("roles") or []
-    for group in groups:
-        group_str = str(group)
-        if group_str.startswith("tenant:"):
-            return group_str.removeprefix("tenant:")
-
-    sub = str(claims.get("preferred_username") or claims.get("sub") or "")
-    if sub.startswith("admin-"):
-        return sub.removeprefix("admin-").split("@", 1)[0]
 
     return None
 

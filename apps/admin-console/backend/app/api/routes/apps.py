@@ -321,33 +321,40 @@ class AccessBody(BaseModel):
     everyone: bool
 
 
+class PositionsBody(BaseModel):
+    """The positions an app is given to. Required: a request that did not
+    say is not one to guess at. An empty list gives the app to no position."""
+
+    positions: list[StrictStr]
+
+
 @router.put("/{profile}/access")
 async def set_access(
     profile: str,
-    body: AccessBody,
+    body: PositionsBody,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """State whether an installed app is for everyone.
+    """State the positions an installed app is given to.
 
-    The director's install route, with `defaultGrant` and nothing else. No
+    The director's install route, with `positions` and nothing else. No
     coordinate and no digest travel, so nothing is fetched and the entry's
-    pinned build stays as it is: on an app the tenant has, this changes the
-    one key. It answers `updated` with a commit, or `already_installed` when
+    pinned build stays as it is: on an app the tenant has, this changes who
+    has it. It answers `updated` with a commit, or `already_installed` when
     the entry already said so.
 
     The same request for an app the tenant does NOT have would install it,
     because that is what the route is. The screen offers this only for an app
     git declares; whether the person may is the director's (can_install_app,
-    and can_grant to make it for everyone).
+    and can_grant to give it to a position).
     """
     return await director.forward(
         settings,
         "POST",
         f"/v1/tenants/{settings.tenant_id}/apps/{_name(profile)}",
         bearer_of(credentials),
-        json_body={"defaultGrant": body.everyone},
+        json_body={"positions": body.positions},
     )
 
 
@@ -366,7 +373,7 @@ async def set_addon_access(
 ) -> Response:
     """State whether one add-on of an installed app is for everyone.
 
-    An add-on is entitled on its own, by its own group. The director's add-on
+    An add-on is an app of its own, with its own roles. The director's add-on
     route replaces the list whole, so the list git has now is read first and
     sent back by name -- which keeps every add-on, its pin and its grant as
     they are -- with this one add-on as {"name", "defaultGrant"}. An add-on
@@ -402,7 +409,7 @@ async def uninstall(
 ) -> Response:
     """Take one app out of this console's tenant. A commit: the app and its
     sign-in client go; its files, database, object storage, stored credentials
-    and access group are kept, and a later install finds them again."""
+    and the roles people hold on it are kept, and a later install finds them again."""
     return await director.forward(
         settings,
         "DELETE",
@@ -423,7 +430,7 @@ async def purge(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """Destroy what an uninstalled app left behind: its files, its database,
-    its object storage, its stored credentials and its access group. An
+    its object storage, its stored credentials and the roles people still hold on it. An
     action, not a commit, and not undone.
 
     One request, answered when the purge is over. The cluster refuses it,

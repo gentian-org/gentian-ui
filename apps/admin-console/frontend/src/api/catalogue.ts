@@ -91,9 +91,9 @@ export function fetchCatalogueEntryAsks(entry: Pick<CatalogueEntry, "name" | "co
  * coordinate and digest, handed back as the listing gave them. The digest is
  * what pins the build; the director refuses a source that serves other bytes.
  *
- * `everyone` installs it for everyone: `defaultGrant: true` travels with the
- * install, and the cluster gives every member access once the app is ready.
- * Without it nothing is said about access, which is then given per person.
+ * `positions` says who gets it: the positions of the tenant whose holders use
+ * the app, stated in the install itself. An empty list gives it to no
+ * position; a role on it is then given per person.
  *
  * `approve` names outbound requests of the build that the person approves
  * with the install, as the director listed them. Each becomes their grant;
@@ -101,19 +101,19 @@ export function fetchCatalogueEntryAsks(entry: Pick<CatalogueEntry, "name" | "co
  */
 export function installCatalogueEntry(
   entry: Pick<CatalogueEntry, "name" | "coordinate" | "digest">,
-  everyone = false,
+  positions: string[] = [],
   approve: AskedEgress[] = [],
 ) {
   const body: {
     coordinate: string;
     digest: string;
-    defaultGrant?: true;
+    positions: string[];
     approve?: { install: string; privilege: string }[];
   } = {
     coordinate: entry.coordinate,
     digest: entry.digest,
+    positions,
   };
-  if (everyone) body.defaultGrant = true;
   if (approve.length > 0) {
     body.approve = approve.map(({ install, privilege }) => ({ install, privilege }));
   }

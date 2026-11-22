@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from app.api.routes import session
 from app.core import auth
 from app.core.config import Settings, get_settings
-from app.core.gentian_groups import user_is_platform_admin, user_is_tenant_admin
+from app.core.rights import user_is_platform_admin, user_is_tenant_admin
 
 
 def _settings(tenant: str = "platform", usher_url: str | None = "http://usher.test:8080") -> Settings:
@@ -46,7 +46,7 @@ class FakeUsher:
         self.seen["auth"] = (headers or {}).get("Authorization")
         return httpx.Response(
             self.status,
-            json={"tenant": "platform", "subject": "root", "relations": self.relations},
+            json={"tenant": "platform", "subject": "root", "relations": self.relations, "positions": ["user"]},
             request=httpx.Request("GET", url),
         )
 
@@ -55,8 +55,8 @@ class FakeUsher:
 async def test_relations_come_from_the_usher_with_the_callers_token(monkeypatch):
     usher = FakeUsher({"can_enter": True, "can_administer": True})
     monkeypatch.setattr(auth.httpx, "AsyncClient", usher)
-    rel = await auth.fetch_tenant_relations("person-token", _settings())
-    assert rel == {"can_enter": True, "can_administer": True}
+    held = await auth.fetch_tenant_rights("person-token", _settings())
+    assert held == {"relations": {"can_enter": True, "can_administer": True}, "positions": ["user"]}
     assert usher.seen["url"] == "http://usher.test:8080/v1/tenants/platform/me"
     assert usher.seen["auth"] == "Bearer person-token"
 
@@ -64,8 +64,9 @@ async def test_relations_come_from_the_usher_with_the_callers_token(monkeypatch)
 @pytest.mark.anyio
 async def test_an_usher_that_refuses_or_is_absent_leaves_nothing(monkeypatch):
     monkeypatch.setattr(auth.httpx, "AsyncClient", FakeUsher({}, status=403))
-    assert await auth.fetch_tenant_relations("t", _settings()) == {}
-    assert await auth.fetch_tenant_relations("t", _settings(usher_url=None)) == {}
+    nothing = {"relations": {}, "positions": []}
+    assert await auth.fetch_tenant_rights("t", _settings()) == nothing
+    assert await auth.fetch_tenant_rights("t", _settings(usher_url=None)) == nothing
 
 
 def test_admin_flags_are_the_ushers_verdict_not_a_group():
@@ -79,7 +80,9 @@ def test_admin_flags_are_the_ushers_verdict_not_a_group():
     # A tenant's admin is not the platform's, whatever groups a token carried.
     assert user_is_tenant_admin(tenant_admin, "acme")
     assert not user_is_platform_admin(tenant_admin)
-    # A group in the token does not promote anyone once the usher has spoken.
+    # A group in a token promotes nobody, and neither does a username.
+    assert not user_is_tenant_admin({"sub": "x", "preferred_username": "admin-acme", "groups": ["gentian:tenant:acme:admins"]})
+    assert not user_is_platform_admin({"sub": "x", "preferred_username": "administrator", "tenant": "platform"})
     assert not user_is_platform_admin({"sub": "x", "tenant": "platform", "groups": ["gentian:platform:admin"], "relations": {}})
 
 
@@ -90,7 +93,7 @@ def test_admin_flags_are_the_ushers_verdict_not_a_group():
 # (gentian-os S7A.6).
 
 
-def test_me_renders_the_verdict_and_no_groups(monkeypatch):
+def test_me_renders_the_verdict_and_the_positions(monkeypatch):
     app = FastAPI()
     app.include_router(session.router, prefix="/api/v1")
     settings = _settings()
@@ -98,10 +101,12 @@ def test_me_renders_the_verdict_and_no_groups(monkeypatch):
     app.dependency_overrides[auth.get_current_user] = lambda: {
         "sub": "root", "preferred_username": "administrator", "email": "root@desk.gentian.org",
         "tenant": "platform", "relations": {"can_enter": True, "can_administer": True},
+        "positions": ["tenant-administrator", "user"],
     }
     r = TestClient(app).get("/api/v1/session/me", headers={"Authorization": "Bearer t"})
     assert r.status_code == 200
     body = r.json()
     assert body["isPlatformAdmin"] is True and body["isTenantAdmin"] is True
-    assert body["groups"] == [] and body["shellApps"] == []
+    assert "groups" not in body and body["shellApps"] == []
+    assert body["positions"] == ["tenant-administrator", "user"]
     assert body["relations"]["can_administer"] is True

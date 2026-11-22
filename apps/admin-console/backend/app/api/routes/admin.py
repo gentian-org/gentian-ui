@@ -160,13 +160,6 @@ NOT_YET_MAPPED: list[tuple[str, str, str]] = [
     # stores that do not exist yet -- see gentian-os docs/roadmap.md 1.12,
     # which is a researched plan rather than a gap.
     ("GET", "/admin/audit-events", "Audit"),
-    # GROUPS ARE NO LONGER HERE. The entry said a group-scoped notification
-    # audience waited for the group list to have an owner; it has one now --
-    # the director reads it through its per-realm Keycloak credential, and
-    # people.py serves it before this catch-all is reached. What is still
-    # missing for that screen is narrower and belongs to the notify action
-    # rather than to the list: POST /actions/notify takes a tenant audience
-    # and no group. An entry that outlived its reason is worse than none.
 ]
 
 

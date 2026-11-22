@@ -18,7 +18,7 @@ refusal is correct and the screen should say so.
 import json
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Body, Depends, Query, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core import director
@@ -213,12 +213,72 @@ async def authorization(
     return await director.read(settings, path, bearer_of(credentials))
 
 
-# --- The access page: what a person, a group or an app holds ----------------
+# --- A tenant's own positions -------------------------------------------------
 #
-# Three reads of the rights store, the usher's, under `can_manage_users`: the
-# relation that already reads who is in which group. The console composes
-# nothing here: the usher answers which roles are held through which group and
-# which permissions are in effect, and a refusal is relayed as it came.
+# What a position is -- its title, the roles it holds, the positions it
+# includes -- is declared at the director, which commits it. Who holds one is
+# given at the registrar (people.py). The three positions every tenant has are
+# listed by the director and are not declared here.
+
+
+def _positions_path(settings: Settings, tenant: str | None, name: str | None = None) -> str:
+    path = f"/v1/tenants/{tenant or settings.tenant_id}/positions"
+    return path if name is None else f"{path}/{quote(name, safe='')}"
+
+
+@router.get("/positions")
+async def positions(
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """The positions every tenant has, by name, and the tenant's own."""
+    return await director.forward(
+        settings, "GET", _positions_path(settings, tenant), bearer_of(credentials)
+    )
+
+
+@router.put("/positions/{name}")
+async def set_position(
+    name: str,
+    payload: dict = Body(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Declare one of the tenant's own positions, new or changed."""
+    body = {k: payload[k] for k in ("title", "description", "includes", "roles") if k in payload}
+    return await director.forward(
+        settings,
+        "PUT",
+        _positions_path(settings, tenant, name),
+        bearer_of(credentials),
+        json_body=body,
+    )
+
+
+@router.delete("/positions/{name}")
+async def remove_position(
+    name: str,
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Take one position out of the tenant's declaration."""
+    return await director.forward(
+        settings, "DELETE", _positions_path(settings, tenant, name), bearer_of(credentials)
+    )
+
+
+# --- The access page: what a person, a position or an app holds --------------
+#
+# Three reads of the rights store, the usher's, under `can_manage_users`. The
+# console composes nothing here: the usher answers which roles are held
+# through which position and which permissions are in effect, and a refusal
+# is relayed as it came.
 
 
 @router.get("/access/people/{person}")
@@ -234,17 +294,17 @@ async def access_of_person(
     return await director.read(settings, path, bearer_of(credentials))
 
 
-@router.get("/access/groups")
-async def access_of_group(
-    group: str = Query(...),
+@router.get("/access/positions/{name}")
+async def access_of_position(
+    name: str,
     tenant: str | None = Query(default=None),
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """What one of the tenant's groups gives its members."""
-    path = f"/v1/tenants/{tenant or settings.tenant_id}/access/groups"
-    return await director.read(settings, path, bearer_of(credentials), params={"group": group})
+    """What one of the tenant's positions holds, what it includes and who holds it."""
+    path = f"/v1/tenants/{tenant or settings.tenant_id}/access/positions/{quote(name, safe='')}"
+    return await director.read(settings, path, bearer_of(credentials))
 
 
 @router.get("/access/apps/{profile}")

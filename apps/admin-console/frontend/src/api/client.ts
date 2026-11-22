@@ -128,7 +128,6 @@ export type MeResponse = {
   name?: string;
   email?: string;
   tenant?: string;
-  groups?: string[];
   isPlatformAdmin?: boolean;
   isTenantAdmin?: boolean;
   shellApps?: ShellApp[];

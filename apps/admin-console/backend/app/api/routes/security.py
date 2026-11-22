@@ -26,7 +26,7 @@ router = APIRouter(prefix="/admin", tags=["security"])
 _bearer = HTTPBearer(auto_error=False)
 
 # Requiring a second factor is not settable yet. Keycloak expresses "this
-# group must use TOTP" as a conditional authentication sub-flow, not as a
+# account must use TOTP" as a conditional authentication sub-flow, not as a
 # realm field, so it cannot be declared the way the rest of this policy is.
 # The screen still shows the two controls; a request that tries to change
 # them is refused with the reason rather than accepted and dropped.
@@ -169,7 +169,7 @@ async def set_security_policies(
 
 # --- The platform's administrators entering the tenant (iam.md 1.1c) --------
 #
-# Whether the members of the platform's administrators' group may sign in to
+# Whether the cluster's administrators may sign in to
 # this tenant as its administrators: the tenant's own switch on its manifest
 # (spec.platformAccess.adminsEnter), off by default, written by the tenant's
 # administrators through the director under can_administer. It is not the

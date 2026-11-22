@@ -8,7 +8,8 @@ outside the prefix the edge routes: it is reached from inside the cluster,
 over the network path the grant opens, and from nowhere else.
 
 The notice is stored for the tenant this desktop serves and for nobody
-outside it: the people it names, the groups of this tenant it names, or both.
+outside it: the people it names, the holders of the positions of this tenant it
+names, or both.
 """
 
 from __future__ import annotations
@@ -31,7 +32,6 @@ from pydantic import (
 )
 
 from app.core.config import Settings, get_settings
-from app.core.gentian_groups import tenant_prefix
 from app.services.admin_notifications import NotificationAudience
 from app.services.notification_store import NotificationStoreDep
 
@@ -44,7 +44,11 @@ _Body = Annotated[str, StringConstraints(min_length=1, max_length=4000)]
 _Publisher = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 # 320 is the longest an email address can be.
 _Person = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=320)]
-_Group = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+# A position's name in the tenant: a DNS label, as the platform names them.
+_Position = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=63, pattern=r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"),
+]
 
 
 class NoticeRequest(BaseModel):
@@ -57,8 +61,9 @@ class NoticeRequest(BaseModel):
     publisher: _Publisher
     # People by subject, username or email address.
     people: list[_Person] = Field(default_factory=list, max_length=50)
-    # Groups of this desktop's tenant.
-    groups: list[_Group] = Field(default_factory=list, max_length=20)
+    # Positions of this desktop's tenant, by name: "user" is every person of
+    # the tenant.
+    positions: list[_Position] = Field(default_factory=list, max_length=20)
     linkUrl: str | None = Field(default=None, max_length=2048)
     linkLabel: str | None = Field(default=None, max_length=100)
 
@@ -77,8 +82,8 @@ class NoticeRequest(BaseModel):
 
     @model_validator(mode="after")
     def _addressed(self) -> "NoticeRequest":
-        if not self.people and not self.groups:
-            raise ValueError("a notice names at least one of people or groups")
+        if not self.people and not self.positions:
+            raise ValueError("a notice names at least one of people or positions")
         return self
 
 
@@ -168,13 +173,6 @@ async def publish_notice(
         ) from exc
 
     tenant = _tenant(settings)
-    prefix = tenant_prefix(tenant)
-    for group in notice.groups:
-        if not group.startswith(prefix):
-            raise HTTPException(
-                status_code=_UNPROCESSABLE,
-                detail=f"Group {group} is outside tenant {tenant}",
-            )
     stored = await store.publish(
         tenant=tenant,
         title=notice.title,
@@ -183,7 +181,7 @@ async def publish_notice(
         audience=NotificationAudience(
             scope="tenant",
             tenant=tenant,
-            groups=list(notice.groups),
+            positions=list(notice.positions),
             people=list(notice.people),
         ),
         publisher=notice.publisher,
@@ -191,11 +189,11 @@ async def publish_notice(
         link_label=notice.linkLabel,
     )
     logger.info(
-        "notice %s published for tenant %s by %r: %d people, %d groups",
+        "notice %s published for tenant %s by %r: %d people, %d positions",
         stored.id,
         tenant,
         notice.publisher,
         len(notice.people),
-        len(notice.groups),
+        len(notice.positions),
     )
     return NoticeResponse(id=stored.id)
