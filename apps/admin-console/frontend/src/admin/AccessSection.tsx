@@ -10,7 +10,6 @@ import {
   fetchPositionAccess,
   fetchPositions,
   type AccessPermission,
-  type AppAdministrators,
   type AppHold,
   type HeldRole,
   type Holder,
@@ -392,27 +391,6 @@ function Holds({ holds, trustTier }: { holds?: AppHold[]; trustTier?: string }) 
   );
 }
 
-/** How a person who administers an app is made an administrator inside it, as sentences. */
-function AdministratorWays({ administrators }: { administrators?: AppAdministrators }) {
-  const { t } = useTranslation();
-  if (!administrators || administrators.ways.length === 0) {
-    return <p className="admin-console__empty">{t("access.nobodyAdministersInside")}</p>;
-  }
-  return (
-    <ul className="admin-console__access-list">
-      {administrators.ways.map((way) => (
-        <li key={way}>
-          {t(`access.administers_${way}`, {
-            role: administrators.role ?? "",
-            roles: (administrators.tokenRoles ?? []).join(", "),
-            defaultValue: way,
-          })}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 export function AppAccessView({ profile }: { profile: string }) {
   const { t } = useTranslation();
   const query = useQuery({
@@ -464,28 +442,6 @@ export function AppAccessView({ profile }: { profile: string }) {
         </table>
       </div>
       <p className="admin-console__hint">{t("access.whoOnTheAppHint")}</p>
-
-      <h3 className="admin-console__subsection-title">{t("access.whoAdministersInside")}</h3>
-      <p className="admin-console__hint">{t("access.whoAdministersInsideHint")}</p>
-      {states.isLoading ? (
-        <p className="admin-console__loading">{t("access.reading")}</p>
-      ) : !state ? (
-        <p className="admin-console__empty">{t("access.appStateUnknown")}</p>
-      ) : (
-        <>
-          <AdministratorWays administrators={state.administrators} />
-          {(state.addons ?? [])
-            .filter((addon) => addon.administrators)
-            .map((addon) => (
-              <div key={addon.profile}>
-                <h4 className="admin-console__subsection-title">
-                  {t("access.addon")} <code>{addon.profile}</code>
-                </h4>
-                <AdministratorWays administrators={addon.administrators} />
-              </div>
-            ))}
-        </>
-      )}
 
       <h3 className="admin-console__subsection-title">{t("access.whatTheAppHolds")}</h3>
       <p className="admin-console__hint">{t("access.whatTheAppHoldsHint")}</p>

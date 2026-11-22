@@ -373,7 +373,7 @@ async def set_addon_access(
 ) -> Response:
     """State whether one add-on of an installed app is for everyone.
 
-    An add-on is entitled on its own, by its own group. The director's add-on
+    An add-on is an app of its own, with its own roles. The director's add-on
     route replaces the list whole, so the list git has now is read first and
     sent back by name -- which keeps every add-on, its pin and its grant as
     they are -- with this one add-on as {"name", "defaultGrant"}. An add-on
@@ -409,7 +409,7 @@ async def uninstall(
 ) -> Response:
     """Take one app out of this console's tenant. A commit: the app and its
     sign-in client go; its files, database, object storage, stored credentials
-    and access group are kept, and a later install finds them again."""
+    and the roles people hold on it are kept, and a later install finds them again."""
     return await director.forward(
         settings,
         "DELETE",
@@ -430,7 +430,7 @@ async def purge(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """Destroy what an uninstalled app left behind: its files, its database,
-    its object storage, its stored credentials and its access group. An
+    its object storage, its stored credentials and the roles people still hold on it. An
     action, not a commit, and not undone.
 
     One request, answered when the purge is over. The cluster refuses it,

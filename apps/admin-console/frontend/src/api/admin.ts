@@ -407,12 +407,12 @@ export type EffectiveAccessRow = {
 // which is a development tool with a write surface. Anything a person wants
 // to change is changed on the other screens.
 
-/** One holder of a role: a position of the tenant, a person, or a group of the sign-in service. */
+/** One holder of a role: a position of the tenant or a person. */
 export type Holder = {
-  kind: "position" | "person" | "group" | (string & {});
+  kind: "position" | "person" | (string & {});
   /**
    * The position's name; the person's account id, qualified by its realm
-   * for a role the cluster gives by name; or the group's name.
+   * for a role the cluster gives by name.
    */
   name: string;
 };
@@ -620,7 +620,7 @@ export function clearAppGrant(app: string, tenant?: string) {
 
 export type GrantableAddon = { id: string; label: string; profile: string };
 
-/** Addons this tenant has installed and can therefore grant to a group. */
+/** Addons this tenant has installed and can therefore give. */
 export function fetchGrantableAddons(tenant?: string) {
   return apiFetch<GrantableAddon[]>(`/admin/grantable-addons${tenantQuery(tenant)}`);
 }
@@ -956,7 +956,7 @@ export function fetchChanges(tenant?: string, scope: "tenant" | "cluster" = "ten
   return apiFetch<ChangesResponse>(`/admin/changes?${params.toString()}`);
 }
 
-// People and groups (S7A.17).
+// People (S7A.17).
 //
 // The console reads and writes these through the director, with the caller's
 // own token. Nothing here holds a Keycloak credential: the director holds one
@@ -1077,16 +1077,6 @@ export function invitePerson(body: Invitation, tenant?: string) {
   });
 }
 
-export function setMembership(
-  body: { person: string; group: string; member: boolean },
-  tenant?: string,
-) {
-  return apiFetch<{ person: string; group: string; member: boolean }>(
-    `/admin/people/membership${tenantQuery(tenant)}`,
-    { method: "POST", body: JSON.stringify(body) },
-  );
-}
-
 function postAction<T>(path: string, body: unknown, tenant?: string) {
   return apiFetch<T>(`${path}${tenantQuery(tenant)}`, {
     method: "POST",
@@ -1201,36 +1191,13 @@ export type AppState = {
    */
   trustTier?: string;
   holds?: AppHold[];
-  /**
-   * How the tenant's app administrators come to administer inside the app.
-   * Absent when the profile maps them to nothing: who administers inside it
-   * is then set in the app itself.
-   */
-  administrators?: AppAdministrators;
   /** The app's add-ons the cluster holds a component for, each with its own. */
   addons?: {
     profile: string;
     name: string;
     trustTier?: string;
     holds?: AppHold[];
-    administrators?: AppAdministrators;
   }[];
-};
-
-/**
- * The app administrator's role is one group of the sign-in service for the
- * whole tenant, and not in the rights store: its members are made
- * administrators inside each app by the app's own means, which this names.
- */
-export type AppAdministrators = {
-  /** The group whose members they are. */
-  group: string;
-  /** How the membership reaches the app: `sync`, `token`, `sign-in`. */
-  ways: string[];
-  /** The in-app role the app's sync job puts them in. */
-  role?: string;
-  /** The app's roles a member's token carries. */
-  tokenRoles?: string[];
 };
 
 /**

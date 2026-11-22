@@ -115,7 +115,7 @@ const TABS: {
   { id: "tenantSettings", labelKey: "tabTenantSettings" },
   { id: "members", labelKey: "tabMembers" },
   { id: "positions", labelKey: "tabPositions" },
-  // Who may do what, and why: what a person, a group or an app holds, as the
+  // Who may do what, and why: what a person, a position or an app holds, as the
   // rights store has it. Read-only, beside the two screens that change it.
   { id: "access", labelKey: "tabAccess" },
   // What the tenant has installed, and everything done to an app after it is
@@ -186,7 +186,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
   });
   // No tenant literal as a fallback. Hooks must be declared before the early
   // returns below, so this runs before the loading and error guards -- but the
-  // groups query is gated on the context having loaded, and every consumer of
+  // queries are gated on the context having loaded, and every consumer of
   // `tenant` sits after those guards, so the empty string is never used. It used
   // to read `?? "demo"`, which would have queried a real, unrelated tenant the
   // moment someone reordered any of that.

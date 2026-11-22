@@ -73,7 +73,7 @@ export function setAddonForEveryone(profile: string, addon: string, everyone: bo
 
 /**
  * Remove an app. The app and its sign-in client go; its files, database,
- * object storage, stored credentials and access group are kept, and a later
+ * object storage, stored credentials and the roles people hold on it are kept, and a later
  * install finds them again.
  */
 export function uninstallApp(profile: string) {

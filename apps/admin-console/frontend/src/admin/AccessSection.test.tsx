@@ -236,7 +236,7 @@ describe("AccessSection", () => {
     expect(without).not.toContain("Ada (ada@acme.example)");
   });
 
-  it("shows who holds which role on an app, how its administrators get inside, and what it may do", () => {
+  it("shows who holds which role on an app and what it may do", () => {
     const view: AuthorizationView = {
       object: "app:acme/shop-sales",
       bindings: [
@@ -265,7 +265,6 @@ describe("AccessSection", () => {
         { kind: "own-store", names: ["groups"] },
         { kind: "something-new", names: ["x"] },
       ],
-      administrators: { group: "gentian:tenant:acme:app-admins", ways: ["sync"], role: "admin" },
       addons: [{ profile: "shop-ai", name: "shop-ai", trustTier: "experimental" }],
     };
     const html = text(
@@ -281,8 +280,6 @@ describe("AccessSection", () => {
     // Positions by their names, people by theirs, an unknown account by its id.
     expect(html).toMatch(/User of the app\s+User\s+Ada \(ada@acme.example\)\s+u-gone/);
     expect(html).toMatch(/manager\s+Declared by the app\s+Sales manager/);
-    expect(html).toContain("Whoever holds the role Administrator of the app is made an administrator inside it this way:");
-    expect(html).toContain("Put in the app's own role admin.");
     expect(html).not.toContain("app-admins");
     expect(html).toContain("Trust tier: certified");
     expect(html).toContain("valid at this app and nowhere else");
@@ -292,7 +289,7 @@ describe("AccessSection", () => {
     expect(html).toContain("shop-ai");
   });
 
-  it("says when the platform makes nobody an administrator inside an app", () => {
+  it("says when an app holds nothing on people's behalf", () => {
     const view: AuthorizationView = { object: "app:acme/wiki", bindings: [], unheld: 0 };
     const state: AppState = { profile: "wiki", name: "wiki", ready: true, phase: "ready" };
     const html = text(
@@ -302,7 +299,6 @@ describe("AccessSection", () => {
         [["admin", "positions"], positions],
       ]),
     );
-    expect(html).toContain("The platform makes nobody an administrator inside this app.");
     expect(html).toContain("Holds nothing on people's behalf.");
   });
 });
