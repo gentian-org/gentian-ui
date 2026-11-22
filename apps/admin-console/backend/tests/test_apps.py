@@ -121,6 +121,18 @@ def test_an_approval_goes_to_the_directors_privilege_route_as_given(monkeypatch)
     assert seen["auth"] == "Bearer person-token"
 
 
+def test_an_egress_approval_names_the_hosts_it_opens(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "abc"}, seen, status=202)
+    answer = _client().put(
+        "/api/v1/admin/apps/privileges/operations-sync-ee/egress/backends",
+        headers=_person,
+        json={"hosts": ["erp.example.org"]},
+    )
+    assert answer.status_code == 202
+    assert seen["json"] == {"hosts": ["erp.example.org"]}
+
+
 def test_a_withdrawn_approval_goes_to_the_directors_privilege_route(monkeypatch):
     seen: dict = {}
     _fake_client(monkeypatch, {"status": "updated", "commit": "abc"}, seen, status=202)

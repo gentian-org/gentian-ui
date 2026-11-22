@@ -16,7 +16,7 @@ import {
   type PrivilegeGrant,
 } from "@/api/apps";
 import { PublicAddressList } from "./AppPublicAddresses";
-import { AnswerRequest, tenantApprovals } from "./ApprovalsSection";
+import { AnswerRequest, RequestedHosts, tenantApprovals } from "./ApprovalsSection";
 import "./admin.css";
 import { formatDateTime, formatNumber } from "@/lib/format";
 
@@ -123,6 +123,7 @@ function Outbound() {
                   <td>
                     <div className="admin-console__mono">{request.privilege}</div>
                     <div className="admin-console__hint">{request.reason || t("approvals.noReason")}</div>
+                    <RequestedHosts approval={request} />
                   </td>
                   <td>
                     <span className="admin-console__badge admin-console__badge--warn">
@@ -167,6 +168,12 @@ function Outbound() {
                       />
                     </div>
                     <div>{grant.reason}</div>
+                    {grant.hosts?.length ? (
+                      <div className="admin-console__hint">
+                        {t("perimeter.outboundGrantedHosts")}{" "}
+                        <span className="admin-console__mono">{grant.hosts.join(", ")}</span>
+                      </div>
+                    ) : null}
                     {grant.expiresAt ? (
                       <div className="admin-console__hint">
                         {t("perimeter.outboundExpires", { when: formatDateTime(grant.expiresAt) })}

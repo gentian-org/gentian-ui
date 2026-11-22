@@ -4,6 +4,8 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import "@/lib/i18n";
 import type { PrivilegeGrant } from "@/api/apps";
+import { parseHosts } from "@/api/approvals";
+import { RequestedHosts } from "./ApprovalsSection";
 import { TrustedDomainsView, WithdrawGrant } from "./PerimeterSection";
 
 const grant: PrivilegeGrant = {
@@ -64,5 +66,23 @@ describe("TrustedDomainsView", () => {
     expect(html).toContain("has not delegated trusted domains");
     expect(html).toContain("no trusted domains of its own");
     expect(html).not.toContain("Trust a domain");
+  });
+});
+
+describe("hosts named at approval", () => {
+  it("reads the hosts typed into an approval, each once and in lower case", () => {
+    expect(parseHosts(" ERP.example.org\nfiles.example.org:8443, erp.example.org  ")).toEqual([
+      "erp.example.org",
+      "files.example.org:8443",
+    ]);
+    expect(parseHosts("  \n ")).toEqual([]);
+  });
+
+  it("says what an egress request reaches, or that its approval names it", () => {
+    const named = renderToString(<RequestedHosts approval={{ hosts: ["graph.microsoft.com"] }} />);
+    expect(named).toContain("graph.microsoft.com");
+    const atApproval = renderToString(<RequestedHosts approval={{ hostsAtApproval: true }} />);
+    expect(atApproval).toContain("the approval names the hosts");
+    expect(renderToString(<RequestedHosts approval={{}} />)).toBe("");
   });
 });

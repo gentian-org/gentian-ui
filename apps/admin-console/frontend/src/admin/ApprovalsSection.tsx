@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { fetchAdminContext, fetchAppStates, type AppState } from "@/api/admin";
-import { approveNodePrivilege, declineNodePrivilege, fetchApprovals, type Approval } from "@/api/approvals";
+import { approveNodePrivilege, declineNodePrivilege, fetchApprovals, parseHosts, type Approval } from "@/api/approvals";
 import "./admin.css";
 import { formatDateTime } from "@/lib/format";
 
@@ -94,6 +94,7 @@ export function ApprovalsSection() {
                   <td>
                     <div className="admin-console__mono">{approval.privilege}</div>
                     <div className="admin-console__hint">{approval.reason || t("approvals.noReason")}</div>
+                    <RequestedHosts approval={approval} />
                     {approval.waiver && !approval.waiver.allowlisted ? (
                       <div className="admin-console__hint">
                         <Trans
@@ -180,6 +181,8 @@ export function tenantApprovals(tenant: string | undefined, apps: AppState[]): A
         declinedBy: p.declinedBy,
         declinedAt: p.declinedAt,
         declineReason: p.declineReason,
+        hosts: p.hosts,
+        hostsAtApproval: p.hostsAtApproval,
       })),
   );
 }
@@ -224,12 +227,29 @@ function NotAnsweredHere({ approval }: { approval: Approval }) {
  * a decline, a reason and nothing committed. Either way the director's
  * refusal is shown as it worded it.
  */
+/**
+ * What an egress request reaches: the hosts it names, or that its approver
+ * names them. Nothing for any other request.
+ */
+export function RequestedHosts({ approval }: { approval: Pick<Approval, "hosts" | "hostsAtApproval"> }) {
+  const { t } = useTranslation();
+  if (approval.hostsAtApproval) return <div className="admin-console__hint">{t("approvals.hostsAtApproval")}</div>;
+  if (!approval.hosts?.length) return null;
+  return (
+    <div className="admin-console__hint">
+      {t("approvals.hostsNamed")} <span className="admin-console__mono">{approval.hosts.join(", ")}</span>
+    </div>
+  );
+}
+
 export function AnswerRequest({ approval }: { approval: Approval }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<"approve" | "decline" | null>(null);
   const [reason, setReason] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
+  const [hostsText, setHostsText] = useState("");
+  const hosts = parseHosts(hostsText);
   const settle = () => {
     setOpen(null);
     setReason("");
@@ -242,6 +262,9 @@ export function AnswerRequest({ approval }: { approval: Approval }) {
       approveNodePrivilege(approval, {
         ...(reason.trim() ? { reason: reason.trim() } : {}),
         ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
+        // A request whose installation chooses its destinations opens the
+        // hosts its approval names.
+        ...(approval.hostsAtApproval ? { hosts } : {}),
         // A waiver the cluster does not permit yet: its allowlist entry is
         // added in the same approval.
         ...(approval.waiver && !approval.waiver.allowlisted
@@ -257,6 +280,7 @@ export function AnswerRequest({ approval }: { approval: Approval }) {
   // A decline is shown to whoever asked, so it says why. An approval's
   // comment is the approver's to leave or not.
   const tooShort = open === "decline" && reason.trim().length < 10;
+  const noHosts = open === "approve" && approval.hostsAtApproval === true && hosts.length === 0;
   const busy = approve.isPending || decline.isPending;
 
   if (approve.isSuccess) {
@@ -290,7 +314,7 @@ export function AnswerRequest({ approval }: { approval: Approval }) {
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        if (tooShort) return;
+        if (tooShort || noHosts) return;
         if (declining) decline.mutate();
         else approve.mutate();
       }}
@@ -306,6 +330,20 @@ export function AnswerRequest({ approval }: { approval: Approval }) {
           rows={declining ? 3 : 2}
         />
       </label>
+      {!declining && approval.hostsAtApproval ? (
+        <label className="admin-console__field">
+          <span>{t("approvals.hostsLabel")}</span>
+          <textarea
+            value={hostsText}
+            onChange={(event) => setHostsText(event.target.value)}
+            required
+            rows={3}
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <span className="admin-console__hint">{t("approvals.hostsHint")}</span>
+        </label>
+      ) : null}
       {declining ? null : (
         <label className="admin-console__field">
           <span>{t("approvals.expiresLabel")}</span>
@@ -324,7 +362,7 @@ export function AnswerRequest({ approval }: { approval: Approval }) {
         </p>
       ) : null}
       <div className="admin-console__actions">
-        <button type="submit" className="admin-console__btn" disabled={tooShort || busy}>
+        <button type="submit" className="admin-console__btn" disabled={tooShort || noHosts || busy}>
           {t(declining ? "approvals.declineConfirm" : "approvals.approveConfirm", { privilege: approval.privilege })}
         </button>
         <button type="button" className="admin-console__btn admin-console__btn--quiet" disabled={busy} onClick={() => setOpen(null)}>
