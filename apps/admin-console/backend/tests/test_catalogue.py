@@ -223,6 +223,15 @@ def test_an_install_for_everyone_says_so_to_the_director(monkeypatch):
     )
     assert seen["json"] == {**entry, "defaultGrant": False}
 
+    # By position: the list travels as it was given, an empty one too.
+    for positions in (["user", "sales"], []):
+        client.post(
+            "/api/v1/catalogue/apps/timesheets",
+            json={**entry, "positions": positions},
+            headers=_person,
+        )
+        assert seen["json"] == {**entry, "positions": positions}
+
     # Unstated, or null, is not sent at all: absent leaves the entry as it is.
     client.post("/api/v1/catalogue/apps/timesheets", json=entry, headers=_person)
     assert seen["json"] == entry
