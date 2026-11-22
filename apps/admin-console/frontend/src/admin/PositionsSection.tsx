@@ -2,8 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  fetchAppAccess,
-  fetchAppStates,
   fetchPeople,
   fetchPositionAccess,
   fetchPositions,
@@ -16,7 +14,8 @@ import {
   type TenantPosition,
 } from "@/api/admin";
 import { PositionAccessView } from "./AccessSection";
-import { allPositions, positionLabel, roleLabel } from "./positionLabels";
+import { PositionRoleGrid } from "./PositionRoleGrid";
+import { allPositions, positionLabel } from "./positionLabels";
 import "./admin.css";
 
 /**
@@ -212,18 +211,6 @@ function PositionRow({
   );
 }
 
-/** The roles a position may hold on one thing: the two every thing has, and on an app the ones it declares. */
-function useRolesOf(app: string) {
-  const access = useQuery({
-    queryKey: ["admin", "access", "app", app],
-    queryFn: () => fetchAppAccess(app),
-    enabled: app !== "",
-    retry: false,
-  });
-  const declared = (access.data?.bindings ?? []).filter((b) => b.declared).map((b) => b.relation);
-  return ["user", ...declared, "admin"];
-}
-
 /** Whether two roles are the same role on the same thing. */
 export function sameRole(a: PositionRole, b: PositionRole) {
   return (a.app ?? "") === (b.app ?? "") && a.role === b.role;
@@ -252,14 +239,7 @@ function PositionDeclaration({
   const [description, setDescription] = useState(position?.description ?? "");
   const [includes, setIncludes] = useState<string[]>(position?.includes ?? []);
   const [roles, setRoles] = useState<PositionRole[]>(position?.roles ?? []);
-  const [on, setOn] = useState("");
-  const [role, setRole] = useState("user");
 
-  const apps = useQuery({ queryKey: ["admin", "apps", "status"], queryFn: fetchAppStates });
-  const profiles = (apps.data?.apps ?? [])
-    .flatMap((app) => [app.profile, ...(app.addons ?? []).map((addon) => addon.profile)])
-    .sort((a, b) => a.localeCompare(b));
-  const offered = useRolesOf(on);
   const name = position?.name ?? "";
 
   const save = useMutation({
@@ -312,70 +292,7 @@ function PositionDeclaration({
         ))}
       </div>
 
-      <div className="admin-console__field">
-        <span>{t("positions.roles")}</span>
-        {roles.length === 0 ? (
-          <p className="admin-console__empty">{t("positions.noRoles")}</p>
-        ) : (
-          <table className="admin-console__table">
-            <tbody>
-              {roles.map((held) => (
-                <tr key={`${held.app ?? ""}/${held.role}`}>
-                  <td>{roleLabel(t, held.app ? "app" : "tenant", held.role)}</td>
-                  <td>{held.app ? <code>{held.app}</code> : t("positions.onTheTenant")}</td>
-                  <td>
-                    <button
-                      className="admin-console__btn admin-console__btn--quiet"
-                      type="button"
-                      onClick={() => setRoles(roles.filter((r) => !sameRole(r, held)))}
-                    >
-                      {t("positions.removeRole")}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        <div className="admin-console__field-row">
-          <label className="admin-console__field">
-            <span className="admin-console__label-text">{t("positions.roleOn")}</span>
-            <select
-              value={on}
-              onChange={(e) => {
-                setOn(e.target.value);
-                setRole("user");
-              }}
-            >
-              <option value="">{t("positions.theTenant")}</option>
-              {profiles.map((profile) => (
-                <option key={profile} value={profile}>
-                  {profile}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="admin-console__field">
-            <span className="admin-console__label-text">{t("positions.role")}</span>
-            <select value={role} onChange={(e) => setRole(e.target.value)}>
-              {offered.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabel(t, on ? "app" : "tenant", r)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="admin-console__field">
-            <button
-              className="admin-console__btn"
-              type="button"
-              onClick={() => setRoles(withRole(roles, on ? { app: on, role } : { role }))}
-            >
-              {t("positions.addRole")}
-            </button>
-          </div>
-        </div>
-      </div>
+      <PositionRoleGrid name={name} own={own} roles={roles} onChange={setRoles} />
 
       {failure && <p className="admin-console__error">{String(failure)}</p>}
       {save.isSuccess ? <p className="admin-console__hint">{t("positions.saved")}</p> : null}

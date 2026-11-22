@@ -1737,3 +1737,45 @@ fieldset.admin-console__choices > legend {
 .admin-console__access-list li {
   margin: 0.125rem 0;
 }
+
+/* A position's roles as a grid: one row per app, add-ons indented. */
+.admin-console__grid-scroll {
+  overflow-x: auto;
+}
+
+.admin-console__role-grid td,
+.admin-console__role-grid th {
+  vertical-align: middle;
+}
+
+.admin-console__grid-addon {
+  padding-left: 1.5rem;
+  color: var(--gtn-ink-3);
+}
+
+.admin-console__grid-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0.125rem 0.5rem 0.125rem 0;
+  padding: 0.125rem 0.375rem;
+  border-left: 3px solid transparent;
+  border-radius: var(--gtn-r1);
+  cursor: pointer;
+}
+
+.admin-console__grid-cell--own {
+  background: var(--gtn-moss-bg);
+  border-left-color: var(--gtn-moss);
+}
+
+.admin-console__grid-cell--inherited,
+.admin-console__grid-cell--implied {
+  background: var(--gtn-iris-bg);
+  border-left-color: var(--gtn-iris);
+  cursor: help;
+}
+
+.admin-console__grid-cell--implied {
+  opacity: 0.7;
+}
