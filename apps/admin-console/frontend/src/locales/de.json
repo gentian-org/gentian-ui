@@ -103,6 +103,13 @@
   },
   "catalogue": {
     "appStore": "App Store",
+    "asksApprove": "Diese Anfragen mit der Installation genehmigen",
+    "asksByAddress": "erreicht Adressen außerhalb des Mandanten",
+    "asksHosts": "erreicht <mono>{{hosts}}</mono>",
+    "asksLead": "Diese App möchte Dienste außerhalb des Mandanten erreichen. Sie startet erst, wenn jede Anfrage genehmigt ist.",
+    "asksTitle": "Ausgehender Zugriff",
+    "asksWait": "Die App wartet, bis der Perimeter-Freigeber des Mandanten sie auf der Seite Perimeter genehmigt.",
+    "asksWaitUnapproved": "Ohne Ihre Genehmigung wird die App installiert und wartet; Sie können sie später auf der Seite Perimeter genehmigen.",
     "cancel": "Abbrechen",
     "catalogues": "Kataloge",
     "cataloguesAreUnavailable": "Kataloge sind nicht verfügbar.",

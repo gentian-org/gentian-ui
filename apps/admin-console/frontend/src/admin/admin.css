@@ -899,6 +899,23 @@
   color: var(--gtn-ink-3);
 }
 
+.admin-console__asks {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--gtn-border);
+}
+
+.admin-console__asks-list {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: 1.1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.admin-console__asks-list li + li {
+  margin-top: 0.4rem;
+}
+
 .admin-console__choice-extra {
   display: block;
   margin-top: 0.75rem;

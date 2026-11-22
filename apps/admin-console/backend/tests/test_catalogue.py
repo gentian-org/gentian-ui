@@ -255,3 +255,82 @@ def test_an_install_is_not_relayed_without_a_token(monkeypatch):
     client = TestClient(_app(_settings()))
     assert client.post("/api/v1/catalogue/apps/timesheets", json={}).status_code == 401
     assert seen == {}
+
+
+# -- what a build asks for, and approving it with the install ---------------
+
+
+def test_what_a_build_asks_for_is_the_directors_answer_for_the_person(monkeypatch):
+    seen: dict = {}
+    asks = {
+        "egress": [
+            {"install": "timesheets", "privilege": "egress/payroll", "hosts": ["payroll.example"]}
+        ],
+        "mayApprove": True,
+    }
+
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def request(self, method, url, params=None, json=None, headers=None):
+            seen.update(
+                method=method, url=url, params=params, auth=(headers or {}).get("Authorization")
+            )
+            return httpx.Response(200, json=asks, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(director.httpx, "AsyncClient", FakeClient)
+    client = TestClient(_app(_settings()))
+    answer = client.get(
+        "/api/v1/catalogue/sources/in-house/entries/timesheets/asks",
+        params={"digest": _digest},
+        headers=_person,
+    )
+    assert answer.status_code == 200
+    # Verbatim, mayApprove included: who may approve is the director's to say.
+    assert answer.json() == asks
+    assert seen["method"] == "GET"
+    assert (
+        seen["url"]
+        == "http://director.test:8080/v1/tenants/platform/catalogues/in-house/entries/timesheets/asks"
+    )
+    assert seen["params"] == {"digest": _digest}
+    assert seen["auth"] == "Bearer person-token"
+
+
+def test_an_install_carries_the_approvals_the_person_gave(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "installed", "commit": "a1b2c3d4"}, seen, status=202)
+    client = TestClient(_app(_settings()))
+    approve = [{"install": "timesheets", "privilege": "egress/payroll"}]
+    answer = client.post(
+        "/api/v1/catalogue/apps/timesheets",
+        json={"coordinate": "in-house/timesheets", "digest": _digest, "approve": approve},
+        headers=_person,
+    )
+    assert answer.status_code == 202
+    # As the person, and nothing added: the director asks whether they may.
+    assert seen["auth"] == "Bearer person-token"
+    assert seen["json"] == {
+        "coordinate": "in-house/timesheets",
+        "digest": _digest,
+        "approve": approve,
+    }
+
+
+def test_an_install_without_approvals_sends_none(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "installed", "commit": "a1b2c3d4"}, seen, status=202)
+    client = TestClient(_app(_settings()))
+    client.post(
+        "/api/v1/catalogue/apps/timesheets",
+        json={"coordinate": "in-house/timesheets", "digest": _digest},
+        headers=_person,
+    )
+    assert "approve" not in seen["json"]
