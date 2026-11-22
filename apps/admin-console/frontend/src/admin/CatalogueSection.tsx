@@ -4,8 +4,10 @@ import { fetchAppStates } from "@/api/admin";
 import { uninstallApp, type AppWriteResult } from "@/api/apps";
 import {
   fetchCatalogueEntries,
+  fetchCatalogueEntryAsks,
   fetchCatalogueSources,
   installCatalogueEntry,
+  type AskedEgress,
   type CatalogueEntry,
 } from "@/api/catalogue";
 import "./admin.css";
@@ -71,8 +73,8 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
   // with the app, and the cluster gives every member access once the app is
   // ready. Nothing is left for this page to do afterwards.
   const installMutation = useMutation({
-    mutationFn: ({ entry, everyone }: { entry: CatalogueEntry; everyone: boolean }) =>
-      installCatalogueEntry(entry, everyone),
+    mutationFn: ({ entry, everyone, approve }: { entry: CatalogueEntry; everyone: boolean; approve: AskedEgress[] }) =>
+      installCatalogueEntry(entry, everyone, approve),
     onSuccess: (result, { entry, everyone }) => {
       setConfirming(null);
       setOutcome({ app: entry.name, result, everyone });
@@ -196,7 +198,7 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
           entry={confirming}
           pending={installMutation.isPending}
           error={installMutation.isError ? messageOf(installMutation.error) : undefined}
-          onConfirm={(everyone) => installMutation.mutate({ entry: confirming, everyone })}
+          onConfirm={(everyone, approve) => installMutation.mutate({ entry: confirming, everyone, approve })}
           onClose={() => setConfirming(null)}
         />
       ) : null}
@@ -279,12 +281,24 @@ function InstallDialog({
   entry: CatalogueEntry;
   pending: boolean;
   error?: string;
-  onConfirm: (everyone: boolean) => void;
+  onConfirm: (everyone: boolean, approve: AskedEgress[]) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
   const [everyone, setEveryone] = useState(false);
+  const [approving, setApproving] = useState(false);
+
+  // What the build asks for beyond the tenant, as the director reads it from
+  // the build itself. A read that fails takes nothing away: the app is
+  // installed as before and its requests wait on the Approvals page.
+  const asksQuery = useQuery({
+    queryKey: ["catalogue", "asks", entry.coordinate, entry.digest],
+    queryFn: () => fetchCatalogueEntryAsks(entry),
+    retry: false,
+  });
+  const asks = asksQuery.data?.egress ?? [];
+  const mayApprove = Boolean(asksQuery.data?.mayApprove);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -306,7 +320,7 @@ function InstallDialog({
         className="admin-console__dialog-body"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!pending) onConfirm(everyone);
+          if (!pending) onConfirm(everyone, approving && mayApprove ? asks : []);
         }}
       >
         <h3 id="install-title" className="admin-console__dialog-title">
@@ -349,6 +363,14 @@ function InstallDialog({
           </label>
         </div>
 
+        <InstallAsks
+          asks={asks}
+          mayApprove={mayApprove}
+          approving={approving}
+          pending={pending}
+          onApproving={setApproving}
+        />
+
         {error ? <p className="admin-console__error">{error}</p> : null}
 
         <div className="admin-console__dialog-footer">
@@ -361,6 +383,65 @@ function InstallDialog({
         </div>
       </form>
     </dialog>
+  );
+}
+
+/**
+ * What the build asks for beyond the tenant: each outbound request that
+ * nobody has answered, with its hosts and the profile's reason. The app does
+ * not start until all of them are approved. The tenant's perimeter approver
+ * can approve them with the install; anybody else is told the app will wait.
+ * Never pre-selected: an approval is something a person says, not a default.
+ */
+export function InstallAsks({
+  asks,
+  mayApprove,
+  approving,
+  pending,
+  onApproving,
+}: {
+  asks: AskedEgress[];
+  mayApprove: boolean;
+  approving: boolean;
+  pending: boolean;
+  onApproving: (approving: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  if (asks.length === 0) return null;
+  return (
+    <div className="admin-console__asks">
+      <h4 className="admin-console__group-title">{t("catalogue.asksTitle")}</h4>
+      <p className="admin-console__hint">{t("catalogue.asksLead")}</p>
+      <ul className="admin-console__asks-list">
+        {asks.map((ask) => (
+          <li key={`${ask.install} ${ask.privilege}`}>
+            <span className="admin-console__mono">{ask.install}</span>{" "}
+            {ask.hosts && ask.hosts.length > 0 ? (
+              <Trans i18nKey="catalogue.asksHosts" values={{ hosts: ask.hosts.join(", ") }} components={mono} />
+            ) : (
+              t("catalogue.asksByAddress")
+            )}
+            {ask.reason ? <span className="admin-console__choice-desc">{ask.reason}</span> : null}
+          </li>
+        ))}
+      </ul>
+      {mayApprove ? (
+        <>
+          <label className="admin-console__checkbox">
+            <input
+              type="checkbox"
+              checked={approving}
+              disabled={pending}
+              onChange={(e) => onApproving(e.target.checked)}
+            />
+            <span>{t("catalogue.asksApprove")}</span>
+          </label>
+          {approving ? null : <p className="admin-console__hint">{t("catalogue.asksWaitUnapproved")}</p>}
+        </>
+      ) : (
+        <p className="admin-console__hint">{t("catalogue.asksWait")}</p>
+      )}
+    </div>
   );
 }
 

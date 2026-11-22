@@ -103,6 +103,13 @@
   },
   "catalogue": {
     "appStore": "App Store",
+    "asksApprove": "Approve these requests with the install",
+    "asksByAddress": "reaches addresses outside the tenant",
+    "asksHosts": "reaches <mono>{{hosts}}</mono>",
+    "asksLead": "This app asks to reach services outside the tenant. It does not start until every request is approved.",
+    "asksTitle": "Outbound access",
+    "asksWait": "The app waits until the tenant's perimeter approver approves them, on the Perimeter page.",
+    "asksWaitUnapproved": "Without your approval the app is installed and waits; you can approve it later on the Perimeter page.",
     "cancel": "Cancel",
     "catalogues": "Catalogs",
     "cataloguesAreUnavailable": "Catalogs are unavailable.",
