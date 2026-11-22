@@ -433,12 +433,12 @@ def test_an_entry_takes_an_approval_and_a_withdrawal_and_nothing_else(monkeypatc
 # -- for everyone, or per person --------------------------------------------
 
 
-@pytest.mark.parametrize("everyone", [True, False])
-def test_access_states_the_default_grant_and_nothing_else(monkeypatch, everyone):
+@pytest.mark.parametrize("positions", [["user", "sales"], []])
+def test_access_states_the_positions_and_nothing_else(monkeypatch, positions):
     seen: dict = {}
     _fake_client(monkeypatch, {"status": "updated", "commit": "a1b2c3d4"}, seen, status=202)
     answer = _client().put(
-        "/api/v1/admin/apps/timesheets/access", json={"everyone": everyone}, headers=_person
+        "/api/v1/admin/apps/timesheets/access", json={"positions": positions}, headers=_person
     )
     assert answer.status_code == 202
     assert answer.json() == {"status": "updated", "commit": "a1b2c3d4"}
@@ -446,7 +446,7 @@ def test_access_states_the_default_grant_and_nothing_else(monkeypatch, everyone)
     assert (seen["method"], seen["url"]) == ("POST", f"{_base}/apps/timesheets")
     # No coordinate and no digest: either would fetch a bundle or move the
     # pin, and this request is about who may open the app, not which build.
-    assert seen["json"] == {"defaultGrant": everyone}
+    assert seen["json"] == {"positions": positions}
     assert seen["auth"] == "Bearer person-token"
 
 
@@ -457,7 +457,7 @@ def test_access_without_saying_which_way_reaches_nobody(monkeypatch):
     # Unstated, null, or something merely shaped like a yes: the director
     # would read an absent defaultGrant as "leave it", and a bare POST to its
     # install route is an install.
-    for body in ({}, {"everyone": None}, {"everyone": "maybe"}):
+    for body in ({}, {"positions": None}, {"positions": "user"}, {"everyone": True}):
         answer = client.put("/api/v1/admin/apps/timesheets/access", json=body, headers=_person)
         assert answer.status_code == 422
     assert seen == {}
@@ -468,7 +468,7 @@ def test_access_refused_names_the_right_it_lacks(monkeypatch):
     body = {"error": "installing an app for everyone needs can_grant on the tenant"}
     _fake_client(monkeypatch, body, seen, status=403)
     answer = _client().put(
-        "/api/v1/admin/apps/timesheets/access", json={"everyone": True}, headers=_person
+        "/api/v1/admin/apps/timesheets/access", json={"positions": ["user"]}, headers=_person
     )
     assert answer.status_code == 403
     assert answer.json() == body
@@ -677,7 +677,9 @@ def test_a_name_that_cannot_be_an_app_is_not_put_in_a_path(monkeypatch, name):
     _fake_client(monkeypatch, {"status": "ok"}, seen)
     client = _client()
     assert client.delete(f"/api/v1/admin/apps/{name}", headers=_person).status_code == 400
-    put = client.put(f"/api/v1/admin/apps/{name}/access", json={"everyone": True}, headers=_person)
+    put = client.put(
+        f"/api/v1/admin/apps/{name}/access", json={"positions": ["user"]}, headers=_person
+    )
     assert put.status_code == 400
     purge = client.post("/api/v1/admin/apps/purge", json={"profile": name}, headers=_person)
     assert purge.status_code == 400
@@ -697,7 +699,9 @@ def test_none_of_them_is_relayed_without_a_token(monkeypatch):
     assert client.get("/api/v1/admin/apps").status_code == 401
     assert client.get("/api/v1/admin/apps/privileges").status_code == 401
     assert client.get("/api/v1/admin/apps/retained").status_code == 401
-    assert client.put("/api/v1/admin/apps/a/access", json={"everyone": True}).status_code == 401
+    assert (
+        client.put("/api/v1/admin/apps/a/access", json={"positions": ["user"]}).status_code == 401
+    )
     assert client.delete("/api/v1/admin/apps/a").status_code == 401
     assert client.post("/api/v1/admin/apps/purge", json={"profile": "a"}).status_code == 401
     assert seen == {}

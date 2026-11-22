@@ -84,11 +84,15 @@ class InstallBody(BaseModel):
 
     `defaultGrant` is who gets the app: true installs it for everyone, false
     says access is given per person, and unstated leaves an installed app's
-    entry as it is -- so it is sent on only when it was stated."""
+    entry as it is -- so it is sent on only when it was stated.
+
+    `positions` says the same by position: the positions of the tenant whose
+    holders get the app. Unstated it is not sent either."""
 
     coordinate: str | None = None
     digest: str | None = None
     defaultGrant: bool | None = None
+    positions: list[str] | None = None
 
 
 @router.post("/apps/{profile}")

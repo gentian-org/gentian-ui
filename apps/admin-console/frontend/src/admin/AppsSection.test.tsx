@@ -157,13 +157,13 @@ describe("AccessPart", () => {
   it("offers no access management for a default component", () => {
     const html = renderAccess({ ...state, origin: "default" });
     expect(html).toContain("The platform places and manages this app");
-    expect(html).not.toContain("Make it for everyone");
+    expect(html).not.toContain("Save who gets it");
     expect(html).not.toContain("Who holds a role on it");
   });
 
   it("offers it for an installed app", () => {
     const html = renderAccess({ ...state, origin: "install" });
-    expect(html).toContain("Make it for everyone");
+    expect(html).toContain("Save who gets it");
     expect(html).toContain("Who holds a role on it");
     // A position by its name, a person given the role by theirs, and the
     // role nobody holds as a row that says so.

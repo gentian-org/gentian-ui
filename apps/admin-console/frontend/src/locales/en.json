@@ -111,10 +111,6 @@
     "install": "Install",
     "installAction": "Install",
     "installBody": "Build <mono>{{digest}}</mono> of <mono>{{coordinate}}</mono>. Installing is a commit to the deployments repository with you as its author; the cluster has the app once that is synced.",
-    "installEveryone": "Install for everyone",
-    "installEveryoneBody": "Every member of this tenant has access by default; people invited later get it pre-selected.",
-    "installPlain": "Install",
-    "installPlainBody": "Access is given per person, under Members.",
     "installTitle": "Install <mono>{{app}}</mono>?",
     "installed": "Installed",
     "loadingCatalogues": "Loading catalogs…",
@@ -122,7 +118,7 @@
     "noDigest": "not installable from here: the source states no digest for this entry",
     "nothingThisClusterListsFor": "Nothing this cluster lists for itself.",
     "outcomeAlreadyInstalled": "Nothing to commit — this tenant already has that build of <mono>{{app}}</mono>.",
-    "outcomeEveryone": "Every member of this tenant gets access once the app is ready.",
+    "outcomeEveryone": "Every person of this tenant gets it once the app is ready.",
     "outcomeInstalled": "Installing <mono>{{app}}</mono> was committed as <mono>{{commit}}</mono> and arrives on the next sync. This list is read from the cluster and does not change at once.",
     "outcomeNotInstalled": "Nothing to commit — <mono>{{app}}</mono> is not installed in this tenant.",
     "outcomeOther": "The director answered <mono>{{status}}</mono> for <mono>{{app}}</mono>.",
@@ -137,7 +133,13 @@
     "trust": "Trust",
     "uninstall": "Uninstall",
     "uninstallConfirm": "Uninstall {{app}} from {{tenant}}? The app is removed for everybody who uses it. Its data stays until it is purged.",
-    "version": "Version"
+    "version": "Version",
+    "installWho": "Who gets the app",
+    "installWhoBody": "Everybody who holds a ticked position uses the app. Untick the positions that should not get it.",
+    "installOwnPositionsUnread": "The tenant's own positions could not be read; only the three every tenant has are listed.",
+    "outcomePositions_one": "The holders of the position chosen get it once the app is ready.",
+    "outcomePositions_other": "The holders of the {{count}} positions chosen get it once the app is ready.",
+    "outcomeNobody": "It was given to no position: a role on it is given per person, under Apps."
   },
   "clusterSettings": {
     "changeRefused": "The change was refused.",
@@ -785,8 +787,6 @@
     "conditionMessage": "Message",
     "accessTitle": "Access",
     "accessPlatformManaged": "The platform places and manages this app in every tenant. Who may open it is decided for the cluster, not here.",
-    "everyoneIsOn": "This app is for everyone: the position User holds it, so every person of this tenant has it, those invited later too.",
-    "everyoneIsOff": "This app is not for everyone: it is held through a position, or by the people given it, below.",
     "everyoneSwitchOn": "Make it for everyone",
     "everyoneSwitchOff": "Stop giving it to everyone",
     "everyoneOnConfirm": "Make {{app}} for everyone in {{tenant}}? Every person of the tenant gets it, those invited later too.",
@@ -1036,7 +1036,12 @@
     "addonAccessTitle": "Add-ons",
     "addonAccessLead": "Each add-on is an app of its own: whoever holds a role on it has it, and may enter the app it lives in.",
     "addonEveryoneIsOn": "This add-on is for everyone: the position User holds it.",
-    "addonEveryoneIsOff": "This add-on is not for everyone: it is held through a position, or by the people given it."
+    "addonEveryoneIsOff": "This add-on is not for everyone: it is held through a position, or by the people given it.",
+    "positionsLead": "Everybody who holds a ticked position uses this app. Saving is a commit.",
+    "positionsSave": "Save who gets it",
+    "positionsTakeConfirm_one": "Take {{app}} from one position in {{tenant}}? Whoever has it only through that position loses it. People who hold it through another position, or were given it themselves, keep it.",
+    "positionsTakeConfirm_other": "Take {{app}} from {{count}} positions in {{tenant}}? Whoever has it only through those positions loses it. People who hold it through another position, or were given it themselves, keep it.",
+    "outcomePositions": "Who gets <mono>{{app}}</mono> was committed as <mono>{{commit}}</mono>. It takes effect once the cluster has synced."
   },
   "perimeter": {
     "outboundTitle": "Outbound",
@@ -1517,5 +1522,12 @@
     "choosePerson": "Choose a person…",
     "theRole": "Role",
     "give": "Give"
+  },
+  "positionChecklist": {
+    "position": "Position",
+    "selectAll": "Select all",
+    "selectNone": "Select none",
+    "userIsEveryone": "(every person of the tenant)",
+    "always": "(administers every app)"
   }
 }

@@ -111,10 +111,6 @@
     "install": "Installation",
     "installAction": "Installieren",
     "installBody": "Build <mono>{{digest}}</mono> von <mono>{{coordinate}}</mono>. Die Installation ist ein Commit im Deployments-Repository mit Ihnen als Autor; der Cluster hat die App, sobald dieser synchronisiert ist.",
-    "installEveryone": "Für alle installieren",
-    "installEveryoneBody": "Alle Mitglieder dieses Mandanten haben standardmäßig Zugriff; bei später eingeladenen Personen ist er vorausgewählt.",
-    "installPlain": "Installieren",
-    "installPlainBody": "Zugriff wird pro Person vergeben, unter Mitglieder.",
     "installTitle": "<mono>{{app}}</mono> installieren?",
     "installed": "Installiert",
     "loadingCatalogues": "Kataloge werden geladen …",
@@ -122,7 +118,7 @@
     "noDigest": "von hier nicht installierbar: die Quelle nennt für diesen Eintrag keinen Digest",
     "nothingThisClusterListsFor": "Dieser Cluster führt selbst nichts auf.",
     "outcomeAlreadyInstalled": "Nichts zu committen — dieser Mandant hat diesen Build von <mono>{{app}}</mono> bereits.",
-    "outcomeEveryone": "Alle Mitglieder dieses Mandanten erhalten Zugriff, sobald die App bereit ist.",
+    "outcomeEveryone": "Jede Person dieses Mandanten erhält sie, sobald die App bereit ist.",
     "outcomeInstalled": "Die Installation von <mono>{{app}}</mono> wurde als <mono>{{commit}}</mono> committet und kommt mit der nächsten Synchronisierung an. Diese Liste wird aus dem Cluster gelesen und ändert sich nicht sofort.",
     "outcomeNotInstalled": "Nichts zu committen — <mono>{{app}}</mono> ist in diesem Mandanten nicht installiert.",
     "outcomeOther": "Der Director hat für <mono>{{app}}</mono> mit <mono>{{status}}</mono> geantwortet.",
@@ -137,7 +133,13 @@
     "trust": "Vertrauen",
     "uninstall": "Deinstallieren",
     "uninstallConfirm": "{{app}} aus {{tenant}} deinstallieren? Die App wird für alle entfernt, die sie nutzen. Ihre Daten bleiben erhalten, bis sie endgültig gelöscht werden.",
-    "version": "Version"
+    "version": "Version",
+    "installWho": "Wer die App erhält",
+    "installWhoBody": "Alle, die eine angekreuzte Position innehaben, nutzen die App. Entfernen Sie das Häkchen bei den Positionen, die sie nicht erhalten sollen.",
+    "installOwnPositionsUnread": "Die eigenen Positionen des Mandanten konnten nicht gelesen werden; aufgeführt sind nur die drei, die jeder Mandant hat.",
+    "outcomePositions_one": "Die Inhaber der gewählten Position erhalten sie, sobald die App bereit ist.",
+    "outcomePositions_other": "Die Inhaber der {{count}} gewählten Positionen erhalten sie, sobald die App bereit ist.",
+    "outcomeNobody": "Sie wurde keiner Position gegeben: Eine Rolle darauf wird pro Person vergeben, unter Apps."
   },
   "clusterSettings": {
     "changeRefused": "Die Änderung wurde abgelehnt.",
@@ -785,8 +787,6 @@
     "conditionMessage": "Meldung",
     "accessTitle": "Zugriff",
     "accessPlatformManaged": "Die Plattform stellt diese App in jeden Mandanten und verwaltet sie selbst. Wer sie öffnen darf, wird für den Cluster entschieden, nicht hier.",
-    "everyoneIsOn": "Diese App ist für alle: Die Position Benutzer hält sie, also hat sie jede Person dieses Mandanten, auch später Eingeladene.",
-    "everyoneIsOff": "Diese App ist nicht für alle: Sie wird über eine Position gehalten oder von den Personen, denen sie unten gegeben wurde.",
     "everyoneSwitchOn": "Für alle freigeben",
     "everyoneSwitchOff": "Nicht mehr allen geben",
     "everyoneOnConfirm": "{{app}} für alle in {{tenant}} freigeben? Jede Person des Mandanten erhält sie, auch später Eingeladene.",
@@ -1036,7 +1036,12 @@
     "addonAccessTitle": "Add-ons",
     "addonAccessLead": "Jede Erweiterung ist eine eigene App: Wer eine Rolle darauf hält, hat sie und darf die App betreten, in der sie liegt.",
     "addonEveryoneIsOn": "Diese Erweiterung ist für alle: Die Position Benutzer hält sie.",
-    "addonEveryoneIsOff": "Diese Erweiterung ist nicht für alle: Sie wird über eine Position gehalten oder von den Personen, denen sie gegeben wurde."
+    "addonEveryoneIsOff": "Diese Erweiterung ist nicht für alle: Sie wird über eine Position gehalten oder von den Personen, denen sie gegeben wurde.",
+    "positionsLead": "Alle, die eine angekreuzte Position innehaben, nutzen diese App. Speichern ist ein Commit.",
+    "positionsSave": "Speichern, wer sie erhält",
+    "positionsTakeConfirm_one": "{{app}} in {{tenant}} einer Position entziehen? Wer sie nur über diese Position hat, verliert sie. Wer sie über eine andere Position hat oder selbst erhalten hat, behält sie.",
+    "positionsTakeConfirm_other": "{{app}} in {{tenant}} {{count}} Positionen entziehen? Wer sie nur über diese Positionen hat, verliert sie. Wer sie über eine andere Position hat oder selbst erhalten hat, behält sie.",
+    "outcomePositions": "Wer <mono>{{app}}</mono> erhält, wurde als <mono>{{commit}}</mono> committet. Es gilt, sobald der Cluster synchronisiert hat."
   },
   "perimeter": {
     "outboundTitle": "Ausgehend",
@@ -1517,5 +1522,12 @@
     "choosePerson": "Person wählen…",
     "theRole": "Rolle",
     "give": "Geben"
+  },
+  "positionChecklist": {
+    "position": "Position",
+    "selectAll": "Alle auswählen",
+    "selectNone": "Keine auswählen",
+    "userIsEveryone": "(jede Person des Mandanten)",
+    "always": "(verwaltet jede App)"
   }
 }
