@@ -287,7 +287,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
           ) : current === "tenantSettings" ? (
             <TenantSettingsSection tenant={tenant} />
           ) : current === "members" ? (
-            <MembersSection tenant={tenant} />
+            <MembersSection />
           ) : current === "positions" ? (
             <PositionsSection />
           ) : current === "access" ? (

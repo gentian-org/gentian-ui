@@ -133,7 +133,16 @@ describe("joinApps", () => {
 describe("AccessPart", () => {
   function renderAccess(appState: AppState) {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    client.setQueryData(["admin", "people", "groups"], { groups: [] });
+    client.setQueryData(["admin", "access", "app", appState.profile], {
+      object: `app:acme/${appState.profile}`,
+      bindings: [
+        { relation: "admin", holders: [], grants: ["can_administer"] },
+        { relation: "user", holders: [{ kind: "position", name: "user" }, { kind: "person", name: "u1" }], grants: ["can_use"] },
+      ],
+      unheld: 1,
+    });
+    client.setQueryData(["admin", "people", ""], { people: [{ id: "u1", username: "ada@acme.example", name: "Ada" }] });
+    client.setQueryData(["admin", "positions"], { shipped: ["user"], positions: [] });
     return renderToString(
       <QueryClientProvider client={client}>
         <AccessPart
@@ -149,22 +158,26 @@ describe("AccessPart", () => {
     const html = renderAccess({ ...state, origin: "default" });
     expect(html).toContain("The platform places and manages this app");
     expect(html).not.toContain("Make it for everyone");
-    expect(html).not.toContain("People with access");
+    expect(html).not.toContain("Who holds a role on it");
   });
 
   it("offers it for an installed app", () => {
     const html = renderAccess({ ...state, origin: "install" });
     expect(html).toContain("Make it for everyone");
-    expect(html).toContain("People with access");
+    expect(html).toContain("Who holds a role on it");
+    // A position by its name, a person given the role by theirs, and the
+    // role nobody holds as a row that says so.
+    expect(html).toContain("Ada (ada@acme.example)");
+    expect(html).toContain("Take back");
+    expect(html).toMatch(/Administrator of the app.*nobody/s);
   });
 
   it("lists each add-on with its own access", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    client.setQueryData(["admin", "people", "groups"], {
-      groups: [
-        { id: "g1", path: "gentian:tenant:acme:app:cloud", name: "app:cloud" },
-        { id: "g2", path: "gentian:tenant:acme:app:cloud-calendar", name: "app:cloud-calendar" },
-      ],
+    client.setQueryData(["admin", "access", "app", "cloud-calendar"], {
+      object: "app:acme/cloud-calendar",
+      bindings: [{ relation: "user", holders: [{ kind: "position", name: "user" }], grants: ["can_use"] }],
+      unheld: 0,
     });
     const html = renderToString(
       <QueryClientProvider client={client}>
@@ -184,13 +197,12 @@ describe("AccessPart", () => {
         />
       </QueryClientProvider>,
     );
-    expect(html).toContain("Each add-on has its own access");
+    expect(html).toContain("Each add-on is an app of its own");
     const calendar = html.slice(html.indexOf('data-addon="cloud-calendar"'), html.indexOf('data-addon="cloud-deck"'));
     const deck = html.slice(html.indexOf('data-addon="cloud-deck"'));
     expect(calendar).toContain("This add-on is for everyone");
-    expect(calendar).not.toContain("has no group yet");
+    expect(calendar).toContain("Held by");
     expect(deck).toContain("This add-on is not for everyone");
-    expect(deck).toContain("This add-on has no group yet");
   });
 });
 
