@@ -1084,6 +1084,8 @@
     "trustedDomain": "Domain",
     "trustedRemove": "Entfernen",
     "trustedRemoveConfirm": "{{domain}} nicht mehr vertrauen? Eine Anfrage, die damit beantwortet war, wartet wieder auf eine Antwort, und die App erreicht diese Hosts nicht mehr, sobald der Cluster das übernommen hat.",
+    "trustedAddWarning": "Wer einer Domain vertraut, lässt jede App dieses Tenants jeden Host darunter erreichen, jetzt und später, ohne dass jemand antwortet. Der Cluster sieht nur den Hostnamen, nie den Pfad: Wer github.com vertraut, öffnet ganz GitHub, auch zum Senden von Daten. Vertrauen Sie einer Domain nur, wenn alles darunter für die Apps des Tenants gedacht ist; sonst genehmigen Sie die Anfrage jeder App einzeln.",
+    "trustedAddConfirm": "{{domain}} vertrauen? Jede App dieses Tenants darf dann jeden Host unter {{domain}} erreichen, ganz und nicht nur einen Pfad, und Daten dorthin senden, ohne dass jemand antwortet.",
     "trustedAddLabel": "Einer Domain vertrauen",
     "trustedAddHint": "Eine Domain umfasst sich selbst und jeden Namen darunter: example.org umfasst auch api.example.org.",
     "trustedInvalid": "Eine Domain wird klein geschrieben und hat mindestens zwei Teile, wie example.org.",
