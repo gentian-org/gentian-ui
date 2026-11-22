@@ -287,7 +287,9 @@ function InstallDialog({
   const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
   const [everyone, setEveryone] = useState(false);
-  const [approving, setApproving] = useState(false);
+  // Pre-selected for the perimeter approver: installing and approving is
+  // one step for somebody who may do both. Unticking leaves the app waiting.
+  const [approving, setApproving] = useState(true);
 
   // What the build asks for beyond the tenant, as the director reads it from
   // the build itself. A read that fails takes nothing away: the app is
@@ -391,7 +393,8 @@ function InstallDialog({
  * nobody has answered, with its hosts and the profile's reason. The app does
  * not start until all of them are approved. The tenant's perimeter approver
  * can approve them with the install; anybody else is told the app will wait.
- * Never pre-selected: an approval is something a person says, not a default.
+ * Pre-selected: for a person who may do both, installing and approving is one
+ * step. Unticking it installs the app and leaves it waiting.
  */
 export function InstallAsks({
   asks,
