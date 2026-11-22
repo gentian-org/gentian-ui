@@ -1166,6 +1166,13 @@ export type PendingPrivilegeApproval = {
   declinedBy?: string | null;
   declinedAt?: string | null;
   declineReason?: string | null;
+  /** For an egress request by host: the hosts it names. */
+  hosts?: string[] | null;
+  /**
+   * For an egress request whose installation chooses its destinations: the
+   * approval names the hosts it opens. Absent from an older operator.
+   */
+  hostsAtApproval?: boolean | null;
 };
 
 /** One of the tenant's components as the cluster holds it. */

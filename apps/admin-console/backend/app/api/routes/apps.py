@@ -22,7 +22,7 @@ from typing import Literal
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, StrictBool, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 
 from app.core import director
 from app.core.auth import bearer_of, get_current_user
@@ -87,6 +87,10 @@ class PrivilegeApproval(BaseModel):
     reason: StrictStr | None = None
     # RFC 3339. Absent: the approval stands until somebody withdraws it.
     expiresAt: StrictStr | None = None
+    # For an egress request whose installation chooses its destinations: the
+    # hosts the approval opens. Whether each is a host is the director's
+    # answer.
+    hosts: list[StrictStr] | None = Field(default=None, max_length=64)
 
 
 @router.put("/privileges/{install}/{kind}/{name}")

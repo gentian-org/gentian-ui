@@ -1053,6 +1053,7 @@
     "outcomePositions": "Who gets <mono>{{app}}</mono> was committed as <mono>{{commit}}</mono>. It takes effect once the cluster has synced."
   },
   "perimeter": {
+    "outboundGrantedHosts": "Opens:",
     "outboundTitle": "Outbound",
     "outboundLead": "What the tenant's apps may reach beyond the tenant, and what they ask to: each egress an app's profile requests, waiting for a decision or granted, with who granted it and why. Approving one is the tenant's perimeter approver's.",
     "outboundReading": "Reading…",
@@ -1241,6 +1242,10 @@
     "notAdministrator": "Not in effect: no longer an administrator of {{tenant}}"
   },
   "approvals": {
+    "hostsLabel": "Hosts it may reach",
+    "hostsHint": "One per line, with a port where it is not 443: erp.example.org, files.example.org:8443. The app reaches these and no others.",
+    "hostsAtApproval": "Its installation chooses where it connects: the approval names the hosts.",
+    "hostsNamed": "Reaches:",
     "title": "Approvals",
     "lead": "What the apps of every tenant ask of the platform beyond the default posture, and who asked for it. Pod-security waivers and cluster roles are the security officer's: they weaken what protects the node, and every tenant on it. Egress is the perimeter approver's. What lets an app write through the cluster's API is break-glass's, and is approved from the command line.",
     "reading": "Reading…",

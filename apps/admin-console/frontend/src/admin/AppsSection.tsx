@@ -26,6 +26,7 @@ import {
   type DeclaredApp,
   type RetainedApp,
 } from "@/api/apps";
+import { parseHosts } from "@/api/approvals";
 import { ApiError } from "@/api/client";
 import { AppLeftovers } from "./AppLeftovers";
 import { AppPublicAddresses } from "./AppPublicAddresses";
@@ -802,6 +803,9 @@ export function PrivilegesPart({ row }: { row: AppRow }) {
   const approvedBy = new Map(
     (row.state?.pendingPrivilegeApprovals ?? []).map((p) => [p.privilege, p.approvedBy]),
   );
+  const hostsAtApproval = new Set(
+    (row.state?.pendingPrivilegeApprovals ?? []).filter((p) => p.hostsAtApproval).map((p) => p.privilege),
+  );
   const declined = new Map(
     (row.state?.pendingPrivilegeApprovals ?? []).filter((p) => p.declinedBy).map((p) => [p.privilege, p]),
   );
@@ -862,7 +866,7 @@ export function PrivilegesPart({ row }: { row: AppRow }) {
                       <div>{t("apps.privilegeWaitingDetail")}</div>
                     )}
                     {mayApprove(approvedBy.get(privilege), context) ? (
-                      <ApprovePrivilege install={install} privilege={privilege} />
+                      <ApprovePrivilege install={install} privilege={privilege} hostsAtApproval={hostsAtApproval.has(privilege)} />
                     ) : (approvedBy.get(privilege) ?? legacyApprover(privilege)) === "perimeter-approver" ? (
                       <div className="admin-console__hint">{t("apps.privilegeApproveNotYours")}</div>
                     ) : (
@@ -934,13 +938,28 @@ function legacyApprover(privilege: string): string {
  * commit through the director. The director decides whether this person may
  * and records them as the approver; its refusal is shown as it worded it.
  */
-function ApprovePrivilege({ install, privilege }: { install: string; privilege: string }) {
+function ApprovePrivilege({
+  install,
+  privilege,
+  hostsAtApproval,
+}: {
+  install: string;
+  privilege: string;
+  hostsAtApproval: boolean;
+}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const [hostsText, setHostsText] = useState("");
+  const hosts = parseHosts(hostsText);
+  const noHosts = hostsAtApproval && hosts.length === 0;
   const approve = useMutation({
-    mutationFn: () => approvePrivilege(install, privilege, reason.trim() ? { reason: reason.trim() } : {}),
+    mutationFn: () =>
+      approvePrivilege(install, privilege, {
+        ...(reason.trim() ? { reason: reason.trim() } : {}),
+        ...(hostsAtApproval ? { hosts } : {}),
+      }),
     onSuccess: () => {
       setOpen(false);
       setReason("");
@@ -963,9 +982,24 @@ function ApprovePrivilege({ install, privilege }: { install: string; privilege: 
     <form
       onSubmit={(event) => {
         event.preventDefault();
+        if (noHosts) return;
         approve.mutate();
       }}
     >
+      {hostsAtApproval ? (
+        <label className="admin-console__field">
+          <span>{t("approvals.hostsLabel")}</span>
+          <textarea
+            value={hostsText}
+            onChange={(event) => setHostsText(event.target.value)}
+            required
+            rows={3}
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <span className="admin-console__hint">{t("approvals.hostsHint")}</span>
+        </label>
+      ) : null}
       <label className="admin-console__field">
         <span>{t("apps.privilegeApproveReason")}</span>
         <textarea
@@ -982,7 +1016,7 @@ function ApprovePrivilege({ install, privilege }: { install: string; privilege: 
         </p>
       ) : null}
       <div className="admin-console__actions">
-        <button type="submit" className="admin-console__btn" disabled={approve.isPending}>
+        <button type="submit" className="admin-console__btn" disabled={approve.isPending || noHosts}>
           {t("apps.privilegeApproveConfirm", { privilege })}
         </button>
         <button
