@@ -32,9 +32,13 @@ describe("InstallAsks", () => {
     expect(html).toContain("addresses outside the tenant");
   });
 
-  it("offers the approval to the perimeter approver, and never pre-selected", () => {
-    const html = render({ asks, mayApprove: true, approving: false });
+  it("offers the approval to the perimeter approver", () => {
+    const html = render({ asks, mayApprove: true, approving: true });
     expect(html).toContain("Approve these requests with the install");
+  });
+
+  it("says the app waits once the approver unticks the approval", () => {
+    const html = render({ asks, mayApprove: true, approving: false });
     expect(html).not.toContain("checked");
     expect(html).toContain("Without your approval the app is installed and waits");
   });
