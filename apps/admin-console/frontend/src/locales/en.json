@@ -592,6 +592,7 @@
     "redirectingToSignIn": "Redirecting to sign in…"
   },
   "members": {
+    "directRolesMatrixHint": "Tick a box to give the person that role themselves, beside their positions; untick to take it. Changes apply at once. Grayed boxes come through a position or follow from another role; hover to see which.",
     "title": "Members",
     "lead": "Who is in this tenant, what they may open, and how they sign in.",
     "search": "Search",
@@ -1363,6 +1364,11 @@
     "changeFailed": "The change failed."
   },
   "access": {
+    "whatThePersonHolds": "What this person holds",
+    "permissionsInDetail": "Permissions in detail",
+    "gridFollows": "Follows from another role (Admin includes every role)",
+    "givenToThePerson": "Given to the person",
+    "throughAPosition": "Through a position",
     "title": "Access",
     "lead": "Who may do what in this tenant, and why. Read-only: people are given positions on People and Positions.",
     "show": "Show the access of",

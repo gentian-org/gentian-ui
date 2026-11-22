@@ -1686,19 +1686,19 @@ fieldset.admin-console__choices > legend {
    position it includes, told apart by color; the row's title says why. */
 .admin-console__access-role--own,
 .admin-console__access-role--inherited {
-  padding: 0.5rem 0.75rem;
-  border-left: 3px solid;
+  padding: 0.375rem 0.625rem;
+  border: 1px solid;
   border-radius: var(--gtn-r1);
 }
 
 .admin-console__access-role--own {
   background: var(--gtn-moss-bg);
-  border-left-color: var(--gtn-moss);
+  border-color: var(--gtn-moss);
 }
 
 .admin-console__access-role--inherited {
   background: var(--gtn-iris-bg);
-  border-left-color: var(--gtn-iris);
+  border-color: var(--gtn-iris);
 }
 
 .admin-console__access-legend {
@@ -1714,19 +1714,24 @@ fieldset.admin-console__choices > legend {
   display: inline-block;
   width: 0.875rem;
   height: 0.875rem;
-  border-radius: 2px;
-  border-left: 3px solid;
+  border: 1px solid;
+  border-radius: 3px;
   vertical-align: middle;
 }
 
 .admin-console__access-swatch--own {
   background: var(--gtn-moss-bg);
-  border-left-color: var(--gtn-moss);
+  border-color: var(--gtn-moss);
 }
 
 .admin-console__access-swatch--inherited {
   background: var(--gtn-iris-bg);
-  border-left-color: var(--gtn-iris);
+  border-color: var(--gtn-iris);
+}
+
+.admin-console__access-swatch--implied {
+  background: var(--gtn-paper-2);
+  border-color: var(--gtn-border-strong);
 }
 
 .admin-console__access-list {
@@ -1738,44 +1743,94 @@ fieldset.admin-console__choices > legend {
   margin: 0.125rem 0;
 }
 
-/* A position's roles as a grid: one row per app, add-ons indented. */
+/* Roles as a matrix: one row per app, add-ons indented, fixed columns. */
 .admin-console__grid-scroll {
   overflow-x: auto;
 }
 
-.admin-console__role-grid td,
-.admin-console__role-grid th {
+.admin-console__role-grid {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.admin-console__role-grid-thing {
+  width: 14rem;
+}
+
+.admin-console__role-grid-box {
+  width: 4.5rem;
+}
+
+.admin-console__role-grid th,
+.admin-console__role-grid td {
+  padding: 0.125rem 0.5rem;
   vertical-align: middle;
+  line-height: 1.5;
+}
+
+.admin-console__role-grid td:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-console__role-grid-center {
+  text-align: center;
 }
 
 .admin-console__grid-addon {
-  padding-left: 1.5rem;
+  padding-left: 1.25rem !important;
   color: var(--gtn-ink-3);
 }
 
+/* One box: a chip with the same outline all round, colored by how it is held. */
 .admin-console__grid-cell {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  margin: 0.125rem 0.5rem 0.125rem 0;
-  padding: 0.125rem 0.375rem;
-  border-left: 3px solid transparent;
-  border-radius: var(--gtn-r1);
+  margin: 0.0625rem 0.25rem 0.0625rem 0;
+  padding: 0 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  line-height: 1.4;
   cursor: pointer;
+}
+
+.admin-console__role-grid-center .admin-console__grid-cell {
+  margin: 0;
+}
+
+.admin-console__grid-cell input {
+  margin: 0;
 }
 
 .admin-console__grid-cell--own {
   background: var(--gtn-moss-bg);
-  border-left-color: var(--gtn-moss);
+  border-color: var(--gtn-moss);
 }
 
-.admin-console__grid-cell--inherited,
-.admin-console__grid-cell--implied {
+.admin-console__grid-cell--inherited {
   background: var(--gtn-iris-bg);
-  border-left-color: var(--gtn-iris);
+  border-color: var(--gtn-iris);
   cursor: help;
 }
 
 .admin-console__grid-cell--implied {
-  opacity: 0.7;
+  background: var(--gtn-paper-2);
+  border-color: var(--gtn-border-strong);
+  cursor: help;
+}
+
+/* The permissions behind the matrix, folded away until asked for. */
+.admin-console__access-details {
+  margin-top: 0.75rem;
+}
+
+.admin-console__access-details > summary {
+  cursor: pointer;
+  color: var(--gtn-ink-3);
+}
+
+.admin-console__access-detail-app {
+  margin: 0.5rem 0;
 }

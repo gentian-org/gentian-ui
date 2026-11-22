@@ -156,7 +156,9 @@ describe("AccessSection", () => {
     // What follows from the add-on is said on the base.
     expect(html).toContain("Follows from what they hold on the app this one belongs to, or on one of its add-ons:");
     // And the app they hold nothing on is named, not listed.
-    expect(html).toContain("No access to: wiki");
+    // What is held is a matrix; the permissions behind it are folded away.
+    expect(html).toContain("What this person holds");
+    expect(html).toContain("Permissions in detail");
     expect(html).not.toContain("group");
   });
 
