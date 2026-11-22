@@ -474,9 +474,9 @@ async def platform_role_members(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """Who holds each cluster role through its kernel Keycloak group, read by
-    the registrar under can_audit on the cluster. Read only: the groups are
-    managed in Keycloak."""
+    """The platform tenant's people who hold each cluster role by name, as
+    the registrar resolves the Cluster claim's role holders in the kernel
+    realm, under can_audit on the cluster. Read only."""
     return await director.forward_to(
         director.registrar_url(settings),
         "GET",

@@ -1002,7 +1002,7 @@ function ApprovePrivilege({ install, privilege }: { install: string; privilege: 
  * Uninstall: removes the app and keeps its data.
  *
  * A commit, like the install was. The app and its sign-in client go; its
- * files, database, object storage, stored credentials and access group stay.
+ * files, database, object storage, stored credentials and the roles people hold on it stay.
  * Destroying those is a different act with a different name, offered
  * elsewhere on this screen and only once the app is gone -- so taking an app
  * away never takes its data with it by accident.

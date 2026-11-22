@@ -10,7 +10,7 @@ const FILTER_FROM = 10;
  * A fixed-size box of rows, one per choice, each a checkbox followed by its
  * name, that scrolls once there are more rows than fit.
  *
- * Fixed rather than growing because a tenant gains a group with every app it
+ * Fixed rather than growing because a tenant gains choices with every app it
  * installs: a list that grew would push the rest of the form off the screen,
  * and a row of buttons stops fitting long before a tenant stops installing
  * apps. Rows rather than a pop-up, so what is chosen is in view while the rest
