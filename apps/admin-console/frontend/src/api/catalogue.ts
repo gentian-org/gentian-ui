@@ -62,19 +62,15 @@ export function fetchCatalogueEntries(source: string, tenant?: string) {
  * coordinate and digest, handed back as the listing gave them. The digest is
  * what pins the build; the director refuses a source that serves other bytes.
  *
- * `everyone` installs it for everyone: `defaultGrant: true` travels with the
- * install, and the cluster gives every member access once the app is ready.
- * Without it nothing is said about access, which is then given per person.
+ * `positions` says who gets it: the positions of the tenant whose holders use
+ * the app, stated in the install itself. An empty list gives it to no
+ * position; a role on it is then given per person.
  */
 export function installCatalogueEntry(
   entry: Pick<CatalogueEntry, "name" | "coordinate" | "digest">,
-  everyone = false,
+  positions: string[] = [],
 ) {
-  const body: { coordinate: string; digest: string; defaultGrant?: true } = {
-    coordinate: entry.coordinate,
-    digest: entry.digest,
-  };
-  if (everyone) body.defaultGrant = true;
+  const body = { coordinate: entry.coordinate, digest: entry.digest, positions };
   return apiFetch<AppWriteResult>(`/catalogue/apps/${encodeURIComponent(entry.name)}`, {
     method: "POST",
     body: JSON.stringify(body),

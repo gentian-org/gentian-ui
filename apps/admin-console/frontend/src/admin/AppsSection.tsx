@@ -7,6 +7,7 @@ import {
   fetchAdminContext,
   fetchAppStates,
   fetchIntegrationsOverview,
+  fetchPositions,
   type AdminContext,
   type AppState,
 } from "@/api/admin";
@@ -16,8 +17,9 @@ import {
   fetchRetainedApps,
   fetchTenantPrivileges,
   purgeAppData,
+  positionsOf,
   setAddonForEveryone,
-  setAppForEveryone,
+  setAppPositions,
   uninstallApp,
   type AppPurgeResult,
   type AppWriteResult,
@@ -27,6 +29,7 @@ import {
 import { ApiError } from "@/api/client";
 import { AppLeftovers } from "./AppLeftovers";
 import { AppPublicAddresses } from "./AppPublicAddresses";
+import { PositionChecklist, choosablePositions } from "./PositionChecklist";
 import { RoleHolders } from "./RoleHolders";
 import "./admin.css";
 import { formatDateTime } from "@/lib/format";
@@ -74,7 +77,13 @@ export function joinApps(declaredApps: DeclaredApp[], states: AppState[]): AppRo
 }
 
 /** What the director answered to the last write on this screen. */
-type Outcome = { kind: "access" | "uninstall"; app: string; everyone?: boolean; result: AppWriteResult };
+type Outcome = {
+  kind: "access" | "uninstall";
+  app: string;
+  everyone?: boolean;
+  positions?: string[];
+  result: AppWriteResult;
+};
 
 /**
  * The tenant's installed apps, and everything that is done to one after it
@@ -541,22 +550,31 @@ export function AccessPart({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { profile, declared } = row;
-  const everyone = Boolean(declared?.defaultGrant);
+  const positions = useQuery({ queryKey: ["admin", "positions"], queryFn: () => fetchPositions(), retry: false });
+  const own = positions.data?.positions ?? [];
+  const choosable = choosablePositions(own);
+  const given = positionsOf(declared);
+  // What is ticked and not yet saved; null while nothing was changed.
+  const [draft, setDraft] = useState<Set<string> | null>(null);
+  const selected = draft ?? new Set(given);
+  const next = choosable.filter((name) => selected.has(name));
+  const changed = draft !== null && [...next].sort().join() !== given.filter((n) => choosable.includes(n)).sort().join();
 
   const access = useMutation({
-    mutationFn: (next: boolean) => setAppForEveryone(profile, next),
-    onSuccess: (result, next) => {
-      onOutcome({ kind: "access", app: profile, everyone: next, result });
+    mutationFn: (names: string[]) => setAppPositions(profile, names),
+    onSuccess: (result, names) => {
+      setDraft(null);
+      onOutcome({ kind: "access", app: profile, positions: names, result });
       void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "declared"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "access"] });
     },
   });
 
-  function switchAccess() {
-    const question = everyone
-      ? t("apps.everyoneOffConfirm", { app: profile, tenant })
-      : t("apps.everyoneOnConfirm", { app: profile, tenant });
-    if (window.confirm(question)) access.mutate(!everyone);
+  function save() {
+    const taken = given.filter((name) => !next.includes(name));
+    if (taken.length === 0 || window.confirm(t("apps.positionsTakeConfirm", { app: profile, tenant, count: taken.length }))) {
+      access.mutate(next);
+    }
   }
 
   // A default component is the platform's: who may open it is decided for
@@ -575,17 +593,21 @@ export function AccessPart({
       <h3 className="admin-console__subsection-title">{t("apps.accessTitle")}</h3>
       {declared ? (
         <>
-          <p className="admin-console__lead">
-            {everyone ? t("apps.everyoneIsOn") : t("apps.everyoneIsOff")}
-          </p>
+          <p className="admin-console__hint">{t("apps.positionsLead")}</p>
+          <PositionChecklist
+            own={own}
+            selected={selected}
+            disabled={access.isPending || positions.isLoading}
+            onChange={setDraft}
+          />
           <div className="admin-console__actions">
             <button
               type="button"
-              className="admin-console__btn"
-              disabled={access.isPending}
-              onClick={switchAccess}
+              className="admin-console__btn admin-console__btn--primary"
+              disabled={!changed || access.isPending}
+              onClick={save}
             >
-              {everyone ? t("apps.everyoneSwitchOff") : t("apps.everyoneSwitchOn")}
+              {t("apps.positionsSave")}
             </button>
           </div>
           {access.isError ? <p className="admin-console__error">{messageOf(access.error)}</p> : null}
@@ -1041,9 +1063,16 @@ function UninstallPart({
  * one, the tenant already was as asked.
  */
 function OutcomeNotice({ outcome }: { outcome: Outcome }) {
-  const { app, result, kind, everyone } = outcome;
+  const { app, result, kind, everyone, positions } = outcome;
   const commit = (result.commit ?? "").slice(0, 8);
   const values = { app, commit, status: result.status };
+  if (kind === "access" && result.commit && positions) {
+    return (
+      <p className="admin-console__success">
+        <Trans i18nKey="apps.outcomePositions" values={values} components={mono} />
+      </p>
+    );
+  }
   if (kind === "access" && result.commit) {
     return (
       <p className="admin-console__success">
