@@ -1084,6 +1084,8 @@
     "trustedDomain": "Domain",
     "trustedRemove": "Remove",
     "trustedRemoveConfirm": "Stop trusting {{domain}}? A request it answered waits for an answer again, and the app can no longer reach those hosts once the cluster has taken that in.",
+    "trustedAddWarning": "Trusting a domain lets every app of this tenant reach every host under it, now and later, without anybody answering. The cluster sees only the host name, never the path: trusting github.com opens all of GitHub, including sending data to it. Trust a domain only when everything under it is meant for the tenant's apps; otherwise approve each app's request by itself.",
+    "trustedAddConfirm": "Trust {{domain}}? Every app of this tenant may then reach every host under {{domain}}, all of it and not only one path, and send data there, without anybody answering.",
     "trustedAddLabel": "Trust a domain",
     "trustedAddHint": "A domain covers itself and every name under it: example.org also covers api.example.org.",
     "trustedInvalid": "A domain is written in lower case with at least two labels, as in example.org.",

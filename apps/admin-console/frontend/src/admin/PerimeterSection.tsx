@@ -344,10 +344,12 @@ export function TrustedDomainsView({
           onSubmit={(event) => {
             event.preventDefault();
             if (!DOMAIN.test(domain)) return;
+            if (!window.confirm(t("perimeter.trustedAddConfirm", { domain }))) return;
             remove.reset();
             add.mutate(domain);
           }}
         >
+          <p className="admin-console__warning">{t("perimeter.trustedAddWarning")}</p>
           <div className="admin-console__field">
             <label className="admin-console__label" htmlFor="trusted-domain">
               <span className="admin-console__label-text">{t("perimeter.trustedAddLabel")}</span>
