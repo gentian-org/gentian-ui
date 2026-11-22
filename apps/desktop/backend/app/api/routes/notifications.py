@@ -19,7 +19,7 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 class NotificationAudienceResponse(BaseModel):
     scope: Literal["platform", "tenant"]
     tenant: str | None = None
-    groups: list[str] = Field(default_factory=list)
+    positions: list[str] = Field(default_factory=list)
 
 
 class InboxNotificationResponse(BaseModel):
@@ -46,7 +46,7 @@ def _inbox_response(notification: Any) -> InboxNotificationResponse:
         audience=NotificationAudienceResponse(
             scope=notification.audience.scope,
             tenant=notification.audience.tenant,
-            groups=notification.audience.groups,
+            positions=notification.audience.positions,
         ),
         publisher=notification.publisher,
         tenant=notification.tenant,

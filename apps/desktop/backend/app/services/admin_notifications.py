@@ -15,11 +15,16 @@ CLOUDEVENT_TYPE = "gentian.admin.notification.published.v1"
 class NotificationAudience:
     scope: AudienceScope
     tenant: str | None = None
-    groups: list[str] = field(default_factory=list)
+    # The tenant's positions the notice is for, by name.
+    positions: list[str] = field(default_factory=list)
     # People the notice is for by name: each entry is a person's subject,
     # username or email address. Kept inside the stored audience, so a row
     # written before there were any reads as naming nobody.
     people: list[str] = field(default_factory=list)
+    # What a row stored while audiences named groups still carries. Never
+    # written; read only so that such a notice is shown to nobody rather than
+    # to everybody (notification_audience.notification_visible_to_user).
+    groups: list[str] = field(default_factory=list)
 
 
 @dataclass

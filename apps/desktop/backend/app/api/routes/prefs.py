@@ -11,7 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from app.api.routes.tiles import _bearer, _catalog
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
-from app.core.gentian_groups import user_is_platform_admin, user_is_tenant_admin
+from app.core.rights import user_is_platform_admin, user_is_tenant_admin
 from app.core.tenant import resolve_user_context
 from app.services.shell_prefs_store import (
     ALLOWED_BACKGROUND_MIMES,

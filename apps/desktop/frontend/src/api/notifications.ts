@@ -5,7 +5,7 @@ export type NotificationSeverity = "info" | "warning" | "critical";
 export type NotificationAudience = {
   scope: "platform" | "tenant";
   tenant?: string | null;
-  groups: string[];
+  positions: string[];
 };
 
 export type AdminNotification = {

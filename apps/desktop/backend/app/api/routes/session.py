@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
-from app.core.gentian_groups import user_is_platform_admin, user_is_tenant_admin
+from app.core.rights import user_is_platform_admin, user_is_tenant_admin
 from app.core.tenant import resolve_user_context
 
 router = APIRouter(prefix="/session", tags=["session"])
@@ -33,8 +33,7 @@ async def get_me(
     usher's projected catalog now, which the shell reads separately, and
     this process holds no Kubernetes credential at all (gentian-os S7A.6).
 
-    No groups either: the usher answers what the caller holds on this
-    tenant, and a group in a token promotes nobody.
+    What the caller holds is the usher's answer for this tenant.
     """
     return {
         "sub": user.get("sub"),
@@ -42,7 +41,7 @@ async def get_me(
         "name": user.get("name"),
         "email": user.get("email"),
         "tenant": resolve_user_context(user, settings),
-        "groups": [],
+        "positions": user.get("positions") or [],
         "relations": user.get("relations") or {},
         "isPlatformAdmin": settings.auth_disabled or user_is_platform_admin(user),
         "isTenantAdmin": settings.auth_disabled or user_is_tenant_admin(user),

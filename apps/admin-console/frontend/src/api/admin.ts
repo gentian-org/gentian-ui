@@ -50,149 +50,12 @@ export type AdminContext = {
   canAuditCluster?: boolean;
 };
 
-export type AdminMember = {
-  id: string;
-  username: string;
-  email?: string | null;
-  inviteEmail?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  enabled: boolean;
-  groups: string[];
-  totpConfigured?: boolean;
-  totpPending?: boolean;
-};
-
-export type AdminGroup = {
-  id: string;
-  name: string;
-  path: string;
-  memberCount: number;
-  gentianOdooModules?: string[];
-  gentianOdooGroupRoles?: string[];
-  /** The tenant provisioned this app rather than only installing it, so adding
-   *  a member ticks it by default. */
-  defaultGrant?: boolean;
-};
-
 function tenantQuery(tenant?: string) {
   return tenant ? `?tenant=${encodeURIComponent(tenant)}` : "";
 }
 
 export function fetchAdminContext(tenant?: string) {
   return apiFetch<AdminContext>(`/admin/context${tenantQuery(tenant)}`);
-}
-
-export function fetchMembers(tenant?: string) {
-  return apiFetch<AdminMember[]>(`/admin/members${tenantQuery(tenant)}`);
-}
-
-export function createMember(
-  body: {
-    email: string;
-    firstName?: string;
-    lastName?: string;
-    enabled?: boolean;
-  },
-  tenant?: string,
-) {
-  return apiFetch<AdminMember>(`/admin/members${tenantQuery(tenant)}`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export function inviteMember(
-  body: {
-    email: string;
-    firstName?: string;
-    lastName?: string;
-    inviteEmail?: string;
-    groupIds?: string[];
-    requireTotp?: boolean;
-    settingsTemplateId?: string;
-  },
-  tenant?: string,
-) {
-  return apiFetch<AdminMember>(`/admin/members/invite${tenantQuery(tenant)}`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export function resetMemberPassword(id: string, tenant?: string) {
-  return apiFetch<{ deliveryEmail: string }>(`/admin/members/${id}/reset-password${tenantQuery(tenant)}`, {
-    method: "POST",
-  });
-}
-
-export function enableMemberTotp(id: string, sendEmail = true, tenant?: string) {
-  return apiFetch<AdminMember>(`/admin/members/${id}/totp/enable${tenantQuery(tenant)}`, {
-    method: "POST",
-    body: JSON.stringify({ sendEmail }),
-  });
-}
-
-export function removeMemberTotp(id: string, tenant?: string) {
-  return apiFetch<AdminMember>(`/admin/members/${id}/totp${tenantQuery(tenant)}`, {
-    method: "DELETE",
-  });
-}
-
-export function updateMember(
-  id: string,
-  body: {
-    email?: string;
-    firstName?: string;
-    lastName?: string;
-    enabled?: boolean;
-    inviteEmail?: string | null;
-  },
-  tenant?: string,
-) {
-  return apiFetch<AdminMember>(`/admin/members/${id}${tenantQuery(tenant)}`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
-}
-
-export function deleteMember(id: string, tenant?: string) {
-  return apiFetch<void>(`/admin/members/${id}${tenantQuery(tenant)}`, {
-    method: "DELETE",
-  });
-}
-
-export function updateMemberGroups(id: string, groupIds: string[], tenant?: string) {
-  return apiFetch<AdminMember>(`/admin/members/${id}/groups${tenantQuery(tenant)}`, {
-    method: "PUT",
-    body: JSON.stringify({ groupIds }),
-  });
-}
-
-export function createGroup(name: string, tenant?: string) {
-  return apiFetch<AdminGroup>(`/admin/groups${tenantQuery(tenant)}`, {
-    method: "POST",
-    body: JSON.stringify({ name }),
-  });
-}
-
-export function updateGroup(
-  id: string,
-  name: string,
-  gentianOdooModules?: string[],
-  gentianOdooGroupRoles?: string[],
-  tenant?: string,
-) {
-  return apiFetch<AdminGroup>(`/admin/groups/${id}${tenantQuery(tenant)}`, {
-    method: "PATCH",
-    body: JSON.stringify({ name, gentianOdooModules, gentianOdooGroupRoles }),
-  });
-}
-
-export function deleteGroup(id: string, tenant?: string) {
-  return apiFetch<void>(`/admin/groups/${id}${tenantQuery(tenant)}`, {
-    method: "DELETE",
-  });
 }
 
 export type SecurityPolicies = {
@@ -343,7 +206,8 @@ export type NotificationSeverity = "info" | "warning" | "critical";
 export type NotificationAudience = {
   scope: "platform" | "tenant";
   tenant?: string | null;
-  groups: string[];
+  /** The tenant's positions the notice is for, by name; none is every person. */
+  positions?: string[];
 };
 
 export type AdminNotification = {
@@ -1119,8 +983,6 @@ export type Person = {
    * looks identical otherwise, which is how a failed invitation goes unseen.
    */
   pending: boolean;
-  /** Group paths, without the leading slash. Filled only by the single read. */
-  groups?: string[];
   /**
    * The address they have a mailbox under on the cluster's own mail server.
    * Absent when they have none there. Removing somebody who has one comes
@@ -1152,18 +1014,6 @@ export type RemovedMailbox = {
   /** The archived mailbox was asked to be deleted and is not gone yet. */
   deletionRequested?: boolean;
   deletionBy?: string;
-};
-
-export type PersonGroup = {
-  id: string;
-  /** The path without the leading slash, which is the name the graph uses. */
-  path: string;
-  name: string;
-  /** Made by an administrator here, and so the only kind that can be deleted. */
-  custom?: boolean;
-  /** An app the tenant provisioned for everybody rather than only installed:
-   *  ticked when a person is added, so it is opt-out for new people. */
-  defaultGrant?: boolean;
 };
 
 export type SettingsTemplate = { id: string; name: string };
@@ -1198,7 +1048,6 @@ export type Invitation = {
   lastName?: string;
   requireTotp?: boolean;
   settingsTemplate?: string;
-  groups: string[];
   /** The positions the person holds from the start, beside user. */
   positions?: string[];
 };
@@ -1215,10 +1064,6 @@ export function fetchPeople(opts?: { search?: string; tenant?: string }) {
 
 export function fetchPerson(id: string, tenant?: string) {
   return apiFetch<Person>(`/admin/people/${encodeURIComponent(id)}${tenantQuery(tenant)}`);
-}
-
-export function fetchPersonGroups(tenant?: string) {
-  return apiFetch<{ tenant: string; groups: PersonGroup[] }>(`/admin/groups${tenantQuery(tenant)}`);
 }
 
 export function fetchIdentitySettings(tenant?: string) {
@@ -1291,24 +1136,6 @@ export function requireTotp(person: string, mail: boolean, tenant?: string) {
 
 export function removeTotp(person: string, tenant?: string) {
   return postAction<{ totpRequired: boolean }>("/admin/people/remove-totp", { person }, tenant);
-}
-
-export function createCustomGroup(name: string, tenant?: string) {
-  return postAction<PersonGroup>("/admin/groups/create", { name }, tenant);
-}
-
-export function renameCustomGroup(group: string, name: string, tenant?: string) {
-  return postAction<PersonGroup>("/admin/groups/rename", { group, name }, tenant);
-}
-
-export function deleteCustomGroup(group: string, tenant?: string) {
-  return postAction<{ deleted: boolean }>("/admin/groups/delete", { group }, tenant);
-}
-
-export function fetchGroupMembers(group: string, tenant?: string) {
-  const params = new URLSearchParams({ group });
-  if (tenant) params.set("tenant", tenant);
-  return apiFetch<{ group: string; people: Person[] }>(`/admin/groups/members?${params.toString()}`);
 }
 
 export function fetchSettingsTemplates(tenant?: string) {

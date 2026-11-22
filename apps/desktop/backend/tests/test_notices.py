@@ -23,13 +23,13 @@ ADA = {
     "sub": "8f1c",
     "preferred_username": "ada",
     "email": "ada@example.org",
-    "groups": [f"gentian:tenant:{TENANT}:members"],
+    "positions": ["user"],
 }
 GRACE = {
     "sub": "77aa",
     "preferred_username": "grace",
     "email": "grace@example.org",
-    "groups": [f"gentian:tenant:{TENANT}:members"],
+    "positions": ["user"],
 }
 
 
@@ -139,15 +139,15 @@ async def test_notice_for_a_person_reaches_that_inbox_only():
     assert stored.audience.scope == "tenant"
     assert stored.audience.tenant == TENANT
     assert stored.audience.people == ["ada@example.org"]
-    assert stored.audience.groups == []
-    # Every member is not who it was for.
+    assert stored.audience.positions == []
+    # Every person is not who it was for.
     assert await store.list_inbox(GRACE, user_tenant=TENANT) == []
 
 
-async def test_notice_for_a_group_and_a_person():
+async def test_notice_for_a_position_and_a_person():
     body = _body(
         people=["grace"],
-        groups=[f"gentian:tenant:{TENANT}:admins"],
+        positions=["tenant-administrator"],
         severity="warning",
         linkUrl="https://files.example.org/export/1",
         linkLabel="Open",
@@ -156,7 +156,7 @@ async def test_notice_for_a_group_and_a_person():
     assert response.status_code == 201
 
     store = SqlNotificationStore()
-    admin = {"sub": "a1", "groups": [f"gentian:tenant:{TENANT}:admins"]}
+    admin = {"sub": "a1", "positions": ["tenant-administrator", "user"]}
     assert len(await store.list_inbox(admin, user_tenant=TENANT)) == 1
     (seen,) = await store.list_inbox(GRACE, user_tenant=TENANT)
     assert seen.link_url == "https://files.example.org/export/1"
@@ -168,7 +168,7 @@ async def test_notice_for_a_group_and_a_person():
 @pytest.mark.parametrize(
     "over",
     [
-        {"people": [], "groups": []},
+        {"people": [], "positions": []},
         {"people": []},
         {"title": ""},
         {"title": "   "},
@@ -181,7 +181,9 @@ async def test_notice_for_a_group_and_a_person():
         {"people": ["x"] * 51},
         {"people": [""]},
         {"people": ["x" * 321]},
-        {"groups": [f"gentian:tenant:{TENANT}:g{i}" for i in range(21)]},
+        {"positions": [f"p{i}" for i in range(21)]},
+        # Groups are not an audience any more.
+        {"groups": [f"gentian:tenant:{TENANT}:admins"]},
         {"linkUrl": "http://example.org/"},
         {"linkUrl": "javascript:alert(1)"},
         {"linkUrl": "https://"},
@@ -204,16 +206,17 @@ def test_missing_title_or_publisher_is_refused():
 
 
 @pytest.mark.parametrize(
-    "group",
+    "position",
     [
-        "gentian:tenant:other:members",
-        "gentian:platform:admin",
-        "members",
-        f"gentian:tenant:{TENANT}x:members",
+        f"gentian:tenant:{TENANT}:members",
+        "Sales Manager",
+        "other/sales",
+        "-sales",
+        "x" * 64,
     ],
 )
-async def test_group_outside_this_tenant_is_refused(group):
-    response = _client().post(URL, json=_body(groups=[group]), headers=_auth())
+async def test_what_is_not_a_positions_name_is_refused(position):
+    response = _client().post(URL, json=_body(positions=[position]), headers=_auth())
     assert response.status_code == 422
     assert await SqlNotificationStore().list_for_tenant(TENANT) == []
 
@@ -224,7 +227,7 @@ def test_limits_are_inclusive():
         body="x" * 4000,
         publisher="x" * 200,
         people=["x" * 320] * 50,
-        groups=[f"gentian:tenant:{TENANT}:g{i}" for i in range(20)],
+        positions=[f"p{i}" for i in range(20)],
         linkLabel="x" * 100,
     )
     assert _client().post(URL, json=body, headers=_auth()).status_code == 201

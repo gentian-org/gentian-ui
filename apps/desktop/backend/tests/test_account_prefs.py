@@ -302,19 +302,21 @@ def _auth_settings() -> Settings:
 
 
 def test_tenant_admins_may_manage_settings_templates():
-    """Settings templates are a tenant-admin tool, and the portal JWT carries
-    entitlements as `groups`, never as `roles`. Asserted against the guard with
-    auth enabled: the CRUD test above runs with auth disabled, where the guard
-    returns early and proves nothing."""
+    """Settings templates are a tenant-admin tool: the usher's verdict
+    decides. Asserted against the guard with auth enabled: the CRUD test above
+    runs with auth disabled, where the guard returns early and proves nothing."""
     settings = _auth_settings()
 
-    prefs_routes.require_admin({"groups": ["gentian:tenant:demo:admins"]}, settings)  # no raise
-    prefs_routes.require_admin({"groups": ["gentian:platform:admin"]}, settings)  # no raise
+    prefs_routes.require_admin({"tenant": "demo", "relations": {"can_administer": True}}, settings)  # no raise
 
-    member = {"groups": ["gentian:tenant:demo:members"]}
-    with pytest.raises(HTTPException) as exc:
-        prefs_routes.require_admin(member, settings)
-    assert exc.value.status_code == 403
+    for member in (
+        {"tenant": "demo", "relations": {"can_administer": False}},
+        # A group in a token decides nothing.
+        {"groups": ["gentian:tenant:demo:admins"]},
+    ):
+        with pytest.raises(HTTPException) as exc:
+            prefs_routes.require_admin(member, settings)
+        assert exc.value.status_code == 403
 
 
 # A desktop on the tile's site, and one on another.
