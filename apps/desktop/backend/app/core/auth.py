@@ -24,7 +24,8 @@ _DEV_USER = {
     "name": "Dev User",
     "email": "dev@gentian.local",
     "tenant": "demo",
-    "groups": ["gentian:tenant:demo:admins", "gentian:tenant:demo:members"],
+    "relations": {"can_administer": True, "can_enter": True},
+    "positions": ["tenant-administrator", "user"],
 }
 
 
@@ -35,8 +36,7 @@ async def get_signed_in_user(
     nothing on the caller's rights, such as a tile's picture, so that it
     costs no round trip to the usher.
 
-    The relations are empty rather than absent: a route that asks them all
-    the same is refused, not sent down the older path that reads groups.
+    The relations are empty: a route that asks them all the same is refused.
     """
     settings = get_settings()
     if settings.auth_disabled:
@@ -44,6 +44,7 @@ async def get_signed_in_user(
     claims = await _verified(credentials)
     claims["tenant"] = settings.gentian_tenant or ""
     claims["relations"] = {}
+    claims["positions"] = []
     return claims
 
 
@@ -57,38 +58,40 @@ async def get_current_user(
 
     # Behind the edge, and only behind the edge.
     #
-    # The token names no groups and this process holds no credential to look
-    # any up. The usher answers what the caller holds on this desktop's
-    # tenant, with the caller's own token, and every decision the shell makes
-    # reads that answer.
-    #
-    # There used to be a second path for a browser-OIDC session, which enriched
-    # the claims from userinfo and then, if that still named no groups, asked
-    # Keycloak's ADMIN API what groups the person was in. That last step is a
-    # credential this service should not hold, and the path it served -- the
-    # desktop's own login page -- is gone with it.
+    # The token says nothing of what the caller holds and this process holds
+    # no credential to look it up. The usher answers what the caller holds on
+    # this desktop's tenant, with the caller's own token, and every decision
+    # the shell makes reads that answer.
     claims["tenant"] = settings.gentian_tenant or ""
-    claims["relations"] = await fetch_tenant_relations(credentials.credentials, settings)
+    held = await fetch_tenant_rights(credentials.credentials, settings)
+    claims["relations"] = held["relations"]
+    claims["positions"] = held["positions"]
     return claims
 
 
-async def fetch_tenant_relations(token: str, settings: Settings) -> dict[str, bool]:
-    """What the caller holds on this desktop's tenant, as the usher says.
+async def fetch_tenant_rights(token: str, settings: Settings) -> dict[str, Any]:
+    """What the caller holds on this desktop's tenant, as the usher says: the
+    relations, and the names of the tenant's positions.
 
     Forwarded with the caller's own token: OpenFGA decides, the usher asks
     it, this process relays. An usher that cannot be reached leaves the
     caller with nothing, which is the safe direction.
     """
+    nothing: dict[str, Any] = {"relations": {}, "positions": []}
     if not settings.usher_url or not settings.gentian_tenant:
-        return {}
+        return nothing
     url = f"{settings.usher_url.rstrip('/')}/v1/tenants/{settings.gentian_tenant}/me"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(url, headers={"Authorization": f"Bearer {token}"})
     except httpx.HTTPError:
-        return {}
+        return nothing
     if resp.status_code != 200:
-        return {}
+        return nothing
     body = resp.json()
     relations = body.get("relations") if isinstance(body, dict) else None
-    return {k: bool(v) for k, v in relations.items()} if isinstance(relations, dict) else {}
+    positions = body.get("positions") if isinstance(body, dict) else None
+    return {
+        "relations": {k: bool(v) for k, v in relations.items()} if isinstance(relations, dict) else {},
+        "positions": [p for p in positions if isinstance(p, str)] if isinstance(positions, list) else [],
+    }

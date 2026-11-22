@@ -239,7 +239,6 @@ function InviteCard({
         lastName: lastName.trim() || undefined,
         requireTotp: requireTotpOnAccept,
         settingsTemplate: template || undefined,
-        groups: [],
         positions: chosen,
       }),
     onSuccess: (result) => {

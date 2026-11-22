@@ -200,10 +200,10 @@ def verifying(monkeypatch, usher):
 
     async def relations(token, settings):
         seen["token"] = token
-        return seen["relations"]
+        return {"relations": seen["relations"], "positions": []}
 
     monkeypatch.setattr(runtime_auth, "decode_token", decode)
-    monkeypatch.setattr(auth, "fetch_tenant_relations", relations)
+    monkeypatch.setattr(auth, "fetch_tenant_rights", relations)
 
     app = FastAPI()
     app.include_router(tiles.router, prefix="/api/v1")
@@ -256,8 +256,8 @@ def test_a_picture_is_served_without_asking_what_the_person_holds(verifying):
 @pytest.mark.anyio
 async def test_a_signed_in_user_holds_nothing_until_asked(monkeypatch):
     """Without the usher's answer a route deciding on relations refuses: they
-    are empty, not absent, so nothing falls back to reading groups."""
-    from app.core.gentian_groups import user_is_platform_admin, user_is_tenant_admin
+    are empty, and a group in the token is not read."""
+    from app.core.rights import user_is_platform_admin, user_is_tenant_admin
 
     process = _settings(OIDC_ISSUER="https://id.desk.gentian.org/auth/realms/acme")
     monkeypatch.setattr(auth, "get_settings", lambda: process)

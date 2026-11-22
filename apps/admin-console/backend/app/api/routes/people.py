@@ -1,4 +1,4 @@
-"""People and groups.
+"""People.
 
 Every one of these is relayed to the registrar with the caller's own token.
 This component holds no Keycloak credential and never has: the registrar holds
@@ -120,32 +120,11 @@ async def person(
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """One person and the groups they hold, within this tenant's scope."""
+    """One person, within this tenant's scope."""
     return await _relay(
         settings,
         "GET",
         f"/v1/tenants/{_tenant(settings, tenant)}/people/{person_id}",
-        bearer_of(credentials),
-    )
-
-
-@router.get("/groups")
-async def groups(
-    tenant: str | None = Query(default=None),
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    """The groups this tenant may put somebody in.
-
-    A tenant with its own realm sees its realm's groups. A tenant that shares
-    the kernel realm sees only its own subtree — the registrar filters, because
-    in a shared realm the credential is no longer the boundary.
-    """
-    return await _relay(
-        settings,
-        "GET",
-        f"/v1/tenants/{_tenant(settings, tenant)}/groups",
         bearer_of(credentials),
     )
 
@@ -196,37 +175,9 @@ async def invite(
                 "lastName",
                 "requireTotp",
                 "settingsTemplate",
-                "groups",
                 "positions",
             ),
         ),
-    )
-
-
-@router.post("/people/membership")
-async def set_membership(
-    payload: dict = Body(...),
-    tenant: str | None = Query(default=None),
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    """Add or remove one person from one group.
-
-    `member` is required and not defaulted. A request that did not say which
-    way is ambiguous, and choosing for the caller is a change nobody asked
-    for.
-    """
-    return await _relay(
-        settings,
-        "POST",
-        f"/v1/tenants/{_tenant(settings, tenant)}/actions/set-membership",
-        bearer_of(credentials),
-        json_body={
-            "person": payload.get("person", ""),
-            "group": payload.get("group", ""),
-            "member": payload.get("member"),
-        },
     )
 
 
@@ -289,7 +240,7 @@ async def take(
     )
 
 
-# Editing somebody, and the groups and templates the member screens use. Each
+# Editing somebody, and the templates the member screens use. Each
 # is the registrar's action of the same name; the fields relayed are listed so
 # nothing else a caller sends travels on.
 
@@ -415,64 +366,6 @@ async def remove_totp(
     """Delete somebody's authenticators, for a lost device."""
     return await _action(
         settings, tenant, credentials, "remove-totp", _fields(payload, ("person",))
-    )
-
-
-@router.post("/groups/create")
-async def create_group(
-    payload: dict = Body(...),
-    tenant: str | None = Query(default=None),
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    """Make a custom group; the registrar places it in the tenant's subtree."""
-    return await _action(settings, tenant, credentials, "create-group", _fields(payload, ("name",)))
-
-
-@router.post("/groups/delete")
-async def delete_group(
-    payload: dict = Body(...),
-    tenant: str | None = Query(default=None),
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    """Delete a custom group. The platform's own groups are refused."""
-    return await _action(
-        settings, tenant, credentials, "delete-group", _fields(payload, ("group",))
-    )
-
-
-@router.post("/groups/rename")
-async def rename_group(
-    payload: dict = Body(...),
-    tenant: str | None = Query(default=None),
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    """Rename a custom group. The platform's own groups keep their names."""
-    return await _action(
-        settings, tenant, credentials, "rename-group", _fields(payload, ("group", "name"))
-    )
-
-
-@router.get("/groups/members")
-async def group_members(
-    group: str = Query(...),
-    tenant: str | None = Query(default=None),
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    """Who is in one group."""
-    return await _relay(
-        settings,
-        "GET",
-        f"/v1/tenants/{_tenant(settings, tenant)}/group-members",
-        bearer_of(credentials),
-        params={"group": group},
     )
 
 

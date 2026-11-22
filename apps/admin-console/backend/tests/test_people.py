@@ -1,4 +1,4 @@
-"""People and groups, relayed to the registrar.
+"""People, relayed to the registrar.
 
 What these assert is the relay's shape rather than Keycloak's behavior: the
 registrar is the one that holds a credential and decides, and a test here that
@@ -95,7 +95,7 @@ def test_inviting_is_an_action_not_a_commit(monkeypatch):
     )
     r = TestClient(_app(_settings())).post(
         "/api/v1/admin/people/invite",
-        json={"email": "ada@example.com", "groups": ["gentian:tenant:platform:members"]},
+        json={"email": "ada@example.com", "positions": ["sales-manager"]},
         headers={"Authorization": "Bearer t"},
     )
     assert r.status_code == 202
@@ -105,7 +105,7 @@ def test_inviting_is_an_action_not_a_commit(monkeypatch):
     assert seen["url"] == "http://registrar.test:8080/v1/tenants/platform/actions/invite-person"
     assert seen["json"] == {
         "email": "ada@example.com",
-        "groups": ["gentian:tenant:platform:members"],
+        "positions": ["sales-manager"],
     }
 
 
@@ -132,18 +132,6 @@ def test_an_invitation_whose_mail_failed_still_reports_the_person(monkeypatch):
     assert r.json()["person"]["id"] == "new"
 
 
-def test_membership_says_which_way(monkeypatch):
-    seen: dict = {}
-    _fake_client(monkeypatch, {"member": False}, seen)
-    TestClient(_app(_settings())).post(
-        "/api/v1/admin/people/membership",
-        json={"person": "u1", "group": "gentian:tenant:platform:members", "member": False},
-        headers={"Authorization": "Bearer t"},
-    )
-    assert seen["url"] == "http://registrar.test:8080/v1/tenants/platform/actions/set-membership"
-    assert seen["json"]["member"] is False
-
-
 def test_the_realms_settings_for_the_member_screens_are_read(monkeypatch):
     seen: dict = {}
     _fake_client(monkeypatch, {"realm": "platform", "loginDomain": "example.test"}, seen)
@@ -154,19 +142,24 @@ def test_the_realms_settings_for_the_member_screens_are_read(monkeypatch):
     assert seen["url"] == "http://registrar.test:8080/v1/tenants/platform/identity"
 
 
-def test_groups_are_served_rather_than_refused(monkeypatch):
-    """They used to answer 501 for the Notifications screen.
-
-    The entry said a group-scoped audience waited for the group list to have
-    an owner. It has one now, so the entry is gone and this route answers.
-    """
+def test_groups_are_not_served(monkeypatch):
+    """What a person holds is a position or a role, read and changed through
+    the assignments routes. No route lists, makes or fills a group, and a
+    group named in an invitation does not travel on."""
     seen: dict = {}
-    _fake_client(monkeypatch, {"groups": [{"path": "gentian:tenant:platform:admins"}]}, seen)
-    r = TestClient(_app(_settings())).get(
-        "/api/v1/admin/groups", headers={"Authorization": "Bearer t"}
-    )
-    assert r.status_code == 200
-    assert seen["url"] == "http://registrar.test:8080/v1/tenants/platform/groups"
+    _fake_client(monkeypatch, {}, seen)
+    client = TestClient(_app(_settings()))
+    for method, path in [
+        ("GET", "/api/v1/admin/groups"),
+        ("GET", "/api/v1/admin/groups/members?group=g"),
+        ("POST", "/api/v1/admin/groups/create"),
+        ("POST", "/api/v1/admin/groups/delete"),
+        ("POST", "/api/v1/admin/groups/rename"),
+        ("POST", "/api/v1/admin/people/membership"),
+    ]:
+        r = client.request(method, path, json={}, headers={"Authorization": "Bearer t"})
+        assert r.status_code in (404, 405), (path, r.status_code)
+    assert seen == {}
 
 
 def test_a_realm_with_no_credential_is_relayed_as_the_platforms_problem(monkeypatch):
@@ -203,6 +196,7 @@ def test_an_invitation_relays_the_whole_form(monkeypatch):
             "lastName": "Doe",
             "requireTotp": True,
             "settingsTemplate": "t1",
+            "positions": ["p"],
             "groups": ["g"],
             "smuggled": "nope",
         },
@@ -217,7 +211,7 @@ def test_an_invitation_relays_the_whole_form(monkeypatch):
         "lastName": "Doe",
         "requireTotp": True,
         "settingsTemplate": "t1",
-        "groups": ["g"],
+        "positions": ["p"],
     }
 
 
@@ -242,13 +236,6 @@ def test_member_actions_reach_their_registrar_actions(monkeypatch):
         ("/api/v1/admin/people/reset-password", "send-password-reset", {"person": "u1"}),
         ("/api/v1/admin/people/require-totp", "require-totp", {"person": "u1", "mail": True}),
         ("/api/v1/admin/people/remove-totp", "remove-totp", {"person": "u1"}),
-        ("/api/v1/admin/groups/create", "create-group", {"name": "sales"}),
-        ("/api/v1/admin/groups/delete", "delete-group", {"group": "gentian:tenant:x:sales"}),
-        (
-            "/api/v1/admin/groups/rename",
-            "rename-group",
-            {"group": "gentian:tenant:x:sales", "name": "field"},
-        ),
     ]:
         seen: dict = {}
         _fake_client(monkeypatch, {}, seen)
@@ -262,11 +249,10 @@ def test_member_actions_reach_their_registrar_actions(monkeypatch):
         assert seen["json"] == body
 
 
-def test_one_person_a_groups_members_and_the_templates_are_the_registrars(monkeypatch):
+def test_one_person_and_the_templates_are_the_registrars(monkeypatch):
     client = TestClient(_app(_settings()))
     for path, upstream, params in [
         ("/api/v1/admin/people/u1", "people/u1", None),
-        ("/api/v1/admin/groups/members?group=g", "group-members", {"group": "g"}),
         ("/api/v1/admin/templates", "templates", None),
     ]:
         seen: dict = {}
@@ -288,7 +274,6 @@ def test_without_a_registrar_it_says_so_and_asks_nobody(monkeypatch):
     client = TestClient(_app(_settings(REGISTRAR_URL=None)))
     for r in (
         client.get("/api/v1/admin/people", headers={"Authorization": "Bearer t"}),
-        client.get("/api/v1/admin/groups", headers={"Authorization": "Bearer t"}),
         client.post(
             "/api/v1/admin/people/remove",
             json={"person": "u1"},

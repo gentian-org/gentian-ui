@@ -2,11 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   fetchNotifications,
-  fetchPersonGroups,
+  fetchPositions,
   publishNotification,
-  type PersonGroup,
+  SHIPPED_POSITIONS,
+  type NotificationAudience,
   type NotificationSeverity,
+  type TenantPosition,
 } from "@/api/admin";
+import { positionLabel } from "./positionLabels";
 import "./admin.css";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -30,20 +33,19 @@ function formatPublishedAt(epochMs: number) {
   return formatDateTime(epochMs);
 }
 
-function audienceLabel(
-  audience: { scope: string; tenant?: string | null; groups: string[] },
-  t: TFunction,
-) {
+/**
+ * Who a published notice was for. A notice that names no position is for
+ * every person of the tenant; one that names positions is for their holders.
+ */
+export function audienceLabel(audience: NotificationAudience, own: TenantPosition[], t: TFunction) {
   if (audience.scope === "platform") {
     return t("notifications.platformAllUsers");
   }
-  if (audience.groups.length === 1) {
-    return audience.groups[0];
+  const positions = audience.positions ?? [];
+  if (positions.length === 0) {
+    return t("notifications.everyPerson");
   }
-  if (audience.groups.length > 1) {
-    return `${audience.groups.length} groups`;
-  }
-  return `Tenant ${audience.tenant ?? "members"}`;
+  return positions.map((name) => positionLabel(t, name, own)).join(", ");
 }
 
 export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsSectionProps) {
@@ -54,15 +56,15 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
   const [body, setBody] = useState("");
   const [severity, setSeverity] = useState<NotificationSeverity>("info");
   const [scope, setScope] = useState<"tenant" | "platform">("tenant");
-  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkLabel, setLinkLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const groupsQuery = useQuery({
-    queryKey: ["admin", "groups", tenant],
-    queryFn: () => fetchPersonGroups(tenant),
+  const positionsQuery = useQuery({
+    queryKey: ["admin", "positions"],
+    queryFn: () => fetchPositions(),
   });
 
   const notificationsQuery = useQuery({
@@ -80,7 +82,7 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
           audience: {
             scope,
             tenant: scope === "tenant" ? tenant : undefined,
-            groups: scope === "tenant" ? selectedGroups : [],
+            positions: scope === "tenant" ? selected : [],
           },
           linkUrl: linkUrl || undefined,
           linkLabel: linkLabel || undefined,
@@ -94,7 +96,7 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
       setBody("");
       setLinkUrl("");
       setLinkLabel("");
-      setSelectedGroups([]);
+      setSelected([]);
       await queryClient.invalidateQueries({ queryKey: ["admin", "notifications", tenant] });
       await queryClient.invalidateQueries({ queryKey: ["notifications", "inbox"] });
     },
@@ -104,25 +106,21 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
     },
   });
 
-  // The groups answer names its tenant beside the list. This screen read it as
-  // a bare list, which is what an earlier endpoint returned, and crashed on
-  // the first render.
-  const groups = groupsQuery.data?.groups ?? [];
+  const own = positionsQuery.data?.positions ?? [];
+  // The three every tenant has, then the tenant's own.
+  const choices = [...SHIPPED_POSITIONS, ...own.map((p) => p.name)];
   const notifications = notificationsQuery.data ?? [];
   // A list that could not be read is said to be unreadable. Drawn as empty it
-  // would say nothing was ever published, or that the tenant has no groups.
+  // would say nothing was ever published, or that the tenant has no positions
+  // of its own.
   const loadError = notificationsQuery.isError
     ? t("notifications.couldNotLoad", { reason: (notificationsQuery.error as Error).message })
-    : groupsQuery.isError
-      ? t("notifications.groupsCouldNotLoad", { reason: (groupsQuery.error as Error).message })
+    : positionsQuery.isError
+      ? t("notifications.positionsCouldNotLoad", { reason: (positionsQuery.error as Error).message })
       : null;
 
-  const toggleGroup = (group: PersonGroup) => {
-    setSelectedGroups((current) =>
-      current.includes(group.name)
-        ? current.filter((name) => name !== group.name)
-        : [...current, group.name],
-    );
+  const toggle = (name: string) => {
+    setSelected((current) => (current.includes(name) ? current.filter((n) => n !== name) : [...current, name]));
   };
 
   return (
@@ -194,7 +192,7 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
               value={scope}
               onChange={(event) => setScope(event.target.value as "tenant" | "platform")}
             >
-              <option value="tenant">{t("notifications.tenantGroups")}</option>
+              <option value="tenant">{t("notifications.tenantPositions")}</option>
               {isPlatformAdmin && <option value="platform">{t("notifications.platformAllUsers")}</option>}
             </select>
           </label>
@@ -202,16 +200,12 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
 
         {scope === "tenant" && (
           <fieldset className="admin-console__fieldset">
-            <legend>{t("notifications.targetGroupsEmptyAllTenant")}</legend>
+            <legend>{t("notifications.targetPositionsEmptyAllTenant")}</legend>
             <div className="admin-console__checkbox-grid">
-              {groups.map((group) => (
-                <label key={group.id} className="admin-console__checkbox">
-                  <input
-                    type="checkbox"
-                    checked={selectedGroups.includes(group.name)}
-                    onChange={() => toggleGroup(group)}
-                  />
-                  <span>{group.name}</span>
+              {choices.map((name) => (
+                <label key={name} className="admin-console__checkbox">
+                  <input type="checkbox" checked={selected.includes(name)} onChange={() => toggle(name)} />
+                  <span>{positionLabel(t, name, own)}</span>
                 </label>
               ))}
             </div>
@@ -264,7 +258,7 @@ export function NotificationsSection({ tenant, isPlatformAdmin }: NotificationsS
                   </div>
                 </td>
                 <td>{notification.severity}</td>
-                <td>{audienceLabel(notification.audience, t)}</td>
+                <td>{audienceLabel(notification.audience, own, t)}</td>
                 <td>{notification.publisher}</td>
               </tr>
             ))}
