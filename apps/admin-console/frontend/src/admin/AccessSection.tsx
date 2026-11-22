@@ -15,10 +15,13 @@ import {
   type Holder,
   type ObjectAccess,
   type Person,
+  type PersonAccess,
   type PositionHold,
   type TenantPosition,
 } from "@/api/admin";
 import { allPositions, positionLabel, roleLabel } from "@/admin/positionLabels";
+import { personCell } from "./personMatrix";
+import { RoleMatrix, useMatrixRows, type Cell, type GridRow } from "./RoleMatrix";
 
 /**
  * Who may do what in the tenant, and why.
@@ -159,6 +162,52 @@ function useOwnPositions() {
   return query.data?.positions ?? [];
 }
 
+/**
+ * What a person holds, as a matrix: green where it was given to them
+ * themselves, iris where it comes through a position (the title names it),
+ * gray where it follows from another role. With `onToggle` the roles given to
+ * the person themselves can be ticked and unticked.
+ */
+export function PersonRoleMatrix({
+  access,
+  own,
+  onToggle,
+  busy,
+}: {
+  access: PersonAccess | undefined;
+  own: TenantPosition[];
+  onToggle?: (app: string, role: string, checked: boolean) => void;
+  busy?: boolean;
+}) {
+  const { t } = useTranslation();
+  const { rows, declaredOf, loading } = useMatrixRows();
+  if (loading) return <p className="admin-console__loading">{t("access.reading")}</p>;
+  const cell = (row: GridRow, role: string): Cell => {
+    const state = personCell(access, row.profile, role);
+    if (state.kind === "inherited") {
+      const names = state.positions.map((p) => positionLabel(t, p, own)).join(", ");
+      return { kind: state.kind, title: t("access.throughPosition", { position: names }) };
+    }
+    if (state.kind === "implied") return { kind: state.kind, title: t("access.gridFollows") };
+    if (state.kind === "own") return { kind: state.kind, title: t("access.givenDirectly") };
+    return { kind: state.kind };
+  };
+  return (
+    <RoleMatrix
+      rows={rows}
+      declaredOf={declaredOf}
+      cell={cell}
+      busy={busy}
+      onToggle={onToggle ? (row, role, checked) => onToggle(row.profile, role, checked) : undefined}
+      legend={{
+        own: t("access.givenToThePerson"),
+        inherited: t("access.throughAPosition"),
+        implied: t("access.gridFollows"),
+      }}
+    />
+  );
+}
+
 export function PersonAccessView({ id }: { id: string }) {
   const { t } = useTranslation();
   const query = useQuery({
@@ -171,7 +220,6 @@ export function PersonAccessView({ id }: { id: string }) {
   if (query.isError || !query.data) return <p className="admin-console__error">{t("access.cannotBeRead")}</p>;
   const access = query.data;
   const withAccess = access.apps.filter(holdsAnything);
-  const without = access.apps.filter((app) => !holdsAnything(app));
   return (
     <>
       <h3 className="admin-console__subsection-title">{t("access.positionsOfPerson")}</h3>
@@ -195,51 +243,29 @@ export function PersonAccessView({ id }: { id: string }) {
         </ul>
       )}
 
-      <h3 className="admin-console__subsection-title">{t("access.inTheTenant")}</h3>
-      {holdsAnything(access.onTenant) ? (
-        <ObjectRights access={access.onTenant} own={own} />
-      ) : (
-        <p className="admin-console__empty">{t("access.nothingInTheTenant")}</p>
-      )}
+      <h3 className="admin-console__subsection-title">{t("access.whatThePersonHolds")}</h3>
+      <PersonRoleMatrix access={access} own={own} />
 
-      <h3 className="admin-console__subsection-title">{t("access.inTheApps")}</h3>
-      {withAccess.length === 0 ? (
-        <p className="admin-console__empty">{t("access.noApps")}</p>
-      ) : (
-        <div className="admin-console__table-wrap">
-          <table className="admin-console__table">
-            <thead>
-              <tr>
-                <th>{t("access.app")}</th>
-                <th>{t("access.holds")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {withAccess.map((app) => (
-                <tr key={app.object}>
-                  <td>
-                    <code>{app.app}</code>
-                  </td>
-                  <td>
-                    <ObjectRights access={app} own={own} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      {without.length > 0 ? (
-        <p className="admin-console__hint">
-          {t("access.noAccessTo")}{" "}
-          {without.map((app, i) => (
-            <span key={app.object}>
-              {i > 0 ? ", " : ""}
+      <details className="admin-console__access-details">
+        <summary>{t("access.permissionsInDetail")}</summary>
+        <h4 className="admin-console__subsection-title">{t("access.inTheTenant")}</h4>
+        {holdsAnything(access.onTenant) ? (
+          <ObjectRights access={access.onTenant} own={own} />
+        ) : (
+          <p className="admin-console__empty">{t("access.nothingInTheTenant")}</p>
+        )}
+        <h4 className="admin-console__subsection-title">{t("access.inTheApps")}</h4>
+        {withAccess.length === 0 ? (
+          <p className="admin-console__empty">{t("access.noApps")}</p>
+        ) : (
+          withAccess.map((app) => (
+            <div key={app.object} className="admin-console__access-detail-app">
               <code>{app.app}</code>
-            </span>
-          ))}
-        </p>
-      ) : null}
+              <ObjectRights access={app} own={own} />
+            </div>
+          ))
+        )}
+      </details>
     </>
   );
 }

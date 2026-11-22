@@ -3,12 +3,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   deleteArchivedMailbox,
-  fetchAppAccess,
-  fetchAppStates,
   fetchAssignments,
   fetchIdentitySettings,
   fetchPeople,
   fetchPerson,
+  fetchPersonAccess,
   fetchPositions,
   fetchRemovedMailboxes,
   fetchSettingsTemplates,
@@ -27,7 +26,8 @@ import {
 import { toggleDraft, withDraft, withoutKey, type MembershipDraft } from "./membershipDraft";
 import { Checklist, type ChecklistItem } from "./Checklist";
 import { allPositions, roleLabel } from "./positionLabels";
-import { rolesOffered } from "./RoleHolders";
+import { PersonRoleMatrix } from "./AccessSection";
+import { useMatrixRows } from "./RoleMatrix";
 import "./admin.css";
 import { formatDate } from "@/lib/format";
 
@@ -459,92 +459,50 @@ function DirectRoles({
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
-  const [on, setOn] = useState("");
-  const [role, setRole] = useState("user");
-  const apps = useQuery({ queryKey: ["admin", "apps", "status"], queryFn: fetchAppStates });
-  const profiles = (apps.data?.apps ?? [])
-    .flatMap((app) => [app.profile, ...(app.addons ?? []).map((addon) => addon.profile)])
-    .sort((a, b) => a.localeCompare(b));
+  const own = useQuery({ queryKey: ["admin", "positions"], queryFn: () => fetchPositions() });
   const access = useQuery({
-    queryKey: ["admin", "access", "app", on],
-    queryFn: () => fetchAppAccess(on),
-    enabled: on !== "",
+    queryKey: ["admin", "access", "person", person],
+    queryFn: () => fetchPersonAccess(person),
     retry: false,
   });
-  const offered = on ? rolesOffered(access.data?.bindings ?? []) : ["user", "admin"];
+  const { rows } = useMatrixRows();
   const change = useMutation({
     mutationFn: (input: { assignment: Assignment; holds: boolean }) => setAssignment({ person, ...input }),
     onSuccess: onChanged,
   });
-  const direct = directRoles(assignments);
+  const shown = new Set(rows.map((row) => row.profile));
+  // A role given on something the matrix has no row for: an app no longer
+  // installed, or one the platform places.
+  const strays = directRoles(assignments).filter((a) => !shown.has(a.app ?? ""));
 
   return (
     <div className="admin-console__subsection">
       <h4 className="admin-console__subsection-title">{t("members.directRoles")}</h4>
-      <p className="admin-console__hint">{t("members.directRolesHint")}</p>
-      {direct.length === 0 ? (
-        <p className="admin-console__empty">{t("members.noDirectRoles")}</p>
-      ) : (
-        <table className="admin-console__table">
-          <tbody>
-            {direct.map((a) => (
-              <tr key={`${a.app ?? ""}/${a.role}`}>
-                <td>{roleLabel(t, a.app ? "app" : "tenant", a.role ?? "")}</td>
-                <td>{a.app ? <code>{a.app}</code> : t("members.onTheTenant")}</td>
-                <td>
-                  <button
-                    className="admin-console__btn admin-console__btn--quiet"
-                    type="button"
-                    disabled={change.isPending}
-                    onClick={() => change.mutate({ assignment: a, holds: false })}
-                  >
-                    {t("members.takeRole")}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <div className="admin-console__field-row">
-        <label className="admin-console__field">
-          <span className="admin-console__label-text">{t("members.roleOn")}</span>
-          <select
-            value={on}
-            onChange={(e) => {
-              setOn(e.target.value);
-              setRole("user");
-            }}
-          >
-            <option value="">{t("members.theTenant")}</option>
-            {profiles.map((profile) => (
-              <option key={profile} value={profile}>
-                {profile}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="admin-console__field">
-          <span className="admin-console__label-text">{t("members.role")}</span>
-          <select value={role} onChange={(e) => setRole(e.target.value)}>
-            {offered.map((r) => (
-              <option key={r} value={r}>
-                {roleLabel(t, on ? "app" : "tenant", r)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="admin-console__field">
-          <button
-            className="admin-console__btn"
-            type="button"
-            disabled={change.isPending}
-            onClick={() => change.mutate({ assignment: on ? { app: on, role } : { role }, holds: true })}
-          >
-            {t("members.giveRole")}
-          </button>
-        </div>
-      </div>
+      <p className="admin-console__hint">{t("members.directRolesMatrixHint")}</p>
+      {access.isError ? <p className="admin-console__error">{t("access.cannotBeRead")}</p> : null}
+      <PersonRoleMatrix
+        access={access.data}
+        own={own.data?.positions ?? []}
+        busy={change.isPending || access.isLoading}
+        onToggle={(app, role, holds) => change.mutate({ assignment: app ? { app, role } : { role }, holds })}
+      />
+      {strays.length > 0 ? (
+        <ul className="admin-console__access-list">
+          {strays.map((a) => (
+            <li key={`${a.app ?? ""}/${a.role}`}>
+              {roleLabel(t, "app", a.role ?? "")} <code>{a.app}</code>{" "}
+              <button
+                className="admin-console__btn admin-console__btn--quiet"
+                type="button"
+                disabled={change.isPending}
+                onClick={() => change.mutate({ assignment: a, holds: false })}
+              >
+                {t("members.takeRole")}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {change.isError && <p className="admin-console__error">{String(change.error)}</p>}
       {change.data?.totpRequired ? <p className="admin-console__hint">{t("members.secondFactorRequired")}</p> : null}
       {change.data?.warning ? <p className="admin-console__error">{change.data.warning}</p> : null}

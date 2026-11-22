@@ -592,6 +592,7 @@
     "plan": "Tarif"
   },
   "members": {
+    "directRolesMatrixHint": "Ein Häkchen gibt der Person die Rolle selbst, neben ihren Positionen; ohne Häkchen wird sie genommen. Änderungen gelten sofort. Graue Felder kommen über eine Position oder folgen aus einer anderen Rolle; mit der Maus darauf zeigen, um zu sehen, woher.",
     "title": "Mitglieder",
     "lead": "Wer in diesem Mandanten ist, was er öffnen darf und wie er sich anmeldet.",
     "search": "Suche",
@@ -1363,6 +1364,11 @@
     "changeFailed": "Die Änderung ist fehlgeschlagen."
   },
   "access": {
+    "whatThePersonHolds": "Was diese Person hält",
+    "permissionsInDetail": "Berechtigungen im Detail",
+    "gridFollows": "Folgt aus einer anderen Rolle (Admin schließt jede Rolle ein)",
+    "givenToThePerson": "Der Person gegeben",
+    "throughAPosition": "Über eine Position",
     "title": "Zugriff",
     "lead": "Wer in diesem Mandanten was darf, und warum. Nur lesend: Positionen werden unter Personen und Positionen vergeben.",
     "show": "Zugriff anzeigen von",
