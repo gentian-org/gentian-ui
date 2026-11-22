@@ -15,6 +15,7 @@ import {
   type Holder,
   type ObjectAccess,
   type Person,
+  type PositionHold,
   type TenantPosition,
 } from "@/api/admin";
 import { allPositions, positionLabel, roleLabel } from "@/admin/positionLabels";
@@ -273,6 +274,46 @@ function HolderBadge({ holder, own, people }: { holder: Holder; own: TenantPosit
 }
 
 /**
+ * Where an inherited role comes from, as a sentence: the position holding it,
+ * and the ones it comes through on the way. Empty for a role given to the
+ * position itself.
+ */
+export function inheritedFrom(t: TFunction, through: string[] | undefined, label: (name: string) => string) {
+  if (!through || through.length === 0) return "";
+  const from = label(through[through.length - 1]);
+  if (through.length === 1) return t("access.inheritedFromPosition", { position: from });
+  const via = through.slice(0, -1).map(label).join(" → ");
+  return t("access.inheritedFromPositionVia", { position: from, via });
+}
+
+/** One role a position holds, colored by whether it was given to it or inherited. */
+function PositionHoldRow({ hold, own }: { hold: PositionHold; own: ReturnType<typeof useOwnPositions> }) {
+  const { t } = useTranslation();
+  const from = inheritedFrom(t, hold.through, (name) => positionLabel(t, name, own));
+  const inherited = from !== "";
+  return (
+    <div
+      className={`admin-console__access-role admin-console__access-role--${inherited ? "inherited" : "own"}`}
+      title={inherited ? from : t("access.givenToThisPosition")}
+    >
+      <div>
+        <strong>{roleLabel(t, typeOf(hold.object), hold.role)}</strong>{" "}
+        {hold.declared ? <span className="admin-console__badge">{t("access.declaredRole")}</span> : null}{" "}
+        {hold.app ? (
+          <span className="admin-console__hint">
+            {t("access.onApp")} <code>{hold.app}</code>
+          </span>
+        ) : (
+          <span className="admin-console__hint">{t("access.onTheTenant")}</span>
+        )}
+        {inherited ? <span className="admin-console__hint admin-console__access-from"> · {from}</span> : null}
+      </div>
+      <Permissions object={hold.object} names={hold.carries} />
+    </div>
+  );
+}
+
+/**
  * What one position is. `withoutHolders` leaves out who holds it, for a screen
  * that lists them itself.
  */
@@ -288,30 +329,28 @@ export function PositionAccessView({ name, withoutHolders }: { name: string; wit
   if (query.isLoading) return <p className="admin-console__loading">{t("access.reading")}</p>;
   if (query.isError || !query.data) return <p className="admin-console__error">{t("access.cannotBeRead")}</p>;
   const position = query.data;
+  const inherited = position.inherited ?? [];
   const description = own.find((p) => p.name === name)?.description;
   return (
     <>
       {description ? <p className="admin-console__lead">{description}</p> : null}
       <h3 className="admin-console__subsection-title">{t("access.whatThePositionHolds")}</h3>
-      {position.holds.length === 0 ? (
+      {position.holds.length === 0 && inherited.length === 0 ? (
         <p className="admin-console__empty">{t("access.positionHoldsNothing")}</p>
       ) : (
-        position.holds.map((hold) => (
-          <div key={`${hold.object}/${hold.role}`} className="admin-console__access-role">
-            <div>
-              <strong>{roleLabel(t, typeOf(hold.object), hold.role)}</strong>{" "}
-              {hold.declared ? <span className="admin-console__badge">{t("access.declaredRole")}</span> : null}{" "}
-              {hold.app ? (
-                <span className="admin-console__hint">
-                  {t("access.onApp")} <code>{hold.app}</code>
-                </span>
-              ) : (
-                <span className="admin-console__hint">{t("access.onTheTenant")}</span>
-              )}
-            </div>
-            <Permissions object={hold.object} names={hold.carries} />
-          </div>
-        ))
+        <>
+          {inherited.length > 0 ? (
+            <p className="admin-console__access-legend">
+              <span className="admin-console__access-swatch admin-console__access-swatch--own" />{" "}
+              {t("access.givenToThisPosition")}{" "}
+              <span className="admin-console__access-swatch admin-console__access-swatch--inherited" />{" "}
+              {t("access.inheritedFromIncluded")}
+            </p>
+          ) : null}
+          {[...position.holds, ...inherited].map((hold) => (
+            <PositionHoldRow key={`${hold.object}/${hold.role}`} hold={hold} own={own} />
+          ))}
+        </>
       )}
       {position.includes.length > 0 ? (
         <p>

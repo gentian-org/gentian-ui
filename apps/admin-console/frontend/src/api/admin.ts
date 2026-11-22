@@ -504,12 +504,22 @@ export type PersonAccess = {
 };
 
 /** One role a position holds on one object. */
-export type PositionHold = { object: string; app?: string; role: string; declared?: boolean; carries: string[] };
+export type PositionHold = {
+  object: string;
+  app?: string;
+  role: string;
+  declared?: boolean;
+  carries: string[];
+  /** On an inherited role: the positions it comes through, the last one holding it. */
+  through?: string[];
+};
 
 export type PositionAccess = {
   tenant: string;
   position: string;
   holds: PositionHold[];
+  /** The roles held through included positions. Absent from an older platform. */
+  inherited?: PositionHold[];
   /** The positions whose roles its holders hold too. */
   includes: string[];
   /** The positions whose holders hold this one. */

@@ -1682,6 +1682,53 @@ fieldset.admin-console__choices > legend {
   margin-bottom: 0;
 }
 
+/* A position's roles: the ones given to it, and the ones it inherits from a
+   position it includes, told apart by color; the row's title says why. */
+.admin-console__access-role--own,
+.admin-console__access-role--inherited {
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid;
+  border-radius: var(--gtn-r1);
+}
+
+.admin-console__access-role--own {
+  background: var(--gtn-moss-bg);
+  border-left-color: var(--gtn-moss);
+}
+
+.admin-console__access-role--inherited {
+  background: var(--gtn-iris-bg);
+  border-left-color: var(--gtn-iris);
+}
+
+.admin-console__access-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.75rem;
+  margin: 0 0 0.75rem;
+  color: var(--gtn-ink-3);
+}
+
+.admin-console__access-swatch {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 2px;
+  border-left: 3px solid;
+  vertical-align: middle;
+}
+
+.admin-console__access-swatch--own {
+  background: var(--gtn-moss-bg);
+  border-left-color: var(--gtn-moss);
+}
+
+.admin-console__access-swatch--inherited {
+  background: var(--gtn-iris-bg);
+  border-left-color: var(--gtn-iris);
+}
+
 .admin-console__access-list {
   margin: 0.25rem 0 0;
   padding-left: 1.25rem;

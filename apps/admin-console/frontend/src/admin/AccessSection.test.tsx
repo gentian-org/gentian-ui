@@ -236,6 +236,43 @@ describe("AccessSection", () => {
     expect(without).not.toContain("Ada (ada@acme.example)");
   });
 
+  it("shows the roles a position inherits, colored apart, each naming where it comes from", () => {
+    const access: PositionAccess = {
+      tenant: "acme",
+      position: "executive",
+      holds: [],
+      inherited: [
+        {
+          object: "app:acme/shop-sales",
+          app: "shop-sales",
+          role: "manager",
+          declared: true,
+          carries: ["can_use"],
+          through: ["sales-manager"],
+        },
+        { object: "tenant:acme", role: "user", carries: ["can_enter"], through: ["sales-manager", "user"] },
+      ],
+      includes: ["sales-manager"],
+      includedIn: [],
+      holders: [],
+    };
+    const seed: [unknown[], unknown][] = [
+      [["admin", "access", "position", "executive"], access],
+      [["admin", "positions"], positions],
+      [["admin", "people", ""], people],
+    ];
+    const markup = render(<PositionAccessView name="executive" />, seed);
+    const html = text(markup);
+    // Holding nothing itself is not holding nothing.
+    expect(html).not.toContain("This position holds no role itself");
+    expect(html).toContain("Inherited from an included position");
+    expect(markup).toContain("admin-console__access-role--inherited");
+    expect(markup).not.toContain("admin-console__access-role--own");
+    expect(html).toMatch(/manager\s+Declared by the app\s+on the app\s+shop-sales\s+· from Sales manager/);
+    expect(html).toContain("· from User, through Sales manager");
+    expect(markup).toContain('title="from User, through Sales manager"');
+  });
+
   it("shows who holds which role on an app and what it may do", () => {
     const view: AuthorizationView = {
       object: "app:acme/shop-sales",
