@@ -391,3 +391,66 @@ def test_deleting_an_archived_mailbox_is_the_registrars_action(monkeypatch):
     # The id and nothing else: which mailbox it is, is the registrar's record's
     # to say, not the request's.
     assert seen["json"] == {"mailbox": "platform-abc12"}
+
+
+def test_a_position_is_given_and_taken_at_the_registrar(monkeypatch):
+    """Who holds what is the registrar's to change. The console relays an
+    assignment's own fields and nothing else, and the answer as it came."""
+    client = TestClient(_app(_settings()))
+    base = "http://registrar.test:8080/v1/tenants"
+    auth = {"Authorization": "Bearer t"}
+
+    seen: dict = {}
+    _fake_client(monkeypatch, {"changed": True, "totpRequired": True}, seen)
+    r = client.post(
+        "/api/v1/admin/people/give",
+        json={"person": "u1", "position": "tenant-administrator", "tenant": "other", "holds": True},
+        headers=auth,
+    )
+    assert r.status_code == 200 and r.json()["totpRequired"] is True
+    assert seen["url"] == f"{base}/platform/actions/give"
+    assert seen["json"] == {"person": "u1", "position": "tenant-administrator"}
+
+    seen = {}
+    _fake_client(monkeypatch, {"changed": True}, seen)
+    client.post(
+        "/api/v1/admin/people/take?tenant=acme",
+        json={"person": "u1", "app": "wiki", "role": "user"},
+        headers=auth,
+    )
+    assert seen["url"] == f"{base}/acme/actions/take"
+    assert seen["json"] == {"person": "u1", "app": "wiki", "role": "user"}
+
+    # The last administrator keeps the role: the refusal is the registrar's
+    # and reaches the caller as it is.
+    seen = {}
+    _fake_client(monkeypatch, {"error": "the tenant's last administrator"}, seen, status=409)
+    r = client.post(
+        "/api/v1/admin/people/take",
+        json={"person": "u1", "position": "tenant-administrator"},
+        headers=auth,
+    )
+    assert r.status_code == 409 and "last administrator" in r.json()["error"]
+
+
+def test_what_a_person_was_given_is_read_at_the_registrar(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"assignments": [{"position": "user"}]}, seen)
+    client = TestClient(_app(_settings()))
+    r = client.get("/api/v1/admin/people/u1/assignments", headers={"Authorization": "Bearer t"})
+    assert r.json()["assignments"] == [{"position": "user"}]
+    assert seen["url"] == "http://registrar.test:8080/v1/tenants/platform/people/u1/assignments"
+    # An id cannot leave its path segment.
+    client.get("/api/v1/admin/people/a%3Fb/assignments", headers={"Authorization": "Bearer t"})
+    assert seen["url"] == "http://registrar.test:8080/v1/tenants/platform/people/a%3Fb/assignments"
+
+
+def test_an_invitation_carries_its_positions(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"person": {"id": "new"}, "mailed": True}, seen, status=202)
+    TestClient(_app(_settings())).post(
+        "/api/v1/admin/people/invite",
+        json={"email": "ada@example.com", "positions": ["sales-manager"]},
+        headers={"Authorization": "Bearer t"},
+    )
+    assert seen["json"]["positions"] == ["sales-manager"]

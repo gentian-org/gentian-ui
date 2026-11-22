@@ -42,6 +42,7 @@ def _fake_client(monkeypatch, body, seen: dict, status: int = 200):
 
         async def request(self, method, url, params=None, json=None, headers=None):
             seen["method"], seen["url"] = method, url
+            seen["json"] = json
             return httpx.Response(status, json=body, request=httpx.Request(method, url))
 
     monkeypatch.setattr(director.httpx, "AsyncClient", FakeClient)
@@ -401,7 +402,7 @@ def test_the_usage_statistics_needs_a_token_before_anything_is_asked(monkeypatch
 
 
 def test_the_access_page_reads_the_usher_and_relays_its_answer(monkeypatch):
-    """What a person, a group or an app holds is the usher's answer, under
+    """What a person, a position or an app holds is the usher's answer, under
     `can_manage_users`. The console asks about the right tenant and passes the
     answer through, a refusal included."""
     client = TestClient(_app(_settings()))
@@ -410,8 +411,12 @@ def test_the_access_page_reads_the_usher_and_relays_its_answer(monkeypatch):
         ("/api/v1/admin/access/people/u1", f"{base}/platform/access/people/u1"),
         ("/api/v1/admin/access/people/u1?tenant=acme", f"{base}/acme/access/people/u1"),
         (
-            "/api/v1/admin/access/groups?group=gentian:tenant:platform:sales",
-            f"{base}/platform/access/groups",
+            "/api/v1/admin/access/positions/sales-manager",
+            f"{base}/platform/access/positions/sales-manager",
+        ),
+        (
+            "/api/v1/admin/access/positions/sales-manager?tenant=acme",
+            f"{base}/acme/access/positions/sales-manager",
         ),
         ("/api/v1/admin/access/apps/notes", f"{base}/platform/access/apps/notes"),
     ]:
@@ -434,3 +439,58 @@ def test_a_persons_id_cannot_leave_its_path_segment(monkeypatch):
     client = TestClient(_app(_settings()))
     client.get("/api/v1/admin/access/people/a%3Fb", headers={"Authorization": "Bearer t"})
     assert seen["url"] == "http://usher.test:8090/v1/tenants/platform/access/people/a%3Fb"
+
+
+def test_a_positions_name_cannot_leave_its_path_segment(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {}, seen)
+    client = TestClient(_app(_settings()))
+    client.get("/api/v1/admin/access/positions/a%3Fb", headers={"Authorization": "Bearer t"})
+    assert seen["url"] == "http://usher.test:8090/v1/tenants/platform/access/positions/a%3Fb"
+
+
+def test_positions_are_declared_at_the_director(monkeypatch):
+    """What a position is, is the director's to commit. The console relays the
+    fields a declaration has and nothing else a caller sends, and hands the
+    director's answer back, a refusal included."""
+    client = TestClient(_app(_settings()))
+    base = "http://director.test:8080/v1/tenants"
+    auth = {"Authorization": "Bearer t"}
+
+    seen: dict = {}
+    _fake_client(monkeypatch, {"shipped": ["user"], "positions": []}, seen)
+    r = client.get("/api/v1/admin/positions", headers=auth)
+    assert r.status_code == 200 and r.json()["shipped"] == ["user"]
+    assert (seen["method"], seen["url"]) == ("GET", f"{base}/platform/positions")
+
+    seen = {}
+    _fake_client(monkeypatch, {"status": "committed"}, seen, status=202)
+    r = client.put(
+        "/api/v1/admin/positions/sales-manager?tenant=acme",
+        json={
+            "title": "Sales manager",
+            "includes": ["user"],
+            "roles": [{"app": "odoo-sales-ce", "role": "manager"}],
+            "name": "another-name",
+            "tenant": "other",
+        },
+        headers=auth,
+    )
+    assert r.status_code == 202
+    assert (seen["method"], seen["url"]) == ("PUT", f"{base}/acme/positions/sales-manager")
+    assert seen["json"] == {
+        "title": "Sales manager",
+        "includes": ["user"],
+        "roles": [{"app": "odoo-sales-ce", "role": "manager"}],
+    }
+
+    seen = {}
+    _fake_client(monkeypatch, {"error": "invalid position"}, seen, status=422)
+    r = client.delete("/api/v1/admin/positions/sales-manager", headers=auth)
+    assert r.status_code == 422
+    assert (seen["method"], seen["url"]) == ("DELETE", f"{base}/platform/positions/sales-manager")
+
+    seen = {}
+    _fake_client(monkeypatch, {}, seen)
+    client.put("/api/v1/admin/positions/a%3Fb", json={}, headers=auth)
+    assert seen["url"] == f"{base}/platform/positions/a%3Fb"
