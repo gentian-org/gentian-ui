@@ -47,7 +47,7 @@ describe("TrustedDomainsView", () => {
     const html = render({ delegated: true, domains: [], mayChange: true });
     expect(html).toContain("admin-console__warning");
     expect(html).toContain("never the path");
-    expect(html).toContain("without anybody answering");
+    expect(html).toContain("unasked");
   });
 
   it("shows the list without a way to change it to anybody else", () => {
