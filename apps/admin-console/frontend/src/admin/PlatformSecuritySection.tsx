@@ -99,12 +99,12 @@ export function PlatformSecuritySection() {
                       <code>{binding.relation}</code>
                     </td>
                     <td>
-                      {binding.groups.length === 0 ? (
+                      {binding.holders.length === 0 ? (
                         <span className="admin-console__empty">{t("platformSecurity.nobody")}</span>
                       ) : (
-                        binding.groups.map((group) => (
-                          <div key={group}>
-                            <code>{group}</code>
+                        binding.holders.map((holder) => (
+                          <div key={`${holder.kind}/${holder.name}`}>
+                            <code>{holder.name}</code>
                           </div>
                         ))
                       )}

@@ -20,6 +20,8 @@ whole reason they are not in git. The registrar spells that in the route
 flattening it into a REST-shaped PUT.
 """
 
+from urllib.parse import quote
+
 from fastapi import APIRouter, Body, Depends, Query, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -195,6 +197,7 @@ async def invite(
                 "requireTotp",
                 "settingsTemplate",
                 "groups",
+                "positions",
             ),
         ),
     )
@@ -224,6 +227,65 @@ async def set_membership(
             "group": payload.get("group", ""),
             "member": payload.get("member"),
         },
+    )
+
+
+# What a person holds in the tenant: their positions, and the roles they were
+# given beside them. Read and changed at the registrar, which asks the
+# operator to write it. The fields relayed are the ones an assignment has:
+# a position, or a role and the app it is held on.
+
+
+@router.get("/people/{person}/assignments")
+async def assignments(
+    person: str,
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """The positions a person was given, and the roles beside them."""
+    return await _relay(
+        settings,
+        "GET",
+        f"/v1/tenants/{_tenant(settings, tenant)}/people/{quote(person, safe='')}/assignments",
+        bearer_of(credentials),
+    )
+
+
+@router.post("/people/give")
+async def give(
+    payload: dict = Body(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Give one person a position, or a role beside their positions."""
+    return await _action(
+        settings,
+        tenant,
+        credentials,
+        "give",
+        _fields(payload, ("person", "position", "app", "role")),
+    )
+
+
+@router.post("/people/take")
+async def take(
+    payload: dict = Body(...),
+    tenant: str | None = Query(default=None),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Take a position, or a role, back from one person."""
+    return await _action(
+        settings,
+        tenant,
+        credentials,
+        "take",
+        _fields(payload, ("person", "position", "app", "role")),
     )
 
 
