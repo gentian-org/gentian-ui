@@ -77,6 +77,38 @@ async def entries(
     )
 
 
+@router.get("/sources/{source}/entries/{entry}/asks")
+async def asks(
+    source: str,
+    entry: str,
+    digest: str = Query(),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What one build of an entry asks for, before it is installed.
+
+    The outbound requests of the app and of the apps it comes with that
+    nobody has answered yet, and `mayApprove`: whether this person may approve
+    them with the install. The director decides both; nothing is written.
+    """
+    return await director.forward(
+        settings,
+        "GET",
+        f"/v1/tenants/{settings.tenant_id}/catalogues/{source}/entries/{entry}/asks",
+        bearer_of(credentials),
+        params={"digest": digest},
+    )
+
+
+class ApprovedRequest(BaseModel):
+    """One outbound request approved with an install: the app it is of and
+    the request, as the director listed them."""
+
+    install: str
+    privilege: str
+
+
 class InstallBody(BaseModel):
     """What an install of a listed entry states: where the profile comes
     from, and which build. Both are the entry listing's own words, handed
@@ -87,12 +119,16 @@ class InstallBody(BaseModel):
     entry as it is -- so it is sent on only when it was stated.
 
     `positions` says the same by position: the positions of the tenant whose
-    holders get the app. Unstated it is not sent either."""
+    holders get the app. Unstated it is not sent either.
+
+    `approve` names outbound requests of the build that the person approves
+    with the install. Whether they may is the director's to decide."""
 
     coordinate: str | None = None
     digest: str | None = None
     defaultGrant: bool | None = None
     positions: list[str] | None = None
+    approve: list[ApprovedRequest] | None = None
 
 
 @router.post("/apps/{profile}")

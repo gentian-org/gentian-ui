@@ -57,6 +57,35 @@ export function fetchCatalogueEntries(source: string, tenant?: string) {
 }
 
 
+/** One outbound request of a build that nobody has answered yet. */
+export type AskedEgress = {
+  /** The app the request is of: the entry itself, or one it comes with. */
+  install: string;
+  /** `egress/<name>`, as an approval names it. */
+  privilege: string;
+  /** What the profile says it needs it for. */
+  reason?: string;
+  /** The hosts of a request by host; none for one by address. */
+  hosts?: string[];
+  /** The app this one comes with, for a request that is not the entry's own. */
+  cameWith?: string;
+};
+
+export type CatalogueEntryAsks = {
+  egress: AskedEgress[];
+  /** Whether this person may approve them: the tenant's perimeter approver. */
+  mayApprove: boolean;
+};
+
+/** What one build asks for, before it is installed. The director's answer. */
+export function fetchCatalogueEntryAsks(entry: Pick<CatalogueEntry, "name" | "coordinate" | "digest">) {
+  const source = entry.coordinate.split("/")[0];
+  return apiFetch<CatalogueEntryAsks>(
+    `/catalogue/sources/${encodeURIComponent(source)}/entries/${encodeURIComponent(entry.name)}/asks` +
+      `?digest=${encodeURIComponent(entry.digest)}`,
+  );
+}
+
 /**
  * Install one listed entry into the console's tenant: the entry's own
  * coordinate and digest, handed back as the listing gave them. The digest is
@@ -65,12 +94,29 @@ export function fetchCatalogueEntries(source: string, tenant?: string) {
  * `positions` says who gets it: the positions of the tenant whose holders use
  * the app, stated in the install itself. An empty list gives it to no
  * position; a role on it is then given per person.
+ *
+ * `approve` names outbound requests of the build that the person approves
+ * with the install, as the director listed them. Each becomes their grant;
+ * the director refuses the whole install when they may not approve.
  */
 export function installCatalogueEntry(
   entry: Pick<CatalogueEntry, "name" | "coordinate" | "digest">,
   positions: string[] = [],
+  approve: AskedEgress[] = [],
 ) {
-  const body = { coordinate: entry.coordinate, digest: entry.digest, positions };
+  const body: {
+    coordinate: string;
+    digest: string;
+    positions: string[];
+    approve?: { install: string; privilege: string }[];
+  } = {
+    coordinate: entry.coordinate,
+    digest: entry.digest,
+    positions,
+  };
+  if (approve.length > 0) {
+    body.approve = approve.map(({ install, privilege }) => ({ install, privilege }));
+  }
   return apiFetch<AppWriteResult>(`/catalogue/apps/${encodeURIComponent(entry.name)}`, {
     method: "POST",
     body: JSON.stringify(body),

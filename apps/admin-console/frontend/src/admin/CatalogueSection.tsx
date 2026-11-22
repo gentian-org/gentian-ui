@@ -4,8 +4,10 @@ import { fetchAppStates, fetchPositions } from "@/api/admin";
 import { uninstallApp, type AppWriteResult } from "@/api/apps";
 import {
   fetchCatalogueEntries,
+  fetchCatalogueEntryAsks,
   fetchCatalogueSources,
   installCatalogueEntry,
+  type AskedEgress,
   type CatalogueEntry,
 } from "@/api/catalogue";
 import "./admin.css";
@@ -72,8 +74,8 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
   // the positions with the app, and their holders have it once the app is
   // ready. Nothing is left for this page to do afterwards.
   const installMutation = useMutation({
-    mutationFn: ({ entry, positions }: { entry: CatalogueEntry; positions: string[] }) =>
-      installCatalogueEntry(entry, positions),
+    mutationFn: ({ entry, positions, approve }: { entry: CatalogueEntry; positions: string[]; approve: AskedEgress[] }) =>
+      installCatalogueEntry(entry, positions, approve),
     onSuccess: (result, { entry, positions }) => {
       setConfirming(null);
       setOutcome({ app: entry.name, result, positions });
@@ -198,7 +200,7 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
           entry={confirming}
           pending={installMutation.isPending}
           error={installMutation.isError ? messageOf(installMutation.error) : undefined}
-          onConfirm={(positions) => installMutation.mutate({ entry: confirming, positions })}
+          onConfirm={(positions, approve) => installMutation.mutate({ entry: confirming, positions, approve })}
           onClose={() => setConfirming(null)}
         />
       ) : null}
@@ -287,7 +289,7 @@ function InstallDialog({
   entry: CatalogueEntry;
   pending: boolean;
   error?: string;
-  onConfirm: (positions: string[]) => void;
+  onConfirm: (positions: string[], approve: AskedEgress[]) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -298,6 +300,20 @@ function InstallDialog({
   // Untouched, every position is ticked, the tenant's own once they are read.
   const [chosen, setChosen] = useState<Set<string> | null>(null);
   const selected = chosen ?? new Set(choosable);
+  // Pre-selected for the perimeter approver: installing and approving is
+  // one step for somebody who may do both. Unticking leaves the app waiting.
+  const [approving, setApproving] = useState(true);
+
+  // What the build asks for beyond the tenant, as the director reads it from
+  // the build itself. A read that fails takes nothing away: the app is
+  // installed as before and its requests wait on the Approvals page.
+  const asksQuery = useQuery({
+    queryKey: ["catalogue", "asks", entry.coordinate, entry.digest],
+    queryFn: () => fetchCatalogueEntryAsks(entry),
+    retry: false,
+  });
+  const asks = asksQuery.data?.egress ?? [];
+  const mayApprove = Boolean(asksQuery.data?.mayApprove);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -319,7 +335,7 @@ function InstallDialog({
         className="admin-console__dialog-body"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!pending) onConfirm(choosable.filter((name) => selected.has(name)));
+          if (!pending) onConfirm(choosable.filter((name) => selected.has(name)), approving && mayApprove ? asks : []);
         }}
       >
         <h3 id="install-title" className="admin-console__dialog-title">
@@ -338,6 +354,14 @@ function InstallDialog({
         <PositionChecklist own={own} selected={selected} disabled={pending || positions.isLoading} onChange={setChosen} />
         {positions.isError ? <p className="admin-console__hint">{t("catalogue.installOwnPositionsUnread")}</p> : null}
 
+        <InstallAsks
+          asks={asks}
+          mayApprove={mayApprove}
+          approving={approving}
+          pending={pending}
+          onApproving={setApproving}
+        />
+
         {error ? <p className="admin-console__error">{error}</p> : null}
 
         <div className="admin-console__dialog-footer">
@@ -354,6 +378,66 @@ function InstallDialog({
         </div>
       </form>
     </dialog>
+  );
+}
+
+/**
+ * What the build asks for beyond the tenant: each outbound request that
+ * nobody has answered, with its hosts and the profile's reason. The app does
+ * not start until all of them are approved. The tenant's perimeter approver
+ * can approve them with the install; anybody else is told the app will wait.
+ * Pre-selected: for a person who may do both, installing and approving is one
+ * step. Unticking it installs the app and leaves it waiting.
+ */
+export function InstallAsks({
+  asks,
+  mayApprove,
+  approving,
+  pending,
+  onApproving,
+}: {
+  asks: AskedEgress[];
+  mayApprove: boolean;
+  approving: boolean;
+  pending: boolean;
+  onApproving: (approving: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  if (asks.length === 0) return null;
+  return (
+    <div className="admin-console__asks">
+      <h4 className="admin-console__group-title">{t("catalogue.asksTitle")}</h4>
+      <p className="admin-console__hint">{t("catalogue.asksLead")}</p>
+      <ul className="admin-console__asks-list">
+        {asks.map((ask) => (
+          <li key={`${ask.install} ${ask.privilege}`}>
+            <span className="admin-console__mono">{ask.install}</span>{" "}
+            {ask.hosts && ask.hosts.length > 0 ? (
+              <Trans i18nKey="catalogue.asksHosts" values={{ hosts: ask.hosts.join(", ") }} components={mono} />
+            ) : (
+              t("catalogue.asksByAddress")
+            )}
+            {ask.reason ? <span className="admin-console__choice-desc">{ask.reason}</span> : null}
+          </li>
+        ))}
+      </ul>
+      {mayApprove ? (
+        <>
+          <label className="admin-console__checkbox">
+            <input
+              type="checkbox"
+              checked={approving}
+              disabled={pending}
+              onChange={(e) => onApproving(e.target.checked)}
+            />
+            <span>{t("catalogue.asksApprove")}</span>
+          </label>
+          {approving ? null : <p className="admin-console__hint">{t("catalogue.asksWaitUnapproved")}</p>}
+        </>
+      ) : (
+        <p className="admin-console__hint">{t("catalogue.asksWait")}</p>
+      )}
+    </div>
   );
 }
 

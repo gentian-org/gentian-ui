@@ -43,11 +43,19 @@ describe("TrustedDomainsView", () => {
     expect(html).toContain("Trust a domain");
   });
 
+  it("warns, beside the field, that a trusted domain opens all of it to every app", () => {
+    const html = render({ delegated: true, domains: [], mayChange: true });
+    expect(html).toContain("admin-console__warning");
+    expect(html).toContain("never the path");
+    expect(html).toContain("unasked");
+  });
+
   it("shows the list without a way to change it to anybody else", () => {
     const html = render({ delegated: true, domains: ["example.org"], mayChange: false });
     expect(html).toContain("example.org");
     expect(html).not.toContain("Remove");
     expect(html).not.toContain("Trust a domain");
+    expect(html).not.toContain("never the path");
     expect(html).toContain("perimeter approver");
   });
 
