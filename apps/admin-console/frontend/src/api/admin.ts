@@ -541,17 +541,31 @@ export type EffectiveAccessRow = {
 //
 // Read-only, and it replaces the idea of exposing OpenFGA's own playground,
 // which is a development tool with a write surface. Anything a person wants
-// to change is changed on the other screens, through the director.
+// to change is changed on the other screens.
+
+/** One holder of a role: a position of the tenant, a person, or a group of the sign-in service. */
+export type Holder = {
+  kind: "position" | "person" | "group" | (string & {});
+  /**
+   * The position's name; the person's account id, qualified by its realm
+   * for a role the cluster gives by name; or the group's name.
+   */
+  name: string;
+};
+
 export type AuthorizationBinding = {
-  // The role as the model names it: admin, auditor, security_officer.
+  // The role as the model names it (admin, user, auditor), or the name of a
+  // role an app's profile declares.
   relation: string;
-  // Keycloak group names. Empty means nobody holds it, which is a row worth
-  // showing rather than one worth hiding.
-  groups: string[];
-  // The permissions the role carries, resolved through the model by the
-  // director. Without these a reader sees "admin" and has to go and read the
-  // model to find out what it means.
+  // Who holds it. Empty means nobody does, which is a row worth showing
+  // rather than one worth hiding.
+  holders: Holder[];
+  // The permissions the role carries, resolved through the model. Without
+  // these a reader sees "admin" and has to go and read the model to find out
+  // what it means.
   grants: string[];
+  /** True for a role an app's profile declares. */
+  declared?: boolean;
 };
 
 export type AuthorizationView = {
@@ -565,17 +579,21 @@ export function fetchAuthorization(scope: "cluster" | "tenant", tenant?: string)
   return apiFetch<AuthorizationView>(`/admin/authorization${query}`);
 }
 
-// The access page: what a person, a group or an app holds, read by the usher
-// from the rights store. Read-only. What a person holds is given from both
-// ends: the roles held with the group each is held through, and the store's
-// own answer to every permission, since the two do not always agree.
+// The access page: what a person, a position or an app holds, read by the
+// usher from the rights store. Read-only. What a person holds is given from
+// both ends: the roles they were given, each with the position it comes
+// through, and the store's own answer to every permission and role, since
+// more is in effect than is held.
 
 /** One role held on one object. */
 export type HeldRole = {
+  /** user, admin, or the name of a role the app declares. */
   role: string;
-  /** The Keycloak group it is held through; absent for a role held by name. */
-  group?: string;
-  byName?: boolean;
+  declared?: boolean;
+  /** The position it is held through; absent for a role given directly. */
+  position?: string;
+  /** True for a role the person holds as themselves, beside their positions. */
+  direct?: boolean;
   /** The permissions the role carries on this kind of object. */
   carries: string[];
 };
@@ -586,49 +604,132 @@ export type AccessPermission = {
   /** The rights store's own answer for this person. */
   inEffect: boolean;
   /**
-   * Where it comes from: `role` (a held role carries it; with inEffect false
-   * the model withholds it), `tenant` (on an app, it follows from what the
-   * person holds on the tenant), `elsewhere` (in effect, and nothing read
-   * here accounts for it). Absent: the person does not have it.
+   * Where it comes from: `role` (a held role carries it), `tenant` (on an
+   * app, it follows from what the person holds on the tenant), `app` (it
+   * follows from what they hold on the app's base or on one of its add-ons),
+   * `elsewhere` (in effect, and nothing read here accounts for it). Absent:
+   * the person does not have it.
    */
-  from?: "role" | "tenant" | "elsewhere" | (string & {});
+  from?: "role" | "tenant" | "app" | "elsewhere" | (string & {});
 };
 
 export type ObjectAccess = {
   object: string;
   /** The profile, for an app. */
   app?: string;
+  /** The roles the person was given here. */
   held: HeldRole[];
+  /** The roles in effect here: the held ones and those that follow from them. */
+  roles: string[];
   permissions: AccessPermission[];
+};
+
+/** A position a person holds: given to them, or included by one that was. */
+export type PositionHeld = {
+  name: string;
+  /** The given position that includes this one; absent when it was given itself. */
+  through?: string;
 };
 
 export type PersonAccess = {
   tenant: string;
   subject: string;
-  /** The groups the rights store has the person in. */
-  groups: string[];
+  positions: PositionHeld[];
   onTenant: ObjectAccess;
   apps: ObjectAccess[];
 };
 
-export type GroupAccess = {
+/** One role a position holds on one object. */
+export type PositionHold = { object: string; app?: string; role: string; declared?: boolean; carries: string[] };
+
+export type PositionAccess = {
   tenant: string;
-  group: string;
-  holds: { object: string; app?: string; role: string; carries: string[] }[];
+  position: string;
+  holds: PositionHold[];
+  /** The positions whose roles its holders hold too. */
+  includes: string[];
+  /** The positions whose holders hold this one. */
+  includedIn: string[];
+  /** The accounts that were given the position itself, by id. */
+  holders: string[];
 };
 
 export function fetchPersonAccess(id: string, tenant?: string) {
   return apiFetch<PersonAccess>(`/admin/access/people/${encodeURIComponent(id)}${tenantQuery(tenant)}`);
 }
 
-export function fetchGroupAccess(group: string, tenant?: string) {
-  const params = new URLSearchParams({ group });
-  if (tenant) params.set("tenant", tenant);
-  return apiFetch<GroupAccess>(`/admin/access/groups?${params.toString()}`);
+export function fetchPositionAccess(name: string, tenant?: string) {
+  return apiFetch<PositionAccess>(`/admin/access/positions/${encodeURIComponent(name)}${tenantQuery(tenant)}`);
 }
 
 export function fetchAppAccess(profile: string, tenant?: string) {
   return apiFetch<AuthorizationView>(`/admin/access/apps/${encodeURIComponent(profile)}${tenantQuery(tenant)}`);
+}
+
+// Positions: named sets of roles a kind of person holds. Three every tenant
+// has; a tenant declares its own at the director, which commits them. Who
+// holds a position, or a role beside one, is given at the registrar.
+
+/** The positions every tenant has. */
+export const SHIPPED_POSITIONS = ["user", "app-administrator", "tenant-administrator"] as const;
+
+/** One role a position holds: on an app, or on the tenant itself when app is absent. */
+export type PositionRole = { app?: string; role: string };
+
+/** A tenant's own position, as it is declared. */
+export type TenantPosition = {
+  name: string;
+  title?: string;
+  description?: string;
+  includes?: string[];
+  roles?: PositionRole[];
+};
+
+export type TenantPositions = { tenant: string; shipped: string[]; positions: TenantPosition[] };
+
+export function fetchPositions(tenant?: string) {
+  return apiFetch<TenantPositions>(`/admin/positions${tenantQuery(tenant)}`);
+}
+
+export function setPosition(position: TenantPosition, tenant?: string) {
+  const { name, ...declaration } = position;
+  return apiFetch<{ status: string; commit?: string }>(
+    `/admin/positions/${encodeURIComponent(name)}${tenantQuery(tenant)}`,
+    { method: "PUT", body: JSON.stringify(declaration) },
+  );
+}
+
+export function removePosition(name: string, tenant?: string) {
+  return apiFetch<{ status: string; commit?: string }>(
+    `/admin/positions/${encodeURIComponent(name)}${tenantQuery(tenant)}`,
+    { method: "DELETE" },
+  );
+}
+
+/** One thing a person was given: a position, or a role and the app it is held on. */
+export type Assignment = { position?: string; role?: string; app?: string };
+
+export type AssignmentResult = {
+  person: string;
+  changed: boolean;
+  holds: boolean;
+  /** True when the person now administers the tenant and was asked for a second factor. */
+  totpRequired?: boolean;
+  warning?: string;
+};
+
+export function fetchAssignments(person: string, tenant?: string) {
+  return apiFetch<{ tenant: string; person: string; assignments: Assignment[] }>(
+    `/admin/people/${encodeURIComponent(person)}/assignments${tenantQuery(tenant)}`,
+  );
+}
+
+/** Give a person a position or a role (holds true), or take it back. */
+export function setAssignment(input: { person: string; assignment: Assignment; holds: boolean }, tenant?: string) {
+  return apiFetch<AssignmentResult>(`/admin/people/${input.holds ? "give" : "take"}${tenantQuery(tenant)}`, {
+    method: "POST",
+    body: JSON.stringify({ person: input.person, ...input.assignment }),
+  });
 }
 
 export function fetchIntegrationsOverview(tenant?: string) {
@@ -1098,6 +1199,8 @@ export type Invitation = {
   requireTotp?: boolean;
   settingsTemplate?: string;
   groups: string[];
+  /** The positions the person holds from the start, beside user. */
+  positions?: string[];
 };
 
 export function fetchPeople(opts?: { search?: string; tenant?: string }) {

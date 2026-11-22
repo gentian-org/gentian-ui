@@ -13,7 +13,7 @@ import { CustomizationDebtSection } from "@/admin/CustomizationDebtSection";
 import { UpdatesSection } from "@/admin/UpdatesSection";
 import { ReleaseSection } from "@/admin/ReleaseSection";
 import { ClusterSettingsSection } from "@/admin/ClusterSettingsSection";
-import { GroupsSection } from "@/admin/GroupsSection";
+import { PositionsSection } from "@/admin/PositionsSection";
 import { MembersSection } from "@/admin/MembersSection";
 import { ModelAccessSection } from "@/admin/ModelAccessSection";
 import { ModelsSection } from "@/admin/ModelsSection";
@@ -38,7 +38,7 @@ type AdminTab =
   | "release"
   | "tenants"
   | "members"
-  | "groups"
+  | "positions"
   | "access"
   | "apps"
   | "resources"
@@ -68,7 +68,7 @@ type AdminTab =
  * and consumes, then what protects it, then the record, then the cluster's own
  * configuration for whoever administers the platform.
  *
- * Members and Groups go through the director, which holds a credential per
+ * People go through the registrar, which holds a credential per
  * realm and asks OpenFGA about the caller before using it; this console holds
  * none. Inviting somebody happens on Members, with the settings template the
  * desktop applies before they first sign in.
@@ -114,7 +114,7 @@ const TABS: {
   // people because the console opens here while a required fact is missing.
   { id: "tenantSettings", labelKey: "tabTenantSettings" },
   { id: "members", labelKey: "tabMembers" },
-  { id: "groups", labelKey: "tabGroups" },
+  { id: "positions", labelKey: "tabPositions" },
   // Who may do what, and why: what a person, a group or an app holds, as the
   // rights store has it. Read-only, beside the two screens that change it.
   { id: "access", labelKey: "tabAccess" },
@@ -288,10 +288,10 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
             <TenantSettingsSection tenant={tenant} />
           ) : current === "members" ? (
             <MembersSection tenant={tenant} />
-          ) : current === "groups" ? (
-            <GroupsSection tenant={tenant} />
+          ) : current === "positions" ? (
+            <PositionsSection />
           ) : current === "access" ? (
-            <AccessSection tenant={tenant} />
+            <AccessSection />
           ) : current === "apps" ? (
             <AppsSection tenant={tenant} onOpenIntegrations={() => setTab("integrations")} />
           ) : current === "security" ? (
