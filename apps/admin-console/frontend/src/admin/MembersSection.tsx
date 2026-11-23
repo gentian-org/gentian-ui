@@ -452,10 +452,13 @@ export function directRoles(assignments: Assignment[]): Assignment[] {
 function DirectRoles({
   person,
   assignments,
+  pending,
   onChanged,
 }: {
   person: string;
   assignments: Assignment[];
+  /** The positions ticked and unticked and not saved yet, which the matrix marks. */
+  pending: MembershipDraft;
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
@@ -484,6 +487,7 @@ function DirectRoles({
         access={access.data}
         own={own.data?.positions ?? []}
         busy={change.isPending || access.isLoading}
+        pending={pending}
         onToggle={(app, role, holds) => change.mutate({ assignment: app ? { app, role } : { role }, holds })}
       />
       {strays.length > 0 ? (
@@ -679,7 +683,7 @@ function MemberEditor({
           )}
         </div>
 
-        <DirectRoles person={person.id} assignments={assignments} onChanged={() => after()} />
+        <DirectRoles person={person.id} assignments={assignments} pending={groupDraft} onChanged={() => after()} />
 
         <div className="admin-console__subsection">
           <h4 className="admin-console__subsection-title">{t("members.signIn")}</h4>

@@ -1734,6 +1734,11 @@ fieldset.admin-console__choices > legend {
   border-color: var(--gtn-border-strong);
 }
 
+.admin-console__access-swatch--pending {
+  background: var(--gtn-ember-bg);
+  border-color: var(--gtn-ember);
+}
+
 .admin-console__access-list {
   margin: 0.25rem 0 0;
   padding-left: 1.25rem;
@@ -1818,6 +1823,18 @@ fieldset.admin-console__choices > legend {
 .admin-console__grid-cell--implied {
   background: var(--gtn-paper-2);
   border-color: var(--gtn-border-strong);
+  cursor: help;
+}
+
+/* Not saved yet: filled where saving would give the role, outlined where it would take it. */
+.admin-console__grid-cell--pendingGain {
+  background: var(--gtn-ember-bg);
+  border-color: var(--gtn-ember);
+  cursor: help;
+}
+
+.admin-console__grid-cell--pendingLoss {
+  border-color: var(--gtn-ember);
   cursor: help;
 }
 

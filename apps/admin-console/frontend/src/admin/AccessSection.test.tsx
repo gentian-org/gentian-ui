@@ -10,6 +10,7 @@ import {
   holdsAnything,
   inEffectFrom,
   PersonAccessView,
+  PersonRoleMatrix,
   PositionAccessView,
   rolesThatFollow,
 } from "./AccessSection";
@@ -160,6 +161,38 @@ describe("AccessSection", () => {
     expect(html).toContain("What this person holds");
     expect(html).toContain("Permissions in detail");
     expect(html).not.toContain("group");
+  });
+
+  it("marks in orange what positions ticked and not saved yet would give and take", () => {
+    const wiki: AppState = { profile: "wiki", name: "wiki", ready: true, phase: "ready" };
+    const appAdmin: PositionAccess = {
+      tenant: "acme",
+      position: "app-administrator",
+      holds: [{ object: "app:acme/wiki", app: "wiki", role: "admin", carries: [] }],
+      includes: [],
+      includedIn: [],
+      holders: [],
+    };
+    const seed: [unknown[], unknown][] = [
+      [["admin", "apps", "status"], { tenant: "acme", apps: [wiki] }],
+      [["admin", "access", "app", "wiki"], { object: "app:acme/wiki", bindings: [] }],
+      [["admin", "access", "position", "app-administrator"], appAdmin],
+    ];
+    const own = positions.positions;
+    const saved = render(<PersonRoleMatrix access={executive} own={own} />, seed);
+    expect(saved).not.toContain("pending");
+    expect(text(saved)).not.toContain("Not saved yet");
+
+    const html = render(
+      <PersonRoleMatrix access={executive} own={own} pending={{ executive: false, "app-administrator": true }} />,
+      seed,
+    );
+    expect(text(html)).toContain("Not saved yet");
+    // Ticked: Admin of the wiki, and the user role it includes.
+    expect(html).toContain('grid-cell--pendingGain" title="Would come through App administrator once saved"');
+    expect(html.match(/grid-cell--pendingGain/g)).toHaveLength(2);
+    // Unticked: the tenant's User came only through Sales manager, which Executive includes.
+    expect(html).toContain('grid-cell--pendingLoss" title="Would be lost once saved: it comes only through Sales manager"');
   });
 
   it("says so when a person holds nothing", () => {

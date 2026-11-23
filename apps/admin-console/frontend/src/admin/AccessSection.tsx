@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import {
@@ -20,7 +20,8 @@ import {
   type TenantPosition,
 } from "@/api/admin";
 import { allPositions, positionLabel, roleLabel } from "@/admin/positionLabels";
-import { personCell } from "./personMatrix";
+import type { MembershipDraft } from "./membershipDraft";
+import { draftGains, draftLosses, pendingCell } from "./personMatrix";
 import { RoleMatrix, useMatrixRows, type Cell, type GridRow } from "./RoleMatrix";
 
 /**
@@ -166,32 +167,60 @@ function useOwnPositions() {
  * What a person holds, as a matrix: green where it was given to them
  * themselves, iris where it comes through a position (the title names it),
  * gray where it follows from another role. With `onToggle` the roles given to
- * the person themselves can be ticked and unticked.
+ * the person themselves can be ticked and unticked. With `pending`, the
+ * positions ticked and unticked and not saved yet, orange marks what saving
+ * them would give (ticked) and take (unticked).
  */
 export function PersonRoleMatrix({
   access,
   own,
   onToggle,
   busy,
+  pending,
 }: {
   access: PersonAccess | undefined;
   own: TenantPosition[];
   onToggle?: (app: string, role: string, checked: boolean) => void;
   busy?: boolean;
+  pending?: MembershipDraft;
 }) {
   const { t } = useTranslation();
   const { rows, declaredOf, loading } = useMatrixRows();
+  const draft = Object.entries(pending ?? {});
+  const ticked = draft.filter(([, on]) => on).map(([name]) => name);
+  const unticked = draft.filter(([, on]) => !on).map(([name]) => name);
+  const tickedAccess = useQueries({
+    queries: ticked.map((name) => ({
+      queryKey: ["admin", "access", "position", name],
+      queryFn: () => fetchPositionAccess(name),
+      retry: false,
+    })),
+  });
   if (loading) return <p className="admin-console__loading">{t("access.reading")}</p>;
+  const gains = draftGains(tickedAccess.flatMap((q) => (q.data ? [q.data] : [])));
+  const lost = draftLosses(access, unticked);
+  const names = (positions: string[]) => positions.map((p) => positionLabel(t, p, own)).join(", ");
   const cell = (row: GridRow, role: string): Cell => {
-    const state = personCell(access, row.profile, role);
+    const state = pendingCell(access, gains, lost, row.profile, role);
+    if (state.kind === "pendingGain") {
+      return { kind: state.kind, title: t("access.gridPendingGain", { positions: names(state.positions) }) };
+    }
+    if (state.kind === "pendingLoss") {
+      return { kind: state.kind, title: t("access.gridPendingLoss", { positions: names(state.positions) }) };
+    }
     if (state.kind === "inherited") {
-      const names = state.positions.map((p) => positionLabel(t, p, own)).join(", ");
-      return { kind: state.kind, title: t("access.throughPosition", { position: names }) };
+      return { kind: state.kind, title: t("access.throughPosition", { position: names(state.positions) }) };
     }
     if (state.kind === "implied") return { kind: state.kind, title: t("access.gridFollows") };
     if (state.kind === "own") return { kind: state.kind, title: t("access.givenDirectly") };
     return { kind: state.kind };
   };
+  const anyPending = rows.some((row) =>
+    ["user", "admin", ...(declaredOf.get(row.profile) ?? [])].some((role) => {
+      const kind = pendingCell(access, gains, lost, row.profile, role).kind;
+      return kind === "pendingGain" || kind === "pendingLoss";
+    }),
+  );
   return (
     <RoleMatrix
       rows={rows}
@@ -203,6 +232,7 @@ export function PersonRoleMatrix({
         own: t("access.givenToThePerson"),
         inherited: t("access.throughAPosition"),
         implied: t("access.gridFollows"),
+        pending: anyPending ? t("access.gridPending") : undefined,
       }}
     />
   );
