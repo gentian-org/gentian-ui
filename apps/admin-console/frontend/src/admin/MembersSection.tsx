@@ -163,6 +163,7 @@ function positionItems(positions: PositionChoice[]): ChecklistItem[] {
 /**
  * The positions an invitation offers. User is not among them: the registrar
  * gives it to every invited person, because entering the tenant takes it.
+ * All apps is: it is what gives an invited person the tenant's apps.
  */
 export function invitable(positions: PositionChoice[]): PositionChoice[] {
   return positions.filter((p) => p.name !== "user");
@@ -201,7 +202,7 @@ function InviteCard({
   const [email, setEmail] = useState("");
   const [template, setTemplate] = useState("");
   // Nothing starts ticked: every invited person holds User, which brings
-  // the apps the tenant installed for everyone, and anything more is said.
+  // the desktop and no app, and anything more is said.
   const [chosen, setChosen] = useState<string[]>([]);
   const [requireTotpOnAccept, setRequireTotpOnAccept] = useState(false);
 

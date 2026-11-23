@@ -265,7 +265,6 @@ function OutcomeNotice({ outcome }: { outcome: Outcome }) {
 
 /** The sentence that says who gets an app installed for these positions. */
 export function whoGetsIt(positions: string[]) {
-  if (positions.includes("user")) return "catalogue.outcomeEveryone";
   return positions.length > 0 ? "catalogue.outcomePositions" : "catalogue.outcomeNobody";
 }
 

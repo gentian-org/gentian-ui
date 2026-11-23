@@ -21,8 +21,9 @@ import "./admin.css";
 /**
  * The tenant's positions: named sets of roles a kind of person holds.
  *
- * Three every tenant has -- a person of the tenant, the administrator of its
- * apps, the administrator of the tenant -- and the ones the tenant declares
+ * Four every tenant has -- a person of the tenant, a person who uses every
+ * app, the administrator of its apps, the administrator of the tenant -- and
+ * the ones the tenant declares
  * here: "Sales intern", "Engineering manager". A person is given a position,
  * not a list of roles; a role given to one person beside their position is the
  * exception and is made on that person's own page.
