@@ -194,8 +194,8 @@ export type ExposureEntry = {
   state: string;
   /**
    * What approving the entry allows: `public`, `publicAppCredential`,
-   * `signInAppAuthorization` or `tokenEntry`. Absent from a director older
-   * than kinds, where every entry is a public address. Sent back with an
+   * `publicAppSignIn`, `signInAppAuthorization` or `tokenEntry`. Absent from
+   * a director older than kinds, where every entry is a public address. Sent back with an
    * approval, so the director refuses it if the entry has come to declare
    * another kind.
    */

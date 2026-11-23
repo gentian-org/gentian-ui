@@ -175,7 +175,14 @@ class ExposureApproval(BaseModel):
     # The director refuses the approval if the entry declares another, so
     # what is approved is what was shown; it records the kind itself.
     kind: (
-        Literal["public", "publicAppCredential", "signInAppAuthorization", "tokenEntry"] | None
+        Literal[
+            "public",
+            "publicAppCredential",
+            "publicAppSignIn",
+            "signInAppAuthorization",
+            "tokenEntry",
+        ]
+        | None
     ) = None
     # When the entry is taken down again, RFC 3339. Absent: it stays until
     # somebody withdraws it.
