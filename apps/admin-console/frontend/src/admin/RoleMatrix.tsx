@@ -24,8 +24,10 @@ export function gridRows(t: TFunction, apps: AppState[]): GridRow[] {
  * How one cell is. `own`: given here (to this position, or to this person
  * themselves). `inherited`: held through another position. `implied`: follows
  * from a role held on the same thing, such as Admin. `free`: not held.
+ * `pendingGain` and `pendingLoss`: not held now and would be, or held now
+ * and would not be, once changes not saved yet are saved.
  */
-export type CellKind = "own" | "inherited" | "implied" | "free";
+export type CellKind = "own" | "inherited" | "implied" | "free" | "pendingGain" | "pendingLoss";
 export type Cell = { kind: CellKind; title?: string };
 
 /** The matrix's rows and the roles each app declares, read from the cluster. */
@@ -70,13 +72,19 @@ export function RoleMatrix({
   cell: (row: GridRow, role: string) => Cell;
   onToggle?: (row: GridRow, role: string, checked: boolean) => void;
   busy?: boolean;
-  legend: { own: string; inherited: string; implied?: string };
+  legend: { own: string; inherited: string; implied?: string; pending?: string };
 }) {
   const { t } = useTranslation();
   const box = (row: GridRow, role: string, text?: string) => {
     const state = cell(row, role);
     const name = text ?? roleLabel(t, row.profile ? "app" : "tenant", role);
-    const locked = !onToggle || busy || state.kind === "inherited" || state.kind === "implied";
+    const locked =
+      !onToggle ||
+      busy ||
+      state.kind === "inherited" ||
+      state.kind === "implied" ||
+      state.kind === "pendingGain" ||
+      state.kind === "pendingLoss";
     return (
       <label
         key={role}
@@ -86,7 +94,7 @@ export function RoleMatrix({
         <input
           type="checkbox"
           aria-label={`${row.label}: ${name}`}
-          checked={state.kind !== "free"}
+          checked={state.kind !== "free" && state.kind !== "pendingLoss"}
           disabled={locked}
           readOnly={!onToggle}
           onChange={(e) => onToggle?.(row, role, e.target.checked)}
@@ -103,6 +111,11 @@ export function RoleMatrix({
         {legend.implied ? (
           <>
             <span className="admin-console__access-swatch admin-console__access-swatch--implied" /> {legend.implied}
+          </>
+        ) : null}
+        {legend.pending ? (
+          <>
+            <span className="admin-console__access-swatch admin-console__access-swatch--pending" /> {legend.pending}
           </>
         ) : null}
       </p>
