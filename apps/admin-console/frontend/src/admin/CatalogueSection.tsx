@@ -8,6 +8,7 @@ import {
   fetchCatalogueSources,
   installCatalogueEntry,
   type AskedEgress,
+  type AskedIntegration,
   type CatalogueEntry,
 } from "@/api/catalogue";
 import "./admin.css";
@@ -74,13 +75,23 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
   // the positions with the app, and their holders have it once the app is
   // ready. Nothing is left for this page to do afterwards.
   const installMutation = useMutation({
-    mutationFn: ({ entry, positions, approve }: { entry: CatalogueEntry; positions: string[]; approve: AskedEgress[] }) =>
-      installCatalogueEntry(entry, positions, approve),
+    mutationFn: ({
+      entry,
+      positions,
+      approve,
+      grant,
+    }: {
+      entry: CatalogueEntry;
+      positions: string[];
+      approve: AskedEgress[];
+      grant: AskedIntegration[];
+    }) => installCatalogueEntry(entry, positions, approve, grant),
     onSuccess: (result, { entry, positions }) => {
       setConfirming(null);
       setOutcome({ app: entry.name, result, positions });
       void queryClient.invalidateQueries({ queryKey: ["admin", "apps"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "access"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "integrations"] });
     },
   });
   const uninstallMutation = useMutation({
@@ -201,7 +212,7 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
           entry={confirming}
           pending={installMutation.isPending}
           error={installMutation.isError ? messageOf(installMutation.error) : undefined}
-          onConfirm={(positions, approve) => installMutation.mutate({ entry: confirming, positions, approve })}
+          onConfirm={(positions, approve, grant) => installMutation.mutate({ entry: confirming, positions, approve, grant })}
           onClose={() => setConfirming(null)}
         />
       ) : null}
@@ -289,7 +300,7 @@ export function InstallDialog({
   entry: CatalogueEntry;
   pending: boolean;
   error?: string;
-  onConfirm: (positions: string[], approve: AskedEgress[]) => void;
+  onConfirm: (positions: string[], approve: AskedEgress[], grant: AskedIntegration[]) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -303,6 +314,9 @@ export function InstallDialog({
   // Pre-selected for the perimeter approver: installing and approving is
   // one step for somebody who may do both. Unticking leaves the app waiting.
   const [approving, setApproving] = useState(true);
+  // The same for what the app reaches of the tenant's other apps: granted
+  // with the install by whoever may grant, unless they untick it.
+  const [granting, setGranting] = useState(true);
 
   // What the build asks for beyond the tenant, as the director reads it from
   // the build itself. A read that fails takes nothing away: the app is
@@ -314,6 +328,8 @@ export function InstallDialog({
   });
   const asks = asksQuery.data?.egress ?? [];
   const mayApprove = Boolean(asksQuery.data?.mayApprove);
+  const integrations = asksQuery.data?.integrations ?? [];
+  const mayGrant = Boolean(asksQuery.data?.mayGrant);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -335,7 +351,12 @@ export function InstallDialog({
         className="admin-console__dialog-body"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!pending) onConfirm(choosable.filter((name) => selected.has(name)), approving && mayApprove ? asks : []);
+          if (!pending)
+            onConfirm(
+              choosable.filter((name) => selected.has(name)),
+              approving && mayApprove ? asks : [],
+              granting && mayGrant ? integrations : [],
+            );
         }}
       >
         <h3 id="install-title" className="admin-console__dialog-title">
@@ -360,6 +381,14 @@ export function InstallDialog({
           approving={approving}
           pending={pending}
           onApproving={setApproving}
+        />
+
+        <InstallIntegrations
+          integrations={integrations}
+          mayGrant={mayGrant}
+          granting={granting}
+          pending={pending}
+          onGranting={setGranting}
         />
 
         {error ? <p className="admin-console__error">{error}</p> : null}
@@ -436,6 +465,60 @@ export function InstallAsks({
         </>
       ) : (
         <p className="admin-console__hint">{t("catalogue.asksWait")}</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What the build reaches of the tenant's other apps: each contract no grant
+ * covers yet, with what of it the build asks for and from which app. Without
+ * a grant the app runs and does not reach them. Whoever may grant can grant
+ * them with the install, exactly as asked; pre-selected, like the outbound
+ * access. Anybody else is told they wait for a grant.
+ */
+export function InstallIntegrations({
+  integrations,
+  mayGrant,
+  granting,
+  pending,
+  onGranting,
+}: {
+  integrations: AskedIntegration[];
+  mayGrant: boolean;
+  granting: boolean;
+  pending: boolean;
+  onGranting: (granting: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  if (integrations.length === 0) return null;
+  return (
+    <div className="admin-console__asks">
+      <h4 className="admin-console__group-title">{t("catalogue.consumesTitle")}</h4>
+      <p className="admin-console__hint">{t("catalogue.consumesLead")}</p>
+      <ul className="admin-console__asks-list">
+        {integrations.map((ask) => (
+          <li key={`${ask.install} ${ask.contract}`}>
+            <span className="admin-console__mono">{ask.install}</span>{" "}
+            <Trans
+              i18nKey={ask.provider ? "catalogue.consumesFrom" : "catalogue.consumes"}
+              values={{ contract: ask.contract, provider: ask.provider, capabilities: ask.capabilities.join(", ") }}
+              components={mono}
+            />
+            {ask.asPerson ? <span className="admin-console__choice-desc">{t("catalogue.consumesAsPerson")}</span> : null}
+          </li>
+        ))}
+      </ul>
+      {mayGrant ? (
+        <>
+          <label className="admin-console__checkbox">
+            <input type="checkbox" checked={granting} disabled={pending} onChange={(e) => onGranting(e.target.checked)} />
+            <span>{t("catalogue.consumesGrant")}</span>
+          </label>
+          {granting ? null : <p className="admin-console__hint">{t("catalogue.consumesWaitUngranted")}</p>}
+        </>
+      ) : (
+        <p className="admin-console__hint">{t("catalogue.consumesWait")}</p>
       )}
     </div>
   );

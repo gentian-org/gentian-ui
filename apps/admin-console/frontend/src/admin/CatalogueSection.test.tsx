@@ -3,8 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import "@/lib/i18n";
-import type { AskedEgress } from "@/api/catalogue";
-import { InstallAsks, InstallDialog } from "./CatalogueSection";
+import type { AskedEgress, AskedIntegration } from "@/api/catalogue";
+import { InstallAsks, InstallDialog, InstallIntegrations } from "./CatalogueSection";
 
 const asks: AskedEgress[] = [
   {
@@ -54,6 +54,48 @@ describe("InstallAsks", () => {
     const html = render({ asks, mayApprove: false, approving: false });
     expect(html).not.toContain("checkbox");
     expect(html).toContain("perimeter approver approves them");
+  });
+});
+
+const integrations: AskedIntegration[] = [
+  { install: "recorder", contract: "file-store", capabilities: ["webdav:read", "webdav:write"], asPerson: true },
+  { install: "relay", contract: "calendar-store", provider: "groupware", capabilities: ["caldav:read"], cameWith: "recorder" },
+];
+
+const renderIntegrations = (props: { integrations: AskedIntegration[]; mayGrant: boolean; granting: boolean }) =>
+  renderToString(<InstallIntegrations {...props} pending={false} onGranting={() => {}} />);
+
+describe("InstallIntegrations", () => {
+  it("shows nothing for an app that consumes nothing", () => {
+    expect(renderIntegrations({ integrations: [], mayGrant: true, granting: true })).toBe("");
+  });
+
+  it("lists each contract with its app, its capabilities and its provider", () => {
+    const html = renderIntegrations({ integrations, mayGrant: true, granting: true });
+    expect(html).toContain("file-store");
+    expect(html).toContain("webdav:read, webdav:write");
+    expect(html).toContain("As the person using it");
+    expect(html).toContain("groupware");
+    expect(html).toContain("caldav:read");
+  });
+
+  it("offers the grant, ticked, to whoever may grant", () => {
+    const html = renderIntegrations({ integrations, mayGrant: true, granting: true });
+    expect(html).toContain("Grant these with the install");
+    expect(html).toContain("checked");
+    expect(html).not.toContain("Without your grant");
+  });
+
+  it("says the app will not reach them once the grant is unticked", () => {
+    const html = renderIntegrations({ integrations, mayGrant: true, granting: false });
+    expect(html).not.toContain("checked");
+    expect(html).toContain("Without your grant the app is installed and does not reach them");
+  });
+
+  it("tells anybody else that they wait for a grant, and offers none", () => {
+    const html = renderIntegrations({ integrations, mayGrant: false, granting: true });
+    expect(html).not.toContain("checkbox");
+    expect(html).toContain("until somebody who may grant grants them");
   });
 });
 

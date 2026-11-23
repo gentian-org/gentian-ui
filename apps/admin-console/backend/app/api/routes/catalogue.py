@@ -110,6 +110,14 @@ class ApprovedRequest(BaseModel):
     privilege: str
 
 
+class GrantedContract(BaseModel):
+    """One contract granted with an install: the app that consumes it and
+    the contract, as the director listed them."""
+
+    install: str
+    contract: str
+
+
 class InstallBody(BaseModel):
     """What an install of a listed entry states: where the profile comes
     from, and which build. Both are the entry listing's own words, handed
@@ -123,13 +131,15 @@ class InstallBody(BaseModel):
     accepts it and it gives nothing. The console does not send it.
 
     `approve` names outbound requests of the build that the person approves
-    with the install. Whether they may is the director's to decide."""
+    with the install, and `grant` the contracts it consumes that they grant
+    with it. Whether they may is the director's to decide."""
 
     coordinate: str | None = None
     digest: str | None = None
     defaultGrant: bool | None = None
     positions: list[str] | None = None
     approve: list[ApprovedRequest] | None = None
+    grant: list[GrantedContract] | None = None
 
 
 @router.post("/apps/{profile}")

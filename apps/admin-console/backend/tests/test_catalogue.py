@@ -334,6 +334,26 @@ def test_an_install_carries_the_approvals_the_person_gave(monkeypatch):
     }
 
 
+def test_an_install_carries_the_grants_the_person_gave(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "installed", "commit": "a1b2c3d4"}, seen, status=202)
+    client = TestClient(_app(_settings()))
+    grant = [{"install": "timesheets", "contract": "file-store"}]
+    answer = client.post(
+        "/api/v1/catalogue/apps/timesheets",
+        json={"coordinate": "in-house/timesheets", "digest": _digest, "grant": grant},
+        headers=_person,
+    )
+    assert answer.status_code == 202
+    # As the person, and nothing added: the director asks whether they may.
+    assert seen["auth"] == "Bearer person-token"
+    assert seen["json"] == {
+        "coordinate": "in-house/timesheets",
+        "digest": _digest,
+        "grant": grant,
+    }
+
+
 def test_an_install_without_approvals_sends_none(monkeypatch):
     seen: dict = {}
     _fake_client(monkeypatch, {"status": "installed", "commit": "a1b2c3d4"}, seen, status=202)
