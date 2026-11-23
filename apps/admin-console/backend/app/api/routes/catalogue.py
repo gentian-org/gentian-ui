@@ -19,8 +19,9 @@ whether they may (can_install_app, and can_grant to give it to a position),
 and its status and body come back as they are. Taking an app out
 again is the Apps screen's (routes/apps.py).
 
-The screen is not shown at present (SHOW_CATALOGUES in the console's tab
-registry): the cluster renders no catalog of its own. The routes stay.
+The console shows the screen only to a tenant that names a catalog source of
+its own, beyond the cluster's defaults (a source the director lists with
+`scope: tenant`): its apps are ones the App Store does not list.
 """
 
 from fastapi import APIRouter, Depends, Query, Response

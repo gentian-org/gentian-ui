@@ -3,6 +3,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import "@/lib/i18n";
 import type { AdminContext, TenantSettings } from "@/api/admin";
+import type { CatalogueSource } from "@/api/catalogue";
 import { AdminConsole } from "./AdminConsole";
 
 const base: AdminContext = {
@@ -23,11 +24,18 @@ const complete: TenantSettings = {
   missing: [],
 };
 
-function render(context: AdminContext, settings: TenantSettings = complete): string {
+function render(context: AdminContext, settings: TenantSettings = complete, catalogues?: CatalogueSource[]): string {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(["admin", "context"], context);
   client.setQueryData(["admin", "approvals"], { approvals: [] });
   client.setQueryData(["admin", "tenant-settings", context.tenant], settings);
+  if (catalogues) {
+    client.setQueryData(["catalogue", "sources", context.tenant], {
+      tenant: context.tenant,
+      storeUrl: "https://store.example",
+      catalogues,
+    });
+  }
   return renderToString(
     <QueryClientProvider client={client}>
       <AdminConsole embedded />
@@ -35,8 +43,8 @@ function render(context: AdminContext, settings: TenantSettings = complete): str
   );
 }
 
-function tabs(context: AdminContext): string[] {
-  return [...render(context).matchAll(/class="admin-console__tab[^"]*"[^>]*>([^<]+)</g)].map((m) => m[1]);
+function tabs(context: AdminContext, catalogues?: CatalogueSource[]): string[] {
+  return [...render(context, complete, catalogues).matchAll(/class="admin-console__tab[^"]*"[^>]*>([^<]+)</g)].map((m) => m[1]);
 }
 
 function activeTab(context: AdminContext, settings?: TenantSettings): string | undefined {
@@ -84,5 +92,18 @@ describe("AdminConsole", () => {
     const shown = tabs(older as AdminContext);
     expect(shown).toContain("Members");
     expect(shown).toContain("Apps");
+  });
+
+  it("shows the Catalogs tab only to a tenant that names a catalog of its own", () => {
+    const cluster: CatalogueSource = { name: "community", scope: "cluster", addedBy: "store" };
+    const own: CatalogueSource = { name: "internal", scope: "tenant", addedBy: "cluster" };
+    expect(tabs(base)).not.toContain("Catalogs");
+    expect(tabs(base, [])).not.toContain("Catalogs");
+    expect(tabs(base, [cluster])).not.toContain("Catalogs");
+    const shown = tabs(base, [cluster, own]);
+    expect(shown).toContain("Catalogs");
+    // In its place: after Integrations, before Credentials.
+    expect(shown.indexOf("Catalogs")).toBe(shown.indexOf("Integrations") + 1);
+    expect(shown.indexOf("Credentials")).toBe(shown.indexOf("Catalogs") + 1);
   });
 });
