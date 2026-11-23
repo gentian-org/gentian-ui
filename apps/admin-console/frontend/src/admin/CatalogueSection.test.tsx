@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import "@/lib/i18n";
 import type { AskedEgress } from "@/api/catalogue";
-import { InstallAsks } from "./CatalogueSection";
+import { InstallAsks, InstallDialog } from "./CatalogueSection";
 
 const asks: AskedEgress[] = [
   {
@@ -53,5 +54,40 @@ describe("InstallAsks", () => {
     const html = render({ asks, mayApprove: false, approving: false });
     expect(html).not.toContain("checkbox");
     expect(html).toContain("perimeter approver approves them");
+  });
+});
+
+describe("InstallDialog", () => {
+  it("starts with no position ticked but the ones that have every app", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(["admin", "positions"], {
+      tenant: "acme",
+      shipped: ["user", "all-apps", "app-administrator", "tenant-administrator"],
+      positions: [{ name: "sales", title: "Sales" }],
+    });
+    const entry = {
+      coordinate: "in-house/timesheets",
+      name: "timesheets",
+      edition: "ce",
+      digest: "sha256:" + "a".repeat(64),
+      installable: true,
+    };
+    client.setQueryData(["catalogue", "asks", entry.coordinate, entry.digest], { egress: [], mayApprove: false });
+    const html = renderToString(
+      <QueryClientProvider client={client}>
+        <InstallDialog entry={entry} pending={false} onConfirm={() => {}} onClose={() => {}} />
+      </QueryClientProvider>,
+    );
+    const body = html.slice(html.indexOf("<tbody"));
+    const rows = [...body.matchAll(/<input type="checkbox"([^>]*)\/><span>([^<]+)</g)].map((m) => [
+      m[2],
+      m[1].includes("checked"),
+    ]);
+    expect(rows).toEqual([
+      ["All apps", true],
+      ["App administrator", true],
+      ["Tenant administrator", false],
+      ["Sales", false],
+    ]);
   });
 });

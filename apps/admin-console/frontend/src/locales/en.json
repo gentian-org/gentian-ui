@@ -141,7 +141,7 @@
     "uninstallConfirm": "Uninstall {{app}} from {{tenant}}? The app is removed for everybody who uses it. Its data stays until it is purged.",
     "version": "Version",
     "installWho": "Who gets the app",
-    "installWhoBody": "Everybody who holds a ticked position uses the app. Untick the positions that should not get it.",
+    "installWhoBody": "Everybody who holds a ticked position uses the app. All apps and App administrator have it anyway; tick the further positions that should get it.",
     "installOwnPositionsUnread": "The tenant's own positions could not be read; only the three every tenant has are listed.",
     "outcomePositions_one": "The holders of the position chosen get it once the app is ready.",
     "outcomePositions_other": "The holders of the {{count}} positions chosen get it once the app is ready.",

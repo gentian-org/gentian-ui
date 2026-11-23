@@ -141,7 +141,7 @@
     "uninstallConfirm": "{{app}} aus {{tenant}} deinstallieren? Die App wird für alle entfernt, die sie nutzen. Ihre Daten bleiben erhalten, bis sie endgültig gelöscht werden.",
     "version": "Version",
     "installWho": "Wer die App erhält",
-    "installWhoBody": "Alle, die eine angekreuzte Position innehaben, nutzen die App. Entfernen Sie das Häkchen bei den Positionen, die sie nicht erhalten sollen.",
+    "installWhoBody": "Alle, die eine angekreuzte Position innehaben, nutzen die App. Alle Apps und App-Administrator haben sie ohnehin; kreuzen Sie die weiteren Positionen an, die sie erhalten sollen.",
     "installOwnPositionsUnread": "Die eigenen Positionen des Mandanten konnten nicht gelesen werden; aufgeführt sind nur die drei, die jeder Mandant hat.",
     "outcomePositions_one": "Die Inhaber der gewählten Position erhalten sie, sobald die App bereit ist.",
     "outcomePositions_other": "Die Inhaber der {{count}} gewählten Positionen erhalten sie, sobald die App bereit ist.",
