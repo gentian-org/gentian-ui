@@ -1,13 +1,13 @@
 import type { TFunction } from "i18next";
 import { SHIPPED_POSITIONS, type TenantPosition } from "@/api/admin";
 
-/** Whether a position is one of the three every tenant has. */
+/** Whether a position is one of the ones every tenant has. */
 export function isShipped(name: string) {
   return (SHIPPED_POSITIONS as readonly string[]).includes(name);
 }
 
 /**
- * A position as people read it: the platform's own words for the three every
+ * A position as people read it: the platform's own words for the ones every
  * tenant has, the title a tenant gave its own, and the name where it gave none.
  */
 export function positionLabel(t: TFunction, name: string, own?: TenantPosition[]) {
@@ -15,7 +15,7 @@ export function positionLabel(t: TFunction, name: string, own?: TenantPosition[]
   return own?.find((p) => p.name === name)?.title || name;
 }
 
-/** The positions a tenant has, the three every tenant has first, each with its label. */
+/** The positions a tenant has, the ones every tenant has first, each with its label. */
 export function allPositions(t: TFunction, shipped: string[], own: TenantPosition[]) {
   const mine = [...own].sort((a, b) => (a.title || a.name).localeCompare(b.title || b.name));
   return [

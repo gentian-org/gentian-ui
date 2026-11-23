@@ -17,12 +17,8 @@ export type DeclaredApp = {
   addons?: string[];
   /** The build each pinned add-on was installed at; an add-on with no entry is not pinned. */
   addonPins?: { name: string; digest: string; catalogue?: string }[];
-  /** Given to the position User: every person of the tenant has it. */
-  defaultGrant?: boolean;
-  /** The further positions the app is given to. */
+  /** The positions the app is given to. */
   positions?: string[];
-  /** The add-ons for everyone; each add-on has its own access, and one with no entry is given per person. */
-  addonGrants?: { name: string; defaultGrant?: boolean }[];
   /**
    * The catalog the build was fetched from. Git records it; the director
    * does not serve it yet, so this is absent today and shown as such.
@@ -44,9 +40,12 @@ export type AppWriteResult = {
   commit?: string;
 };
 
-/** The positions an app's entry gives it to, User among them when it is for everyone. */
-export function positionsOf(app: Pick<DeclaredApp, "defaultGrant" | "positions"> | undefined) {
-  return [...(app?.defaultGrant ? ["user"] : []), ...(app?.positions ?? []).filter((name) => name !== "user")];
+/**
+ * The positions an app's entry gives it to. User is left out: it enters the
+ * tenant and gives no app, so an entry that still names it gives nothing by it.
+ */
+export function positionsOf(app: Pick<DeclaredApp, "positions"> | undefined) {
+  return (app?.positions ?? []).filter((name) => name !== "user");
 }
 
 /**
@@ -58,17 +57,6 @@ export function setAppPositions(profile: string, positions: string[]) {
     method: "PUT",
     body: JSON.stringify({ positions }),
   });
-}
-
-/**
- * State whether one add-on of an installed app is for everyone. An add-on is
- * entitled on its own; the rest of the app's add-ons stay as they are.
- */
-export function setAddonForEveryone(profile: string, addon: string, everyone: boolean) {
-  return apiFetch<AppWriteResult>(
-    `/admin/apps/${encodeURIComponent(profile)}/addons/${encodeURIComponent(addon)}/access`,
-    { method: "PUT", body: JSON.stringify({ everyone }) },
-  );
 }
 
 /**

@@ -540,12 +540,15 @@ export function fetchAppAccess(profile: string, tenant?: string) {
   return apiFetch<AuthorizationView>(`/admin/access/apps/${encodeURIComponent(profile)}${tenantQuery(tenant)}`);
 }
 
-// Positions: named sets of roles a kind of person holds. Three every tenant
+// Positions: named sets of roles a kind of person holds. Four every tenant
 // has; a tenant declares its own at the director, which commits them. Who
 // holds a position, or a role beside one, is given at the registrar.
 
-/** The positions every tenant has. */
-export const SHIPPED_POSITIONS = ["user", "app-administrator", "tenant-administrator"] as const;
+/**
+ * The positions every tenant has. User enters the tenant (its desktop) and
+ * gives no app; All apps uses every app the tenant installed and includes User.
+ */
+export const SHIPPED_POSITIONS = ["user", "all-apps", "app-administrator", "tenant-administrator"] as const;
 
 /** One role a position holds: on an app, or on the tenant itself when app is absent. */
 export type PositionRole = { app?: string; role: string };

@@ -18,7 +18,6 @@ import {
   fetchTenantPrivileges,
   purgeAppData,
   positionsOf,
-  setAddonForEveryone,
   setAppPositions,
   uninstallApp,
   type AppPurgeResult,
@@ -81,7 +80,6 @@ export function joinApps(declaredApps: DeclaredApp[], states: AppState[]): AppRo
 type Outcome = {
   kind: "access" | "uninstall";
   app: string;
-  everyone?: boolean;
   positions?: string[];
   result: AppWriteResult;
 };
@@ -400,8 +398,8 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 
 /**
  * Status: the app at a glance -- how it stands on the cluster and why, which
- * build git pins, where that build came from, what is switched on inside it,
- * and whether it is for everyone.
+ * build git pins, where that build came from and what is switched on inside
+ * it.
  *
  * The cluster's own words are shown as they came -- the message, the failure,
  * every condition -- because "why is it not running" is answered there and
@@ -495,9 +493,6 @@ function StatePart({
                 );
               })}
         </Fact>
-        <Fact label={t("apps.forEveryone")}>
-          {declared ? (declared.defaultGrant ? t("apps.yes") : t("apps.no")) : "—"}
-        </Fact>
       </div>
       {conditions.length > 0 ? (
         <div className="admin-console__table-wrap">
@@ -528,12 +523,13 @@ function StatePart({
 }
 
 /**
- * Access: whether the app is for everyone, and who has it now.
+ * Access: the positions the app is given to, and who has it now.
  *
- * "For everyone" is a key on the app's entry in git. Switching it restates
+ * The positions are a key on the app's entry in git. Changing them restates
  * that key through the director's install route and leaves the pinned build
  * alone. It is offered only for an app git declares, because the same request
- * for one git does not have would install it.
+ * for one git does not have would install it. All apps and App administrator
+ * have every app whatever the entry says.
  *
  * Who has access now is who holds a role on the app: mostly a position, whose
  * holders are changed on Positions, and now and then one person who was given
@@ -614,7 +610,7 @@ export function AccessPart({
           {access.isError ? <p className="admin-console__error">{messageOf(access.error)}</p> : null}
         </>
       ) : (
-        <p className="admin-console__hint">{t("apps.everyoneNotDeclared")}</p>
+        <p className="admin-console__hint">{t("apps.positionsNotDeclared")}</p>
       )}
 
       <h4 className="admin-console__group-title">{t("apps.peopleTitle")}</h4>
@@ -626,14 +622,7 @@ export function AccessPart({
           <h4 className="admin-console__group-title">{t("apps.addonAccessTitle")}</h4>
           <p className="admin-console__hint">{t("apps.addonAccessLead")}</p>
           {(declared?.addons ?? []).map((addon) => (
-            <AddonAccess
-              key={addon}
-              profile={profile}
-              addon={addon}
-              tenant={tenant}
-              everyone={(declared?.addonGrants ?? []).some((g) => g.name === addon && g.defaultGrant)}
-              onOutcome={onOutcome}
-            />
+            <AddonAccess key={addon} addon={addon} />
           ))}
         </>
       ) : null}
@@ -643,50 +632,14 @@ export function AccessPart({
 
 /**
  * One add-on's own access. An add-on is an app of its own, with roles of its
- * own: whether it is for everyone, and who holds a role on it, are the
- * add-on's, not the app's.
+ * own: who holds a role on it is the add-on's, not the app's.
  */
-function AddonAccess({
-  profile,
-  addon,
-  tenant,
-  everyone,
-  onOutcome,
-}: {
-  profile: string;
-  addon: string;
-  tenant: string;
-  everyone: boolean;
-  onOutcome: (outcome: Outcome) => void;
-}) {
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const access = useMutation({
-    mutationFn: (next: boolean) => setAddonForEveryone(profile, addon, next),
-    onSuccess: (result, next) => {
-      onOutcome({ kind: "access", app: addon, everyone: next, result });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "declared"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "access"] });
-    },
-  });
-  function switchAccess() {
-    const question = everyone
-      ? t("apps.everyoneOffConfirm", { app: addon, tenant })
-      : t("apps.everyoneOnConfirm", { app: addon, tenant });
-    if (window.confirm(question)) access.mutate(!everyone);
-  }
+function AddonAccess({ addon }: { addon: string }) {
   return (
     <div className="admin-console__subsection" data-addon={addon}>
       <h5 className="admin-console__group-title">
         <span className="admin-console__chip">{addon}</span>
       </h5>
-      <p className="admin-console__lead">{everyone ? t("apps.addonEveryoneIsOn") : t("apps.addonEveryoneIsOff")}</p>
-      <div className="admin-console__actions">
-        <button type="button" className="admin-console__btn" disabled={access.isPending} onClick={switchAccess}>
-          {everyone ? t("apps.everyoneSwitchOff") : t("apps.everyoneSwitchOn")}
-        </button>
-      </div>
-      {access.isError ? <p className="admin-console__error">{messageOf(access.error)}</p> : null}
       <RoleHolders profile={addon} />
     </div>
   );
@@ -1097,24 +1050,13 @@ function UninstallPart({
  * one, the tenant already was as asked.
  */
 function OutcomeNotice({ outcome }: { outcome: Outcome }) {
-  const { app, result, kind, everyone, positions } = outcome;
+  const { app, result, kind, positions } = outcome;
   const commit = (result.commit ?? "").slice(0, 8);
   const values = { app, commit, status: result.status };
   if (kind === "access" && result.commit && positions) {
     return (
       <p className="admin-console__success">
         <Trans i18nKey="apps.outcomePositions" values={values} components={mono} />
-      </p>
-    );
-  }
-  if (kind === "access" && result.commit) {
-    return (
-      <p className="admin-console__success">
-        {everyone ? (
-          <Trans i18nKey="apps.outcomeEveryoneOn" values={values} components={mono} />
-        ) : (
-          <Trans i18nKey="apps.outcomeEveryoneOff" values={values} components={mono} />
-        )}
       </p>
     );
   }

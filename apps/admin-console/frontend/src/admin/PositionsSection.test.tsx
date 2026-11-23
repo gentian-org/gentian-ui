@@ -25,7 +25,7 @@ function text(html: string) {
 
 const positions: TenantPositions = {
   tenant: "acme",
-  shipped: ["user", "app-administrator", "tenant-administrator"],
+  shipped: ["user", "all-apps", "app-administrator", "tenant-administrator"],
   positions: [
     { name: "sales-manager", title: "Sales manager" },
     { name: "interns" },
@@ -39,9 +39,9 @@ describe("PositionsSection", () => {
   it("lists the positions every tenant has before the tenant's own, each by what people call it", () => {
     const html = text(render(<PositionsSection />, [[["admin", "positions"], positions]]));
     expect(html).toContain("A position is a named set of roles");
-    // The three every tenant has, in the platform's words and marked as such.
-    for (const label of ["User", "App administrator", "Tenant administrator"]) expect(html).toContain(label);
-    expect(html.match(/Every tenant has it/g)).toHaveLength(3);
+    // The four every tenant has, in the platform's words and marked as such.
+    for (const label of ["User", "All apps", "App administrator", "Tenant administrator"]) expect(html).toContain(label);
+    expect(html.match(/Every tenant has it/g)).toHaveLength(4);
     // The tenant's own by their titles, and by the name where none was given.
     const order = ["Tenant administrator", "Executive", "interns", "Sales manager"].map((label) => html.indexOf(label));
     expect(order).toEqual([...order].sort((a, b) => a - b));
@@ -63,8 +63,11 @@ describe("PositionsSection", () => {
 });
 
 describe("position labels", () => {
-  it("names the three every tenant has in the platform's words and a tenant's own by its title", () => {
+  it("names the ones every tenant has in the platform's words and a tenant's own by its title", () => {
     expect(isShipped("user")).toBe(true);
+    expect(isShipped("all-apps")).toBe(true);
+    expect(positionLabel(t, "user")).toBe("User");
+    expect(positionLabel(t, "all-apps")).toBe("All apps");
     expect(isShipped("sales-manager")).toBe(false);
     expect(positionLabel(t, "tenant-administrator")).toBe("Tenant administrator");
     expect(positionLabel(t, "sales-manager", positions.positions)).toBe("Sales manager");
@@ -73,12 +76,21 @@ describe("position labels", () => {
     expect(positionLabel(t, "ghost", positions.positions)).toBe("ghost");
     expect(allPositions(t, positions.shipped, positions.positions).map((p) => p.name)).toEqual([
       "user",
+      "all-apps",
       "app-administrator",
       "tenant-administrator",
       "executive",
       "interns",
       "sales-manager",
     ]);
+  });
+
+  it("says what User and All apps give, in English and German", () => {
+    const de = i18n.getFixedT("de");
+    expect(de("positions.shipped_all-apps")).toBe("Alle Apps");
+    expect(t("positions.shippedHint_user")).toMatch(/^Enters the tenant: its desktop, no apps\./);
+    expect(t("positions.shippedHint_all-apps")).toMatch(/^Uses every app installed in the tenant/);
+    expect(de("positions.shippedHint_all-apps")).toMatch(/^Nutzt jede im Mandanten installierte App/);
   });
 
   it("names a role in words, and leaves one an app declares as the app named it", () => {

@@ -7,8 +7,8 @@ describe("who gets an app, by position", () => {
   const own = [{ name: "sales", title: "Sales" }];
   const choosable = choosablePositions(own);
 
-  it("offers every position but the one that administers every app", () => {
-    expect(choosable).toEqual(["user", "tenant-administrator", "sales"]);
+  it("offers every position but the ones that have every app and the one that gives none", () => {
+    expect(choosable).toEqual(["tenant-administrator", "sales"]);
   });
 
   it("shows the box at the top as all, some or none", () => {
@@ -23,14 +23,13 @@ describe("who gets an app, by position", () => {
     expect([...toggledAll(choosable, new Set(choosable))]).toEqual([]);
   });
 
-  it("reads an entry's positions with User for the default grant", () => {
-    expect(positionsOf({ defaultGrant: true, positions: ["sales"] })).toEqual(["user", "sales"]);
+  it("reads an entry's positions, leaving out User, which gives no app", () => {
+    expect(positionsOf({ positions: ["user", "sales"] })).toEqual(["sales"]);
     expect(positionsOf({ positions: ["sales"] })).toEqual(["sales"]);
     expect(positionsOf(undefined)).toEqual([]);
   });
 
   it("says who gets a new install", () => {
-    expect(whoGetsIt(["user", "sales"])).toBe("catalogue.outcomeEveryone");
     expect(whoGetsIt(["sales"])).toBe("catalogue.outcomePositions");
     expect(whoGetsIt([])).toBe("catalogue.outcomeNobody");
   });

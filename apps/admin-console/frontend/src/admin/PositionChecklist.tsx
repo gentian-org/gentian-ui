@@ -3,12 +3,21 @@ import { useTranslation } from "react-i18next";
 import { SHIPPED_POSITIONS, type TenantPosition } from "@/api/admin";
 import { allPositions } from "./positionLabels";
 
-/** The position whose holders administer every app: it has each app whatever is ticked. */
-const ALWAYS = "app-administrator";
+/**
+ * The positions that have every app whatever is ticked, each with the hint
+ * that says why: All apps uses every app, App administrator administers it.
+ */
+const ALWAYS: Record<string, string> = {
+  "all-apps": "positionChecklist.allApps",
+  "app-administrator": "positionChecklist.always",
+};
 
-/** The positions an app can be given to or kept from, by name: all of the tenant's but the one that has every app. */
+/** The position no app is given to: it enters the tenant, its desktop, and nothing else. */
+const NO_APP = "user";
+
+/** The positions an app can be given to or kept from, by name: the tenant's, but none that has every app or none. */
 export function choosablePositions(own: TenantPosition[]) {
-  return [...SHIPPED_POSITIONS.filter((name) => name !== ALWAYS), ...own.map((p) => p.name)];
+  return [...SHIPPED_POSITIONS.filter((name) => !(name in ALWAYS) && name !== NO_APP), ...own.map((p) => p.name)];
 }
 
 /** What the box at the top shows for a selection: all, none, or some. */
@@ -28,8 +37,8 @@ export function toggledAll(choosable: string[], selected: ReadonlySet<string>) {
  * the top that ticks all of them or none.
  *
  * A ticked position holds the app's role user, so everybody who holds the
- * position uses the app. User is every person of the tenant. App
- * administrator administers every app and is shown ticked, not to change.
+ * position uses the app. User gives no app and is not listed. All apps and
+ * App administrator have every app and are shown ticked, not to change.
  */
 export function PositionChecklist({
   own,
@@ -44,6 +53,7 @@ export function PositionChecklist({
 }) {
   const { t } = useTranslation();
   const choosable = choosablePositions(own);
+  const listed = allPositions(t, [...SHIPPED_POSITIONS], own).filter((position) => position.name !== NO_APP);
   const state = headerState(choosable, selected);
   const header = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -78,24 +88,21 @@ export function PositionChecklist({
           </tr>
         </thead>
         <tbody>
-          {allPositions(t, [...SHIPPED_POSITIONS], own).map((position) => {
-            const always = position.name === ALWAYS;
+          {listed.map((position) => {
+            const always = ALWAYS[position.name];
             return (
               <tr key={position.name}>
                 <td>
                   <label className="admin-console__checkbox">
                     <input
                       type="checkbox"
-                      checked={always || selected.has(position.name)}
-                      disabled={disabled || always}
+                      checked={Boolean(always) || selected.has(position.name)}
+                      disabled={disabled || Boolean(always)}
                       onChange={(e) => toggle(position.name, e.target.checked)}
                     />
                     <span>
                       {position.label}
-                      {position.name === "user" ? (
-                        <span className="admin-console__hint"> {t("positionChecklist.userIsEveryone")}</span>
-                      ) : null}
-                      {always ? <span className="admin-console__hint"> {t("positionChecklist.always")}</span> : null}
+                      {always ? <span className="admin-console__hint"> {t(always)}</span> : null}
                     </span>
                   </label>
                 </td>

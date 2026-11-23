@@ -68,7 +68,7 @@ def test_the_declared_apps_are_the_directors_answer_untouched(monkeypatch):
     body = {
         "tenant": "platform",
         "apps": [
-            {"profile": "timesheets", "digest": "sha256:" + "a" * 64, "defaultGrant": True},
+            {"profile": "timesheets", "digest": "sha256:" + "a" * 64, "positions": ["sales"]},
             {"profile": "wiki", "addons": ["wiki-search"]},
         ],
     }
@@ -442,10 +442,10 @@ def test_an_entry_takes_an_approval_and_a_withdrawal_and_nothing_else(monkeypatc
     assert seen == {}
 
 
-# -- for everyone, or per person --------------------------------------------
+# -- who gets the app, by position -----------------------------------------
 
 
-@pytest.mark.parametrize("positions", [["user", "sales"], []])
+@pytest.mark.parametrize("positions", [["sales"], []])
 def test_access_states_the_positions_and_nothing_else(monkeypatch, positions):
     seen: dict = {}
     _fake_client(monkeypatch, {"status": "updated", "commit": "a1b2c3d4"}, seen, status=202)
@@ -466,9 +466,9 @@ def test_access_without_saying_which_way_reaches_nobody(monkeypatch):
     seen: dict = {}
     _fake_client(monkeypatch, {"status": "updated"}, seen, status=202)
     client = _client()
-    # Unstated, null, or something merely shaped like a yes: the director
-    # would read an absent defaultGrant as "leave it", and a bare POST to its
-    # install route is an install.
+    # Unstated, null, or not a list: the director would read absent
+    # positions as "leave it", and a bare POST to its install route is an
+    # install.
     for body in ({}, {"positions": None}, {"positions": "user"}, {"everyone": True}):
         answer = client.put("/api/v1/admin/apps/timesheets/access", json=body, headers=_person)
         assert answer.status_code == 422
@@ -477,10 +477,10 @@ def test_access_without_saying_which_way_reaches_nobody(monkeypatch):
 
 def test_access_refused_names_the_right_it_lacks(monkeypatch):
     seen: dict = {}
-    body = {"error": "installing an app for everyone needs can_grant on the tenant"}
+    body = {"error": "giving an app to a position needs can_grant on the tenant"}
     _fake_client(monkeypatch, body, seen, status=403)
     answer = _client().put(
-        "/api/v1/admin/apps/timesheets/access", json={"positions": ["user"]}, headers=_person
+        "/api/v1/admin/apps/timesheets/access", json={"positions": ["sales"]}, headers=_person
     )
     assert answer.status_code == 403
     assert answer.json() == body
@@ -972,61 +972,15 @@ def test_a_removal_from_another_origin_is_refused_before_anything_is_asked(monke
         app.dependency_overrides.pop(get_settings, None)
 
 
-# -- an add-on's own access -------------------------------------------------
-
-
-def _fake_director(monkeypatch, answers: list[tuple[int, dict]], calls: list):
-    class FakeClient:
-        def __init__(self, *a, **kw):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def request(self, method, url, params=None, json=None, headers=None):
-            calls.append((method, url, json))
-            status, body = answers.pop(0)
-            return httpx.Response(status, json=body, request=httpx.Request(method, url))
-
-    monkeypatch.setattr(director.httpx, "AsyncClient", FakeClient)
-
-
-@pytest.mark.parametrize("everyone", [True, False])
-def test_an_addons_access_restates_the_list_with_that_one_addons_grant(monkeypatch, everyone):
-    calls: list = []
-    _fake_director(
-        monkeypatch,
-        [
-            (200, {"profile": "cloud", "addons": ["cloud-calendar", "cloud-deck"]}),
-            (202, {"status": "updated", "commit": "a1b2c3d4"}),
-        ],
-        calls,
-    )
-    answer = _client().put(
-        "/api/v1/admin/apps/cloud/addons/cloud-deck/access",
-        json={"everyone": everyone},
-        headers=_person,
-    )
-    assert answer.status_code == 202
-    assert calls[0][:2] == ("GET", f"{_base}/apps/cloud/addons")
-    # Every add-on stays by name, so its pin and grant stay; only this one says.
-    assert calls[1] == (
-        "PUT",
-        f"{_base}/apps/cloud/addons",
-        {"addons": ["cloud-calendar", {"name": "cloud-deck", "defaultGrant": everyone}]},
-    )
-
-
-def test_an_addon_the_app_does_not_activate_is_not_switched_on(monkeypatch):
-    calls: list = []
-    _fake_director(monkeypatch, [(200, {"profile": "cloud", "addons": ["cloud-calendar"]})], calls)
+def test_an_addon_is_not_made_for_everyone_from_here(monkeypatch):
+    # Nothing is for everyone any more: an add-on reaches people through a
+    # role on it, so the console has no route that says otherwise.
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated"}, seen, status=202)
     answer = _client().put(
         "/api/v1/admin/apps/cloud/addons/cloud-deck/access",
         json={"everyone": True},
         headers=_person,
     )
-    assert answer.status_code == 404
-    assert [c[0] for c in calls] == ["GET"]
+    assert answer.status_code in (404, 405)
+    assert seen == {}

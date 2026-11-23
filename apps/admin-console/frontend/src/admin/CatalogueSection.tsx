@@ -265,7 +265,6 @@ function OutcomeNotice({ outcome }: { outcome: Outcome }) {
 
 /** The sentence that says who gets an app installed for these positions. */
 export function whoGetsIt(positions: string[]) {
-  if (positions.includes("user")) return "catalogue.outcomeEveryone";
   return positions.length > 0 ? "catalogue.outcomePositions" : "catalogue.outcomeNobody";
 }
 
@@ -275,11 +274,11 @@ export function whoGetsIt(positions: string[]) {
  * called.
  *
  * One question rides along: who gets the app. The tenant's positions are
- * listed, all ticked; the box at the top ticks all or none. What is ticked
+ * listed, none ticked; the box at the top ticks all or none. What is ticked
  * is stated in the install itself, and the holders of those positions have
  * the app once it is ready.
  */
-function InstallDialog({
+export function InstallDialog({
   entry,
   pending,
   error,
@@ -297,9 +296,9 @@ function InstallDialog({
   const positions = useQuery({ queryKey: ["admin", "positions"], queryFn: () => fetchPositions(), retry: false });
   const own = positions.data?.positions ?? [];
   const choosable = choosablePositions(own);
-  // Untouched, every position is ticked, the tenant's own once they are read.
-  const [chosen, setChosen] = useState<Set<string> | null>(null);
-  const selected = chosen ?? new Set(choosable);
+  // Nothing starts ticked: the least access is the default, and All apps and
+  // App administrator have the app anyway.
+  const [selected, setChosen] = useState<Set<string>>(() => new Set());
   // Pre-selected for the perimeter approver: installing and approving is
   // one step for somebody who may do both. Unticking leaves the app waiting.
   const [approving, setApproving] = useState(true);

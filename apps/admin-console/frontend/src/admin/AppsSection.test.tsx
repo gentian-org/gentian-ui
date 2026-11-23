@@ -142,7 +142,10 @@ describe("AccessPart", () => {
       unheld: 1,
     });
     client.setQueryData(["admin", "people", ""], { people: [{ id: "u1", username: "ada@acme.example", name: "Ada" }] });
-    client.setQueryData(["admin", "positions"], { shipped: ["user"], positions: [] });
+    client.setQueryData(["admin", "positions"], {
+      shipped: ["user", "all-apps", "app-administrator", "tenant-administrator"],
+      positions: [],
+    });
     return renderToString(
       <QueryClientProvider client={client}>
         <AccessPart
@@ -172,6 +175,15 @@ describe("AccessPart", () => {
     expect(html).toMatch(/Administrator of the app.*nobody/s);
   });
 
+  it("offers neither User nor All apps as a position to give the app to", () => {
+    const html = renderAccess({ ...state, origin: "install" });
+    const checklist = html.slice(0, html.indexOf("Save who gets it"));
+    // All apps has every app, shown ticked and not to change; User gives no app and is not listed.
+    expect(checklist).toMatch(/disabled="" checked=""\/><span>All apps<span class="admin-console__hint"> <!-- -->\(uses every app\)/);
+    expect(checklist).not.toMatch(/>User</);
+    expect(html).not.toMatch(/for everyone|every person of the tenant/i);
+  });
+
   it("lists each add-on with its own access", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     client.setQueryData(["admin", "access", "app", "cloud-calendar"], {
@@ -186,9 +198,7 @@ describe("AccessPart", () => {
             profile: "cloud",
             declared: {
               profile: "cloud",
-              defaultGrant: true,
               addons: ["cloud-calendar", "cloud-deck"],
-              addonGrants: [{ name: "cloud-calendar", defaultGrant: true }],
             },
             state: { ...state, profile: "cloud", origin: "install" },
           }}
@@ -200,9 +210,10 @@ describe("AccessPart", () => {
     expect(html).toContain("Each add-on is an app of its own");
     const calendar = html.slice(html.indexOf('data-addon="cloud-calendar"'), html.indexOf('data-addon="cloud-deck"'));
     const deck = html.slice(html.indexOf('data-addon="cloud-deck"'));
-    expect(calendar).toContain("This add-on is for everyone");
     expect(calendar).toContain("Held by");
-    expect(deck).toContain("This add-on is not for everyone");
+    expect(deck).toContain("cloud-deck");
+    // Nothing is for everyone any more: an add-on reaches people through roles on it.
+    expect(html).not.toMatch(/for everyone/i);
   });
 });
 
