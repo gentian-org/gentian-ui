@@ -13,7 +13,24 @@ import { apiFetch } from "@/api/client";
 
 export type CatalogueSource = {
   name: string;
+  /**
+   * "cluster" for one of the cluster's defaults, on the Cluster claim, which
+   * every tenant sees; "tenant" for one the tenant names itself (Tenant
+   * `spec.catalogue.sources`), whoever added it there.
+   */
+  scope?: "cluster" | "tenant";
+  /** Who added it: "cluster", "tenant", or "store" for a cluster default the installer added. */
+  addedBy?: string;
 };
+
+/**
+ * Whether the tenant names a catalog of its own: one beyond the cluster's
+ * defaults. Its apps are ones the App Store does not list, so this is what
+ * the Catalogs tab is shown for.
+ */
+export function namesOwnCatalogue(sources: CatalogueSourcesResponse | undefined): boolean {
+  return (sources?.catalogues ?? []).some((source) => source.scope === "tenant");
+}
 
 export type CatalogueSourcesResponse = {
   tenant: string;

@@ -113,11 +113,12 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
   const sources = sourcesQuery.data?.catalogues ?? [];
   const storeUrl = sourcesQuery.data?.storeUrl ?? "";
 
-  // The first catalog, until somebody picks another. Not a stored default:
-  // a cluster with one source should not need a click to see it.
+  // The tenant's own catalog first, else the first of the cluster's, until
+  // somebody picks another. Not a stored default: a tenant that names a
+  // catalog of its own came here for it, and should not need a click to see it.
   useEffect(() => {
     if (!selected && sources.length > 0) {
-      setSelected(sources[0].name);
+      setSelected((sources.find((source) => source.scope === "tenant") ?? sources[0]).name);
     }
   }, [selected, sources]);
 
