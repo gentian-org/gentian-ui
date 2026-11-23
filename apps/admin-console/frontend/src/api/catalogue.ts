@@ -88,10 +88,30 @@ export type AskedEgress = {
   cameWith?: string;
 };
 
+/** One contract a build consumes from the tenant's other apps that no grant covers yet. */
+export type AskedIntegration = {
+  /** The app that consumes: the entry itself, or one it comes with. */
+  install: string;
+  /** The contract, as a grant names it. */
+  contract: string;
+  /** The app the profile expects to provide it; absent where the tenant's binding chooses. */
+  provider?: string;
+  /** What of the contract the build asks for, and what a grant with the install grants. */
+  capabilities: string[];
+  /** Whether the app calls the provider as the person it acts for. */
+  asPerson?: boolean;
+  /** The app this one comes with, for a contract that is not the entry's own. */
+  cameWith?: string;
+};
+
 export type CatalogueEntryAsks = {
   egress: AskedEgress[];
   /** Whether this person may approve them: the tenant's perimeter approver. */
   mayApprove: boolean;
+  /** Absent from a director that does not say them. */
+  integrations?: AskedIntegration[];
+  /** Whether this person may grant them (can_grant). */
+  mayGrant?: boolean;
 };
 
 /** What one build asks for, before it is installed. The director's answer. */
@@ -115,17 +135,23 @@ export function fetchCatalogueEntryAsks(entry: Pick<CatalogueEntry, "name" | "co
  * `approve` names outbound requests of the build that the person approves
  * with the install, as the director listed them. Each becomes their grant;
  * the director refuses the whole install when they may not approve.
+ *
+ * `grant` names the contracts the build consumes that the person grants with
+ * the install, each with exactly what the build asks for; the director
+ * refuses the whole install when they may not grant.
  */
 export function installCatalogueEntry(
   entry: Pick<CatalogueEntry, "name" | "coordinate" | "digest">,
   positions: string[] = [],
   approve: AskedEgress[] = [],
+  grant: AskedIntegration[] = [],
 ) {
   const body: {
     coordinate: string;
     digest: string;
     positions: string[];
     approve?: { install: string; privilege: string }[];
+    grant?: { install: string; contract: string }[];
   } = {
     coordinate: entry.coordinate,
     digest: entry.digest,
@@ -133,6 +159,9 @@ export function installCatalogueEntry(
   };
   if (approve.length > 0) {
     body.approve = approve.map(({ install, privilege }) => ({ install, privilege }));
+  }
+  if (grant.length > 0) {
+    body.grant = grant.map(({ install, contract }) => ({ install, contract }));
   }
   return apiFetch<AppWriteResult>(`/catalogue/apps/${encodeURIComponent(entry.name)}`, {
     method: "POST",
