@@ -9,11 +9,14 @@ import {
 } from "@/api/account";
 import { accountConsoleUrl } from "@/auth/oidc";
 import { DevicesTab } from "@/account/DevicesTab";
+import { ConnectionsTab } from "@/account/ConnectionsTab";
+import { arrivalShown, pendingArrival } from "@/account/arrival";
+import { fetchConnections } from "@/api/connections";
 import "@/styles/shell-panel.css";
 
 import { useTranslation } from "react-i18next";
 import { formatDateTime } from "@/lib/locale";
-type AccountTab = "profile" | "security" | "sessions" | "devices";
+type AccountTab = "profile" | "security" | "sessions" | "devices" | "connections";
 
 type AccountPanelProps = {
   embedded?: boolean;
@@ -29,7 +32,18 @@ function formatTime(epochMs: number | null | undefined) {
 export function AccountPanel({ embedded = false }: AccountPanelProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<AccountTab>("profile");
+  // A person back from an outside service's sign-in lands on Connections.
+  const [arrival] = useState(pendingArrival);
+  const [tab, setTab] = useState<AccountTab>(arrival?.tab ?? "profile");
+  useEffect(() => {
+    arrivalShown();
+  }, []);
+  // The tab is there only where the workspace has a liaison.
+  const connectionsQuery = useQuery({
+    queryKey: ["account", "connections"],
+    queryFn: fetchConnections,
+  });
+  const hasConnections = connectionsQuery.data?.available === true || tab === "connections";
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -108,8 +122,11 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
               ["security", "Security"],
               ["sessions", "Sessions"],
               ["devices", "Devices"],
+              ["connections", "Connections"],
             ] as const
-          ).map(([id, label]) => (
+          )
+            .filter(([id]) => id !== "connections" || hasConnections)
+            .map(([id, label]) => (
             <button
               key={id}
               type="button"
@@ -269,6 +286,7 @@ export function AccountPanel({ embedded = false }: AccountPanelProps) {
             </section>
           )}
           {tab === "devices" && <DevicesTab />}
+          {tab === "connections" && <ConnectionsTab arrival={arrival} />}
         </div>
       </div>
     </div>

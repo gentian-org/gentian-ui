@@ -187,6 +187,13 @@ usher:
 registrar:
   url: ""
 
+# The tenant's liaison, in this namespace under its fixed name: where a person
+# lists, starts and ends their connections to services outside the workspace
+# (the account panel's Connections tab), with their own token. A workspace
+# whose apps name no such service has no liaison, and the tab is not shown.
+liaison:
+  url: "http://liaison:8000"
+
 # The chart's objects are <release>-gentian-portal-<part> unless a name is
 # given here. The operator installs the desktop as a component whose Release
 # carries the namespace in its name, and names the objects after the
