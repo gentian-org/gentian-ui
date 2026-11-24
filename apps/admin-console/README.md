@@ -95,7 +95,8 @@ The Apps tab is where a tenant's apps are administered; the desktop only shows
 tiles and opens them. It lists the installed apps from two answers — what git
 declares (the director) and what the cluster has made of it (the usher) — and
 says so where they disagree. For one app it shows its state, who has access
-and whether it is for everyone, what it exchanges with other apps, what it
+(the positions it is given to, and the people who hold a role on it beside
+them, for the app and each add-on), what it exchanges with other apps, what it
 asked of the platform and what was approved, and it uninstalls. Purging the
 data of an app that is no longer installed is a separate, typed-out act.
 For an app that declares entries for the internet, its Details also list them

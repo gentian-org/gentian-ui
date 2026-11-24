@@ -77,7 +77,7 @@ only references contract **names** that match those definitions.
 |---|---|---|---|
 | **Declaration** | `provides` + `optionalIntegrations` on AppProfile | Catalog / app developer | **Implemented** (CRD) |
 | **Wiring** | `IntegrationBinding` — credentials + OIDC between installed apps | Platform operator (auto when peers match) | **Implemented** |
-| **Grant (ReBAC)** | Future `AppGrant` — tenant-approved subset + OpenFGA tuples | Tenant admin at install | **Planned** (Stage 2 in security architecture) |
+| **Grant (ReBAC)** | `AppGrant` — the capabilities the tenant approved for a consumer, a subset of what the binding declares; the director projects it into OpenFGA | Tenant admin, after install | **Implemented** |
 
 `kernelRequirements` (OIDC, Postgres, S3, …) is **separate** — it declares
 **kernel services**, not cross-app integration contracts.
@@ -86,7 +86,7 @@ only references contract **names** that match those definitions.
 |---|-------------|-----|
 | M18 | **Declare kernel needs honestly** | `kernelRequirements` — only OIDC/DB/storage/mail the app actually uses |
 | M19 | **Declare integration contracts honestly** | `provides` / `optionalIntegrations` — only contracts the app implements or consumes; see existing profiles under `gentian-apps/profiles/` |
-| M20 | **Never implement tenant grants in app code** | Cross-app access is wired by `IntegrationBinding` (today) and `AppGrant` + OpenFGA (future) — apps declare, they do not grant |
+| M20 | **Never implement tenant grants in app code** | Cross-app access is wired by `IntegrationBinding` and narrowed by `AppGrant`; who may use an app, and with which role, is the roles people hold on it through positions in the platform's rights store ([gentian-os iam.md §1.2](https://github.com/gentian-org/gentian-os/blob/develop/docs/concepts/iam.md)) — apps declare, they do not grant |
 
 The admin console's profile is the platform's, not this repository's: the
 `ComponentProfile` `admin-console` in gentian-os
@@ -119,7 +119,7 @@ When OpenFGA is available in the cluster, these become mandatory for all apps
 | # | Requirement |
 |---|-------------|
 | S1 | Call OpenFGA **Check** (AuthZEN API) on every mutation and sensitive read |
-| S2 | Effective access = `AppProfile contract declaration ∩ tenant grant (AppGrant, future) ∩ user ceiling ∩ ABAC` |
+| S2 | Effective access = `contract declaration ∩ tenant grant (AppGrant) ∩ the person's roles on the app ∩ ABAC` |
 | S3 | Agent routes validate **delegation tuple + task TTL** before acting |
 
 Until then, M1–M4 + M26 are the minimum authorization bar.
