@@ -2,8 +2,9 @@
 
 This template implements the **application-layer** slice of
 [gentian-os/docs/security/design.md](https://github.com/gentian-org/gentian-os/blob/main/docs/security/design.md).
-Platform MAC (namespaces, default-deny egress, mesh) is enforced by Gentian OS;
-apps must not weaken it.
+Platform MAC (namespaces, NetworkPolicy, the edge in both directions) is
+enforced by Gentian OS; apps must not weaken it. The edge is described in
+[gentian-os/docs/concepts/edge.md](https://github.com/gentian-org/gentian-os/blob/develop/docs/concepts/edge.md).
 
 ---
 
@@ -53,8 +54,8 @@ Public unauthenticated endpoints are limited to **`/healthz`** and **`/readyz`**
 
 | # | Requirement | How |
 |---|-------------|-----|
-| M16 | **Gateway API HTTPRoute only** | `chart/templates/httproute.yaml`; no nginx Ingress, no in-pod reverse proxy |
-| M17 | **Split API and static web at the gateway** | `/api`, `/healthz`, `/readyz` → API Service; `/` → web Service |
+| M16 | **Routes come from the profile's `expose` entries** | The operator writes the HTTPRoutes from the profile's `expose[]`; in the cluster the chart's own `chart/templates/httproute.yaml` stays off (`gateway.enabled: false`). No nginx Ingress, no in-pod reverse proxy |
+| M17 | **Split API and static web at the gateway** | `/api`, `/healthz`, `/readyz` → API Service; `/` → web Service: two `expose` entries on one host (`surface: gateway`, `authMode: oidc`) |
 
 ### Catalog declaration (catalog apps only)
 
@@ -87,7 +88,10 @@ only references contract **names** that match those definitions.
 | M19 | **Declare integration contracts honestly** | `provides` / `optionalIntegrations` — only contracts the app implements or consumes; see existing profiles under `gentian-apps/profiles/` |
 | M20 | **Never implement tenant grants in app code** | Cross-app access is wired by `IntegrationBinding` (today) and `AppGrant` + OpenFGA (future) — apps declare, they do not grant |
 
-Kernel-only repos (e.g. `gentian-ui`) skip M18–M20; they deploy via ApplicationSet, not AppProfile.
+The admin console's profile is the platform's, not this repository's: the
+`ComponentProfile` `admin-console` in gentian-os
+(`charts/gentian-os/templates/componentprofile-admin-console.yaml`). M18–M20
+are checked there.
 
 ---
 
@@ -101,7 +105,7 @@ Enable these when the condition is true — not optional laziness.
 | App exposes **admin or destructive operations** | M22: **OpenFGA / AuthZEN `Check`** before the handler runs (via `require_permission()` once PDP is wired) |
 | App runs **AI agents or workflows** | M23: **Dedicated Keycloak client per agent instance** — never reuse human credentials or a shared service account |
 | App agents act **on behalf of a user** | M24: **RFC 8693 token exchange** with `act` / `may_act`; rights derived through user ceiling (§2.3) |
-| App calls **external URLs** | M25: Declare endpoints; rely on platform egress allowlist — do not disable NetworkPolicy |
+| App calls **hosts outside the cluster** | M25: Declare each destination in `requires.privileges.egress[]` with a `reason`, as `hosts`, `hostsAtApproval` or an address `rule` ([app-profile-guide.md](https://github.com/gentian-org/gentian-apps/blob/develop/docs/app-profile-guide.md)). Connect to the host by its name as usual: no proxy setting, no own NetworkPolicy, and never disable the platform's. The admin console calls no host outside the cluster |
 | App stores **tenant/user data** | M26: **Row-level tenant isolation** in queries; no cross-tenant reads even if ReBAC is not wired yet |
 | **Production** deploy | M27: **CPU/memory requests and limits** on api and web containers |
 
@@ -147,13 +151,42 @@ in the chart unless platform docs explicitly require an app-specific supplement.
 | Control | Owner |
 |---------|--------|
 | Per-tenant namespace isolation | Gentian OS / Crossplane |
-| Default-deny egress NetworkPolicy (Cilium) | Gentian OS |
-| Tenant Gateway + wildcard TLS (cert-manager) | Gentian OS operator |
+| Tenant NetworkPolicy baseline: DNS to the cluster's DNS, the API server, what the profile declares inside the cluster; everything outside refused unless granted (Calico) | Gentian OS operator |
+| The Gateways `authenticated`, `perimeter` and `inside` and their TLS certificates (cert-manager) | Gentian OS operator |
+| The outgoing gateway: one listener per granted host, the caller's host-table entry, the record of each connection | Gentian OS operator |
 | `frame-ancestors` / CSP for portal iframe embedding | Gentian OS gateway policy |
 | Admission control (no privileged pods, image policy) | Kyverno / Gatekeeper |
 | Keycloak realm, OIDC clients, token exchange infra | Kernel Keycloak config |
 | OpenBao paths + ESO ExternalSecrets | Platform provisioning |
-| HTTPRoute hostnames from AppProfile `ingress.subDomain` | Operator (tenant apps) |
+| HTTPRoute hostnames from the profile's `expose[].subDomain` | Gentian OS operator |
+
+---
+
+## Edge decisions in this console
+
+The console shows and answers what the director allows; the director decides
+again on every write and its refusal is shown as it came.
+
+- **Perimeter** (for `can_expose`): the entries waiting for a decision and the
+  published ones, the tenant's **Outbound** list, **Trusted domains**, the
+  traffic of the published paths, and the history of each decision from its
+  commit. Outbound lists every `egress/<name>` request of the tenant's apps,
+  waiting or declined, with its reason and the hosts it names (or that the
+  approval names them), and every grant with its approver, time, reason,
+  the hosts it opens and its end. The tenant's perimeter approver
+  (`can_approve_privilege`) approves or declines a request there and withdraws
+  a grant; a withdrawn request waits for an answer again.
+- **Trusted domains**: the tenant's own list, beside the cluster's. While the
+  cluster's administrator has delegated the list to the tenant, the tenant's
+  perimeter approver adds and removes domains. A request whose every host is
+  in or under a trusted domain is granted without a further answer; removing
+  the domain makes it wait again.
+- **Approvals**: the requests a person answers: the cluster's approvers see
+  every tenant's, the tenant's perimeter approver the tenant's own. An
+  approval takes an optional comment and an optional end; a decline needs a
+  reason of at least ten characters. For a `hostsAtApproval`
+  request the approver names the hosts, one per line or comma-separated, with
+  a port where it is not 443, and the grant opens those and no others.
 
 ---
 
@@ -164,7 +197,7 @@ in the chart unless platform docs explicitly require an app-specific supplement.
 [ ] M5–M7  Pattern A secrets; no leakage in logs
 [ ] M8–M10 Health probes; CORS; no in-app TLS termination
 [ ] M11–M15 Pod hardening; pinned images
-[ ] M16–M17 HTTPRoute; no nginx
+[ ] M16–M17 Routes from the profile's expose; no nginx
 [ ] M18–M20 AppProfile honest declaration (catalog apps)
 [ ] M21+    Conditional items reviewed
 [ ] M27     Resource limits set for production
@@ -177,4 +210,5 @@ in the chart unless platform docs explicitly require an app-specific supplement.
 - [gentian-os/docs/concepts/app-catalog.md](https://github.com/gentian-org/gentian-os/blob/main/docs/concepts/app-catalog.md) — contracts, `provides`, `IntegrationBinding`
 - [gentian-os/docs/security/design.md](https://github.com/gentian-org/gentian-os/blob/main/docs/security/design.md) §3.4 — same model as `provides`/`optionalIntegrations`, plus future AppGrant/ReBAC
 - [gentian-os/docs/concepts/routing.md](https://github.com/gentian-org/gentian-os/blob/main/docs/concepts/routing.md)
+- [gentian-os/docs/guides/edge.md](https://github.com/gentian-org/gentian-os/blob/develop/docs/guides/edge.md) — operating the edge: approvals, trusted domains, the record
 - [gentian-os/docs/security/design.md](https://github.com/gentian-org/gentian-os/blob/main/docs/security/design.md)
