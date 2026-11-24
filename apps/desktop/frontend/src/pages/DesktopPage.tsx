@@ -10,6 +10,7 @@ import { buildAppLaunchUrl } from "@/lib/appLaunchUrl";
 import { WindowManager } from "@/windows/WindowManager";
 import { DesktopShortcuts } from "@/shell/DesktopShortcuts";
 import { OPENED, openAppRequest } from "@/lib/openApp";
+import { arriveFromAddress } from "@/account/arrival";
 
 const GRID_X = 100;
 const GRID_Y = 110;
@@ -40,6 +41,13 @@ export function DesktopPage() {
 
   useEffect(() => {
     void loadPrefs();
+  }, []);
+
+  // Back from an outside service's sign-in: the account panel, at Connections.
+  useEffect(() => {
+    if (arriveFromAddress()) {
+      openBuiltinPanel("account", "Account", "account");
+    }
   }, []);
 
   useEffect(() => {

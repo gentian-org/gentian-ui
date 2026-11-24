@@ -85,7 +85,19 @@
     "devicesNeverUsed": "Nie",
     "devicesRevoke": "Widerrufen",
     "devicesRevokeConfirm": "Gerätepasswort für {{name}} widerrufen? Das Programm auf diesem Gerät synchronisiert dann nicht mehr.",
-    "devicesNone": "Sie haben keine Gerätepasswörter."
+    "devicesNone": "Sie haben keine Gerätepasswörter.",
+    "connectionsIntro": "Ihre Anmeldungen bei Diensten außerhalb dieses Arbeitsbereichs, etwa einem Aufnahmegerät oder einem Maildienst. Die Agenten, die Sie ausführen, rufen diese Dienste in Ihrem Namen auf, und nur für das, was Sie starten oder planen. Was ein Dienst zurückgibt, bleibt beim Arbeitsbereich, nie bei einem Agenten. Trennen Sie einen Dienst, um die Verbindung zu beenden.",
+    "connectionsService": "Dienst",
+    "connectionsState": "Status",
+    "connectionsYes": "Verbunden",
+    "connectionsNo": "Nicht verbunden",
+    "connectionsConnect": "Verbinden",
+    "connectionsDisconnect": "Trennen",
+    "connectionsConnected": "Verbunden: {{name}}.",
+    "connectionsDeclined": "Die Anmeldung beim Dienst wurde abgelehnt, es wurde nichts verbunden.",
+    "connectionsFailed": "Die Anmeldung konnte nicht abgeschlossen werden. Versuchen Sie es erneut.",
+    "connectionsNone": "Keine App in diesem Arbeitsbereich ruft einen Dienst außerhalb auf.",
+    "connectionsUnavailable": "Verbindungen sind gerade nicht verfügbar."
   },
   "auth": {
     "signInElsewhere": "Am Haupteingang anmelden",

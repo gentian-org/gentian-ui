@@ -85,7 +85,19 @@
     "devicesNeverUsed": "Never",
     "devicesRevoke": "Revoke",
     "devicesRevokeConfirm": "Revoke the device password for {{name}}? The program on that device stops syncing.",
-    "devicesNone": "You have no device passwords."
+    "devicesNone": "You have no device passwords.",
+    "connectionsIntro": "Your sign-ins at services outside this workspace, such as a recorder or a mail service. The agents you run call these services as you, and only for what you start or schedule. What a service hands back stays with the workspace, never with an agent. Disconnect a service to end it.",
+    "connectionsService": "Service",
+    "connectionsState": "State",
+    "connectionsYes": "Connected",
+    "connectionsNo": "Not connected",
+    "connectionsConnect": "Connect",
+    "connectionsDisconnect": "Disconnect",
+    "connectionsConnected": "Connected: {{name}}.",
+    "connectionsDeclined": "The service's sign-in was declined, so nothing was connected.",
+    "connectionsFailed": "The sign-in could not be completed. Try again.",
+    "connectionsNone": "No app in this workspace calls a service outside it.",
+    "connectionsUnavailable": "Connections are not available right now."
   },
   "auth": {
     "signInElsewhere": "Sign in at the front door",

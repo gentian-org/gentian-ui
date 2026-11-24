@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import (
     account,
     cluster,
+    connections,
     devices,
     health,
     llm,
@@ -88,6 +89,7 @@ app.include_router(cluster.router, prefix=settings.api_v1_str)
 app.include_router(prefs.router, prefix=settings.api_v1_str)
 app.include_router(account.router, prefix=settings.api_v1_str)
 app.include_router(devices.router, prefix=settings.api_v1_str)
+app.include_router(connections.router, prefix=settings.api_v1_str)
 app.include_router(notifications.router, prefix=settings.api_v1_str)
 app.include_router(llm.router, prefix=settings.api_v1_str)
 app.include_router(tiles.router, prefix=settings.api_v1_str)

@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     # passwords, with their own token (app/api/routes/account.py, devices.py).
     registrar_url: str | None = Field(default=None, alias="REGISTRAR_URL")
 
+    # The tenant's liaison, in the desktop's own namespace: where a person
+    # lists, starts and ends their connections to services outside the
+    # workspace, with their own token (app/api/routes/connections.py). A
+    # workspace whose apps name no such service has none, and the Connections
+    # tab is not shown.
+    liaison_url: str | None = Field(default=None, alias="LIAISON_URL")
+
     # The model gateway, for the assistant on the desktop (docs/ai-widget.md).
     #
     # The platform hands each tenant's desktop a key of its own at the gateway
