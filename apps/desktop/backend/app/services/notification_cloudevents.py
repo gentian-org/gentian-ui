@@ -31,6 +31,6 @@ def notification_to_cloudevent(notification: AdminNotification) -> dict:
         "gentianaudience": {
             "scope": notification.audience.scope,
             "tenant": notification.audience.tenant,
-            "groups": notification.audience.groups,
+            "positions": notification.audience.positions,
         },
     }

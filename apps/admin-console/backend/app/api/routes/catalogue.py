@@ -12,15 +12,16 @@ here is relayed from the director, which lists only the community (ce) and
 private (pe) editions of the sources named on the Cluster claim and counts
 the rest as the store's (AD-14). None of that is decided here.
 
-An entry the listing calls installable can be installed from here -- for
-everyone, if the person says so. That is a relay too, for the tenant this
+An entry the listing calls installable can be installed from here, given to
+the positions the person ticks. That is a relay too, for the tenant this
 console runs in: the person's own token goes to the director, which asks
-whether they may (can_install_app, and can_grant for an install for
-everyone), and its status and body come back as they are. Taking an app out
+whether they may (can_install_app, and can_grant to give it to a position),
+and its status and body come back as they are. Taking an app out
 again is the Apps screen's (routes/apps.py).
 
-The screen is not shown at present (SHOW_CATALOGUES in the console's tab
-registry): the cluster renders no catalog of its own. The routes stay.
+The console shows the screen only to a tenant that names a catalog source of
+its own, beyond the cluster's defaults (a source the director lists with
+`scope: tenant`): its apps are ones the App Store does not list.
 """
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -77,18 +78,68 @@ async def entries(
     )
 
 
+@router.get("/sources/{source}/entries/{entry}/asks")
+async def asks(
+    source: str,
+    entry: str,
+    digest: str = Query(),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """What one build of an entry asks for, before it is installed.
+
+    The outbound requests of the app and of the apps it comes with that
+    nobody has answered yet, and `mayApprove`: whether this person may approve
+    them with the install. The director decides both; nothing is written.
+    """
+    return await director.forward(
+        settings,
+        "GET",
+        f"/v1/tenants/{settings.tenant_id}/catalogues/{source}/entries/{entry}/asks",
+        bearer_of(credentials),
+        params={"digest": digest},
+    )
+
+
+class ApprovedRequest(BaseModel):
+    """One outbound request approved with an install: the app it is of and
+    the request, as the director listed them."""
+
+    install: str
+    privilege: str
+
+
+class GrantedContract(BaseModel):
+    """One contract granted with an install: the app that consumes it and
+    the contract, as the director listed them."""
+
+    install: str
+    contract: str
+
+
 class InstallBody(BaseModel):
     """What an install of a listed entry states: where the profile comes
     from, and which build. Both are the entry listing's own words, handed
     back; a missing one is the director's to refuse, not this component's.
 
-    `defaultGrant` is who gets the app: true installs it for everyone, false
-    says access is given per person, and unstated leaves an installed app's
-    entry as it is -- so it is sent on only when it was stated."""
+    `positions` says who gets the app: the positions of the tenant whose
+    holders use it. Unstated it is not sent, and an installed app's entry
+    keeps the positions it has.
+
+    `defaultGrant` is relayed as it came when it is stated; the director
+    accepts it and it gives nothing. The console does not send it.
+
+    `approve` names outbound requests of the build that the person approves
+    with the install, and `grant` the contracts it consumes that they grant
+    with it. Whether they may is the director's to decide."""
 
     coordinate: str | None = None
     digest: str | None = None
     defaultGrant: bool | None = None
+    positions: list[str] | None = None
+    approve: list[ApprovedRequest] | None = None
+    grant: list[GrantedContract] | None = None
 
 
 @router.post("/apps/{profile}")
@@ -104,9 +155,9 @@ async def install(
     A commit, not a rollout: 202 with a commit means git has it and the
     cluster does not yet, 200 means the tenant already had that build. The
     digest pins the bytes, and the director refuses a source that serves
-    anything else. With `defaultGrant` true the cluster gives every member
-    access once the app is ready, by itself; the director asks can_grant for
-    that as well. All of that is its answer and arrives unchanged.
+    anything else. The holders of the stated positions have the app once it
+    is ready; the director asks can_grant for giving it to a position. All
+    of that is its answer and arrives unchanged.
     """
     return await director.forward(
         settings,

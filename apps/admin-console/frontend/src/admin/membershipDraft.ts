@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 /**
- * Membership changes ticked and not saved yet: for each key (a group's path,
- * or a person's id), whether it is to be in (true) or out (false). A key that
+ * Changes to what a person holds, ticked and not saved yet: for each key (a
+ * position's name), whether it is to be held (true) or not (false). A key that
  * is ticked back to what it is now leaves the draft, so an empty draft is
  * "nothing to save".
  */

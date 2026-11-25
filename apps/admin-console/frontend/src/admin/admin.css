@@ -899,6 +899,23 @@
   color: var(--gtn-ink-3);
 }
 
+.admin-console__asks {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--gtn-border);
+}
+
+.admin-console__asks-list {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: 1.1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.admin-console__asks-list li + li {
+  margin-top: 0.4rem;
+}
+
 .admin-console__choice-extra {
   display: block;
   margin-top: 0.75rem;
@@ -1652,4 +1669,185 @@ fieldset.admin-console__choices > legend {
 }
 .admin-console__traffic-bar--failed {
   background: #b42318;
+}
+
+/* ── Access ──────────────────────────────────────────────────────────────── */
+
+/* One role, or one source of permissions, and what it lets a person do. */
+.admin-console__access-role {
+  margin: 0 0 0.75rem;
+}
+
+.admin-console__access-role:last-child {
+  margin-bottom: 0;
+}
+
+/* A position's roles: the ones given to it, and the ones it inherits from a
+   position it includes, told apart by color; the row's title says why. */
+.admin-console__access-role--own,
+.admin-console__access-role--inherited {
+  padding: 0.375rem 0.625rem;
+  border: 1px solid;
+  border-radius: var(--gtn-r1);
+}
+
+.admin-console__access-role--own {
+  background: var(--gtn-moss-bg);
+  border-color: var(--gtn-moss);
+}
+
+.admin-console__access-role--inherited {
+  background: var(--gtn-iris-bg);
+  border-color: var(--gtn-iris);
+}
+
+.admin-console__access-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.75rem;
+  margin: 0 0 0.75rem;
+  color: var(--gtn-ink-3);
+}
+
+.admin-console__access-swatch {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 1px solid;
+  border-radius: 3px;
+  vertical-align: middle;
+}
+
+.admin-console__access-swatch--own {
+  background: var(--gtn-moss-bg);
+  border-color: var(--gtn-moss);
+}
+
+.admin-console__access-swatch--inherited {
+  background: var(--gtn-iris-bg);
+  border-color: var(--gtn-iris);
+}
+
+.admin-console__access-swatch--implied {
+  background: var(--gtn-paper-2);
+  border-color: var(--gtn-border-strong);
+}
+
+.admin-console__access-swatch--pending {
+  background: var(--gtn-ember-bg);
+  border-color: var(--gtn-ember);
+}
+
+.admin-console__access-list {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.admin-console__access-list li {
+  margin: 0.125rem 0;
+}
+
+/* Roles as a matrix: one row per app, add-ons indented, fixed columns. */
+.admin-console__grid-scroll {
+  overflow-x: auto;
+}
+
+.admin-console__role-grid {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.admin-console__role-grid-thing {
+  width: 14rem;
+}
+
+.admin-console__role-grid-box {
+  width: 4.5rem;
+}
+
+.admin-console__role-grid th,
+.admin-console__role-grid td {
+  padding: 0.125rem 0.5rem;
+  vertical-align: middle;
+  line-height: 1.5;
+}
+
+.admin-console__role-grid td:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-console__role-grid-center {
+  text-align: center;
+}
+
+.admin-console__grid-addon {
+  padding-left: 1.25rem !important;
+  color: var(--gtn-ink-3);
+}
+
+/* One box: a chip with the same outline all round, colored by how it is held. */
+.admin-console__grid-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0.0625rem 0.25rem 0.0625rem 0;
+  padding: 0 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.admin-console__role-grid-center .admin-console__grid-cell {
+  margin: 0;
+}
+
+.admin-console__grid-cell input {
+  margin: 0;
+}
+
+.admin-console__grid-cell--own {
+  background: var(--gtn-moss-bg);
+  border-color: var(--gtn-moss);
+}
+
+.admin-console__grid-cell--inherited {
+  background: var(--gtn-iris-bg);
+  border-color: var(--gtn-iris);
+  cursor: help;
+}
+
+.admin-console__grid-cell--implied {
+  background: var(--gtn-paper-2);
+  border-color: var(--gtn-border-strong);
+  cursor: help;
+}
+
+/* Not saved yet: filled where saving would give the role, outlined where it would take it. */
+.admin-console__grid-cell--pendingGain {
+  background: var(--gtn-ember-bg);
+  border-color: var(--gtn-ember);
+  cursor: help;
+}
+
+.admin-console__grid-cell--pendingLoss {
+  border-color: var(--gtn-ember);
+  cursor: help;
+}
+
+/* The permissions behind the matrix, folded away until asked for. */
+.admin-console__access-details {
+  margin-top: 0.75rem;
+}
+
+.admin-console__access-details > summary {
+  cursor: pointer;
+  color: var(--gtn-ink-3);
+}
+
+.admin-console__access-detail-app {
+  margin: 0.5rem 0;
 }

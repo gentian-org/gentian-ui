@@ -34,6 +34,13 @@ export type Approval = {
    * older backend, and for every other kind.
    */
   waiver?: WaiverAllowance | null;
+  /** For an egress request by host: the hosts it names. */
+  hosts?: string[] | null;
+  /**
+   * For an egress request whose installation chooses its destinations: the
+   * approval names the hosts it opens. Absent from an older operator.
+   */
+  hostsAtApproval?: boolean | null;
 };
 
 export type WaiverAllowance = { profile: string; policy: string; scope: string; allowlisted: boolean };
@@ -43,11 +50,27 @@ export function fetchApprovals() {
 }
 
 export type NodePrivilegeApproval = {
-  reason: string;
+  reason?: string;
   expiresAt?: string;
   /** The allowlist entry a waiver lacks, added by the director with the grant. */
   allowlist?: { profile: string; policy: string; scope: string };
+  /** The hosts an egress approval opens, where the request leaves them to it. */
+  hosts?: string[];
 };
+
+/**
+ * The hosts typed into an approval: one per line or separated by commas or
+ * spaces, each once, in lower case. Whether each is a host is the director's
+ * answer.
+ */
+export function parseHosts(text: string): string[] {
+  const out: string[] = [];
+  for (const raw of text.split(/[\s,]+/)) {
+    const host = raw.trim().toLowerCase();
+    if (host && !out.includes(host)) out.push(host);
+  }
+  return out;
+}
 
 /**
  * Approve one request for the tenant it was made in. The director decides

@@ -189,10 +189,12 @@ def _framing(monkeypatch, tiles, handler=None):
     return asked
 
 
-async def _check(url: str):
+async def _check(url: str, desktop: str | None = None):
+    """Asked as the desktop at `desktop` asks it: the page is its referer."""
     transport = ASGITransport(app=app)
+    headers = {"Referer": f"{desktop}/"} if desktop else {}
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        return await client.get("/api/v1/prefs/check-iframe", params={"url": url})
+        return await client.get("/api/v1/prefs/check-iframe", params={"url": url}, headers=headers)
 
 
 @pytest.mark.asyncio
@@ -300,16 +302,75 @@ def _auth_settings() -> Settings:
 
 
 def test_tenant_admins_may_manage_settings_templates():
-    """Settings templates are a tenant-admin tool, and the portal JWT carries
-    entitlements as `groups`, never as `roles`. Asserted against the guard with
-    auth enabled: the CRUD test above runs with auth disabled, where the guard
-    returns early and proves nothing."""
+    """Settings templates are a tenant-admin tool: the usher's verdict
+    decides. Asserted against the guard with auth enabled: the CRUD test above
+    runs with auth disabled, where the guard returns early and proves nothing."""
     settings = _auth_settings()
 
-    prefs_routes.require_admin({"groups": ["gentian:tenant:demo:admins"]}, settings)  # no raise
-    prefs_routes.require_admin({"groups": ["gentian:platform:admin"]}, settings)  # no raise
+    prefs_routes.require_admin({"tenant": "demo", "relations": {"can_administer": True}}, settings)  # no raise
 
-    member = {"groups": ["gentian:tenant:demo:members"]}
-    with pytest.raises(HTTPException) as exc:
-        prefs_routes.require_admin(member, settings)
-    assert exc.value.status_code == 403
+    for member in (
+        {"tenant": "demo", "relations": {"can_administer": False}},
+        # A group in a token decides nothing.
+        {"groups": ["gentian:tenant:demo:admins"]},
+    ):
+        with pytest.raises(HTTPException) as exc:
+            prefs_routes.require_admin(member, settings)
+        assert exc.value.status_code == 403
+
+
+# A desktop on the tile's site, and one on another.
+SAME_SITE = "https://desktop.acme.example"
+OTHER_SITE = "https://desktop.team.other.example"
+
+
+def _sign_in_first(sign_in: str, same_site: str | None, desktop: str):
+    """An app behind a sign-in: its first answer sends the browser to the
+    realm and keeps the flow's state in a cookie on the app's host."""
+    cookie = "OauthNonce=abc; Path=/oauth2/callback; Secure; HttpOnly"
+    if same_site:
+        cookie += f"; SameSite={same_site}"
+
+    def answer(request):
+        if request.url.host == "cloud.acme.example":
+            return httpx.Response(302, headers={"Location": sign_in, "Set-Cookie": cookie})
+        return httpx.Response(
+            200, headers={"Content-Security-Policy": f"frame-ancestors 'self' {desktop}"}
+        )
+
+    return answer
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("same_site", ["Lax", "Strict", None])
+async def test_check_iframe_says_no_where_the_session_cannot_cross_sites(monkeypatch, same_site):
+    """The app's frame policy names the desktop, but the desktop is on
+    another site: the browser keeps the app's sign-in cookie out of the frame,
+    so the app opens in a tab."""
+    from app.core.config import get_settings
+
+    sign_in = f"https://{get_settings().idp_public_host}/auth"
+    _framing(monkeypatch, [{"url": TILE}], _sign_in_first(sign_in, same_site, OTHER_SITE))
+    got = await _check(TILE, desktop=OTHER_SITE)
+    assert got.json() == {"embeddable": False}
+
+
+@pytest.mark.asyncio
+async def test_check_iframe_frames_a_session_on_the_desktops_site(monkeypatch):
+    from app.core.config import get_settings
+
+    sign_in = f"https://{get_settings().idp_public_host}/auth"
+    _framing(monkeypatch, [{"url": TILE}], _sign_in_first(sign_in, "Lax", SAME_SITE))
+    got = await _check(TILE, desktop=SAME_SITE)
+    assert got.json() == {"embeddable": True}
+
+
+@pytest.mark.asyncio
+async def test_check_iframe_frames_a_cookie_meant_for_frames(monkeypatch):
+    """SameSite=None crosses sites: the cookie is not the obstacle."""
+    from app.core.config import get_settings
+
+    sign_in = f"https://{get_settings().idp_public_host}/auth"
+    _framing(monkeypatch, [{"url": TILE}], _sign_in_first(sign_in, "None", OTHER_SITE))
+    got = await _check(TILE, desktop=OTHER_SITE)
+    assert got.json() == {"embeddable": True}

@@ -116,6 +116,16 @@ def test_an_approval_goes_to_the_directors_privilege_route_for_the_requests_tena
     assert seen["auth"] == "Bearer officer-token"
 
 
+def test_an_approval_needs_no_comment(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "abc"}, seen, status=202)
+    answer = _client().put(
+        "/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root", headers=_person, json={}
+    )
+    assert answer.status_code == 202
+    assert seen["json"] == {}
+
+
 def test_an_approval_carries_the_allowlist_entry_a_waiver_lacks(monkeypatch):
     """A waiver the cluster does not permit yet is approved in one step: the
     allowlist entry goes to the director with the grant."""
@@ -161,7 +171,6 @@ def test_the_directors_refusal_of_an_approval_comes_back_as_it_is(monkeypatch):
             "/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root",
             {"reason": "long enough", "install": "x"},
         ),
-        ("/api/v1/admin/approvals/acme/crm/podSecurity/run-as-root", {}),
     ],
 )
 def test_what_is_not_an_approval_never_reaches_the_director(monkeypatch, path, body):
@@ -243,4 +252,34 @@ def test_what_is_not_a_decline_never_reaches_the_director(monkeypatch, path, bod
     _fake_client(monkeypatch, {}, seen)
     answer = _client().post(path, headers=_person, json=body)
     assert answer.status_code in (400, 422)
+    assert seen == {}
+
+
+def test_an_egress_approval_carries_the_hosts_it_opens(monkeypatch):
+    """A request whose installation chooses its destinations opens the hosts
+    its approval names; the director decides whether each is a host."""
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "abc"}, seen, status=202)
+    answer = _client().put(
+        "/api/v1/admin/approvals/acme/operations-sync-ee/egress/backends",
+        headers=_person,
+        json={"hosts": ["erp.example.org", "files.example.org:8443"]},
+    )
+    assert answer.status_code == 202
+    assert (
+        seen["url"]
+        == "http://director.test:8080/v1/tenants/acme/privileges/operations-sync-ee/egress/backends"
+    )
+    assert seen["json"] == {"hosts": ["erp.example.org", "files.example.org:8443"]}
+
+
+def test_more_hosts_than_a_grant_holds_never_reach_the_director(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {}, seen)
+    answer = _client().put(
+        "/api/v1/admin/approvals/acme/operations-sync-ee/egress/backends",
+        headers=_person,
+        json={"hosts": [f"h{i}.example.org" for i in range(65)]},
+    )
+    assert answer.status_code == 422
     assert seen == {}

@@ -15,14 +15,13 @@ usher's to answer and is read beside this (`/admin/apps/status`, in admin.py).
 The two are joined on the screen, and where they disagree the screen says so.
 """
 
-import json
 import re
 from typing import Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, StrictBool, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 
 from app.core import director
 from app.core.auth import bearer_of, get_current_user
@@ -57,7 +56,7 @@ async def declared(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """What git says this tenant has installed: each app's pinned build, its
-    add-ons, and whether it is installed for everyone."""
+    add-ons, and the positions it is given to."""
     return await director.forward(
         settings, "GET", f"/v1/tenants/{settings.tenant_id}/apps", bearer_of(credentials)
     )
@@ -77,16 +76,20 @@ async def privileges(
 
 
 class PrivilegeApproval(BaseModel):
-    """What the approver states in the console: why, and optionally until
-    when. Who they are and when they answered come from the call, at the
+    """What the approver states in the console: a comment if they leave
+    one, and optionally until when. Who they are and when they answered come from the call, at the
     director. A field this does not name is refused rather than dropped."""
 
     model_config = ConfigDict(extra="forbid")
 
-    # In the approver's own words; the director wants at least ten characters.
-    reason: StrictStr
+    # A comment the approver may leave.
+    reason: StrictStr | None = None
     # RFC 3339. Absent: the approval stands until somebody withdraws it.
     expiresAt: StrictStr | None = None
+    # For an egress request whose installation chooses its destinations: the
+    # hosts the approval opens. Whether each is a host is the director's
+    # answer.
+    hosts: list[StrictStr] | None = Field(default=None, max_length=64)
 
 
 @router.put("/privileges/{install}/{kind}/{name}")
@@ -114,6 +117,30 @@ async def approve_privilege(
         f"/v1/tenants/{settings.tenant_id}/privileges/{_name(install)}/{kind}/{_name(name)}",
         bearer_of(credentials),
         json_body=body.model_dump(exclude_none=True),
+    )
+
+
+@router.delete("/privileges/{install}/{kind}/{name}")
+async def withdraw_privilege(
+    install: str,
+    kind: Literal["egress", "podSecurity", "clusterRoles"],
+    name: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Take back one approval. A commit: the app's request waits for an
+    answer again, and the platform takes away what the approval gave.
+
+    The director's withdrawal for this console's tenant, as the person, with
+    no body. Whoever may approve the kind may withdraw it; that is the
+    director's to decide, and its answer arrives as it is.
+    """
+    return await director.forward(
+        settings,
+        "DELETE",
+        f"/v1/tenants/{settings.tenant_id}/privileges/{_name(install)}/{kind}/{_name(name)}",
+        bearer_of(credentials),
     )
 
 
@@ -148,7 +175,14 @@ class ExposureApproval(BaseModel):
     # The director refuses the approval if the entry declares another, so
     # what is approved is what was shown; it records the kind itself.
     kind: (
-        Literal["public", "publicAppCredential", "signInAppAuthorization", "tokenEntry"] | None
+        Literal[
+            "public",
+            "publicAppCredential",
+            "publicAppSignIn",
+            "signInAppAuthorization",
+            "tokenEntry",
+        ]
+        | None
     ) = None
     # When the entry is taken down again, RFC 3339. Absent: it stays until
     # somebody withdraws it.
@@ -290,83 +324,41 @@ async def remove_residue(
     )
 
 
-class AccessBody(BaseModel):
-    """Whether the app is for everyone. Required: a request that did not say
-    which way is not one to guess at."""
+class PositionsBody(BaseModel):
+    """The positions an app is given to. Required: a request that did not
+    say is not one to guess at. An empty list gives the app to no position."""
 
-    everyone: bool
+    positions: list[StrictStr]
 
 
 @router.put("/{profile}/access")
 async def set_access(
     profile: str,
-    body: AccessBody,
+    body: PositionsBody,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     _user: dict = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    """State whether an installed app is for everyone.
+    """State the positions an installed app is given to.
 
-    The director's install route, with `defaultGrant` and nothing else. No
+    The director's install route, with `positions` and nothing else. No
     coordinate and no digest travel, so nothing is fetched and the entry's
-    pinned build stays as it is: on an app the tenant has, this changes the
-    one key. It answers `updated` with a commit, or `already_installed` when
+    pinned build stays as it is: on an app the tenant has, this changes who
+    has it. It answers `updated` with a commit, or `already_installed` when
     the entry already said so.
 
     The same request for an app the tenant does NOT have would install it,
     because that is what the route is. The screen offers this only for an app
     git declares; whether the person may is the director's (can_install_app,
-    and can_grant to make it for everyone).
+    and can_grant to give it to a position).
     """
     return await director.forward(
         settings,
         "POST",
         f"/v1/tenants/{settings.tenant_id}/apps/{_name(profile)}",
         bearer_of(credentials),
-        json_body={"defaultGrant": body.everyone},
+        json_body={"positions": body.positions},
     )
-
-
-# An add-on's name, as the director accepts it in an app's add-on list.
-_ADDON = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$")
-
-
-@router.put("/{profile}/addons/{addon}/access")
-async def set_addon_access(
-    profile: str,
-    addon: str,
-    body: AccessBody,
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    _user: dict = Depends(get_current_user),
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    """State whether one add-on of an installed app is for everyone.
-
-    An add-on is entitled on its own, by its own group. The director's add-on
-    route replaces the list whole, so the list git has now is read first and
-    sent back by name -- which keeps every add-on, its pin and its grant as
-    they are -- with this one add-on as {"name", "defaultGrant"}. An add-on
-    the app does not activate is refused here (404): adding it to the list
-    would switch it on. Whether the person may is the director's
-    (can_install_app, and can_grant to make it for everyone).
-    """
-    if not _ADDON.match(addon):
-        raise HTTPException(status_code=400, detail="That is not a valid add-on name.")
-    path = f"/v1/tenants/{settings.tenant_id}/apps/{_name(profile)}/addons"
-    token = bearer_of(credentials)
-    current = await director.forward(settings, "GET", path, token)
-    if current.status_code != 200:
-        return current
-    try:
-        names = [n for n in json.loads(current.body).get("addons") or [] if isinstance(n, str)]
-    except (ValueError, AttributeError) as exc:
-        raise HTTPException(status_code=502, detail="The director's answer did not parse.") from exc
-    if addon not in names:
-        raise HTTPException(status_code=404, detail="The app does not activate that add-on.")
-    entries: list[object] = [
-        {"name": n, "defaultGrant": body.everyone} if n == addon else n for n in names
-    ]
-    return await director.forward(settings, "PUT", path, token, json_body={"addons": entries})
 
 
 @router.delete("/{profile}")
@@ -378,7 +370,7 @@ async def uninstall(
 ) -> Response:
     """Take one app out of this console's tenant. A commit: the app and its
     sign-in client go; its files, database, object storage, stored credentials
-    and access group are kept, and a later install finds them again."""
+    and the roles people hold on it are kept, and a later install finds them again."""
     return await director.forward(
         settings,
         "DELETE",
@@ -399,7 +391,7 @@ async def purge(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     """Destroy what an uninstalled app left behind: its files, its database,
-    its object storage, its stored credentials and its access group. An
+    its object storage, its stored credentials and the roles people still hold on it. An
     action, not a commit, and not undone.
 
     One request, answered when the purge is over. The cluster refuses it,

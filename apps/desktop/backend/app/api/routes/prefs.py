@@ -2,6 +2,8 @@ import asyncio
 import ipaddress
 import socket
 
+import tldextract
+
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 from fastapi.responses import Response
 from fastapi.security import HTTPAuthorizationCredentials
@@ -9,7 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from app.api.routes.tiles import _bearer, _catalog
 from app.core.auth import get_current_user
 from app.core.config import Settings, get_settings
-from app.core.gentian_groups import user_is_platform_admin, user_is_tenant_admin
+from app.core.rights import user_is_platform_admin, user_is_tenant_admin
 from app.core.tenant import resolve_user_context
 from app.services.shell_prefs_store import (
     ALLOWED_BACKGROUND_MIMES,
@@ -230,6 +232,43 @@ def apply_template(
 
 import httpx
 
+# The public suffix list as the package ships it: never fetched at run time.
+_SITES = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
+
+
+def _site(host: str) -> str:
+    """The site a host belongs to, as a browser's SameSite rule sees it: its
+    registrable domain. A suffix the list does not know takes the list's
+    default rule, as browsers do: the last label is the suffix (dev.local is
+    the site of desktop.dev.local). An address, or a single label, is its own
+    site."""
+    host = host.lower().rstrip(".")
+    try:
+        ipaddress.ip_address(host.strip("[]"))
+        return host
+    except ValueError:
+        pass
+    known = _SITES(host).top_domain_under_public_suffix
+    if known:
+        return known
+    return ".".join(host.split(".")[-2:])
+
+
+def _sets_same_site_cookie(resp: httpx.Response) -> bool:
+    """Whether the answer sets a cookie a browser keeps out of a frame on
+    another site: one with SameSite Lax or Strict, or with none, which
+    browsers take as Lax."""
+    for cookie in resp.headers.get_list("set-cookie"):
+        same_site = ""
+        for attr in cookie.split(";")[1:]:
+            name, _, value = attr.strip().partition("=")
+            if name.strip().lower() == "samesite":
+                same_site = value.strip().lower()
+        if same_site != "none":
+            return True
+    return False
+
+
 def _frame_ancestors_allows(csp: str, parent_origin: str) -> bool:
     """Whether frame-ancestors in `csp` permits a page served from `parent_origin`.
 
@@ -292,24 +331,30 @@ async def _is_public(host: str) -> bool:
 
 async def _answer_of(
     client: httpx.AsyncClient, url: str, known_hosts: set[str]
-) -> httpx.Response | None:
+) -> tuple[httpx.Response | None, bool]:
     """What `url` answers at the end of its redirects, or None where one of
     them leaves https, or leaves the hosts the platform names for an address
     that is not public. Those hosts are exempt because inside a cluster they
-    resolve to the edge's private address."""
+    resolve to the edge's private address. With it, whether an answer on the
+    tile's own host set a cookie a frame on another site does not keep
+    (_sets_same_site_cookie): the session an app behind a sign-in needs."""
+    own_host = httpx.URL(url).host
+    session = False
     for _ in range(_MAX_HOPS):
         parsed = httpx.URL(url)
         if parsed.scheme != "https":
-            return None
+            return None, session
         if parsed.host not in known_hosts and not await _is_public(parsed.host):
-            return None
+            return None, session
         resp = await client.head(url, timeout=2.0)
         if resp.status_code in {404, 405}:
             resp = await client.get(url, timeout=2.0)
+        if parsed.host == own_host and _sets_same_site_cookie(resp):
+            session = True
         if resp.next_request is None:
-            return resp
+            return resp, session
         url = str(resp.next_request.url)
-    return None
+    return None, session
 
 
 @router.get("/check-iframe")
@@ -323,7 +368,12 @@ async def check_iframe_embeddable(
     """Whether a tile's page can be framed. Only of a host this person's
     tiles name, and asked at the address the tile names: nothing the caller
     wrote is fetched. False only where the page refuses framing; null where
-    the check could not tell, which leaves it to the browser."""
+    the check could not tell, which leaves it to the browser.
+
+    Also False where the page keeps its session in a cookie a frame on
+    another site does not keep, and the tile is on another site than the
+    desktop: the frame would be sent to sign in again and again, though the
+    page's frame policy names the desktop."""
     tiles = await _catalog(credentials.credentials if credentials else None, settings)
     if tiles is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "The tile catalog is unavailable")
@@ -339,8 +389,20 @@ async def check_iframe_embeddable(
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
+        # The origin the shell is served from, which is what frame-ancestors
+        # is asked about and what a cookie's site is compared with.
+        parent = request.headers.get("origin") or ""
+        if not parent:
+            referer = request.headers.get("referer") or ""
+            if referer:
+                r = urlparse(referer)
+                if r.scheme and r.hostname:
+                    parent = f"{r.scheme}://{r.netloc}"
+        parent_host = urlparse(parent).hostname or ""
         async with httpx.AsyncClient(headers=headers) as client:
-            resp = await _answer_of(client, tile_url, known_hosts)
+            resp, session = await _answer_of(client, tile_url, known_hosts)
+            if session and parent_host and _site(parent_host) != _site(target.hostname or ""):
+                return {"embeddable": False}
             if resp is None or resp.status_code in {401, 403}:
                 return {"embeddable": None}
 
@@ -349,15 +411,6 @@ async def check_iframe_embeddable(
             csp = resp_headers.get("content-security-policy", "").lower()
             if "deny" in x_frame or "sameorigin" in x_frame:
                 return {"embeddable": False}
-            # The origin the shell is served from, which is what
-            # frame-ancestors is asked about.
-            parent = request.headers.get("origin") or ""
-            if not parent:
-                referer = request.headers.get("referer") or ""
-                if referer:
-                    r = urlparse(referer)
-                    if r.scheme and r.hostname:
-                        parent = f"{r.scheme}://{r.netloc}"
             if not _frame_ancestors_allows(csp, parent):
                 return {"embeddable": False}
             return {"embeddable": True}

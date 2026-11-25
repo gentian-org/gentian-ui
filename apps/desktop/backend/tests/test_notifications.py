@@ -4,13 +4,12 @@ from app.services.admin_notifications import AdminNotification, NotificationAudi
 from app.services.notification_audience import (
     notification_visible_to_user,
     normalize_audience,
-    validate_publish_audience,
 )
 
 
-def test_normalize_audience_defaults_to_tenant_members():
+def test_normalize_audience_defaults_to_every_person_of_the_tenant():
     audience = normalize_audience(NotificationAudience(scope="tenant", tenant="demo"), "demo")
-    assert audience.groups == ["gentian:tenant:demo:members"]
+    assert audience.positions == ["user"]
 
 
 def test_platform_notification_visible_to_any_user():
@@ -24,11 +23,11 @@ def test_platform_notification_visible_to_any_user():
         publisher="admin",
         tenant="kernel",
     )
-    user = {"groups": ["gentian:tenant:demo:members"]}
+    user = {"positions": ["user"]}
     assert notification_visible_to_user(notification, user, user_tenant="demo")
 
 
-def test_tenant_notification_requires_group_membership():
+def test_tenant_notification_requires_the_position():
     notification = AdminNotification(
         id="n2",
         published_at=1_700_000_000_000,
@@ -38,26 +37,15 @@ def test_tenant_notification_requires_group_membership():
         audience=NotificationAudience(
             scope="tenant",
             tenant="demo",
-            groups=["gentian:tenant:demo:admins"],
+            positions=["tenant-administrator"],
         ),
         publisher="admin",
         tenant="demo",
     )
-    member = {"groups": ["gentian:tenant:demo:members"]}
-    admin = {"groups": ["gentian:tenant:demo:admins"]}
+    member = {"positions": ["user"]}
+    admin = {"positions": ["tenant-administrator", "user"]}
     assert not notification_visible_to_user(notification, member, user_tenant="demo")
     assert notification_visible_to_user(notification, admin, user_tenant="demo")
-
-
-def test_validate_publish_audience_allows_platform_superadmin():
-    user = {"groups": ["gentian:platform:admin"]}
-    audience = validate_publish_audience(
-        user,
-        resolved_tenant="kernel",
-        kernel_realm="kernel",
-        audience=NotificationAudience(scope="platform"),
-    )
-    assert audience.scope == "platform"
 
 
 def test_cloudevent_envelope_shape():
@@ -69,7 +57,7 @@ def test_cloudevent_envelope_shape():
         title="Test",
         body="Body",
         severity="warning",
-        audience=NotificationAudience(scope="tenant", tenant="demo", groups=["gentian:tenant:demo:members"]),
+        audience=NotificationAudience(scope="tenant", tenant="demo", positions=["user"]),
         publisher="admin@demo",
         tenant="demo",
     )
@@ -77,6 +65,7 @@ def test_cloudevent_envelope_shape():
     assert event["specversion"] == "1.0"
     assert event["type"] == "gentian.admin.notification.published.v1"
     assert event["gentianaudience"]["tenant"] == "demo"
+    assert event["gentianaudience"]["positions"] == ["user"]
     assert event["data"]["title"] == "Test"
 
 
@@ -97,13 +86,13 @@ MEMBER = {
     "sub": "8f1c",
     "preferred_username": "Ada",
     "email": "Ada@Example.org",
-    "groups": ["gentian:tenant:demo:members"],
+    "positions": ["user"],
 }
 OTHER_MEMBER = {
     "sub": "77aa",
     "preferred_username": "grace",
     "email": "grace@example.org",
-    "groups": ["gentian:tenant:demo:members"],
+    "positions": ["user"],
 }
 
 
@@ -128,31 +117,33 @@ def test_person_is_named_by_subject_username_or_email():
 def test_empty_claims_and_empty_entries_match_nobody():
     notice = _notice(NotificationAudience(scope="tenant", tenant="demo", people=["", "  "]))
     for user in (
-        {"groups": ["gentian:tenant:demo:members"]},
-        {"sub": "", "preferred_username": "", "email": "", "groups": ["gentian:tenant:demo:members"]},
-        {"sub": None, "email": None, "groups": ["gentian:tenant:demo:members"]},
+        {"positions": ["user"]},
+        {"sub": "", "preferred_username": "", "email": "", "positions": ["user"]},
+        {"sub": None, "email": None, "positions": ["user"]},
     ):
         assert not notification_visible_to_user(notice, user, user_tenant="demo")
 
 
-def test_people_and_groups_together_reach_both():
+def test_people_and_positions_together_reach_both():
     notice = _notice(
         NotificationAudience(
             scope="tenant",
             tenant="demo",
-            groups=["gentian:tenant:demo:admins"],
+            positions=["tenant-administrator"],
             people=["grace"],
         )
     )
-    admin = {"sub": "a1", "groups": ["gentian:tenant:demo:admins"]}
+    admin = {"sub": "a1", "positions": ["tenant-administrator", "user"]}
     assert notification_visible_to_user(notice, admin, user_tenant="demo")
     assert notification_visible_to_user(notice, OTHER_MEMBER, user_tenant="demo")
     assert not notification_visible_to_user(notice, MEMBER, user_tenant="demo")
 
 
-def test_audience_without_people_or_groups_is_still_every_member():
+def test_audience_without_people_or_positions_is_every_person_of_the_tenant():
     notice = _notice(NotificationAudience(scope="tenant", tenant="demo"))
     assert notification_visible_to_user(notice, MEMBER, user_tenant="demo")
+    # Whoever the usher said nothing about is not shown it.
+    assert not notification_visible_to_user(notice, {"sub": "x"}, user_tenant="demo")
 
 
 def test_named_person_of_another_tenant_sees_nothing():
@@ -160,12 +151,12 @@ def test_named_person_of_another_tenant_sees_nothing():
     assert not notification_visible_to_user(notice, MEMBER, user_tenant="other")
 
 
-def test_normalize_audience_keeps_people_and_adds_no_group_to_them():
+def test_normalize_audience_keeps_people_and_adds_no_position_to_them():
     audience = normalize_audience(
         NotificationAudience(scope="tenant", tenant="demo", people=["ada"]), "demo"
     )
     assert audience.people == ["ada"]
-    assert audience.groups == []
+    assert audience.positions == []
 
 
 def test_row_written_before_people_reads_as_naming_nobody():
@@ -185,3 +176,28 @@ def test_row_written_before_people_reads_as_naming_nobody():
     notification = _row_to_notification(row)
     assert notification.audience.people == []
     assert notification_visible_to_user(notification, MEMBER, user_tenant="demo")
+
+
+def test_row_that_names_groups_and_nothing_else_is_for_nobody():
+    """A notice written for a group must not widen to the whole tenant now
+    that groups are not read."""
+    from app.models.admin_notification import AdminNotificationRow
+    from app.services.sql_notification_store import _row_to_notification
+
+    row = AdminNotificationRow(
+        id="old",
+        published_at=1,
+        tenant="demo",
+        title="t",
+        body="b",
+        severity="info",
+        publisher="admin",
+        audience={"scope": "tenant", "tenant": "demo", "groups": ["gentian:tenant:demo:admins"]},
+    )
+    notification = _row_to_notification(row)
+    admin = {"sub": "a1", "positions": ["tenant-administrator", "user"], "groups": ["gentian:tenant:demo:admins"]}
+    assert not notification_visible_to_user(notification, admin, user_tenant="demo")
+    assert not notification_visible_to_user(notification, MEMBER, user_tenant="demo")
+    # Named people are still reached.
+    row.audience = {"scope": "tenant", "tenant": "demo", "groups": ["g"], "people": ["ada"]}
+    assert notification_visible_to_user(_row_to_notification(row), MEMBER, user_tenant="demo")

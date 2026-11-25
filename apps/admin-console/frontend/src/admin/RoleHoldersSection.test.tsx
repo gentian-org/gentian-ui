@@ -61,19 +61,6 @@ const candidates = {
   ],
 };
 
-const members = {
-  cluster: "demo",
-  complete: false,
-  roles: [
-    {
-      role: "admin",
-      group: "gentian:platform:admin",
-      members: [{ id: "u1", username: "ops@k.example", email: "ops@k.example", enabled: true }],
-    },
-    { role: "securityOfficer", group: "gentian:platform:security", members: [] },
-    { role: "auditor", group: "gentian:platform:auditor", members: null, unavailable: true },
-  ],
-};
 const grants = {
   cluster: "demo",
   privileges: [
@@ -93,7 +80,6 @@ function render(canEdit = true, withHolders: unknown = holders) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(["admin", "platform", "role-holders"], withHolders);
   client.setQueryData(["admin", "platform", "role-candidates"], candidates);
-  client.setQueryData(["admin", "platform", "role-members"], members);
   client.setQueryData(["admin", "platform", "granted-privileges"], grants);
   return renderToString(
     <QueryClientProvider client={client}>
@@ -147,15 +133,12 @@ describe("RoleHoldersSection", () => {
     expect(render()).toContain("globex");
   });
 
-  it("lists who holds each role through its group, read only", () => {
-    const html = render(false);
-    expect(html).toContain("Administrator");
-    expect(html).toContain("Through the group gentian:platform:admin:");
-    expect(html).toContain("ops@k.example");
-    expect(html).toContain("Through the group gentian:platform:security:");
-    expect(html).toContain("nobody.");
-    expect(html).toContain("the group could not be read.");
-    expect(html).toContain("managed in Keycloak");
+  it("offers the administrator's role like the others, and says who administers while nobody is named", () => {
+    const html = render();
+    expect(html).toContain('value="admin"');
+    expect(html).toContain("the account the installation made");
+    expect(html).not.toContain("Through the group");
+    expect(html).not.toContain("Keycloak");
   });
 
   it("lists every tenant's granted exceptions", () => {

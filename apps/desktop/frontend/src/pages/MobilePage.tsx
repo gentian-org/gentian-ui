@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AccountPanel } from "@/account/AccountPanel";
+import { arriveFromAddress } from "@/account/arrival";
 import { AppMenu } from "@/shell/AppMenu";
 import { Background } from "@/shell/Background";
 import { MobileAppLayer } from "@/shell/MobileAppLayer";
@@ -23,6 +24,13 @@ export function MobilePage() {
   const activeApp = apps.find((app) => app.id === activeAppId) ?? null;
   const [overlay, setOverlay] = useState<MobileOverlay>(null);
   const [activeLaunchUrl, setActiveLaunchUrl] = useState<string | null>(null);
+
+  // Back from an outside service's sign-in: the account panel, at Connections.
+  useEffect(() => {
+    if (arriveFromAddress()) {
+      setActiveAppId("account");
+    }
+  }, []);
 
   useEffect(() => {
     if (activeAppId === "account") {

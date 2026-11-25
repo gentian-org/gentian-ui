@@ -55,7 +55,7 @@ class SqlNotificationStore:
             audience={
                 "scope": audience.scope,
                 "tenant": audience.tenant,
-                "groups": audience.groups,
+                "positions": audience.positions,
                 "people": audience.people,
             },
             link_url=link_url,
@@ -142,6 +142,7 @@ def _row_to_notification(row: AdminNotificationRow) -> AdminNotification:
         audience=NotificationAudience(
             scope=audience_data.get("scope", "tenant"),
             tenant=audience_data.get("tenant"),
+            positions=list(audience_data.get("positions") or []),
             groups=list(audience_data.get("groups") or []),
             people=list(audience_data.get("people") or []),
         ),

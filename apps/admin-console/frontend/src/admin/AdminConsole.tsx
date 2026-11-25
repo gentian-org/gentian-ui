@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { fetchAdminContext, fetchTenantSettings } from "@/api/admin";
+import { fetchCatalogueSources, namesOwnCatalogue } from "@/api/catalogue";
 import { AppsSection } from "@/admin/AppsSection";
 import { ApprovalsSection } from "@/admin/ApprovalsSection";
 import { AuditSection } from "@/admin/AuditSection";
@@ -13,7 +14,7 @@ import { CustomizationDebtSection } from "@/admin/CustomizationDebtSection";
 import { UpdatesSection } from "@/admin/UpdatesSection";
 import { ReleaseSection } from "@/admin/ReleaseSection";
 import { ClusterSettingsSection } from "@/admin/ClusterSettingsSection";
-import { GroupsSection } from "@/admin/GroupsSection";
+import { PositionsSection } from "@/admin/PositionsSection";
 import { MembersSection } from "@/admin/MembersSection";
 import { ModelAccessSection } from "@/admin/ModelAccessSection";
 import { ModelsSection } from "@/admin/ModelsSection";
@@ -27,6 +28,7 @@ import { RoleHoldersSection } from "@/admin/RoleHoldersSection";
 import { SecurityPoliciesSection } from "@/admin/SecurityPoliciesSection";
 import { TenantSettingsSection } from "@/admin/TenantSettingsSection";
 import { TenantsSection } from "@/admin/TenantsSection";
+import { AccessSection } from "@/admin/AccessSection";
 import "./admin.css";
 import { useTranslation } from "react-i18next";
 
@@ -37,7 +39,8 @@ type AdminTab =
   | "release"
   | "tenants"
   | "members"
-  | "groups"
+  | "positions"
+  | "access"
   | "apps"
   | "resources"
   | "export"
@@ -66,22 +69,11 @@ type AdminTab =
  * and consumes, then what protects it, then the record, then the cluster's own
  * configuration for whoever administers the platform.
  *
- * Members and Groups go through the director, which holds a credential per
+ * People go through the registrar, which holds a credential per
  * realm and asks OpenFGA about the caller before using it; this console holds
  * none. Inviting somebody happens on Members, with the settings template the
  * desktop applies before they first sign in.
  */
-
-/**
- * Whether the Catalogs tab is shown. It is not, for now.
- *
- * The cluster renders no catalog of its own: apps are installed from the
- * App Store, and where no store is available by command
- * (`kubectl gentian apps install`). The screen, its routes and its tests are
- * kept as they are, and with them the Install action that lives in it; this
- * switch only takes the tab out of the strip. Set it to true to show it again.
- */
-const SHOW_CATALOGUES = false;
 
 const TABS: {
   id: AdminTab;
@@ -98,7 +90,13 @@ const TABS: {
   officerOnly?: boolean;
   /** Shown only to those who may read the cluster's roles (cluster can_audit). */
   auditorOnly?: boolean;
-  hidden?: boolean;
+  /**
+   * Shown only while the tenant names a catalog source of its own, beyond
+   * the cluster's defaults (namesOwnCatalogue). Apps come from the App
+   * Store; a tenant's own catalog holds apps the store does not list, and
+   * this is the screen that installs them.
+   */
+  ownCatalogueOnly?: boolean;
 }[] = [
   // First, and platform-only, because bringing a customer on is what an MSP
   // employee opens this console to do. A tenant administrator sees their own
@@ -112,7 +110,10 @@ const TABS: {
   // people because the console opens here while a required fact is missing.
   { id: "tenantSettings", labelKey: "tabTenantSettings" },
   { id: "members", labelKey: "tabMembers" },
-  { id: "groups", labelKey: "tabGroups" },
+  { id: "positions", labelKey: "tabPositions" },
+  // Who may do what, and why: what a person, a position or an app holds, as the
+  // rights store has it. Read-only, beside the two screens that change it.
+  { id: "access", labelKey: "tabAccess" },
   // What the tenant has installed, and everything done to an app after it is
   // installed: who may open it, what it exchanges with other apps, what it
   // asked of the platform, taking it away. Nothing is installed from here.
@@ -129,8 +130,8 @@ const TABS: {
   // Near the end on purpose. Apps come from the App Store; this tab is the
   // plain fallback for when the store is not the answer, and putting it where
   // a shop would go would make it look like a rival to the one that is
-  // maintained. Hidden at present: see SHOW_CATALOGUES.
-  { id: "catalogue", labelKey: "tabCatalogues", hidden: !SHOW_CATALOGUES },
+  // maintained. Shown only to a tenant that names a catalog of its own.
+  { id: "catalogue", labelKey: "tabCatalogues", ownCatalogueOnly: true },
   { id: "credentials", labelKey: "tabCredentials" },
   // What the tenant has on the internet and what asks to be, for those who
   // answer for it (can_expose); the director guards the reads the same way.
@@ -167,7 +168,8 @@ type AdminConsoleProps = {
 function linkedTab(): AdminTab | null {
   if (typeof window === "undefined") return null;
   const wanted = new URLSearchParams(window.location.search).get("tab");
-  const entry = TABS.find((candidate) => candidate.id === wanted && !candidate.hidden);
+  // Whether the tab is shown is decided once the console has loaded.
+  const entry = TABS.find((candidate) => candidate.id === wanted);
   return entry ? entry.id : null;
 }
 
@@ -181,7 +183,7 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
   });
   // No tenant literal as a fallback. Hooks must be declared before the early
   // returns below, so this runs before the loading and error guards -- but the
-  // groups query is gated on the context having loaded, and every consumer of
+  // queries are gated on the context having loaded, and every consumer of
   // `tenant` sits after those guards, so the empty string is never used. It used
   // to read `?? "demo"`, which would have queried a real, unrelated tenant the
   // moment someone reordered any of that.
@@ -194,6 +196,15 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
     enabled: !!contextQuery.data && contextQuery.data.isTenantAdmin !== false,
   });
   const settingsIncomplete = (settingsQuery.data?.missing.length ?? 0) > 0;
+  // Whether the tenant names a catalog of its own, under the key the Catalogs
+  // screen reads, so the two share one fetch. Neither the loading guard
+  // below nor an error waits on it: the tab stays out until it answers yes.
+  const cataloguesQuery = useQuery({
+    queryKey: ["catalogue", "sources", tenant],
+    queryFn: () => fetchCatalogueSources(tenant),
+    enabled: !!contextQuery.data && contextQuery.data.isTenantAdmin !== false,
+  });
+  const ownCatalogue = namesOwnCatalogue(cataloguesQuery.data);
 
   if (contextQuery.isLoading || settingsQuery.isLoading) {
     return (
@@ -218,18 +229,23 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
     );
   }
 
-  const { realm, isPlatformAdmin, canExpose, canApproveNodePrivilege, canApprovePerimeter, canAuditCluster } =
+  const { realm, isPlatformAdmin, canExpose, canApproveNodePrivilege, canApprovePerimeter, canApprovePrivilege, canAuditCluster } =
     contextQuery.data;
   // False only for the approver let in for the Approvals screen; a
   // backend older than that field answered nobody who did not administer.
   const administers = contextQuery.data.isTenantAdmin !== false;
   const shown = TABS.filter(
     (entry) =>
-      !entry.hidden &&
+      (!entry.ownCatalogueOnly || ownCatalogue) &&
       (administers || entry.officerOnly) &&
       (!entry.platformOnly || isPlatformAdmin) &&
       (!entry.approverOnly || canExpose === true) &&
-      (!entry.officerOnly || canApproveNodePrivilege === true || canApprovePerimeter === true || isPlatformAdmin) &&
+      (!entry.officerOnly ||
+        canApproveNodePrivilege === true ||
+        canApprovePerimeter === true ||
+        isPlatformAdmin ||
+        // The tenant's perimeter approver answers its own apps' egress there.
+        (entry.id === "approvals" && administers && canApprovePrivilege === true)) &&
       (!entry.auditorOnly || canAuditCluster === true),
   );
   // Tenant Settings while the tenant is incomplete, otherwise Members, as it
@@ -277,9 +293,11 @@ export function AdminConsole({ embedded = false }: AdminConsoleProps) {
           ) : current === "tenantSettings" ? (
             <TenantSettingsSection tenant={tenant} />
           ) : current === "members" ? (
-            <MembersSection tenant={tenant} />
-          ) : current === "groups" ? (
-            <GroupsSection tenant={tenant} />
+            <MembersSection />
+          ) : current === "positions" ? (
+            <PositionsSection />
+          ) : current === "access" ? (
+            <AccessSection />
           ) : current === "apps" ? (
             <AppsSection tenant={tenant} onOpenIntegrations={() => setTab("integrations")} />
           ) : current === "security" ? (

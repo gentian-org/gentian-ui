@@ -122,7 +122,7 @@ def test_without_a_tenant_the_component_asks_about_its_own(monkeypatch):
     assert seen["url"].endswith("/v1/tenants/platform/catalogues")
 
 
-# -- installing, for one person or for everyone -----------------------------
+# -- installing, given to positions ----------------------------------------
 #
 # The person's token and nothing else decides these, so each test pins that
 # the token arrives upstream, which path it arrives on, and that the body is
@@ -202,7 +202,7 @@ def test_a_missing_digest_is_the_directors_to_refuse(monkeypatch):
     assert seen["json"] == {"coordinate": "in-house/timesheets"}
 
 
-def test_an_install_for_everyone_says_so_to_the_director(monkeypatch):
+def test_an_install_states_its_positions_to_the_director(monkeypatch):
     seen: dict = {}
     body = {"status": "installed", "commit": "0123abcd"}
     _fake_client(monkeypatch, body, seen, status=202)
@@ -210,36 +210,46 @@ def test_an_install_for_everyone_says_so_to_the_director(monkeypatch):
     entry = {"coordinate": "in-house/timesheets", "digest": "sha256:" + "a" * 64}
     answer = client.post(
         "/api/v1/catalogue/apps/timesheets",
-        json={**entry, "defaultGrant": True},
+        json={**entry, "positions": ["sales"]},
         headers=_person,
     )
     assert answer.status_code == 202
     assert seen["url"] == "http://director.test:8080/v1/tenants/platform/apps/timesheets"
-    assert seen["json"] == {**entry, "defaultGrant": True}
+    assert seen["json"] == {**entry, "positions": ["sales"]}
 
-    # False is a statement too -- access is given per person -- and travels.
-    client.post(
-        "/api/v1/catalogue/apps/timesheets", json={**entry, "defaultGrant": False}, headers=_person
-    )
-    assert seen["json"] == {**entry, "defaultGrant": False}
+    # The list travels as it was given, an empty one too.
+    for positions in (["sales", "interns"], []):
+        client.post(
+            "/api/v1/catalogue/apps/timesheets",
+            json={**entry, "positions": positions},
+            headers=_person,
+        )
+        assert seen["json"] == {**entry, "positions": positions}
 
     # Unstated, or null, is not sent at all: absent leaves the entry as it is.
     client.post("/api/v1/catalogue/apps/timesheets", json=entry, headers=_person)
     assert seen["json"] == entry
     client.post(
-        "/api/v1/catalogue/apps/timesheets", json={**entry, "defaultGrant": None}, headers=_person
+        "/api/v1/catalogue/apps/timesheets", json={**entry, "positions": None}, headers=_person
     )
     assert seen["json"] == entry
 
+    # A defaultGrant somebody still states is relayed as it came; the
+    # director accepts it and it gives nothing.
+    client.post(
+        "/api/v1/catalogue/apps/timesheets", json={**entry, "defaultGrant": True}, headers=_person
+    )
+    assert seen["json"] == {**entry, "defaultGrant": True}
 
-def test_an_install_for_everyone_refused_names_the_right_it_lacks(monkeypatch):
+
+def test_an_install_refused_names_the_right_it_lacks(monkeypatch):
     seen: dict = {}
-    body = {"error": "installing an app for everyone needs can_grant on the tenant"}
+    body = {"error": "giving an app to a position needs can_grant on the tenant"}
     _fake_client(monkeypatch, body, seen, status=403)
     client = TestClient(_app(_settings()))
     answer = client.post(
         "/api/v1/catalogue/apps/timesheets",
-        json={"coordinate": "in-house/timesheets", "defaultGrant": True},
+        json={"coordinate": "in-house/timesheets", "positions": ["sales"]},
         headers=_person,
     )
     assert answer.status_code == 403
@@ -255,3 +265,102 @@ def test_an_install_is_not_relayed_without_a_token(monkeypatch):
     client = TestClient(_app(_settings()))
     assert client.post("/api/v1/catalogue/apps/timesheets", json={}).status_code == 401
     assert seen == {}
+
+
+# -- what a build asks for, and approving it with the install ---------------
+
+
+def test_what_a_build_asks_for_is_the_directors_answer_for_the_person(monkeypatch):
+    seen: dict = {}
+    asks = {
+        "egress": [
+            {"install": "timesheets", "privilege": "egress/payroll", "hosts": ["payroll.example"]}
+        ],
+        "mayApprove": True,
+    }
+
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def request(self, method, url, params=None, json=None, headers=None):
+            seen.update(
+                method=method, url=url, params=params, auth=(headers or {}).get("Authorization")
+            )
+            return httpx.Response(200, json=asks, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(director.httpx, "AsyncClient", FakeClient)
+    client = TestClient(_app(_settings()))
+    answer = client.get(
+        "/api/v1/catalogue/sources/in-house/entries/timesheets/asks",
+        params={"digest": _digest},
+        headers=_person,
+    )
+    assert answer.status_code == 200
+    # Verbatim, mayApprove included: who may approve is the director's to say.
+    assert answer.json() == asks
+    assert seen["method"] == "GET"
+    assert (
+        seen["url"]
+        == "http://director.test:8080/v1/tenants/platform/catalogues/in-house/entries/timesheets/asks"
+    )
+    assert seen["params"] == {"digest": _digest}
+    assert seen["auth"] == "Bearer person-token"
+
+
+def test_an_install_carries_the_approvals_the_person_gave(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "installed", "commit": "a1b2c3d4"}, seen, status=202)
+    client = TestClient(_app(_settings()))
+    approve = [{"install": "timesheets", "privilege": "egress/payroll"}]
+    answer = client.post(
+        "/api/v1/catalogue/apps/timesheets",
+        json={"coordinate": "in-house/timesheets", "digest": _digest, "approve": approve},
+        headers=_person,
+    )
+    assert answer.status_code == 202
+    # As the person, and nothing added: the director asks whether they may.
+    assert seen["auth"] == "Bearer person-token"
+    assert seen["json"] == {
+        "coordinate": "in-house/timesheets",
+        "digest": _digest,
+        "approve": approve,
+    }
+
+
+def test_an_install_carries_the_grants_the_person_gave(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "installed", "commit": "a1b2c3d4"}, seen, status=202)
+    client = TestClient(_app(_settings()))
+    grant = [{"install": "timesheets", "contract": "file-store"}]
+    answer = client.post(
+        "/api/v1/catalogue/apps/timesheets",
+        json={"coordinate": "in-house/timesheets", "digest": _digest, "grant": grant},
+        headers=_person,
+    )
+    assert answer.status_code == 202
+    # As the person, and nothing added: the director asks whether they may.
+    assert seen["auth"] == "Bearer person-token"
+    assert seen["json"] == {
+        "coordinate": "in-house/timesheets",
+        "digest": _digest,
+        "grant": grant,
+    }
+
+
+def test_an_install_without_approvals_sends_none(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "installed", "commit": "a1b2c3d4"}, seen, status=202)
+    client = TestClient(_app(_settings()))
+    client.post(
+        "/api/v1/catalogue/apps/timesheets",
+        json={"coordinate": "in-house/timesheets", "digest": _digest},
+        headers=_person,
+    )
+    assert "approve" not in seen["json"]

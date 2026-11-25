@@ -144,3 +144,45 @@ describe("ApprovalsSection", () => {
     expect(render([], { canApproveNodePrivilege: true })).toContain("Nothing is waiting for an approval.");
   });
 });
+
+describe("ApprovalsSection for the tenant's perimeter approver", () => {
+  function renderTenant(context: Partial<AdminContext>) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(["admin", "context"], context);
+    client.setQueryData(["admin", "apps", "status"], {
+      tenant: "acme",
+      apps: [
+        {
+          profile: "crm",
+          name: "crm",
+          ready: false,
+          phase: "installing",
+          pendingPrivileges: ["egress/usage-reports", "podSecurity/run-as-root"],
+          pendingPrivilegeApprovals: [
+            { privilege: "egress/usage-reports", approvedBy: "perimeter-approver", reason: "sends what was run" },
+            { privilege: "podSecurity/run-as-root", approvedBy: "security-officer" },
+          ],
+        },
+      ],
+    });
+    return renderToString(
+      <QueryClientProvider client={client}>
+        <ApprovalsSection />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("lists the egress of the tenant's own apps, with the button, and nothing the officer answers", () => {
+    const html = renderTenant({ canApprovePrivilege: true, isTenantAdmin: true });
+    expect(html).toContain("egress/usage-reports");
+    expect(html).toContain("sends what was run");
+    expect(html).toContain("Approve…");
+    expect(html).not.toContain("podSecurity/run-as-root");
+    expect(html).not.toContain("The list is not available");
+  });
+
+  it("shows a tenant administrator who may not approve nothing to answer", () => {
+    const html = renderTenant({ canApprovePrivilege: false, isTenantAdmin: true });
+    expect(html).not.toContain("egress/usage-reports");
+  });
+});

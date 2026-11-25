@@ -50,149 +50,12 @@ export type AdminContext = {
   canAuditCluster?: boolean;
 };
 
-export type AdminMember = {
-  id: string;
-  username: string;
-  email?: string | null;
-  inviteEmail?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  enabled: boolean;
-  groups: string[];
-  totpConfigured?: boolean;
-  totpPending?: boolean;
-};
-
-export type AdminGroup = {
-  id: string;
-  name: string;
-  path: string;
-  memberCount: number;
-  gentianOdooModules?: string[];
-  gentianOdooGroupRoles?: string[];
-  /** The tenant provisioned this app rather than only installing it, so adding
-   *  a member ticks it by default. */
-  defaultGrant?: boolean;
-};
-
 function tenantQuery(tenant?: string) {
   return tenant ? `?tenant=${encodeURIComponent(tenant)}` : "";
 }
 
 export function fetchAdminContext(tenant?: string) {
   return apiFetch<AdminContext>(`/admin/context${tenantQuery(tenant)}`);
-}
-
-export function fetchMembers(tenant?: string) {
-  return apiFetch<AdminMember[]>(`/admin/members${tenantQuery(tenant)}`);
-}
-
-export function createMember(
-  body: {
-    email: string;
-    firstName?: string;
-    lastName?: string;
-    enabled?: boolean;
-  },
-  tenant?: string,
-) {
-  return apiFetch<AdminMember>(`/admin/members${tenantQuery(tenant)}`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export function inviteMember(
-  body: {
-    email: string;
-    firstName?: string;
-    lastName?: string;
-    inviteEmail?: string;
-    groupIds?: string[];
-    requireTotp?: boolean;
-    settingsTemplateId?: string;
-  },
-  tenant?: string,
-) {
-  return apiFetch<AdminMember>(`/admin/members/invite${tenantQuery(tenant)}`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export function resetMemberPassword(id: string, tenant?: string) {
-  return apiFetch<{ deliveryEmail: string }>(`/admin/members/${id}/reset-password${tenantQuery(tenant)}`, {
-    method: "POST",
-  });
-}
-
-export function enableMemberTotp(id: string, sendEmail = true, tenant?: string) {
-  return apiFetch<AdminMember>(`/admin/members/${id}/totp/enable${tenantQuery(tenant)}`, {
-    method: "POST",
-    body: JSON.stringify({ sendEmail }),
-  });
-}
-
-export function removeMemberTotp(id: string, tenant?: string) {
-  return apiFetch<AdminMember>(`/admin/members/${id}/totp${tenantQuery(tenant)}`, {
-    method: "DELETE",
-  });
-}
-
-export function updateMember(
-  id: string,
-  body: {
-    email?: string;
-    firstName?: string;
-    lastName?: string;
-    enabled?: boolean;
-    inviteEmail?: string | null;
-  },
-  tenant?: string,
-) {
-  return apiFetch<AdminMember>(`/admin/members/${id}${tenantQuery(tenant)}`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
-}
-
-export function deleteMember(id: string, tenant?: string) {
-  return apiFetch<void>(`/admin/members/${id}${tenantQuery(tenant)}`, {
-    method: "DELETE",
-  });
-}
-
-export function updateMemberGroups(id: string, groupIds: string[], tenant?: string) {
-  return apiFetch<AdminMember>(`/admin/members/${id}/groups${tenantQuery(tenant)}`, {
-    method: "PUT",
-    body: JSON.stringify({ groupIds }),
-  });
-}
-
-export function createGroup(name: string, tenant?: string) {
-  return apiFetch<AdminGroup>(`/admin/groups${tenantQuery(tenant)}`, {
-    method: "POST",
-    body: JSON.stringify({ name }),
-  });
-}
-
-export function updateGroup(
-  id: string,
-  name: string,
-  gentianOdooModules?: string[],
-  gentianOdooGroupRoles?: string[],
-  tenant?: string,
-) {
-  return apiFetch<AdminGroup>(`/admin/groups/${id}${tenantQuery(tenant)}`, {
-    method: "PATCH",
-    body: JSON.stringify({ name, gentianOdooModules, gentianOdooGroupRoles }),
-  });
-}
-
-export function deleteGroup(id: string, tenant?: string) {
-  return apiFetch<void>(`/admin/groups/${id}${tenantQuery(tenant)}`, {
-    method: "DELETE",
-  });
 }
 
 export type SecurityPolicies = {
@@ -343,7 +206,8 @@ export type NotificationSeverity = "info" | "warning" | "critical";
 export type NotificationAudience = {
   scope: "platform" | "tenant";
   tenant?: string | null;
-  groups: string[];
+  /** The tenant's positions the notice is for, by name; none is every person. */
+  positions?: string[];
 };
 
 export type AdminNotification = {
@@ -541,17 +405,31 @@ export type EffectiveAccessRow = {
 //
 // Read-only, and it replaces the idea of exposing OpenFGA's own playground,
 // which is a development tool with a write surface. Anything a person wants
-// to change is changed on the other screens, through the director.
+// to change is changed on the other screens.
+
+/** One holder of a role: a position of the tenant or a person. */
+export type Holder = {
+  kind: "position" | "person" | (string & {});
+  /**
+   * The position's name; the person's account id, qualified by its realm
+   * for a role the cluster gives by name.
+   */
+  name: string;
+};
+
 export type AuthorizationBinding = {
-  // The role as the model names it: admin, auditor, security_officer.
+  // The role as the model names it (admin, user, auditor), or the name of a
+  // role an app's profile declares.
   relation: string;
-  // Keycloak group names. Empty means nobody holds it, which is a row worth
-  // showing rather than one worth hiding.
-  groups: string[];
-  // The permissions the role carries, resolved through the model by the
-  // director. Without these a reader sees "admin" and has to go and read the
-  // model to find out what it means.
+  // Who holds it. Empty means nobody does, which is a row worth showing
+  // rather than one worth hiding.
+  holders: Holder[];
+  // The permissions the role carries, resolved through the model. Without
+  // these a reader sees "admin" and has to go and read the model to find out
+  // what it means.
   grants: string[];
+  /** True for a role an app's profile declares. */
+  declared?: boolean;
 };
 
 export type AuthorizationView = {
@@ -563,6 +441,172 @@ export type AuthorizationView = {
 export function fetchAuthorization(scope: "cluster" | "tenant", tenant?: string) {
   const query = scope === "cluster" ? "?scope=cluster" : tenantQuery(tenant) || "";
   return apiFetch<AuthorizationView>(`/admin/authorization${query}`);
+}
+
+// The access page: what a person, a position or an app holds, read by the
+// usher from the rights store. Read-only. What a person holds is given from
+// both ends: the roles they were given, each with the position it comes
+// through, and the store's own answer to every permission and role, since
+// more is in effect than is held.
+
+/** One role held on one object. */
+export type HeldRole = {
+  /** user, admin, or the name of a role the app declares. */
+  role: string;
+  declared?: boolean;
+  /** The position it is held through; absent for a role given directly. */
+  position?: string;
+  /** True for a role the person holds as themselves, beside their positions. */
+  direct?: boolean;
+  /** The permissions the role carries on this kind of object. */
+  carries: string[];
+};
+
+/** One permission on one object, for one person. */
+export type AccessPermission = {
+  name: string;
+  /** The rights store's own answer for this person. */
+  inEffect: boolean;
+  /**
+   * Where it comes from: `role` (a held role carries it), `tenant` (on an
+   * app, it follows from what the person holds on the tenant), `app` (it
+   * follows from what they hold on the app's base or on one of its add-ons),
+   * `elsewhere` (in effect, and nothing read here accounts for it). Absent:
+   * the person does not have it.
+   */
+  from?: "role" | "tenant" | "app" | "elsewhere" | (string & {});
+};
+
+export type ObjectAccess = {
+  object: string;
+  /** The profile, for an app. */
+  app?: string;
+  /** The roles the person was given here. */
+  held: HeldRole[];
+  /** The roles in effect here: the held ones and those that follow from them. */
+  roles: string[];
+  permissions: AccessPermission[];
+};
+
+/** A position a person holds: given to them, or included by one that was. */
+export type PositionHeld = {
+  name: string;
+  /** The given position that includes this one; absent when it was given itself. */
+  through?: string;
+};
+
+export type PersonAccess = {
+  tenant: string;
+  subject: string;
+  positions: PositionHeld[];
+  onTenant: ObjectAccess;
+  apps: ObjectAccess[];
+};
+
+/** One role a position holds on one object. */
+export type PositionHold = {
+  object: string;
+  app?: string;
+  role: string;
+  declared?: boolean;
+  carries: string[];
+  /** On an inherited role: the positions it comes through, the last one holding it. */
+  through?: string[];
+};
+
+export type PositionAccess = {
+  tenant: string;
+  position: string;
+  holds: PositionHold[];
+  /** The roles held through included positions. Absent from an older platform. */
+  inherited?: PositionHold[];
+  /** The positions whose roles its holders hold too. */
+  includes: string[];
+  /** The positions whose holders hold this one. */
+  includedIn: string[];
+  /** The accounts that were given the position itself, by id. */
+  holders: string[];
+};
+
+export function fetchPersonAccess(id: string, tenant?: string) {
+  return apiFetch<PersonAccess>(`/admin/access/people/${encodeURIComponent(id)}${tenantQuery(tenant)}`);
+}
+
+export function fetchPositionAccess(name: string, tenant?: string) {
+  return apiFetch<PositionAccess>(`/admin/access/positions/${encodeURIComponent(name)}${tenantQuery(tenant)}`);
+}
+
+export function fetchAppAccess(profile: string, tenant?: string) {
+  return apiFetch<AuthorizationView>(`/admin/access/apps/${encodeURIComponent(profile)}${tenantQuery(tenant)}`);
+}
+
+// Positions: named sets of roles a kind of person holds. Four every tenant
+// has; a tenant declares its own at the director, which commits them. Who
+// holds a position, or a role beside one, is given at the registrar.
+
+/**
+ * The positions every tenant has. User enters the tenant (its desktop) and
+ * gives no app; All apps uses every app the tenant installed and includes User.
+ */
+export const SHIPPED_POSITIONS = ["user", "all-apps", "app-administrator", "tenant-administrator"] as const;
+
+/** One role a position holds: on an app, or on the tenant itself when app is absent. */
+export type PositionRole = { app?: string; role: string };
+
+/** A tenant's own position, as it is declared. */
+export type TenantPosition = {
+  name: string;
+  title?: string;
+  description?: string;
+  includes?: string[];
+  roles?: PositionRole[];
+};
+
+export type TenantPositions = { tenant: string; shipped: string[]; positions: TenantPosition[] };
+
+export function fetchPositions(tenant?: string) {
+  return apiFetch<TenantPositions>(`/admin/positions${tenantQuery(tenant)}`);
+}
+
+export function setPosition(position: TenantPosition, tenant?: string) {
+  const { name, ...declaration } = position;
+  return apiFetch<{ status: string; commit?: string }>(
+    `/admin/positions/${encodeURIComponent(name)}${tenantQuery(tenant)}`,
+    { method: "PUT", body: JSON.stringify(declaration) },
+  );
+}
+
+export function removePosition(name: string, tenant?: string) {
+  return apiFetch<{ status: string; commit?: string }>(
+    `/admin/positions/${encodeURIComponent(name)}${tenantQuery(tenant)}`,
+    { method: "DELETE" },
+  );
+}
+
+/** One thing a person was given: a position, or a role and the app it is held on. */
+export type Assignment = { position?: string; role?: string; app?: string };
+
+export type AssignmentResult = {
+  person: string;
+  changed: boolean;
+  holds: boolean;
+  /** True when the person now administers the tenant and was asked for a second factor. */
+  totpRequired?: boolean;
+  warning?: string;
+};
+
+export function fetchAssignments(person: string, tenant?: string) {
+  return apiFetch<{ tenant: string; person: string; assignments: Assignment[] }>(
+    `/admin/people/${encodeURIComponent(person)}/assignments${tenantQuery(tenant)}`,
+  );
+}
+
+/** Give a person a position or a role (holds true), or take it back. */
+export function setAssignment(input: { person: string; assignment: Assignment; holds: boolean }, tenant?: string) {
+  return apiFetch<AssignmentResult>(`/admin/people/${input.holds ? "give" : "take"}${tenantQuery(tenant)}`, {
+    method: "POST",
+    body: JSON.stringify({ person: input.person, ...input.assignment }),
+  });
 }
 
 export function fetchIntegrationsOverview(tenant?: string) {
@@ -589,7 +633,7 @@ export function clearAppGrant(app: string, tenant?: string) {
 
 export type GrantableAddon = { id: string; label: string; profile: string };
 
-/** Addons this tenant has installed and can therefore grant to a group. */
+/** Addons this tenant has installed and can therefore give. */
 export function fetchGrantableAddons(tenant?: string) {
   return apiFetch<GrantableAddon[]>(`/admin/grantable-addons${tenantQuery(tenant)}`);
 }
@@ -696,6 +740,32 @@ export function fetchBackupKeyStatus() {
   return apiFetch<BackupKeyStatus>("/credentials/backup-identity");
 }
 
+/** What is exported before an app update (gentian-os versioning.md §5). */
+export type BeforeMove = "tenant" | "app" | "none";
+
+/** The part of the tenant's backup policy this console reads and sets. */
+export type BackupPolicy = {
+  configured: boolean;
+  /** Whether the cluster lets the tenant state a policy of its own. */
+  allowTenantOverride: boolean;
+  /** What the tenant states; absent when it inherits the cluster's. */
+  beforeMove?: BeforeMove;
+  /** What applies. */
+  effectiveBeforeMove: BeforeMove;
+};
+
+export function fetchBackupPolicy(tenant?: string) {
+  return apiFetch<BackupPolicy>(`/admin/backup-policy${tenantQuery(tenant)}`);
+}
+
+/** Set what is exported before an app update; "" inherits the cluster's. */
+export function setBeforeMove(beforeMove: BeforeMove | "", tenant?: string) {
+  return apiFetch<unknown>(`/admin/backup-policy/before-move${tenantQuery(tenant)}`, {
+    method: "PUT",
+    body: JSON.stringify({ beforeMove }),
+  });
+}
+
 // --- Resources ---------------------------------------------------------------
 
 export type ResourceHeadroom = {
@@ -723,6 +793,17 @@ export type ResourceState = {
   installedApps: number;
   /** Where the tenant orders another plan, as the cluster states it. */
   ordering?: PlanOrdering;
+  /** The plan the tenant's administrator asked to be moved to, if pending. */
+  request?: PlanRequest;
+};
+
+/** A tenant administrator's pending request for another plan. */
+export type PlanRequest = {
+  plan: string;
+  by?: string;
+  /** RFC 3339. */
+  at?: string;
+  reason?: string;
 };
 
 /** The cluster's notice on ordering another plan: a text by language and at
@@ -786,6 +867,39 @@ export function fetchResourceState(tenant?: string) {
 
 export function fetchResourcePlans(tenant?: string) {
   return apiFetch<ResourcePlan[]>(`/admin/resources/plans${tenantQuery(tenant)}`);
+}
+
+/** The director's answer to moving a tenant: 202 with a commit, or 200 when
+ *  the tenant is on that plan already. */
+export type ResourcePlanChange = {
+  status: string;
+  tenant: string;
+  plan: string;
+  previousPlan: string;
+  message: string;
+  commit?: string;
+};
+
+export function changeResourcePlan(plan: string, tenant?: string, force = false) {
+  return apiFetch<ResourcePlanChange>(`/admin/resources${tenantQuery(tenant)}`, {
+    method: "PUT",
+    body: JSON.stringify({ plan, force }),
+  });
+}
+
+export function requestResourcePlan(plan: string, reason: string, tenant?: string) {
+  return apiFetch<{ status: string; plan: string; commit?: string }>(
+    `/admin/resources/request${tenantQuery(tenant)}`,
+    { method: "PUT", body: JSON.stringify({ plan, reason }) },
+  );
+}
+
+/** Withdraw (the tenant's administrator) or decline (the cluster's) the
+ *  tenant's pending request. */
+export function clearResourcePlanRequest(tenant?: string) {
+  return apiFetch<{ status: string }>(`/admin/resources/request${tenantQuery(tenant)}`, {
+    method: "DELETE",
+  });
 }
 
 export function fetchResourceUsage(
@@ -855,7 +969,7 @@ export function fetchChanges(tenant?: string, scope: "tenant" | "cluster" = "ten
   return apiFetch<ChangesResponse>(`/admin/changes?${params.toString()}`);
 }
 
-// People and groups (S7A.17).
+// People (S7A.17).
 //
 // The console reads and writes these through the director, with the caller's
 // own token. Nothing here holds a Keycloak credential: the director holds one
@@ -882,8 +996,6 @@ export type Person = {
    * looks identical otherwise, which is how a failed invitation goes unseen.
    */
   pending: boolean;
-  /** Group paths, without the leading slash. Filled only by the single read. */
-  groups?: string[];
   /**
    * The address they have a mailbox under on the cluster's own mail server.
    * Absent when they have none there. Removing somebody who has one comes
@@ -915,18 +1027,6 @@ export type RemovedMailbox = {
   /** The archived mailbox was asked to be deleted and is not gone yet. */
   deletionRequested?: boolean;
   deletionBy?: string;
-};
-
-export type PersonGroup = {
-  id: string;
-  /** The path without the leading slash, which is the name the graph uses. */
-  path: string;
-  name: string;
-  /** Made by an administrator here, and so the only kind that can be deleted. */
-  custom?: boolean;
-  /** An app the tenant provisioned for everybody rather than only installed:
-   *  ticked when a person is added, so it is opt-out for new people. */
-  defaultGrant?: boolean;
 };
 
 export type SettingsTemplate = { id: string; name: string };
@@ -961,7 +1061,8 @@ export type Invitation = {
   lastName?: string;
   requireTotp?: boolean;
   settingsTemplate?: string;
-  groups: string[];
+  /** The positions the person holds from the start, beside user. */
+  positions?: string[];
 };
 
 export function fetchPeople(opts?: { search?: string; tenant?: string }) {
@@ -978,10 +1079,6 @@ export function fetchPerson(id: string, tenant?: string) {
   return apiFetch<Person>(`/admin/people/${encodeURIComponent(id)}${tenantQuery(tenant)}`);
 }
 
-export function fetchPersonGroups(tenant?: string) {
-  return apiFetch<{ tenant: string; groups: PersonGroup[] }>(`/admin/groups${tenantQuery(tenant)}`);
-}
-
 export function fetchIdentitySettings(tenant?: string) {
   return apiFetch<IdentitySettings>(`/admin/identity${tenantQuery(tenant)}`);
 }
@@ -991,16 +1088,6 @@ export function invitePerson(body: Invitation, tenant?: string) {
     method: "POST",
     body: JSON.stringify(body),
   });
-}
-
-export function setMembership(
-  body: { person: string; group: string; member: boolean },
-  tenant?: string,
-) {
-  return apiFetch<{ person: string; group: string; member: boolean }>(
-    `/admin/people/membership${tenantQuery(tenant)}`,
-    { method: "POST", body: JSON.stringify(body) },
-  );
 }
 
 function postAction<T>(path: string, body: unknown, tenant?: string) {
@@ -1054,24 +1141,6 @@ export function removeTotp(person: string, tenant?: string) {
   return postAction<{ totpRequired: boolean }>("/admin/people/remove-totp", { person }, tenant);
 }
 
-export function createCustomGroup(name: string, tenant?: string) {
-  return postAction<PersonGroup>("/admin/groups/create", { name }, tenant);
-}
-
-export function renameCustomGroup(group: string, name: string, tenant?: string) {
-  return postAction<PersonGroup>("/admin/groups/rename", { group, name }, tenant);
-}
-
-export function deleteCustomGroup(group: string, tenant?: string) {
-  return postAction<{ deleted: boolean }>("/admin/groups/delete", { group }, tenant);
-}
-
-export function fetchGroupMembers(group: string, tenant?: string) {
-  const params = new URLSearchParams({ group });
-  if (tenant) params.set("tenant", tenant);
-  return apiFetch<{ group: string; people: Person[] }>(`/admin/groups/members?${params.toString()}`);
-}
-
 export function fetchSettingsTemplates(tenant?: string) {
   return apiFetch<{ templates: SettingsTemplate[] }>(`/admin/templates${tenantQuery(tenant)}`);
 }
@@ -1085,6 +1154,13 @@ export function fetchSettingsTemplates(tenant?: string) {
 export type PendingPrivilegeApproval = {
   privilege: string;
   approvedBy: "perimeter-approver" | "security-officer" | (string & {});
+  /** The profile's reason, and the request the tenant's administrator made. */
+  reason?: string | null;
+  requestedBy?: string | null;
+  requestedAt?: string | null;
+  note?: string | null;
+  /** When a grant for it ran out: approved once, waiting again. */
+  expiredAt?: string | null;
   /**
    * The approver's no, when one was said: who, when and why. The request is
    * still pending -- the app keeps waiting -- until somebody approves, or
@@ -1093,6 +1169,13 @@ export type PendingPrivilegeApproval = {
   declinedBy?: string | null;
   declinedAt?: string | null;
   declineReason?: string | null;
+  /** For an egress request by host: the hosts it names. */
+  hosts?: string[] | null;
+  /**
+   * For an egress request whose installation chooses its destinations: the
+   * approval names the hosts it opens. Absent from an older operator.
+   */
+  hostsAtApproval?: boolean | null;
 };
 
 /** One of the tenant's components as the cluster holds it. */
@@ -1121,6 +1204,33 @@ export type AppState = {
    * component counts as installed.
    */
   origin?: "default" | "install";
+  /**
+   * The profile's trust tier, and what the profile has the component hold on
+   * people's behalf. Absent from an operator older than these fields, and for
+   * a component whose profile the cluster no longer has.
+   */
+  trustTier?: string;
+  holds?: AppHold[];
+  /** The app's add-ons the cluster holds a component for, each with its own. */
+  addons?: {
+    profile: string;
+    name: string;
+    trustTier?: string;
+    holds?: AppHold[];
+  }[];
+};
+
+/**
+ * One thing a component holds on people's behalf, as the operator read it from
+ * the profile. `kind` is the operator's word for it; one this console does not
+ * know is shown as it came.
+ */
+export type AppHold = {
+  kind: string;
+  /** Whether the person has to be there: `present`, or `away` for also when not. */
+  presence?: "present" | "away" | (string & {});
+  /** What it concerns: entries, contracts, services, scopes or ways. */
+  names?: string[];
 };
 
 export function fetchAppStates() {

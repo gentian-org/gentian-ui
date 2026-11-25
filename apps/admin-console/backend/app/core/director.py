@@ -161,7 +161,7 @@ def registrar_url(settings: Settings) -> str:
     """Where everything about people goes.
 
     The registrar holds the per-realm Keycloak credential and answers for
-    people, groups and the realm's settings; the director answers 404 on all
+    people and the realm's settings; the director answers 404 on all
     of them. Unset is a 503 that names the setting, never a fall back to the
     director: a console quietly asking the wrong service would read as an
     empty tenant.

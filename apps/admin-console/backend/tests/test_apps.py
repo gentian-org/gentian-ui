@@ -68,7 +68,7 @@ def test_the_declared_apps_are_the_directors_answer_untouched(monkeypatch):
     body = {
         "tenant": "platform",
         "apps": [
-            {"profile": "timesheets", "digest": "sha256:" + "a" * 64, "defaultGrant": True},
+            {"profile": "timesheets", "digest": "sha256:" + "a" * 64, "positions": ["sales"]},
             {"profile": "wiki", "addons": ["wiki-search"]},
         ],
     }
@@ -121,6 +121,54 @@ def test_an_approval_goes_to_the_directors_privilege_route_as_given(monkeypatch)
     assert seen["auth"] == "Bearer person-token"
 
 
+def test_an_egress_approval_names_the_hosts_it_opens(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "abc"}, seen, status=202)
+    answer = _client().put(
+        "/api/v1/admin/apps/privileges/operations-sync-ee/egress/backends",
+        headers=_person,
+        json={"hosts": ["erp.example.org"]},
+    )
+    assert answer.status_code == 202
+    assert seen["json"] == {"hosts": ["erp.example.org"]}
+
+
+def test_a_withdrawn_approval_goes_to_the_directors_privilege_route(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "abc"}, seen, status=202)
+    answer = _client().delete(
+        "/api/v1/admin/apps/privileges/aluvian-commerce/egress/intake", headers=_person
+    )
+    assert answer.status_code == 202
+    assert answer.json() == {"status": "updated", "commit": "abc"}
+    assert (seen["method"], seen["url"]) == (
+        "DELETE",
+        f"{_base}/privileges/aluvian-commerce/egress/intake",
+    )
+    assert seen["json"] is None
+    assert seen["auth"] == "Bearer person-token"
+
+
+def test_a_withdrawal_of_no_known_kind_never_reaches_the_director(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {}, seen)
+    answer = _client().delete(
+        "/api/v1/admin/apps/privileges/aluvian-commerce/hostNetwork/x", headers=_person
+    )
+    assert answer.status_code in (400, 422)
+    assert seen == {}
+
+
+def test_an_approval_needs_no_comment(monkeypatch):
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated", "commit": "abc"}, seen, status=202)
+    answer = _client().put(
+        "/api/v1/admin/apps/privileges/aluvian-commerce/egress/intake", headers=_person, json={}
+    )
+    assert answer.status_code == 202
+    assert seen["json"] == {}
+
+
 def test_the_directors_refusal_of_an_approval_comes_back_as_it_is(monkeypatch):
     seen: dict = {}
     refusal = {"error": "approving an egress request is the tenant administrator's"}
@@ -145,7 +193,6 @@ def test_the_directors_refusal_of_an_approval_comes_back_as_it_is(monkeypatch):
             "aluvian-commerce/egress/intake",
             {"reason": "because it needs it", "approver": "someone"},
         ),
-        ("aluvian-commerce/egress/intake", {}),
     ],
 )
 def test_an_approval_the_director_could_not_mean_is_refused_here(monkeypatch, path, body):
@@ -234,7 +281,8 @@ def test_the_main_address_travels_only_as_the_person_sent_it(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "kind", ["public", "publicAppCredential", "signInAppAuthorization", "tokenEntry"]
+    "kind",
+    ["public", "publicAppCredential", "publicAppSignIn", "signInAppAuthorization", "tokenEntry"],
 )
 def test_the_kind_the_dialog_showed_travels_with_the_approval(monkeypatch, kind):
     """What the person was shown is what they approve: the director refuses
@@ -395,15 +443,15 @@ def test_an_entry_takes_an_approval_and_a_withdrawal_and_nothing_else(monkeypatc
     assert seen == {}
 
 
-# -- for everyone, or per person --------------------------------------------
+# -- who gets the app, by position -----------------------------------------
 
 
-@pytest.mark.parametrize("everyone", [True, False])
-def test_access_states_the_default_grant_and_nothing_else(monkeypatch, everyone):
+@pytest.mark.parametrize("positions", [["sales"], []])
+def test_access_states_the_positions_and_nothing_else(monkeypatch, positions):
     seen: dict = {}
     _fake_client(monkeypatch, {"status": "updated", "commit": "a1b2c3d4"}, seen, status=202)
     answer = _client().put(
-        "/api/v1/admin/apps/timesheets/access", json={"everyone": everyone}, headers=_person
+        "/api/v1/admin/apps/timesheets/access", json={"positions": positions}, headers=_person
     )
     assert answer.status_code == 202
     assert answer.json() == {"status": "updated", "commit": "a1b2c3d4"}
@@ -411,7 +459,7 @@ def test_access_states_the_default_grant_and_nothing_else(monkeypatch, everyone)
     assert (seen["method"], seen["url"]) == ("POST", f"{_base}/apps/timesheets")
     # No coordinate and no digest: either would fetch a bundle or move the
     # pin, and this request is about who may open the app, not which build.
-    assert seen["json"] == {"defaultGrant": everyone}
+    assert seen["json"] == {"positions": positions}
     assert seen["auth"] == "Bearer person-token"
 
 
@@ -419,10 +467,10 @@ def test_access_without_saying_which_way_reaches_nobody(monkeypatch):
     seen: dict = {}
     _fake_client(monkeypatch, {"status": "updated"}, seen, status=202)
     client = _client()
-    # Unstated, null, or something merely shaped like a yes: the director
-    # would read an absent defaultGrant as "leave it", and a bare POST to its
-    # install route is an install.
-    for body in ({}, {"everyone": None}, {"everyone": "maybe"}):
+    # Unstated, null, or not a list: the director would read absent
+    # positions as "leave it", and a bare POST to its install route is an
+    # install.
+    for body in ({}, {"positions": None}, {"positions": "user"}, {"everyone": True}):
         answer = client.put("/api/v1/admin/apps/timesheets/access", json=body, headers=_person)
         assert answer.status_code == 422
     assert seen == {}
@@ -430,10 +478,10 @@ def test_access_without_saying_which_way_reaches_nobody(monkeypatch):
 
 def test_access_refused_names_the_right_it_lacks(monkeypatch):
     seen: dict = {}
-    body = {"error": "installing an app for everyone needs can_grant on the tenant"}
+    body = {"error": "giving an app to a position needs can_grant on the tenant"}
     _fake_client(monkeypatch, body, seen, status=403)
     answer = _client().put(
-        "/api/v1/admin/apps/timesheets/access", json={"everyone": True}, headers=_person
+        "/api/v1/admin/apps/timesheets/access", json={"positions": ["sales"]}, headers=_person
     )
     assert answer.status_code == 403
     assert answer.json() == body
@@ -642,7 +690,9 @@ def test_a_name_that_cannot_be_an_app_is_not_put_in_a_path(monkeypatch, name):
     _fake_client(monkeypatch, {"status": "ok"}, seen)
     client = _client()
     assert client.delete(f"/api/v1/admin/apps/{name}", headers=_person).status_code == 400
-    put = client.put(f"/api/v1/admin/apps/{name}/access", json={"everyone": True}, headers=_person)
+    put = client.put(
+        f"/api/v1/admin/apps/{name}/access", json={"positions": ["user"]}, headers=_person
+    )
     assert put.status_code == 400
     purge = client.post("/api/v1/admin/apps/purge", json={"profile": name}, headers=_person)
     assert purge.status_code == 400
@@ -662,7 +712,9 @@ def test_none_of_them_is_relayed_without_a_token(monkeypatch):
     assert client.get("/api/v1/admin/apps").status_code == 401
     assert client.get("/api/v1/admin/apps/privileges").status_code == 401
     assert client.get("/api/v1/admin/apps/retained").status_code == 401
-    assert client.put("/api/v1/admin/apps/a/access", json={"everyone": True}).status_code == 401
+    assert (
+        client.put("/api/v1/admin/apps/a/access", json={"positions": ["user"]}).status_code == 401
+    )
     assert client.delete("/api/v1/admin/apps/a").status_code == 401
     assert client.post("/api/v1/admin/apps/purge", json={"profile": "a"}).status_code == 401
     assert seen == {}
@@ -921,61 +973,15 @@ def test_a_removal_from_another_origin_is_refused_before_anything_is_asked(monke
         app.dependency_overrides.pop(get_settings, None)
 
 
-# -- an add-on's own access -------------------------------------------------
-
-
-def _fake_director(monkeypatch, answers: list[tuple[int, dict]], calls: list):
-    class FakeClient:
-        def __init__(self, *a, **kw):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def request(self, method, url, params=None, json=None, headers=None):
-            calls.append((method, url, json))
-            status, body = answers.pop(0)
-            return httpx.Response(status, json=body, request=httpx.Request(method, url))
-
-    monkeypatch.setattr(director.httpx, "AsyncClient", FakeClient)
-
-
-@pytest.mark.parametrize("everyone", [True, False])
-def test_an_addons_access_restates_the_list_with_that_one_addons_grant(monkeypatch, everyone):
-    calls: list = []
-    _fake_director(
-        monkeypatch,
-        [
-            (200, {"profile": "cloud", "addons": ["cloud-calendar", "cloud-deck"]}),
-            (202, {"status": "updated", "commit": "a1b2c3d4"}),
-        ],
-        calls,
-    )
-    answer = _client().put(
-        "/api/v1/admin/apps/cloud/addons/cloud-deck/access",
-        json={"everyone": everyone},
-        headers=_person,
-    )
-    assert answer.status_code == 202
-    assert calls[0][:2] == ("GET", f"{_base}/apps/cloud/addons")
-    # Every add-on stays by name, so its pin and grant stay; only this one says.
-    assert calls[1] == (
-        "PUT",
-        f"{_base}/apps/cloud/addons",
-        {"addons": ["cloud-calendar", {"name": "cloud-deck", "defaultGrant": everyone}]},
-    )
-
-
-def test_an_addon_the_app_does_not_activate_is_not_switched_on(monkeypatch):
-    calls: list = []
-    _fake_director(monkeypatch, [(200, {"profile": "cloud", "addons": ["cloud-calendar"]})], calls)
+def test_an_addon_is_not_made_for_everyone_from_here(monkeypatch):
+    # Nothing is for everyone any more: an add-on reaches people through a
+    # role on it, so the console has no route that says otherwise.
+    seen: dict = {}
+    _fake_client(monkeypatch, {"status": "updated"}, seen, status=202)
     answer = _client().put(
         "/api/v1/admin/apps/cloud/addons/cloud-deck/access",
         json={"everyone": True},
         headers=_person,
     )
-    assert answer.status_code == 404
-    assert [c[0] for c in calls] == ["GET"]
+    assert answer.status_code in (404, 405)
+    assert seen == {}

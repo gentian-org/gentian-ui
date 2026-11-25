@@ -7,7 +7,7 @@ import {
   fetchAdminContext,
   fetchAppStates,
   fetchIntegrationsOverview,
-  fetchPersonGroups,
+  fetchPositions,
   type AdminContext,
   type AppState,
 } from "@/api/admin";
@@ -17,19 +17,20 @@ import {
   fetchRetainedApps,
   fetchTenantPrivileges,
   purgeAppData,
-  setAddonForEveryone,
-  setAppForEveryone,
+  positionsOf,
+  setAppPositions,
   uninstallApp,
   type AppPurgeResult,
   type AppWriteResult,
   type DeclaredApp,
   type RetainedApp,
 } from "@/api/apps";
+import { parseHosts } from "@/api/approvals";
 import { ApiError } from "@/api/client";
 import { AppLeftovers } from "./AppLeftovers";
 import { AppPublicAddresses } from "./AppPublicAddresses";
-import { GroupMembers } from "./GroupMembers";
-import { describeGroups } from "./groupLabels";
+import { PositionChecklist, choosablePositions } from "./PositionChecklist";
+import { RoleHolders } from "./RoleHolders";
 import "./admin.css";
 import { formatDateTime } from "@/lib/format";
 
@@ -76,7 +77,12 @@ export function joinApps(declaredApps: DeclaredApp[], states: AppState[]): AppRo
 }
 
 /** What the director answered to the last write on this screen. */
-type Outcome = { kind: "access" | "uninstall"; app: string; everyone?: boolean; result: AppWriteResult };
+type Outcome = {
+  kind: "access" | "uninstall";
+  app: string;
+  positions?: string[];
+  result: AppWriteResult;
+};
 
 /**
  * The tenant's installed apps, and everything that is done to one after it
@@ -392,8 +398,8 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 
 /**
  * Status: the app at a glance -- how it stands on the cluster and why, which
- * build git pins, where that build came from, what is switched on inside it,
- * and whether it is for everyone.
+ * build git pins, where that build came from and what is switched on inside
+ * it.
  *
  * The cluster's own words are shown as they came -- the message, the failure,
  * every condition -- because "why is it not running" is answered there and
@@ -487,9 +493,6 @@ function StatePart({
                 );
               })}
         </Fact>
-        <Fact label={t("apps.forEveryone")}>
-          {declared ? (declared.defaultGrant ? t("apps.yes") : t("apps.no")) : "—"}
-        </Fact>
       </div>
       {conditions.length > 0 ? (
         <div className="admin-console__table-wrap">
@@ -520,15 +523,17 @@ function StatePart({
 }
 
 /**
- * Access: whether the app is for everyone, and who has it now.
+ * Access: the positions the app is given to, and who has it now.
  *
- * "For everyone" is a key on the app's entry in git. Switching it restates
+ * The positions are a key on the app's entry in git. Changing them restates
  * that key through the director's install route and leaves the pinned build
  * alone. It is offered only for an app git declares, because the same request
- * for one git does not have would install it.
+ * for one git does not have would install it. All apps and App administrator
+ * have every app whatever the entry says.
  *
- * Who has access now is who is in the app's group, and that is the registrar's
- * list, changed a person at a time.
+ * Who has access now is who holds a role on the app: mostly a position, whose
+ * holders are changed on Positions, and now and then one person who was given
+ * a role beside theirs (RoleHolders).
  */
 export function AccessPart({
   row,
@@ -542,36 +547,31 @@ export function AccessPart({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { profile, declared } = row;
-  const everyone = Boolean(declared?.defaultGrant);
-
-  const groupsQuery = useQuery({
-    queryKey: ["admin", "people", "groups"],
-    queryFn: () => fetchPersonGroups(),
-  });
-  // The app's group, found the way Members and Groups find it: by what the
-  // registrar's path says it is for, never by a name put together here.
-  const group = useMemo(
-    () =>
-      describeGroups(groupsQuery.data?.groups ?? [], tenant).find(
-        (g) => g.kind === "app" && g.label === profile,
-      ),
-    [groupsQuery.data, tenant, profile],
-  );
+  const positions = useQuery({ queryKey: ["admin", "positions"], queryFn: () => fetchPositions(), retry: false });
+  const own = positions.data?.positions ?? [];
+  const choosable = choosablePositions(own);
+  const given = positionsOf(declared);
+  // What is ticked and not yet saved; null while nothing was changed.
+  const [draft, setDraft] = useState<Set<string> | null>(null);
+  const selected = draft ?? new Set(given);
+  const next = choosable.filter((name) => selected.has(name));
+  const changed = draft !== null && [...next].sort().join() !== given.filter((n) => choosable.includes(n)).sort().join();
 
   const access = useMutation({
-    mutationFn: (next: boolean) => setAppForEveryone(profile, next),
-    onSuccess: (result, next) => {
-      onOutcome({ kind: "access", app: profile, everyone: next, result });
+    mutationFn: (names: string[]) => setAppPositions(profile, names),
+    onSuccess: (result, names) => {
+      setDraft(null);
+      onOutcome({ kind: "access", app: profile, positions: names, result });
       void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "declared"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "people"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "access"] });
     },
   });
 
-  function switchAccess() {
-    const question = everyone
-      ? t("apps.everyoneOffConfirm", { app: profile, tenant })
-      : t("apps.everyoneOnConfirm", { app: profile, tenant });
-    if (window.confirm(question)) access.mutate(!everyone);
+  function save() {
+    const taken = given.filter((name) => !next.includes(name));
+    if (taken.length === 0 || window.confirm(t("apps.positionsTakeConfirm", { app: profile, tenant, count: taken.length }))) {
+      access.mutate(next);
+    }
   }
 
   // A default component is the platform's: who may open it is decided for
@@ -590,55 +590,39 @@ export function AccessPart({
       <h3 className="admin-console__subsection-title">{t("apps.accessTitle")}</h3>
       {declared ? (
         <>
-          <p className="admin-console__lead">
-            {everyone ? t("apps.everyoneIsOn") : t("apps.everyoneIsOff")}
-          </p>
+          <p className="admin-console__hint">{t("apps.positionsLead")}</p>
+          <PositionChecklist
+            own={own}
+            selected={selected}
+            disabled={access.isPending || positions.isLoading}
+            onChange={setDraft}
+          />
           <div className="admin-console__actions">
             <button
               type="button"
-              className="admin-console__btn"
-              disabled={access.isPending}
-              onClick={switchAccess}
+              className="admin-console__btn admin-console__btn--primary"
+              disabled={!changed || access.isPending}
+              onClick={save}
             >
-              {everyone ? t("apps.everyoneSwitchOff") : t("apps.everyoneSwitchOn")}
+              {t("apps.positionsSave")}
             </button>
           </div>
           {access.isError ? <p className="admin-console__error">{messageOf(access.error)}</p> : null}
         </>
       ) : (
-        <p className="admin-console__hint">{t("apps.everyoneNotDeclared")}</p>
+        <p className="admin-console__hint">{t("apps.positionsNotDeclared")}</p>
       )}
 
       <h4 className="admin-console__group-title">{t("apps.peopleTitle")}</h4>
-      {groupsQuery.isLoading ? (
-        <p className="admin-console__hint">{t("apps.readingGroup")}</p>
-      ) : groupsQuery.isError ? (
-        <p className="admin-console__error">{messageOf(groupsQuery.error)}</p>
-      ) : group ? (
-        <>
-          <p className="admin-console__hint">
-            <Trans i18nKey="apps.peopleLead" values={{ group: group.path }} components={mono} />
-          </p>
-          <GroupMembers group={group} />
-        </>
-      ) : (
-        <p className="admin-console__hint">{t("apps.noGroupYet")}</p>
-      )}
+      <p className="admin-console__hint">{t("apps.peopleLead")}</p>
+      <RoleHolders profile={profile} />
 
       {(declared?.addons ?? []).length > 0 ? (
         <>
           <h4 className="admin-console__group-title">{t("apps.addonAccessTitle")}</h4>
           <p className="admin-console__hint">{t("apps.addonAccessLead")}</p>
           {(declared?.addons ?? []).map((addon) => (
-            <AddonAccess
-              key={addon}
-              profile={profile}
-              addon={addon}
-              tenant={tenant}
-              everyone={(declared?.addonGrants ?? []).some((g) => g.name === addon && g.defaultGrant)}
-              groups={groupsQuery.data?.groups ?? []}
-              onOutcome={onOutcome}
-            />
+            <AddonAccess key={addon} addon={addon} />
           ))}
         </>
       ) : null}
@@ -647,58 +631,16 @@ export function AccessPart({
 }
 
 /**
- * One add-on's own access. An add-on is entitled by its own group, as an app
- * is: whether it is for everyone, and who is in its group, are the add-on's,
- * not the app's.
+ * One add-on's own access. An add-on is an app of its own, with roles of its
+ * own: who holds a role on it is the add-on's, not the app's.
  */
-function AddonAccess({
-  profile,
-  addon,
-  tenant,
-  everyone,
-  groups,
-  onOutcome,
-}: {
-  profile: string;
-  addon: string;
-  tenant: string;
-  everyone: boolean;
-  groups: Parameters<typeof describeGroups>[0];
-  onOutcome: (outcome: Outcome) => void;
-}) {
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const group = useMemo(
-    () => describeGroups(groups, tenant).find((g) => g.kind === "app" && g.label === addon),
-    [groups, tenant, addon],
-  );
-  const access = useMutation({
-    mutationFn: (next: boolean) => setAddonForEveryone(profile, addon, next),
-    onSuccess: (result, next) => {
-      onOutcome({ kind: "access", app: addon, everyone: next, result });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "declared"] });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "people"] });
-    },
-  });
-  function switchAccess() {
-    const question = everyone
-      ? t("apps.everyoneOffConfirm", { app: addon, tenant })
-      : t("apps.everyoneOnConfirm", { app: addon, tenant });
-    if (window.confirm(question)) access.mutate(!everyone);
-  }
+function AddonAccess({ addon }: { addon: string }) {
   return (
     <div className="admin-console__subsection" data-addon={addon}>
       <h5 className="admin-console__group-title">
         <span className="admin-console__chip">{addon}</span>
       </h5>
-      <p className="admin-console__lead">{everyone ? t("apps.addonEveryoneIsOn") : t("apps.addonEveryoneIsOff")}</p>
-      <div className="admin-console__actions">
-        <button type="button" className="admin-console__btn" disabled={access.isPending} onClick={switchAccess}>
-          {everyone ? t("apps.everyoneSwitchOff") : t("apps.everyoneSwitchOn")}
-        </button>
-      </div>
-      {access.isError ? <p className="admin-console__error">{messageOf(access.error)}</p> : null}
-      {group ? <GroupMembers group={group} /> : <p className="admin-console__hint">{t("apps.addonNoGroupYet")}</p>}
+      <RoleHolders profile={addon} />
     </div>
   );
 }
@@ -814,6 +756,9 @@ export function PrivilegesPart({ row }: { row: AppRow }) {
   const approvedBy = new Map(
     (row.state?.pendingPrivilegeApprovals ?? []).map((p) => [p.privilege, p.approvedBy]),
   );
+  const hostsAtApproval = new Set(
+    (row.state?.pendingPrivilegeApprovals ?? []).filter((p) => p.hostsAtApproval).map((p) => p.privilege),
+  );
   const declined = new Map(
     (row.state?.pendingPrivilegeApprovals ?? []).filter((p) => p.declinedBy).map((p) => [p.privilege, p]),
   );
@@ -874,7 +819,7 @@ export function PrivilegesPart({ row }: { row: AppRow }) {
                       <div>{t("apps.privilegeWaitingDetail")}</div>
                     )}
                     {mayApprove(approvedBy.get(privilege), context) ? (
-                      <ApprovePrivilege install={install} privilege={privilege} />
+                      <ApprovePrivilege install={install} privilege={privilege} hostsAtApproval={hostsAtApproval.has(privilege)} />
                     ) : (approvedBy.get(privilege) ?? legacyApprover(privilege)) === "perimeter-approver" ? (
                       <div className="admin-console__hint">{t("apps.privilegeApproveNotYours")}</div>
                     ) : (
@@ -942,17 +887,32 @@ function legacyApprover(privilege: string): string {
 }
 
 /**
- * Approve one waiting request: a reason in the approver's words, then one
+ * Approve one waiting request: a comment if the approver leaves one, then one
  * commit through the director. The director decides whether this person may
  * and records them as the approver; its refusal is shown as it worded it.
  */
-function ApprovePrivilege({ install, privilege }: { install: string; privilege: string }) {
+function ApprovePrivilege({
+  install,
+  privilege,
+  hostsAtApproval,
+}: {
+  install: string;
+  privilege: string;
+  hostsAtApproval: boolean;
+}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const [hostsText, setHostsText] = useState("");
+  const hosts = parseHosts(hostsText);
+  const noHosts = hostsAtApproval && hosts.length === 0;
   const approve = useMutation({
-    mutationFn: () => approvePrivilege(install, privilege, { reason: reason.trim() }),
+    mutationFn: () =>
+      approvePrivilege(install, privilege, {
+        ...(reason.trim() ? { reason: reason.trim() } : {}),
+        ...(hostsAtApproval ? { hosts } : {}),
+      }),
     onSuccess: () => {
       setOpen(false);
       setReason("");
@@ -960,7 +920,6 @@ function ApprovePrivilege({ install, privilege }: { install: string; privilege: 
       void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "status"] });
     },
   });
-  const tooShort = reason.trim().length < 10;
 
   if (!open) {
     return (
@@ -976,18 +935,31 @@ function ApprovePrivilege({ install, privilege }: { install: string; privilege: 
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        if (!tooShort) approve.mutate();
+        if (noHosts) return;
+        approve.mutate();
       }}
     >
+      {hostsAtApproval ? (
+        <label className="admin-console__field">
+          <span>{t("approvals.hostsLabel")}</span>
+          <textarea
+            value={hostsText}
+            onChange={(event) => setHostsText(event.target.value)}
+            required
+            rows={3}
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <span className="admin-console__hint">{t("approvals.hostsHint")}</span>
+        </label>
+      ) : null}
       <label className="admin-console__field">
         <span>{t("apps.privilegeApproveReason")}</span>
         <textarea
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          required
-          minLength={10}
           maxLength={1000}
-          rows={3}
+          rows={2}
         />
       </label>
       <p className="admin-console__hint">{t("apps.privilegeApproveHint")}</p>
@@ -997,7 +969,7 @@ function ApprovePrivilege({ install, privilege }: { install: string; privilege: 
         </p>
       ) : null}
       <div className="admin-console__actions">
-        <button type="submit" className="admin-console__btn" disabled={tooShort || approve.isPending}>
+        <button type="submit" className="admin-console__btn" disabled={approve.isPending || noHosts}>
           {t("apps.privilegeApproveConfirm", { privilege })}
         </button>
         <button
@@ -1017,7 +989,7 @@ function ApprovePrivilege({ install, privilege }: { install: string; privilege: 
  * Uninstall: removes the app and keeps its data.
  *
  * A commit, like the install was. The app and its sign-in client go; its
- * files, database, object storage, stored credentials and access group stay.
+ * files, database, object storage, stored credentials and the roles people hold on it stay.
  * Destroying those is a different act with a different name, offered
  * elsewhere on this screen and only once the app is gone -- so taking an app
  * away never takes its data with it by accident.
@@ -1078,17 +1050,13 @@ function UninstallPart({
  * one, the tenant already was as asked.
  */
 function OutcomeNotice({ outcome }: { outcome: Outcome }) {
-  const { app, result, kind, everyone } = outcome;
+  const { app, result, kind, positions } = outcome;
   const commit = (result.commit ?? "").slice(0, 8);
   const values = { app, commit, status: result.status };
-  if (kind === "access" && result.commit) {
+  if (kind === "access" && result.commit && positions) {
     return (
       <p className="admin-console__success">
-        {everyone ? (
-          <Trans i18nKey="apps.outcomeEveryoneOn" values={values} components={mono} />
-        ) : (
-          <Trans i18nKey="apps.outcomeEveryoneOff" values={values} components={mono} />
-        )}
+        <Trans i18nKey="apps.outcomePositions" values={values} components={mono} />
       </p>
     );
   }

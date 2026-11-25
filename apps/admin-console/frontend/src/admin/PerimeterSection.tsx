@@ -1,9 +1,22 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { fetchPerimeterHistory, fetchPerimeterTraffic, type ExposureEntry } from "@/api/apps";
+import { fetchAdminContext, fetchAppStates } from "@/api/admin";
+import { ApiError } from "@/api/client";
+import {
+  fetchPerimeterHistory,
+  fetchPerimeterTraffic,
+  fetchTenantPrivileges,
+  fetchTrustedDomains,
+  stopTrustingDomain,
+  trustDomain,
+  withdrawPrivilege,
+  type ExposureEntry,
+  type PrivilegeGrant,
+} from "@/api/apps";
 import { PublicAddressList } from "./AppPublicAddresses";
+import { AnswerRequest, RequestedHosts, tenantApprovals } from "./ApprovalsSection";
 import "./admin.css";
 import { formatDateTime, formatNumber } from "@/lib/format";
 
@@ -50,9 +63,329 @@ export function PerimeterSection() {
         lead={t("perimeter.surfaceLead")}
         empty={t("perimeter.surfaceNone")}
       />
+      <Outbound />
+      <TrustedDomainList />
       <PerimeterTraffic />
       <PerimeterHistory />
     </section>
+  );
+}
+
+/**
+ * The tenant's way out: what its apps ask to reach beyond the tenant
+ * (egress, the perimeter approver's to answer) and what they were granted,
+ * by whom and why. The requests are what the cluster says of each app; the
+ * grants are git's. Answering is the director's, as on the Approvals and
+ * Apps screens.
+ */
+function Outbound() {
+  const { t } = useTranslation();
+  const statesQuery = useQuery({ queryKey: ["admin", "apps", "status"], queryFn: () => fetchAppStates() });
+  const grantsQuery = useQuery({ queryKey: ["admin", "apps", "privileges"], queryFn: () => fetchTenantPrivileges() });
+  const contextQuery = useQuery({ queryKey: ["admin", "context"], queryFn: () => fetchAdminContext() });
+  const waiting = tenantApprovals(statesQuery.data?.tenant, statesQuery.data?.apps ?? []).filter((a) =>
+    a.privilege.startsWith("egress/"),
+  );
+  const granted = (grantsQuery.data?.privileges ?? []).filter((g) => g.privilege.startsWith("egress/"));
+  const mayAnswer = contextQuery.data?.canApprovePrivilege === true;
+  const failed = statesQuery.isError ? statesQuery.error : grantsQuery.isError ? grantsQuery.error : null;
+
+  return (
+    <div className="admin-console__subsection">
+      <h3 className="admin-console__subsection-title">{t("perimeter.outboundTitle")}</h3>
+      <p className="admin-console__hint">{t("perimeter.outboundLead")}</p>
+      {statesQuery.isLoading || grantsQuery.isLoading ? (
+        <p className="admin-console__loading">{t("perimeter.outboundReading")}</p>
+      ) : null}
+      {failed ? (
+        <p className="admin-console__error">
+          {t("perimeter.outboundUnavailable")} {failed instanceof Error ? failed.message : String(failed)}
+        </p>
+      ) : null}
+      {statesQuery.isSuccess && grantsQuery.isSuccess && waiting.length === 0 && granted.length === 0 ? (
+        <p className="admin-console__hint">{t("perimeter.outboundNone")}</p>
+      ) : null}
+      {waiting.length > 0 || granted.length > 0 ? (
+        <div className="admin-console__table-wrap">
+          <table className="admin-console__table">
+            <thead>
+              <tr>
+                <th>{t("perimeter.outboundApp")}</th>
+                <th>{t("perimeter.outboundPrivilege")}</th>
+                <th>{t("perimeter.outboundState")}</th>
+                <th>{t("perimeter.outboundDetail")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {waiting.map((request) => (
+                <tr key={`waiting-${request.install}-${request.privilege}`}>
+                  <td className="admin-console__mono">{request.install}</td>
+                  <td>
+                    <div className="admin-console__mono">{request.privilege}</div>
+                    <div className="admin-console__hint">{request.reason || t("approvals.noReason")}</div>
+                    <RequestedHosts approval={request} />
+                  </td>
+                  <td>
+                    <span className="admin-console__badge admin-console__badge--warn">
+                      {t(request.declinedBy ? "perimeter.outboundDeclined" : "perimeter.outboundWaiting")}
+                    </span>
+                  </td>
+                  <td>
+                    {request.declinedBy ? (
+                      <div className="admin-console__hint">
+                        <Trans
+                          i18nKey="approvals.declinedBy"
+                          values={{
+                            who: request.declinedBy,
+                            when: request.declinedAt ? formatDateTime(request.declinedAt) : "",
+                            reason: request.declineReason ?? "",
+                          }}
+                          components={mono}
+                        />
+                      </div>
+                    ) : null}
+                    {mayAnswer ? (
+                      <AnswerRequest approval={request} />
+                    ) : (
+                      <div className="admin-console__hint">{t("approvals.notYoursPerimeter")}</div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {granted.map((grant) => (
+                <tr key={`granted-${grant.install}-${grant.privilege}`}>
+                  <td className="admin-console__mono">{grant.install}</td>
+                  <td className="admin-console__mono">{grant.privilege}</td>
+                  <td>
+                    <span className="admin-console__badge admin-console__badge--ok">{t("perimeter.outboundGranted")}</span>
+                  </td>
+                  <td>
+                    <div>
+                      <Trans
+                        i18nKey="perimeter.outboundGrantedBy"
+                        values={{ who: grant.approver, when: formatDateTime(grant.approvedAt) }}
+                        components={mono}
+                      />
+                    </div>
+                    <div>{grant.reason}</div>
+                    {grant.hosts?.length ? (
+                      <div className="admin-console__hint">
+                        {t("perimeter.outboundGrantedHosts")}{" "}
+                        <span className="admin-console__mono">{grant.hosts.join(", ")}</span>
+                      </div>
+                    ) : null}
+                    {grant.expiresAt ? (
+                      <div className="admin-console__hint">
+                        {t("perimeter.outboundExpires", { when: formatDateTime(grant.expiresAt) })}
+                      </div>
+                    ) : null}
+                    {mayAnswer ? <WithdrawGrant grant={grant} /> : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Take back one grant. The director decides whether the person may, as it
+ * does for the approval; its refusal is shown as it came.
+ */
+export function WithdrawGrant({ grant }: { grant: PrivilegeGrant }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const withdraw = useMutation({
+    mutationFn: () => withdrawPrivilege(grant.install, grant.privilege),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin", "approvals"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "status"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "privileges"] });
+    },
+  });
+  const ask = () => {
+    if (!window.confirm(t("perimeter.outboundWithdrawConfirm", { app: grant.install, privilege: grant.privilege }))) return;
+    withdraw.mutate();
+  };
+  const refusal = withdraw.isError
+    ? withdraw.error instanceof ApiError && withdraw.error.detail
+      ? withdraw.error.detail
+      : withdraw.error instanceof Error
+        ? withdraw.error.message
+        : String(withdraw.error)
+    : null;
+  return (
+    <div>
+      <button
+        type="button"
+        className="admin-console__btn admin-console__btn--danger"
+        disabled={withdraw.isPending || withdraw.isSuccess}
+        onClick={ask}
+      >
+        {t(withdraw.isPending ? "perimeter.outboundWithdrawing" : "perimeter.outboundWithdraw")}
+      </button>
+      {withdraw.isSuccess ? <div className="admin-console__hint">{t("perimeter.outboundWithdrawn")}</div> : null}
+      {refusal ? (
+        <div className="admin-console__error">
+          {t("perimeter.outboundWithdrawRefused")} {refusal}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** A domain as the director takes one: lower-case labels, at least two. */
+const DOMAIN = /^([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\.)+[a-z]([-a-z0-9]{0,61}[a-z0-9])?$/;
+
+const refusalOf = (err: unknown) =>
+  err instanceof ApiError && err.detail ? err.detail : err instanceof Error ? err.message : String(err);
+
+/**
+ * The domains trusted for this tenant alone: an egress request whose hosts
+ * are all in trusted domains is granted without a further answer. The
+ * perimeter approver adds and removes them while the cluster's administrator
+ * delegated the list to the tenant; the director decides both.
+ */
+function TrustedDomainList() {
+  const query = useQuery({ queryKey: ["admin", "perimeter", "trusted-domains"], queryFn: () => fetchTrustedDomains() });
+  const contextQuery = useQuery({ queryKey: ["admin", "context"], queryFn: () => fetchAdminContext() });
+  const { t } = useTranslation();
+  return (
+    <div className="admin-console__subsection">
+      <h3 className="admin-console__subsection-title">{t("perimeter.trustedTitle")}</h3>
+      <p className="admin-console__hint">{t("perimeter.trustedLead")}</p>
+      {query.isLoading ? <p className="admin-console__loading">{t("perimeter.outboundReading")}</p> : null}
+      {query.isError ? (
+        <p className="admin-console__error">
+          {t("perimeter.trustedUnavailable")} {refusalOf(query.error)}
+        </p>
+      ) : null}
+      {query.data ? (
+        <TrustedDomainsView
+          delegated={query.data.delegated}
+          domains={query.data.domains}
+          mayChange={contextQuery.data?.canApprovePrivilege === true}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** The list, and for whoever may change a delegated one, adding and removing. */
+export function TrustedDomainsView({
+  delegated,
+  domains,
+  mayChange,
+}: {
+  delegated: boolean;
+  domains: string[];
+  mayChange: boolean;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [typed, setTyped] = useState("");
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ["admin", "perimeter", "trusted-domains"] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "status"] });
+  };
+  const add = useMutation({
+    mutationFn: (domain: string) => trustDomain(domain),
+    onSuccess: () => {
+      setTyped("");
+      refresh();
+    },
+  });
+  const remove = useMutation({ mutationFn: (domain: string) => stopTrustingDomain(domain), onSuccess: refresh });
+  const domain = typed.trim().toLowerCase();
+  const editable = delegated && mayChange;
+  const askRemove = (name: string) => {
+    if (!window.confirm(t("perimeter.trustedRemoveConfirm", { domain: name }))) return;
+    add.reset();
+    remove.mutate(name);
+  };
+  const failed = add.isError ? add.error : remove.isError ? remove.error : null;
+
+  return (
+    <>
+      {!delegated ? <p className="admin-console__hint">{t("perimeter.trustedNotDelegated")}</p> : null}
+      {delegated && !mayChange ? <p className="admin-console__hint">{t("perimeter.trustedNotYours")}</p> : null}
+      {domains.length === 0 ? (
+        <p className="admin-console__hint">{t("perimeter.trustedNone")}</p>
+      ) : (
+        <div className="admin-console__table-wrap">
+          <table className="admin-console__table">
+            <thead>
+              <tr>
+                <th>{t("perimeter.trustedDomain")}</th>
+                {editable ? <th /> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {domains.map((name) => (
+                <tr key={name}>
+                  <td className="admin-console__mono">{name}</td>
+                  {editable ? (
+                    <td>
+                      <button
+                        type="button"
+                        className="admin-console__btn admin-console__btn--danger"
+                        disabled={remove.isPending}
+                        onClick={() => askRemove(name)}
+                      >
+                        {t("perimeter.trustedRemove")}
+                      </button>
+                    </td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {editable ? (
+        <form
+          className="admin-console__form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!DOMAIN.test(domain)) return;
+            if (!window.confirm(t("perimeter.trustedAddConfirm", { domain }))) return;
+            remove.reset();
+            add.mutate(domain);
+          }}
+        >
+          <p className="admin-console__warning">{t("perimeter.trustedAddWarning")}</p>
+          <div className="admin-console__field">
+            <label className="admin-console__label" htmlFor="trusted-domain">
+              <span className="admin-console__label-text">{t("perimeter.trustedAddLabel")}</span>
+              <input
+                id="trusted-domain"
+                type="text"
+                value={typed}
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(e) => setTyped(e.target.value)}
+              />
+            </label>
+            {domain !== "" && !DOMAIN.test(domain) ? (
+              <p className="admin-console__field-error">{t("perimeter.trustedInvalid")}</p>
+            ) : (
+              <p className="admin-console__hint">{t("perimeter.trustedAddHint")}</p>
+            )}
+          </div>
+          <button type="submit" className="admin-console__btn" disabled={!DOMAIN.test(domain) || add.isPending}>
+            {t(add.isPending ? "perimeter.trustedAdding" : "perimeter.trustedAdd")}
+          </button>
+        </form>
+      ) : null}
+      {failed ? (
+        <p className="admin-console__error">
+          {t("perimeter.trustedRefused")} {refusalOf(failed)}
+        </p>
+      ) : null}
+    </>
   );
 }
 

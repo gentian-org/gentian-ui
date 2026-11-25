@@ -17,10 +17,8 @@ export type DeclaredApp = {
   addons?: string[];
   /** The build each pinned add-on was installed at; an add-on with no entry is not pinned. */
   addonPins?: { name: string; digest: string; catalogue?: string }[];
-  /** Installed for everyone: every member has access by default. */
-  defaultGrant?: boolean;
-  /** The add-ons for everyone; each add-on has its own access, and one with no entry is given per person. */
-  addonGrants?: { name: string; defaultGrant?: boolean }[];
+  /** The positions the app is given to. */
+  positions?: string[];
   /**
    * The catalog the build was fetched from. Git records it; the director
    * does not serve it yet, so this is absent today and shown as such.
@@ -43,30 +41,27 @@ export type AppWriteResult = {
 };
 
 /**
- * State whether an installed app is for everyone. Only that travels: the
+ * The positions an app's entry gives it to. User is left out: it enters the
+ * tenant and gives no app, so an entry that still names it gives nothing by it.
+ */
+export function positionsOf(app: Pick<DeclaredApp, "positions"> | undefined) {
+  return (app?.positions ?? []).filter((name) => name !== "user");
+}
+
+/**
+ * State the positions an installed app is given to. Only that travels: the
  * entry's pinned build is left as it is.
  */
-export function setAppForEveryone(profile: string, everyone: boolean) {
+export function setAppPositions(profile: string, positions: string[]) {
   return apiFetch<AppWriteResult>(`/admin/apps/${encodeURIComponent(profile)}/access`, {
     method: "PUT",
-    body: JSON.stringify({ everyone }),
+    body: JSON.stringify({ positions }),
   });
 }
 
 /**
- * State whether one add-on of an installed app is for everyone. An add-on is
- * entitled on its own; the rest of the app's add-ons stay as they are.
- */
-export function setAddonForEveryone(profile: string, addon: string, everyone: boolean) {
-  return apiFetch<AppWriteResult>(
-    `/admin/apps/${encodeURIComponent(profile)}/addons/${encodeURIComponent(addon)}/access`,
-    { method: "PUT", body: JSON.stringify({ everyone }) },
-  );
-}
-
-/**
  * Remove an app. The app and its sign-in client go; its files, database,
- * object storage, stored credentials and access group are kept, and a later
+ * object storage, stored credentials and the roles people hold on it are kept, and a later
  * install finds them again.
  */
 export function uninstallApp(profile: string) {
@@ -139,6 +134,8 @@ export type PrivilegeGrant = {
   approvedAt: string;
   reason: string;
   expiresAt?: string;
+  /** The hosts an egress grant opens, where the approver named them. */
+  hosts?: string[];
 };
 
 export function fetchTenantPrivileges() {
@@ -146,7 +143,7 @@ export function fetchTenantPrivileges() {
 }
 
 /** What an approver states: why, and optionally until when (RFC 3339). */
-export type PrivilegeApprovalRequest = { reason: string; expiresAt?: string };
+export type PrivilegeApprovalRequest = { reason?: string; expiresAt?: string; hosts?: string[] };
 
 /**
  * Answer one request an app makes beyond the default posture, `<kind>/<name>`
@@ -158,6 +155,19 @@ export function approvePrivilege(install: string, privilege: string, body: Privi
   return apiFetch<AppWriteResult>(
     `/admin/apps/privileges/${encodeURIComponent(install)}/${encodeURIComponent(kind)}/${encodeURIComponent(name ?? "")}`,
     { method: "PUT", body: JSON.stringify(body) },
+  );
+}
+
+/**
+ * Take back one approval, `<kind>/<name>` as the grant names it. A commit:
+ * the app's request waits for an answer again. Whoever may approve the kind
+ * may withdraw it, which is the director's answer.
+ */
+export function withdrawPrivilege(install: string, privilege: string) {
+  const [kind, name] = privilege.split("/", 2);
+  return apiFetch<AppWriteResult>(
+    `/admin/apps/privileges/${encodeURIComponent(install)}/${encodeURIComponent(kind)}/${encodeURIComponent(name ?? "")}`,
+    { method: "DELETE" },
   );
 }
 
@@ -184,8 +194,8 @@ export type ExposureEntry = {
   state: string;
   /**
    * What approving the entry allows: `public`, `publicAppCredential`,
-   * `signInAppAuthorization` or `tokenEntry`. Absent from a director older
-   * than kinds, where every entry is a public address. Sent back with an
+   * `publicAppSignIn`, `signInAppAuthorization` or `tokenEntry`. Absent from
+   * a director older than kinds, where every entry is a public address. Sent back with an
    * approval, so the director refuses it if the entry has come to declare
    * another kind.
    */
@@ -255,6 +265,23 @@ export type PerimeterChange = {
   decision?: string;
   requestId?: string;
 };
+
+/** The domains trusted for this tenant alone, and whether the tenant may keep them. */
+export type TrustedDomains = { tenant: string; delegated: boolean; domains: string[] };
+
+export function fetchTrustedDomains() {
+  return apiFetch<TrustedDomains>("/admin/perimeter/trusted-domains");
+}
+
+/** Trust one more domain for the tenant. A commit; whether the person may is the director's answer. */
+export function trustDomain(domain: string) {
+  return apiFetch<AppWriteResult>(`/admin/perimeter/trusted-domains/${encodeURIComponent(domain)}`, { method: "PUT" });
+}
+
+/** Stop trusting one domain. A commit: a request it answered waits for an answer again. */
+export function stopTrustingDomain(domain: string) {
+  return apiFetch<AppWriteResult>(`/admin/perimeter/trusted-domains/${encodeURIComponent(domain)}`, { method: "DELETE" });
+}
 
 /** Requests by response class. */
 export type TrafficCounts = { requests: number; "2xx": number; "3xx": number; "4xx": number; "5xx": number };

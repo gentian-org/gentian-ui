@@ -2,8 +2,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { fetchAdminContext } from "@/api/admin";
-import { approveNodePrivilege, declineNodePrivilege, fetchApprovals, type Approval } from "@/api/approvals";
+import { fetchAdminContext, fetchAppStates, type AppState } from "@/api/admin";
+import { approveNodePrivilege, declineNodePrivilege, fetchApprovals, parseHosts, type Approval } from "@/api/approvals";
 import "./admin.css";
 import { formatDateTime } from "@/lib/format";
 
@@ -25,30 +25,55 @@ const messageOf = (err: unknown) => (err instanceof Error ? err.message : String
  */
 export function ApprovalsSection() {
   const { t } = useTranslation();
-  const approvalsQuery = useQuery({ queryKey: ["admin", "approvals"], queryFn: () => fetchApprovals() });
   const contextQuery = useQuery({ queryKey: ["admin", "context"], queryFn: () => fetchAdminContext() });
   const context = contextQuery.data;
+  // The cluster's list is read by the cluster's approvers and administrator
+  // alone (the usher refuses anybody else); the tenant's perimeter approver
+  // reads the requests of the tenant's own apps.
+  const ofCluster =
+    context?.isPlatformAdmin === true || context?.canApproveNodePrivilege === true || context?.canApprovePerimeter === true;
+  const ofTenant = context?.canApprovePrivilege === true;
+  const approvalsQuery = useQuery({
+    queryKey: ["admin", "approvals"],
+    queryFn: () => fetchApprovals(),
+    enabled: ofCluster,
+  });
+  const statesQuery = useQuery({
+    queryKey: ["admin", "apps", "status"],
+    queryFn: () => fetchAppStates(),
+    enabled: ofTenant,
+  });
+  const tenant = statesQuery.data?.tenant;
   const mayApprove = (approval: Approval) =>
     approval.approvedBy === "security-officer"
       ? context?.canApproveNodePrivilege === true
-      : approval.approvedBy === "perimeter-approver" && context?.canApprovePerimeter === true;
-  const approvals = (approvalsQuery.data?.approvals ?? []).filter(
+      : approval.approvedBy === "perimeter-approver" &&
+        (context?.canApprovePerimeter === true || (ofTenant && approval.tenant === tenant));
+  const listed = new Map<string, Approval>();
+  for (const approval of [
+    ...(approvalsQuery.data?.approvals ?? []),
+    ...tenantApprovals(statesQuery.data?.tenant, statesQuery.data?.apps ?? []),
+  ]) {
+    listed.set(`${approval.tenant}/${approval.install}/${approval.privilege}`, approval);
+  }
+  const approvals = [...listed.values()].filter(
     (approval) => context?.isPlatformAdmin === true || mayApprove(approval),
   );
+  const loading = approvalsQuery.isLoading || statesQuery.isLoading;
+  const failed = approvalsQuery.isError ? approvalsQuery.error : statesQuery.isError ? statesQuery.error : null;
+  const read = (!ofCluster || approvalsQuery.isSuccess) && (!ofTenant || statesQuery.isSuccess);
 
   return (
     <section className="admin-console__section">
       <h2 className="admin-console__section-title">{t("approvals.title")}</h2>
       <p className="admin-console__hint">{t("approvals.lead")}</p>
-      {approvalsQuery.isLoading ? <p className="admin-console__loading">{t("approvals.reading")}</p> : null}
-      {approvalsQuery.isError ? (
+      {loading ? <p className="admin-console__loading">{t("approvals.reading")}</p> : null}
+      {failed ? (
         <p className="admin-console__error">
-          {t("approvals.unavailable")} {messageOf(approvalsQuery.error)}
+          {t("approvals.unavailable")} {messageOf(failed)}
         </p>
       ) : null}
-      {approvalsQuery.isSuccess && approvals.length === 0 ? (
-        <p className="admin-console__hint">{t("approvals.none")}</p>
-      ) : null}
+      {read && approvals.length === 0 ? <p className="admin-console__hint">{t("approvals.none")}</p> : null}
       {approvals.length > 0 ? (
         <div className="admin-console__table-wrap">
           <table className="admin-console__table">
@@ -69,6 +94,7 @@ export function ApprovalsSection() {
                   <td>
                     <div className="admin-console__mono">{approval.privilege}</div>
                     <div className="admin-console__hint">{approval.reason || t("approvals.noReason")}</div>
+                    <RequestedHosts approval={approval} />
                     {approval.waiver && !approval.waiver.allowlisted ? (
                       <div className="admin-console__hint">
                         <Trans
@@ -131,6 +157,37 @@ export function ApprovalsSection() {
 }
 
 /**
+ * The requests of the tenant's own apps, from what the cluster says of each
+ * (the usher's app states): the egress the tenant's perimeter approver
+ * answers, in the shape of the cluster's list. An add-on's requests are the
+ * add-on's own install's.
+ */
+export function tenantApprovals(tenant: string | undefined, apps: AppState[]): Approval[] {
+  if (!tenant) return [];
+  return apps.flatMap((app) =>
+    (app.pendingPrivilegeApprovals ?? [])
+      .filter((p) => p.approvedBy === "perimeter-approver")
+      .map((p) => ({
+        tenant,
+        profile: app.profile,
+        install: app.name || app.profile,
+        privilege: p.privilege,
+        approvedBy: p.approvedBy,
+        reason: p.reason,
+        requestedBy: p.requestedBy,
+        requestedAt: p.requestedAt,
+        note: p.note,
+        expiredAt: p.expiredAt,
+        declinedBy: p.declinedBy,
+        declinedAt: p.declinedAt,
+        declineReason: p.declineReason,
+        hosts: p.hosts,
+        hostsAtApproval: p.hostsAtApproval,
+      })),
+  );
+}
+
+/**
  * Whose a request is, for a reader who cannot answer it here. The usher
  * names the approver; one this console has no button for is named as it is
  * rather than passed off as the security officer's. Break-glass answers
@@ -150,7 +207,7 @@ function NotAnsweredHere({ approval }: { approval: Approval }) {
         <Trans
           i18nKey="approvals.breakGlass"
           values={{
-            command: `kubectl gentian apps approve ${approval.install} ${approval.privilege} --tenant ${approval.tenant} --reason "…"`,
+            command: `kubectl gentian apps approve ${approval.install} ${approval.privilege} --tenant ${approval.tenant}`,
           }}
           components={mono}
         />
@@ -165,27 +222,49 @@ function NotAnsweredHere({ approval }: { approval: Approval }) {
 }
 
 /**
- * The officer's answer: an approval -- a reason in their words, an optional
+ * The officer's answer: an approval -- a comment if they leave one, an optional
  * end, then one commit through the director for the request's tenant -- or
  * a decline, a reason and nothing committed. Either way the director's
  * refusal is shown as it worded it.
  */
-function AnswerRequest({ approval }: { approval: Approval }) {
+/**
+ * What an egress request reaches: the hosts it names, or that its approver
+ * names them. Nothing for any other request.
+ */
+export function RequestedHosts({ approval }: { approval: Pick<Approval, "hosts" | "hostsAtApproval"> }) {
+  const { t } = useTranslation();
+  if (approval.hostsAtApproval) return <div className="admin-console__hint">{t("approvals.hostsAtApproval")}</div>;
+  if (!approval.hosts?.length) return null;
+  return (
+    <div className="admin-console__hint">
+      {t("approvals.hostsNamed")} <span className="admin-console__mono">{approval.hosts.join(", ")}</span>
+    </div>
+  );
+}
+
+export function AnswerRequest({ approval }: { approval: Approval }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<"approve" | "decline" | null>(null);
   const [reason, setReason] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
+  const [hostsText, setHostsText] = useState("");
+  const hosts = parseHosts(hostsText);
   const settle = () => {
     setOpen(null);
     setReason("");
     void queryClient.invalidateQueries({ queryKey: ["admin", "approvals"] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "status"] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "privileges"] });
   };
   const approve = useMutation({
     mutationFn: () =>
       approveNodePrivilege(approval, {
-        reason: reason.trim(),
+        ...(reason.trim() ? { reason: reason.trim() } : {}),
         ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
+        // A request whose installation chooses its destinations opens the
+        // hosts its approval names.
+        ...(approval.hostsAtApproval ? { hosts } : {}),
         // A waiver the cluster does not permit yet: its allowlist entry is
         // added in the same approval.
         ...(approval.waiver && !approval.waiver.allowlisted
@@ -198,7 +277,10 @@ function AnswerRequest({ approval }: { approval: Approval }) {
     mutationFn: () => declineNodePrivilege(approval, { reason: reason.trim() }),
     onSuccess: settle,
   });
-  const tooShort = reason.trim().length < 10;
+  // A decline is shown to whoever asked, so it says why. An approval's
+  // comment is the approver's to leave or not.
+  const tooShort = open === "decline" && reason.trim().length < 10;
+  const noHosts = open === "approve" && approval.hostsAtApproval === true && hosts.length === 0;
   const busy = approve.isPending || decline.isPending;
 
   if (approve.isSuccess) {
@@ -232,15 +314,36 @@ function AnswerRequest({ approval }: { approval: Approval }) {
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        if (tooShort) return;
+        if (tooShort || noHosts) return;
         if (declining) decline.mutate();
         else approve.mutate();
       }}
     >
       <label className="admin-console__field">
         <span>{t(declining ? "approvals.declineReasonLabel" : "approvals.reasonLabel")}</span>
-        <textarea value={reason} onChange={(event) => setReason(event.target.value)} required minLength={10} maxLength={1000} rows={3} />
+        <textarea
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          required={declining}
+          minLength={declining ? 10 : undefined}
+          maxLength={1000}
+          rows={declining ? 3 : 2}
+        />
       </label>
+      {!declining && approval.hostsAtApproval ? (
+        <label className="admin-console__field">
+          <span>{t("approvals.hostsLabel")}</span>
+          <textarea
+            value={hostsText}
+            onChange={(event) => setHostsText(event.target.value)}
+            required
+            rows={3}
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <span className="admin-console__hint">{t("approvals.hostsHint")}</span>
+        </label>
+      ) : null}
       {declining ? null : (
         <label className="admin-console__field">
           <span>{t("approvals.expiresLabel")}</span>
@@ -259,7 +362,7 @@ function AnswerRequest({ approval }: { approval: Approval }) {
         </p>
       ) : null}
       <div className="admin-console__actions">
-        <button type="submit" className="admin-console__btn" disabled={tooShort || busy}>
+        <button type="submit" className="admin-console__btn" disabled={tooShort || noHosts || busy}>
           {t(declining ? "approvals.declineConfirm" : "approvals.approveConfirm", { privilege: approval.privilege })}
         </button>
         <button type="button" className="admin-console__btn admin-console__btn--quiet" disabled={busy} onClick={() => setOpen(null)}>

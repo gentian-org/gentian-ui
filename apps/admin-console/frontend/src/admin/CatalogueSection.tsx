@@ -1,18 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { fetchAppStates } from "@/api/admin";
+import { fetchAppStates, fetchPositions } from "@/api/admin";
 import { uninstallApp, type AppWriteResult } from "@/api/apps";
 import {
   fetchCatalogueEntries,
+  fetchCatalogueEntryAsks,
   fetchCatalogueSources,
   installCatalogueEntry,
+  type AskedEgress,
+  type AskedIntegration,
   type CatalogueEntry,
 } from "@/api/catalogue";
 import "./admin.css";
+import { PositionChecklist, choosablePositions } from "./PositionChecklist";
 import { Trans, useTranslation } from "react-i18next";
 
 /** What the last install or uninstall came to, in the director's own terms. */
-type Outcome = { app: string; result: AppWriteResult; everyone?: boolean };
+type Outcome = { app: string; result: AppWriteResult; positions?: string[] };
 
 const mono = { mono: <span className="admin-console__mono" /> };
 
@@ -67,16 +71,27 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
   });
   const installed = new Set((statesQuery.data?.apps ?? []).map((a) => a.profile));
 
-  // "For everyone" is part of the install itself: the director records it
-  // with the app, and the cluster gives every member access once the app is
+  // Who gets the app is part of the install itself: the director records
+  // the positions with the app, and their holders have it once the app is
   // ready. Nothing is left for this page to do afterwards.
   const installMutation = useMutation({
-    mutationFn: ({ entry, everyone }: { entry: CatalogueEntry; everyone: boolean }) =>
-      installCatalogueEntry(entry, everyone),
-    onSuccess: (result, { entry, everyone }) => {
+    mutationFn: ({
+      entry,
+      positions,
+      approve,
+      grant,
+    }: {
+      entry: CatalogueEntry;
+      positions: string[];
+      approve: AskedEgress[];
+      grant: AskedIntegration[];
+    }) => installCatalogueEntry(entry, positions, approve, grant),
+    onSuccess: (result, { entry, positions }) => {
       setConfirming(null);
-      setOutcome({ app: entry.name, result, everyone });
-      void queryClient.invalidateQueries({ queryKey: ["admin", "apps", "status"] });
+      setOutcome({ app: entry.name, result, positions });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "apps"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "access"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "integrations"] });
     },
   });
   const uninstallMutation = useMutation({
@@ -109,11 +124,12 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
   const sources = sourcesQuery.data?.catalogues ?? [];
   const storeUrl = sourcesQuery.data?.storeUrl ?? "";
 
-  // The first catalog, until somebody picks another. Not a stored default:
-  // a cluster with one source should not need a click to see it.
+  // The tenant's own catalog first, else the first of the cluster's, until
+  // somebody picks another. Not a stored default: a tenant that names a
+  // catalog of its own came here for it, and should not need a click to see it.
   useEffect(() => {
     if (!selected && sources.length > 0) {
-      setSelected(sources[0].name);
+      setSelected((sources.find((source) => source.scope === "tenant") ?? sources[0]).name);
     }
   }, [selected, sources]);
 
@@ -196,7 +212,7 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
           entry={confirming}
           pending={installMutation.isPending}
           error={installMutation.isError ? messageOf(installMutation.error) : undefined}
-          onConfirm={(everyone) => installMutation.mutate({ entry: confirming, everyone })}
+          onConfirm={(positions, approve, grant) => installMutation.mutate({ entry: confirming, positions, approve, grant })}
           onClose={() => setConfirming(null)}
         />
       ) : null}
@@ -213,13 +229,13 @@ export function CatalogueSection({ tenant }: { tenant: string }) {
  */
 function OutcomeNotice({ outcome }: { outcome: Outcome }) {
   const { t } = useTranslation();
-  const { app, result, everyone } = outcome;
+  const { app, result, positions } = outcome;
   const commit = (result.commit ?? "").slice(0, 8);
   if (result.status === "installed" && result.commit) {
     return (
       <p className="admin-console__success">
         <Trans i18nKey="catalogue.outcomeInstalled" values={{ app, commit }} components={mono} />
-        {everyone ? <> {t("catalogue.outcomeEveryone")}</> : null}
+        {positions ? <> {t(whoGetsIt(positions), { count: positions.length })}</> : null}
       </p>
     );
   }
@@ -259,17 +275,22 @@ function OutcomeNotice({ outcome }: { outcome: Outcome }) {
   );
 }
 
+/** The sentence that says who gets an app installed for these positions. */
+export function whoGetsIt(positions: string[]) {
+  return positions.length > 0 ? "catalogue.outcomePositions" : "catalogue.outcomeNobody";
+}
+
 /**
  * Installing one entry, said back before it is done: which app, and which
  * build of it — the digest is what is installed, the name is only what it is
  * called.
  *
- * One choice rides along. Installing makes an app exist in the tenant; who
- * may open it is a separate matter. Plain "Install" leaves that to Members,
- * person by person; "Install for everyone" states it in the install itself,
- * and the cluster gives every member access once the app is ready.
+ * One question rides along: who gets the app. The tenant's positions are
+ * listed, none ticked; the box at the top ticks all or none. What is ticked
+ * is stated in the install itself, and the holders of those positions have
+ * the app once it is ready.
  */
-function InstallDialog({
+export function InstallDialog({
   entry,
   pending,
   error,
@@ -279,12 +300,36 @@ function InstallDialog({
   entry: CatalogueEntry;
   pending: boolean;
   error?: string;
-  onConfirm: (everyone: boolean) => void;
+  onConfirm: (positions: string[], approve: AskedEgress[], grant: AskedIntegration[]) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
-  const [everyone, setEveryone] = useState(false);
+  const positions = useQuery({ queryKey: ["admin", "positions"], queryFn: () => fetchPositions(), retry: false });
+  const own = positions.data?.positions ?? [];
+  const choosable = choosablePositions(own);
+  // Nothing starts ticked: the least access is the default, and All apps and
+  // App administrator have the app anyway.
+  const [selected, setChosen] = useState<Set<string>>(() => new Set());
+  // Pre-selected for the perimeter approver: installing and approving is
+  // one step for somebody who may do both. Unticking leaves the app waiting.
+  const [approving, setApproving] = useState(true);
+  // The same for what the app reaches of the tenant's other apps: granted
+  // with the install by whoever may grant, unless they untick it.
+  const [granting, setGranting] = useState(true);
+
+  // What the build asks for beyond the tenant, as the director reads it from
+  // the build itself. A read that fails takes nothing away: the app is
+  // installed as before and its requests wait on the Approvals page.
+  const asksQuery = useQuery({
+    queryKey: ["catalogue", "asks", entry.coordinate, entry.digest],
+    queryFn: () => fetchCatalogueEntryAsks(entry),
+    retry: false,
+  });
+  const asks = asksQuery.data?.egress ?? [];
+  const mayApprove = Boolean(asksQuery.data?.mayApprove);
+  const integrations = asksQuery.data?.integrations ?? [];
+  const mayGrant = Boolean(asksQuery.data?.mayGrant);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -306,7 +351,12 @@ function InstallDialog({
         className="admin-console__dialog-body"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!pending) onConfirm(everyone);
+          if (!pending)
+            onConfirm(
+              choosable.filter((name) => selected.has(name)),
+              approving && mayApprove ? asks : [],
+              granting && mayGrant ? integrations : [],
+            );
         }}
       >
         <h3 id="install-title" className="admin-console__dialog-title">
@@ -320,34 +370,26 @@ function InstallDialog({
           />
         </p>
 
-        <div className="admin-console__choices" role="radiogroup" aria-labelledby="install-title">
-          <label className={`admin-console__choice${everyone ? "" : " admin-console__choice--selected"}`}>
-            <input
-              type="radio"
-              name="install-access"
-              checked={!everyone}
-              disabled={pending}
-              onChange={() => setEveryone(false)}
-            />
-            <span>
-              <span className="admin-console__choice-title">{t("catalogue.installPlain")}</span>
-              <span className="admin-console__choice-desc">{t("catalogue.installPlainBody")}</span>
-            </span>
-          </label>
-          <label className={`admin-console__choice${everyone ? " admin-console__choice--selected" : ""}`}>
-            <input
-              type="radio"
-              name="install-access"
-              checked={everyone}
-              disabled={pending}
-              onChange={() => setEveryone(true)}
-            />
-            <span>
-              <span className="admin-console__choice-title">{t("catalogue.installEveryone")}</span>
-              <span className="admin-console__choice-desc">{t("catalogue.installEveryoneBody")}</span>
-            </span>
-          </label>
-        </div>
+        <h4 className="admin-console__group-title">{t("catalogue.installWho")}</h4>
+        <p className="admin-console__hint">{t("catalogue.installWhoBody")}</p>
+        <PositionChecklist own={own} selected={selected} disabled={pending || positions.isLoading} onChange={setChosen} />
+        {positions.isError ? <p className="admin-console__hint">{t("catalogue.installOwnPositionsUnread")}</p> : null}
+
+        <InstallAsks
+          asks={asks}
+          mayApprove={mayApprove}
+          approving={approving}
+          pending={pending}
+          onApproving={setApproving}
+        />
+
+        <InstallIntegrations
+          integrations={integrations}
+          mayGrant={mayGrant}
+          granting={granting}
+          pending={pending}
+          onGranting={setGranting}
+        />
 
         {error ? <p className="admin-console__error">{error}</p> : null}
 
@@ -355,12 +397,130 @@ function InstallDialog({
           <button type="button" className="admin-console__btn admin-console__btn--quiet" disabled={pending} onClick={onClose}>
             {t("catalogue.cancel")}
           </button>
-          <button type="submit" className="admin-console__btn admin-console__btn--primary" disabled={pending}>
-            {everyone ? t("catalogue.installEveryone") : t("catalogue.installAction")}
+          <button
+            type="submit"
+            className="admin-console__btn admin-console__btn--primary"
+            disabled={pending || positions.isLoading}
+          >
+            {t("catalogue.installAction")}
           </button>
         </div>
       </form>
     </dialog>
+  );
+}
+
+/**
+ * What the build asks for beyond the tenant: each outbound request that
+ * nobody has answered, with its hosts and the profile's reason. The app does
+ * not start until all of them are approved. The tenant's perimeter approver
+ * can approve them with the install; anybody else is told the app will wait.
+ * Pre-selected: for a person who may do both, installing and approving is one
+ * step. Unticking it installs the app and leaves it waiting.
+ */
+export function InstallAsks({
+  asks,
+  mayApprove,
+  approving,
+  pending,
+  onApproving,
+}: {
+  asks: AskedEgress[];
+  mayApprove: boolean;
+  approving: boolean;
+  pending: boolean;
+  onApproving: (approving: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  if (asks.length === 0) return null;
+  return (
+    <div className="admin-console__asks">
+      <h4 className="admin-console__group-title">{t("catalogue.asksTitle")}</h4>
+      <p className="admin-console__hint">{t("catalogue.asksLead")}</p>
+      <ul className="admin-console__asks-list">
+        {asks.map((ask) => (
+          <li key={`${ask.install} ${ask.privilege}`}>
+            <span className="admin-console__mono">{ask.install}</span>{" "}
+            {ask.hosts && ask.hosts.length > 0 ? (
+              <Trans i18nKey="catalogue.asksHosts" values={{ hosts: ask.hosts.join(", ") }} components={mono} />
+            ) : (
+              t("catalogue.asksByAddress")
+            )}
+            {ask.reason ? <span className="admin-console__choice-desc">{ask.reason}</span> : null}
+          </li>
+        ))}
+      </ul>
+      {mayApprove ? (
+        <>
+          <label className="admin-console__checkbox">
+            <input
+              type="checkbox"
+              checked={approving}
+              disabled={pending}
+              onChange={(e) => onApproving(e.target.checked)}
+            />
+            <span>{t("catalogue.asksApprove")}</span>
+          </label>
+          {approving ? null : <p className="admin-console__hint">{t("catalogue.asksWaitUnapproved")}</p>}
+        </>
+      ) : (
+        <p className="admin-console__hint">{t("catalogue.asksWait")}</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What the build reaches of the tenant's other apps: each contract no grant
+ * covers yet, with what of it the build asks for and from which app. Without
+ * a grant the app runs and does not reach them. Whoever may grant can grant
+ * them with the install, exactly as asked; pre-selected, like the outbound
+ * access. Anybody else is told they wait for a grant.
+ */
+export function InstallIntegrations({
+  integrations,
+  mayGrant,
+  granting,
+  pending,
+  onGranting,
+}: {
+  integrations: AskedIntegration[];
+  mayGrant: boolean;
+  granting: boolean;
+  pending: boolean;
+  onGranting: (granting: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  if (integrations.length === 0) return null;
+  return (
+    <div className="admin-console__asks">
+      <h4 className="admin-console__group-title">{t("catalogue.consumesTitle")}</h4>
+      <p className="admin-console__hint">{t("catalogue.consumesLead")}</p>
+      <ul className="admin-console__asks-list">
+        {integrations.map((ask) => (
+          <li key={`${ask.install} ${ask.contract}`}>
+            <span className="admin-console__mono">{ask.install}</span>{" "}
+            <Trans
+              i18nKey={ask.provider ? "catalogue.consumesFrom" : "catalogue.consumes"}
+              values={{ contract: ask.contract, provider: ask.provider, capabilities: ask.capabilities.join(", ") }}
+              components={mono}
+            />
+            {ask.asPerson ? <span className="admin-console__choice-desc">{t("catalogue.consumesAsPerson")}</span> : null}
+          </li>
+        ))}
+      </ul>
+      {mayGrant ? (
+        <>
+          <label className="admin-console__checkbox">
+            <input type="checkbox" checked={granting} disabled={pending} onChange={(e) => onGranting(e.target.checked)} />
+            <span>{t("catalogue.consumesGrant")}</span>
+          </label>
+          {granting ? null : <p className="admin-console__hint">{t("catalogue.consumesWaitUngranted")}</p>}
+        </>
+      ) : (
+        <p className="admin-console__hint">{t("catalogue.consumesWait")}</p>
+      )}
+    </div>
   );
 }
 

@@ -3,10 +3,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   deleteArchivedMailbox,
+  fetchAssignments,
   fetchIdentitySettings,
   fetchPeople,
   fetchPerson,
-  fetchPersonGroups,
+  fetchPersonAccess,
+  fetchPositions,
   fetchRemovedMailboxes,
   fetchSettingsTemplates,
   invitePerson,
@@ -14,15 +16,18 @@ import {
   removeTotp,
   requireTotp,
   sendPasswordReset,
-  setMembership,
+  setAssignment,
   updatePerson,
+  type Assignment,
   type MailboxChoice,
   type Person,
   type RemovedMailbox,
 } from "@/api/admin";
 import { toggleDraft, withDraft, withoutKey, type MembershipDraft } from "./membershipDraft";
 import { Checklist, type ChecklistItem } from "./Checklist";
-import { describeGroups, type DescribedGroup } from "./groupLabels";
+import { allPositions, roleLabel } from "./positionLabels";
+import { PersonRoleMatrix } from "./AccessSection";
+import { useMatrixRows } from "./RoleMatrix";
 import "./admin.css";
 import { formatDate } from "@/lib/format";
 
@@ -33,7 +38,7 @@ import { formatDate } from "@/lib/format";
  * write is an action rather than a commit, because people do not belong in an
  * append-only history.
  */
-export function MembersSection({ tenant }: { tenant: string }) {
+export function MembersSection() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -43,18 +48,18 @@ export function MembersSection({ tenant }: { tenant: string }) {
     queryKey: ["admin", "people", search],
     queryFn: () => fetchPeople({ search: search || undefined }),
   });
-  const groupsQuery = useQuery({
-    queryKey: ["admin", "people", "groups"],
-    queryFn: () => fetchPersonGroups(),
+  const positionsQuery = useQuery({
+    queryKey: ["admin", "positions"],
+    queryFn: () => fetchPositions(),
   });
   const settingsQuery = useQuery({
     queryKey: ["admin", "people", "identity"],
     queryFn: () => fetchIdentitySettings(),
     retry: false,
   });
-  const groups = useMemo(
-    () => describeGroups(groupsQuery.data?.groups ?? [], tenant),
-    [groupsQuery.data, tenant],
+  const positions = useMemo(
+    () => allPositions(t, positionsQuery.data?.shipped ?? [], positionsQuery.data?.positions ?? []),
+    [positionsQuery.data, t],
   );
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["admin", "people"] });
 
@@ -95,7 +100,7 @@ export function MembersSection({ tenant }: { tenant: string }) {
 
       <div className="admin-console__cards">
         <InviteCard
-          groups={groups}
+          positions={positions}
           loginDomain={settingsQuery.data?.loginDomain ?? ""}
           templatesOffered={settingsQuery.data?.templates ?? false}
           onInvited={refresh}
@@ -123,7 +128,7 @@ export function MembersSection({ tenant }: { tenant: string }) {
                   <MemberRow
                     key={person.id}
                     person={person}
-                    groups={groups}
+                    positions={positions}
                     editing={editing === person.id}
                     onToggle={() => setEditing(editing === person.id ? null : person.id)}
                     onChanged={refresh}
@@ -147,18 +152,21 @@ export function MembersSection({ tenant }: { tenant: string }) {
   );
 }
 
-/** Groups as checklist rows, listed under what they are for. */
-function groupItems(groups: DescribedGroup[]): ChecklistItem[] {
-  return groups.map((g) => ({ key: g.path, label: g.label, section: g.kind }));
+/** A position as the screens here list it. */
+export type PositionChoice = { name: string; label: string; shipped: boolean };
+
+/** Positions as checklist rows: the ones every tenant has, then the tenant's own. */
+function positionItems(positions: PositionChoice[]): ChecklistItem[] {
+  return positions.map((p) => ({ key: p.name, label: p.label, section: p.shipped ? "shipped" : "own" }));
 }
 
 /**
- * The groups an invitation offers. The tenant's members group is not among
- * them: the registrar puts every invited person in it, because entering the
- * tenant takes it.
+ * The positions an invitation offers. User is not among them: the registrar
+ * gives it to every invited person, because entering the tenant takes it.
+ * All apps is: it is what gives an invited person the tenant's apps.
  */
-export function invitable(groups: DescribedGroup[]): DescribedGroup[] {
-  return groups.filter((g) => !(g.kind === "role" && g.label === "members"));
+export function invitable(positions: PositionChoice[]): PositionChoice[] {
+  return positions.filter((p) => p.name !== "user");
 }
 
 /** The part before the @ a person types: letters, digits, dots, dashes, underscores. */
@@ -176,12 +184,12 @@ function suggestLocalPart(first: string, last: string): string {
 }
 
 function InviteCard({
-  groups,
+  positions,
   loginDomain,
   templatesOffered,
   onInvited,
 }: {
-  groups: DescribedGroup[];
+  positions: PositionChoice[];
   loginDomain: string;
   templatesOffered: boolean;
   onInvited: () => void;
@@ -193,20 +201,9 @@ function InviteCard({
   const [localEdited, setLocalEdited] = useState(false);
   const [email, setEmail] = useState("");
   const [template, setTemplate] = useState("");
-  // The apps the tenant provisioned for everybody start ticked: a new person
-  // gets them unless somebody says otherwise. The list arrives after the form
-  // is drawn, so the defaults are applied when it does -- and only until
-  // somebody has changed the selection themselves.
-  const defaults = useMemo(() => groups.filter((g) => g.defaultGrant).map((g) => g.path), [groups]);
-  const [chosen, setChosenState] = useState<string[]>(defaults);
-  const [chosenEdited, setChosenEdited] = useState(false);
-  useEffect(() => {
-    if (!chosenEdited) setChosenState(defaults);
-  }, [defaults, chosenEdited]);
-  const setChosen = (next: string[]) => {
-    setChosenEdited(true);
-    setChosenState(next);
-  };
+  // Nothing starts ticked: every invited person holds User, which brings
+  // the desktop and no app, and anything more is said.
+  const [chosen, setChosen] = useState<string[]>([]);
   const [requireTotpOnAccept, setRequireTotpOnAccept] = useState(false);
 
   const templatesQuery = useQuery({
@@ -230,8 +227,7 @@ function InviteCard({
     setLocalEdited(false);
     setEmail("");
     setTemplate("");
-    setChosenEdited(false);
-    setChosenState(defaults);
+    setChosen([]);
     setRequireTotpOnAccept(false);
   };
 
@@ -244,7 +240,7 @@ function InviteCard({
         lastName: lastName.trim() || undefined,
         requireTotp: requireTotpOnAccept,
         settingsTemplate: template || undefined,
-        groups: chosen,
+        positions: chosen,
       }),
     onSuccess: (result) => {
       if (result.mailed) reset();
@@ -346,13 +342,14 @@ function InviteCard({
         )}
 
         <div className="admin-console__field">
-          <span>{t("members.groups")}</span>
+          <span>{t("members.positions")}</span>
+          <p className="admin-console__hint">{t("members.invitePositionsHint")}</p>
           <Checklist
-            id="inv-groups"
-            items={groupItems(invitable(groups))}
+            id="inv-positions"
+            items={positionItems(invitable(positions))}
             selected={new Set(chosen)}
-            sectionLabel={(kind) => t(`groupPicker.kind_${kind}`)}
-            onToggle={(path, on) => setChosen(on ? [...chosen, path] : chosen.filter((p) => p !== path))}
+            sectionLabel={(kind) => t(`members.positionKind_${kind}`)}
+            onToggle={(name, on) => setChosen(on ? [...chosen, name] : chosen.filter((p) => p !== name))}
           />
         </div>
 
@@ -396,13 +393,13 @@ function InviteCard({
 
 function MemberRow({
   person,
-  groups,
+  positions,
   editing,
   onToggle,
   onChanged,
 }: {
   person: Person;
-  groups: DescribedGroup[];
+  positions: PositionChoice[];
   editing: boolean;
   onToggle: () => void;
   onChanged: () => void;
@@ -432,7 +429,7 @@ function MemberRow({
       {editing && (
         <tr>
           <td colSpan={4}>
-            <MemberEditor person={person} groups={groups} onChanged={onChanged} onRemoved={onToggle} />
+            <MemberEditor person={person} positions={positions} onChanged={onChanged} onRemoved={onToggle} />
           </td>
         </tr>
       )}
@@ -440,19 +437,98 @@ function MemberRow({
   );
 }
 
+/** The roles a person was given beside their positions, in the order they are listed. */
+export function directRoles(assignments: Assignment[]): Assignment[] {
+  return assignments.filter((a) => !a.position && a.role);
+}
+
 /**
- * One member, opened: who they are, which groups they are in, how they sign
- * in. Read again when opened, because the list does not carry anybody's groups
- * or second factor -- a call per person, made only for the one being looked at.
+ * The roles one person holds beside their positions, given and taken here.
+ *
+ * The exception, for the person who needs one thing their position does not
+ * hold: an engineer who administers one app. Written at once, unlike the
+ * positions above, which wait for Save: a role is one decision about one
+ * person, and there is nothing to collect it with.
+ */
+function DirectRoles({
+  person,
+  assignments,
+  pending,
+  onChanged,
+}: {
+  person: string;
+  assignments: Assignment[];
+  /** The positions ticked and unticked and not saved yet, which the matrix marks. */
+  pending: MembershipDraft;
+  onChanged: () => void;
+}) {
+  const { t } = useTranslation();
+  const own = useQuery({ queryKey: ["admin", "positions"], queryFn: () => fetchPositions() });
+  const access = useQuery({
+    queryKey: ["admin", "access", "person", person],
+    queryFn: () => fetchPersonAccess(person),
+    retry: false,
+  });
+  const { rows } = useMatrixRows();
+  const change = useMutation({
+    mutationFn: (input: { assignment: Assignment; holds: boolean }) => setAssignment({ person, ...input }),
+    onSuccess: onChanged,
+  });
+  const shown = new Set(rows.map((row) => row.profile));
+  // A role given on something the matrix has no row for: an app no longer
+  // installed, or one the platform places.
+  const strays = directRoles(assignments).filter((a) => !shown.has(a.app ?? ""));
+
+  return (
+    <div className="admin-console__subsection">
+      <h4 className="admin-console__subsection-title">{t("members.directRoles")}</h4>
+      <p className="admin-console__hint">{t("members.directRolesMatrixHint")}</p>
+      {access.isError ? <p className="admin-console__error">{t("access.cannotBeRead")}</p> : null}
+      <PersonRoleMatrix
+        access={access.data}
+        own={own.data?.positions ?? []}
+        busy={change.isPending || access.isLoading}
+        pending={pending}
+        onToggle={(app, role, holds) => change.mutate({ assignment: app ? { app, role } : { role }, holds })}
+      />
+      {strays.length > 0 ? (
+        <ul className="admin-console__access-list">
+          {strays.map((a) => (
+            <li key={`${a.app ?? ""}/${a.role}`}>
+              {roleLabel(t, "app", a.role ?? "")} <code>{a.app}</code>{" "}
+              <button
+                className="admin-console__btn admin-console__btn--quiet"
+                type="button"
+                disabled={change.isPending}
+                onClick={() => change.mutate({ assignment: a, holds: false })}
+              >
+                {t("members.takeRole")}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {change.isError && <p className="admin-console__error">{String(change.error)}</p>}
+      {change.data?.totpRequired ? <p className="admin-console__hint">{t("members.secondFactorRequired")}</p> : null}
+      {change.data?.warning ? <p className="admin-console__error">{change.data.warning}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * One person, opened: who they are, which positions they hold, which roles
+ * they were given beside those, how they sign in. Read again when opened,
+ * because the list does not carry what anybody holds or their second factor
+ * -- a call per person, made only for the one being looked at.
  */
 function MemberEditor({
   person,
-  groups,
+  positions,
   onChanged,
   onRemoved,
 }: {
   person: Person;
-  groups: DescribedGroup[];
+  positions: PositionChoice[];
   onChanged: () => void;
   onRemoved: () => void;
 }) {
@@ -462,16 +538,22 @@ function MemberEditor({
     queryKey: ["admin", "people", "detail", person.id],
     queryFn: () => fetchPerson(person.id),
   });
+  const held = useQuery({
+    queryKey: ["admin", "people", "assignments", person.id],
+    queryFn: () => fetchAssignments(person.id),
+    retry: false,
+  });
+  const assignments = held.data?.assignments ?? [];
   const p = detail.data ?? person;
   const [draft, setDraft] = useState<{ firstName?: string; lastName?: string; email?: string; enabled?: boolean }>(
     {},
   );
-  // The groups ticked or unticked and not saved yet, by path: what the
-  // person is to be (true) or not to be (false) a member of. Applied with the
+  // The positions ticked or unticked and not saved yet, by name: what the
+  // person is to hold (true) or no longer hold (false). Applied with the
   // other fields when Save is pressed, never as each box is ticked.
   const [groupDraft, setGroupDraft] = useState<MembershipDraft>({});
   const [notice, setNotice] = useState<string | null>(null);
-  const current = new Set(p.groups ?? []);
+  const current = new Set(assignments.flatMap((a) => (a.position ? [a.position] : [])));
   const changed = Object.keys(draft).length > 0 || Object.keys(groupDraft).length > 0;
   const selectedGroups = withDraft(current, groupDraft);
   const toggleGroup = (group: string, member: boolean) =>
@@ -480,10 +562,12 @@ function MemberEditor({
   const after = (message?: string) => {
     setNotice(message ?? null);
     void queryClient.invalidateQueries({ queryKey: ["admin", "people", "detail", person.id] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "people", "assignments", person.id] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "access"] });
     onChanged();
   };
 
-  // Everything changed, in one go: the fields, then each group. A change
+  // Everything changed, in one go: the fields, then each position. A change
   // that goes through is taken off the draft; what failed stays on it, and
   // is named, so Save asks again for that alone.
   const save = useMutation({
@@ -497,15 +581,15 @@ function MemberEditor({
           failed.push(t("members.saveFailedDetails", { error: String(error) }));
         }
       }
-      const labels = new Map(groups.map((g) => [g.path, g.label]));
-      for (const [group, member] of Object.entries(groupDraft)) {
+      const labels = new Map(positions.map((position) => [position.name, position.label]));
+      for (const [position, holds] of Object.entries(groupDraft)) {
         try {
-          await setMembership({ person: person.id, group, member });
-          setGroupDraft((now) => withoutKey(now, group));
+          await setAssignment({ person: person.id, assignment: { position }, holds });
+          setGroupDraft((now) => withoutKey(now, position));
         } catch (error) {
           failed.push(
-            t(member ? "members.saveFailedJoin" : "members.saveFailedLeave", {
-              group: labels.get(group) ?? group,
+            t(holds ? "members.saveFailedGive" : "members.saveFailedTake", {
+              position: labels.get(position) ?? position,
               error: String(error),
             }),
           );
@@ -585,16 +669,22 @@ function MemberEditor({
         </label>
 
         <div className="admin-console__field">
-          <span>{t("members.groups")}</span>
-          <Checklist
-            id={`m-groups-${person.id}`}
-            items={groupItems(groups)}
-            selected={selectedGroups}
-            disabled={save.isPending}
-            sectionLabel={(kind) => t(`groupPicker.kind_${kind}`)}
-            onToggle={toggleGroup}
-          />
+          <span>{t("members.positions")}</span>
+          {held.isError ? (
+            <p className="admin-console__error">{t("members.assignmentsCannotBeRead")}</p>
+          ) : (
+            <Checklist
+              id={`m-positions-${person.id}`}
+              items={positionItems(positions)}
+              selected={selectedGroups}
+              disabled={save.isPending || held.isLoading}
+              sectionLabel={(kind) => t(`members.positionKind_${kind}`)}
+              onToggle={toggleGroup}
+            />
+          )}
         </div>
+
+        <DirectRoles person={person.id} assignments={assignments} pending={groupDraft} onChanged={() => after()} />
 
         <div className="admin-console__subsection">
           <h4 className="admin-console__subsection-title">{t("members.signIn")}</h4>
