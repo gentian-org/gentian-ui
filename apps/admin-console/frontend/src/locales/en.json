@@ -584,7 +584,19 @@
     "countryNamed": "{{country}}. Apps such as the App Store are told it; it can be changed later.",
     "countryPlaceholder": "CH",
     "enterTenant": "Enter tenant",
-    "enterTenantHint": "This tenant lets the platform's administrators sign in to it. Opens its desktop through the kernel realm; you arrive as one of its administrators."
+    "enterTenantHint": "This tenant lets the platform's administrators sign in to it. Opens its desktop through the kernel realm; you arrive as one of its administrators.",
+    "asleep": "asleep",
+    "asleepHint": "This tenant runs nothing and keeps its data. Its addresses answer that it is asleep until it is woken.",
+    "awakeUntil": "awake until {{when}}",
+    "awakeUntilHint": "The tenant goes to sleep again by itself at that time.",
+    "putToSleep": "Put to sleep",
+    "putToSleepHint": "Its apps stop and its addresses answer that it is asleep. Its data stays.",
+    "wake": "Wake…",
+    "wakeTenant": "Wake tenant {{tenant}}",
+    "wakeForDays_one": "for {{count}} day",
+    "wakeForDays_other": "for {{count}} days",
+    "wakeForGood": "until it is put to sleep",
+    "couldNotChangeSleep": "The tenant could not be put to sleep or woken."
   },
   "usage": {
     "committed": "committed",

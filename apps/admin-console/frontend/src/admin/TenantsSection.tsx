@@ -4,9 +4,11 @@ import {
   createClusterTenant,
   fetchClusterTenants,
   fetchPendingAdminInvitations,
+  hibernateClusterTenant,
   purgeClusterTenant,
   requestAdminInvitation,
   retireClusterTenant,
+  wakeClusterTenant,
 } from "@/api/cluster";
 import { AdminActivationPanel } from "./AdminActivationPanel";
 import { RetireTenantDialog, type RetireMode } from "./RetireTenantDialog";
@@ -36,6 +38,9 @@ function regionName(language: string, code: string): string | null {
     return null;
   }
 }
+
+/** How long a tenant can be woken for, in days; 0 is until it is put to sleep. */
+const WAKE_DAYS = [1, 3, 7, 14, 0];
 
 export function TenantsSection() {
   const { t, i18n } = useTranslation();
@@ -128,6 +133,16 @@ export function TenantsSection() {
     },
   });
 
+  // Sleep and wake are one commit each; `days` set wakes, 0 for good.
+  const sleepMutation = useMutation({
+    mutationFn: ({ tenant, days }: { tenant: string; days?: number }) =>
+      days === undefined ? hibernateClusterTenant(tenant) : wakeClusterTenant(tenant, days || undefined),
+    onSuccess: (result) => {
+      setLastCommit(result.commit ?? null);
+      void invalidate();
+    },
+  });
+
   // The same rule the director enforces, checked here so the field can say
   // what is wrong while it is being typed rather than after a round trip.
   const nameIsValid = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(name.trim());
@@ -166,6 +181,11 @@ export function TenantsSection() {
             values={{ commit: lastCommit.slice(0, 8) }}
             components={{ mono: <span className="admin-console__mono" /> }}
           />
+        </p>
+      ) : null}
+      {sleepMutation.isError ? (
+        <p className="admin-console__error">
+          {(sleepMutation.error as Error).message || t("tenants.couldNotChangeSleep")}
         </p>
       ) : null}
       {createMutation.isError ? (
@@ -212,6 +232,19 @@ export function TenantsSection() {
                   {tenant.displayName && tenant.displayName !== tenant.name ? (
                     <div className="admin-console__card-meta">{tenant.displayName}</div>
                   ) : null}
+                  {tenant.asleep ? (
+                    <div>
+                      <span className="admin-console__badge admin-console__badge--info" title={t("tenants.asleepHint")}>
+                        {t("tenants.asleep")}</span>
+                    </div>
+                  ) : tenant.awakeUntil ? (
+                    <div>
+                      <span className="admin-console__badge admin-console__badge--ok" title={t("tenants.awakeUntilHint")}>
+                        {t("tenants.awakeUntil", {
+                          when: new Date(tenant.awakeUntil).toLocaleString(i18n.resolvedLanguage),
+                        })}</span>
+                    </div>
+                  ) : null}
                 </td>
                 <td className="admin-console__mono">{tenant.realm ?? "—"}</td>
                 <td>{tenant.apps.length === 0 ? "—" : tenant.apps.join(", ")}</td>
@@ -249,6 +282,43 @@ export function TenantsSection() {
                         {t("tenants.enterTenant")}
                       </a>
                     ) : null}
+                    {tenant.protected || tenant.purging ? null : (
+                      <>
+                        {tenant.asleep || tenant.awakeUntil ? (
+                          <select
+                            aria-label={t("tenants.wakeTenant", { tenant: tenant.name })}
+                            value=""
+                            disabled={sleepMutation.isPending}
+                            onChange={(event) => {
+                              if (event.target.value === "") return;
+                              setLastCommit(null);
+                              sleepMutation.mutate({ tenant: tenant.name, days: Number(event.target.value) });
+                            }}
+                          >
+                            <option value="">{t("tenants.wake")}</option>
+                            {WAKE_DAYS.map((days) => (
+                              <option key={days} value={days}>
+                                {days === 0 ? t("tenants.wakeForGood") : t("tenants.wakeForDays", { count: days })}
+                              </option>
+                            ))}
+                          </select>
+                        ) : null}
+                        {tenant.asleep ? null : (
+                          <button
+                            type="button"
+                            className="admin-console__btn admin-console__btn--quiet"
+                            title={t("tenants.putToSleepHint")}
+                            disabled={sleepMutation.isPending}
+                            onClick={() => {
+                              setLastCommit(null);
+                              sleepMutation.mutate({ tenant: tenant.name });
+                            }}
+                          >
+                            {t("tenants.putToSleep")}
+                          </button>
+                        )}
+                      </>
+                    )}
                     {tenant.protected ? (
                       <span
                         className="admin-console__badge admin-console__badge--info"

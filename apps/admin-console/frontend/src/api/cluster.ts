@@ -89,6 +89,10 @@ export type ClusterTenant = {
    * director, which is a no.
    */
   adminsEnter?: boolean;
+  /** True while the tenant sleeps: it runs nothing and keeps its data. */
+  asleep?: boolean;
+  /** When a tenant that is kept awake sleeps again, while that is ahead. */
+  awakeUntil?: string;
 };
 
 export type ClusterTenantsResponse = {
@@ -130,6 +134,27 @@ export async function purgeClusterTenant(name: string, keepBundles = false): Pro
   const body = await apiFetch<{ status: string; commit?: string }>(
     `/cluster/tenants/${encodeURIComponent(name)}/purge`,
     { method: "POST", body: JSON.stringify(keepBundles ? { keepBundles: true } : {}) },
+  );
+  return { ...body, changed: Boolean(body.commit) };
+}
+
+/** Put a tenant to sleep until somebody wakes it. */
+export async function hibernateClusterTenant(name: string): Promise<ClusterSettingsWriteResult> {
+  const body = await apiFetch<{ status: string; commit?: string }>(
+    `/cluster/tenants/${encodeURIComponent(name)}/hibernate`,
+    { method: "POST" },
+  );
+  return { ...body, changed: Boolean(body.commit) };
+}
+
+/**
+ * Wake a tenant: for a number of days, after which it sleeps again by
+ * itself, or for good when no number is given.
+ */
+export async function wakeClusterTenant(name: string, days?: number): Promise<ClusterSettingsWriteResult> {
+  const body = await apiFetch<{ status: string; commit?: string }>(
+    `/cluster/tenants/${encodeURIComponent(name)}/wake`,
+    { method: "POST", body: JSON.stringify(days ? { for: `${days}d` } : {}) },
   );
   return { ...body, changed: Boolean(body.commit) };
 }

@@ -299,6 +299,44 @@ async def purge_cluster_tenant(
     )
 
 
+@router.post("/tenants/{tenant}/hibernate")
+async def hibernate_cluster_tenant(
+    tenant: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Put a tenant to sleep: it runs nothing and keeps its data. The cluster
+    administrator's act (`can_configure`), one commit by the director."""
+    return await director.forward(
+        settings,
+        "POST",
+        _cluster_path(settings, f"/tenants/{tenant}/actions/hibernate"),
+        bearer_of(credentials),
+    )
+
+
+@router.post("/tenants/{tenant}/wake")
+async def wake_cluster_tenant(
+    tenant: str,
+    body: dict | None = None,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    _user: dict = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """Wake a tenant: for good, or with {"for": "5d"} until that long from
+    now, after which it sleeps again by itself. Only the duration is
+    relayed."""
+    awake = body.get("for") if body else None
+    return await director.forward(
+        settings,
+        "POST",
+        _cluster_path(settings, f"/tenants/{tenant}/actions/wake"),
+        bearer_of(credentials),
+        json_body={"for": awake} if awake else None,
+    )
+
+
 @router.post("/tenants/{tenant}/activate-admin")
 async def activate_tenant_admin(
     tenant: str,
