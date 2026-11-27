@@ -381,3 +381,36 @@ def test_purging_a_tenant_is_the_directors_purge_action(monkeypatch):
     )
     assert r.status_code == 202
     assert seen["json"] == {"keepBundles": True}
+
+
+def test_sleep_and_wake_are_the_directors_actions(monkeypatch):
+    seen: dict = {}
+    _fake_client(
+        monkeypatch,
+        lambda m, url: httpx.Response(
+            202,
+            json={"status": "updated", "commit": "abc"},
+            request=httpx.Request(m, url),
+        ),
+        seen,
+    )
+    client = TestClient(_app(_settings()))
+    headers = {"Authorization": "Bearer person-token"}
+
+    r = client.post("/api/v1/cluster/tenants/acme/hibernate", headers=headers)
+    assert r.status_code == 202
+    assert seen["url"].endswith("/v1/clusters/demo/tenants/acme/actions/hibernate")
+    assert seen["json"] is None
+
+    r = client.post("/api/v1/cluster/tenants/acme/wake", headers=headers)
+    assert r.status_code == 202
+    assert seen["url"].endswith("/v1/clusters/demo/tenants/acme/actions/wake")
+    assert seen["json"] is None
+
+    r = client.post(
+        "/api/v1/cluster/tenants/acme/wake",
+        json={"for": "5d", "smuggled": True},
+        headers=headers,
+    )
+    assert r.status_code == 202
+    assert seen["json"] == {"for": "5d"}

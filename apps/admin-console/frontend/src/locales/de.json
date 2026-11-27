@@ -590,7 +590,19 @@
     "countryNamed": "{{country}}. Apps wie der App Store erhalten es; es lässt sich später ändern.",
     "countryPlaceholder": "CH",
     "enterTenant": "Mandant betreten",
-    "enterTenantHint": "Dieser Mandant lässt die Administratoren der Plattform sich bei ihm anmelden. Öffnet seinen Desktop über den Kernel-Realm; Sie kommen als einer seiner Administratoren an."
+    "enterTenantHint": "Dieser Mandant lässt die Administratoren der Plattform sich bei ihm anmelden. Öffnet seinen Desktop über den Kernel-Realm; Sie kommen als einer seiner Administratoren an.",
+    "asleep": "schläft",
+    "asleepHint": "Dieser Mandant führt nichts aus und behält seine Daten. Seine Adressen antworten, dass er schläft, bis er geweckt wird.",
+    "awakeUntil": "wach bis {{when}}",
+    "awakeUntilHint": "Der Mandant schläft zu diesem Zeitpunkt von selbst wieder ein.",
+    "putToSleep": "Schlafen legen",
+    "putToSleepHint": "Seine Apps werden angehalten und seine Adressen antworten, dass er schläft. Seine Daten bleiben erhalten.",
+    "wake": "Wecken…",
+    "wakeTenant": "Mandant {{tenant}} wecken",
+    "wakeForDays_one": "für {{count}} Tag",
+    "wakeForDays_other": "für {{count}} Tage",
+    "wakeForGood": "bis er schlafen gelegt wird",
+    "couldNotChangeSleep": "Der Mandant konnte nicht schlafen gelegt oder geweckt werden."
   },
   "usage": {
     "committed": "zugesagt",
