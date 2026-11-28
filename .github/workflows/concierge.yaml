@@ -180,8 +180,7 @@ jobs:
   chart:
     # A component is installed from a chart the operator resolves through
     # provider-helm, which pulls from a registry. Published like the
-    # consoles': a moving prerelease per branch and an immutable one per
-    # commit, the moving one naming the immutable one in appVersion.
+    # consoles', under the version of its build.
     runs-on: ubuntu-latest
     # After the image: the chart names the image of the build it came from.
     needs: [test, build]
@@ -191,22 +190,15 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        # The version counts the commits and reads the release tags.
+        with:
+          fetch-depth: 0
       - name: Chart version
         id: chart
         run: |
-          base="$(sed -n 's/^version: *//p' apps/concierge/chart/Chart.yaml)"
-          short="${GITHUB_SHA::7}"
-          # The chart's version is semver, and a prerelease part of digits
-          # alone is a number there: "0710412" is refused for its leading
-          # zero. A commit whose first seven characters are all digits is
-          # named by as many more as it takes to reach a letter. The image
-          # tag stays at seven.
-          vshort="${short}"; n=7
-          while [[ "${vshort}" =~ ^[0-9]+$ && "${n}" -lt 40 ]]; do n=$((n + 1)); vshort="${GITHUB_SHA::n}"; done
           branch="${GITHUB_REF_NAME//\//-}"
-          echo "moving=${base}-${branch}" >> "$GITHUB_OUTPUT"
-          echo "immutable=${base}-${branch}.${vshort}" >> "$GITHUB_OUTPUT"
-          echo "image=${branch}-${short}" >> "$GITHUB_OUTPUT"
+          echo "version=$(.github/scripts/chart-version.sh)" >> "$GITHUB_OUTPUT"
+          echo "image=${branch}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
       - name: Name this build's image
         run: |
           sed -i 's/^\(\s*tag:\) "0\.1\.0"$/\1 "${{ steps.chart.outputs.image }}"/' apps/concierge/chart/values.yaml
@@ -214,20 +206,18 @@ jobs:
       - name: Lint and package
         run: |
           helm lint apps/concierge/chart
-          helm package apps/concierge/chart --version "${{ steps.chart.outputs.immutable }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-immutable
-          helm package apps/concierge/chart --version "${{ steps.chart.outputs.moving }}" --app-version "${{ steps.chart.outputs.immutable }}" -d /tmp/chart-moving
+          helm package apps/concierge/chart --version "${{ steps.chart.outputs.version }}" --app-version "${{ steps.chart.outputs.version }}" -d /tmp/chart
       # Pushed from the same refs as the images: develop, which a dev cluster
       # follows, and the release tags, so a cluster that pins a release finds
-      # the chart (0.1.0-v0.5.0) and the images it names under that release
-      # and reads nothing from develop.
+      # the chart (0.5.0) and the images it names under that release and
+      # reads nothing from develop.
       - name: Log in to GHCR
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v'))
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
       - name: Push
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v'))
         run: |
-          helm push /tmp/chart-immutable/*.tgz oci://ghcr.io/gentian-org/charts
-          helm push /tmp/chart-moving/*.tgz oci://ghcr.io/gentian-org/charts
+          helm push /tmp/chart/*.tgz oci://ghcr.io/gentian-org/charts
 
   # The one status the branch rules require. It passes when every job above
   # succeeded or was skipped because this pull request gave it nothing to do,
