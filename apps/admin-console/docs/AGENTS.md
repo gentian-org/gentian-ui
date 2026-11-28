@@ -44,8 +44,9 @@ client of the gentian-os director. Read the top-level README first.
 
 By `.github/workflows/admin-console.yaml` at the root of gentian-ui, the same way
 the desktop is built: images to `ghcr.io/gentian-org/admin-console-{api,web}`
-tagged `<branch>-<sha>`, and the chart to `oci://ghcr.io/gentian-org/charts` as
-`<Chart.yaml version>-<branch>.<sha>` (immutable) and `<version>-<branch>`
-(moving), with the chart's image tags rewritten to this build's. Published from
-develop only. The installer resolves the moving version to the immutable one
-and the profile in gentian-os pins that.
+tagged `<branch>-<sha>`, and the chart to `oci://ghcr.io/gentian-org/charts`
+under the version of its build (`X.Y.Z` from a release tag,
+`X.Y.Z-dev.<n>.g<sha>` from develop; `.github/scripts/chart-version.sh`), with
+the chart's image tags rewritten to this build's. Published from develop and
+from release tags. gentian-os takes the newest build of develop, or the
+release's, and its profile pins that.
